@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"go-ora/converters"
+	"github.com/sijms/go-ora/converters"
 	"log"
 	"net"
 	"strings"

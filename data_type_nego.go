@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"go-ora/network"
+	"github.com/sijms/go-ora/network"
 	"time"
 )
 

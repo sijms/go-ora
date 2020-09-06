@@ -3,7 +3,7 @@ package go_ora
 import (
 	"errors"
 	"fmt"
-	"go-ora/network"
+	"github.com/sijms/go-ora/network"
 )
 
 type DBVersion struct {

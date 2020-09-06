@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"go-ora/converters"
-	"go-ora/network"
+	"github.com/sijms/go-ora/converters"
+	"github.com/sijms/go-ora/network"
 	"math"
 	"time"
 

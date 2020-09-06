@@ -1,7 +1,7 @@
 package go_ora
 
 import (
-	"go-ora/network"
+	"github.com/sijms/go-ora/network"
 	"math"
 	"strings"
 )

@@ -10,7 +10,7 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
-	"go-ora/network"
+	"github.com/sijms/go-ora/network"
 	"strconv"
 	"strings"
 	"time"

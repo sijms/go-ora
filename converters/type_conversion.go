@@ -100,7 +100,7 @@ func EncodeInt64(val int64) []byte {
 	for i, j := 0, len(output)-1; i < j; i, j = i+1, j-1 {
 		output[i], output[j] = output[j], output[i]
 	}
-	byteLen := uint8(len(output))
+	byteLen := uint8(len(output)) - 1
 	output = bytes.TrimRight(output, "\x00")
 
 	output = append([]byte{byteLen}, output...)
@@ -119,26 +119,11 @@ func EncodeInt(val int) []byte {
 	for i, j := 0, len(output)-1; i < j; i, j = i+1, j-1 {
 		output[i], output[j] = output[j], output[i]
 	}
-	byteLen := uint8(len(output))
+	byteLen := uint8(len(output)) - 1
 	output = bytes.TrimRight(output, "\x00")
 
 	output = append([]byte{byteLen}, output...)
 	return encodeSign(output, neg)
-	//if !neg {
-	//	output[0] = output[0] + 0x80 + 0x40
-	//	for x := 1; x < len(output); x++ {
-	//		output[x] = output[x] + 1
-	//	}
-	//} else {
-	//	output[0] = 0xFF - (output[0] + 0x80 + 0x40)
-	//	for x := 1; x < len(output); x++ {
-	//		output[x] = uint8(101 - output[x])
-	//	}
-	//	if len(output) <= 20 {
-	//		output = append(output, 102)
-	//	}
-	//}
-	//return output
 }
 
 func EncodeDate(ti time.Time) []byte {

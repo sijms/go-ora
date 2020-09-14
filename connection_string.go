@@ -146,6 +146,15 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	}
 	ret.Host = u.Host
 	ret.SID = strings.Trim(u.Path, "/")
+	if len(ret.UserID) == 0 {
+		return nil, errors.New("empty user name")
+	}
+	if len(ret.Password) {
+		return nil, errors.New("empty password")
+	}
+	if len(ret.Host) == 0 {
+		return nil, errors.New("empty host name (server name)")
+	}
 	if q != nil {
 		for key, val := range q {
 			switch strings.ToUpper(key) {
@@ -243,6 +252,9 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				ret.ProxyPassword = val[0]
 			}
 		}
+	}
+	if len(ret.SID) == 0 && len(ret.ServiceName) == 0 {
+		return nil, errors.New("empty SID and service name")
 	}
 	ret.validate()
 	return ret, nil

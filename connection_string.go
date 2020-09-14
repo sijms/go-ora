@@ -149,7 +149,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	if len(ret.UserID) == 0 {
 		return nil, errors.New("empty user name")
 	}
-	if len(ret.Password) {
+	if len(ret.Password) == 0{
 		return nil, errors.New("empty password")
 	}
 	if len(ret.Host) == 0 {

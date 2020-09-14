@@ -18,7 +18,7 @@ important notes:
     )
       
 #### 2- create the connection
-    conn, err := sql.Open("oracle", "oracle://user:pass@dbname/service_name")
+    conn, err := sql.Open("oracle", "oracle://user:pass@server/service_name")
     // check for error
     defer conn.Close()
    

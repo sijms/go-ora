@@ -24,7 +24,7 @@ const (
 type LogonMode int
 
 const (
-	NoNewPass   LogonMode = 0x1
+	NoNewPass LogonMode = 0x1
 	//WithNewPass LogonMode = 0x2
 	SysDba      LogonMode = 0x20 // no verify response from server
 	SysOper     LogonMode = 0x40 // no verify response from server
@@ -345,6 +345,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 		State:      Closed,
 		conStr:     conStr,
 		connOption: connOption,
+		autoCommit: true,
 	}, nil
 }
 

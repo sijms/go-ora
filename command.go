@@ -624,53 +624,62 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 	//	stmt.Pars = append(stmt.Pars, param)
 	//	return
 	//}
-	switch val := val.(type) {
-	case int64:
-		param.Value = converters.EncodeInt64(val)
-		param.DataType = NUMBER
-	case int32:
-		param.Value = converters.EncodeInt(int(val))
-		param.DataType = NUMBER
-	case int16:
-		param.Value = converters.EncodeInt(int(val))
-		param.DataType = NUMBER
-	case int8:
-		param.Value = converters.EncodeInt(int(val))
-		param.DataType = NUMBER
-	case int:
-		param.Value = converters.EncodeInt(val)
-		param.DataType = NUMBER
-	case float32:
-		param.Value, _ = converters.EncodeDouble(float64(val))
-		param.DataType = NUMBER
-	case float64:
-		param.Value, _ = converters.EncodeDouble(val)
-		param.DataType = NUMBER
-	case time.Time:
-		param.Value = converters.EncodeDate(val)
-		param.DataType = DATE
-		param.ContFlag = 0
-		param.MaxLen = 11
-		param.MaxCharLen = 11
-	case string:
-		param.Value = stmt.connection.strConv.Encode(val)
+	if val == nil {
 		param.DataType = NCHAR
-		param.ContFlag = 16
-		param.MaxCharLen = len(val)
-		if size > len(val) {
-			param.MaxCharLen = size
-		}
-		param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
-		param.CharsetForm = 1
-	}
-	if param.DataType == NUMBER {
-		param.ContFlag = 0
-		param.MaxCharLen = 22
-		param.MaxLen = 22
-		param.CharsetForm = 1
-	}
-	if direction == Output {
 		param.Value = nil
+		param.ContFlag = 16
+		param.MaxCharLen = 0
+		param.MaxLen = 1
+		param.CharsetForm = 1
+	} else {
+		switch val := val.(type) {
+		case int64:
+			param.Value = converters.EncodeInt64(val)
+			param.DataType = NUMBER
+		case int32:
+			param.Value = converters.EncodeInt(int(val))
+			param.DataType = NUMBER
+		case int16:
+			param.Value = converters.EncodeInt(int(val))
+			param.DataType = NUMBER
+		case int8:
+			param.Value = converters.EncodeInt(int(val))
+			param.DataType = NUMBER
+		case int:
+			param.Value = converters.EncodeInt(val)
+			param.DataType = NUMBER
+		case float32:
+			param.Value, _ = converters.EncodeDouble(float64(val))
+			param.DataType = NUMBER
+		case float64:
+			param.Value, _ = converters.EncodeDouble(val)
+			param.DataType = NUMBER
+		case time.Time:
+			param.Value = converters.EncodeDate(val)
+			param.DataType = DATE
+			param.ContFlag = 0
+			param.MaxLen = 11
+			param.MaxCharLen = 11
+		case string:
+			param.Value = stmt.connection.strConv.Encode(val)
+			param.DataType = NCHAR
+			param.ContFlag = 16
+			param.MaxCharLen = len(val)
+			if size > len(val) {
+				param.MaxCharLen = size
+			}
+			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
+			param.CharsetForm = 1
+		}
+		if param.DataType == NUMBER {
+			param.ContFlag = 0
+			param.MaxCharLen = 22
+			param.MaxLen = 22
+			param.CharsetForm = 1
+		}
+		if direction == Output {
+			param.Value = nil
+		}
 	}
 	stmt.Pars = append(stmt.Pars, param)
 }

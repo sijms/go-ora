@@ -7,19 +7,19 @@ import (
 	"strings"
 )
 
-type PromotableTransaction string
+type PromotableTransaction int
 
 const (
-	Promotable PromotableTransaction = "Promotable"
-	Local      PromotableTransaction = "Local"
+	Promotable PromotableTransaction = 1
+	Local      PromotableTransaction = 0
 )
 
-type DBAPrivilege string
+type DBAPrivilege int
 
 const (
-	NONE    DBAPrivilege = "NONE"
-	SYSDBA  DBAPrivilege = "SYSDBA"
-	SYSOPER DBAPrivilege = "SYSOPER"
+	NONE    DBAPrivilege = 0
+	SYSDBA  DBAPrivilege = 0x20
+	SYSOPER DBAPrivilege = 0x40
 )
 
 func DBAPrivilegeFromString(s string) DBAPrivilege {
@@ -33,12 +33,12 @@ func DBAPrivilegeFromString(s string) DBAPrivilege {
 	}
 }
 
-type EnList string
+type EnList int
 
 const (
-	FALSE   EnList = "FALSE"
-	TRUE    EnList = "TRUE"
-	DYNAMIC EnList = "DYNAMIC"
+	FALSE   EnList = 0
+	TRUE    EnList = 1
+	DYNAMIC EnList = 2
 )
 
 func EnListFromString(s string) EnList {

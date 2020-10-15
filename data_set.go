@@ -24,7 +24,7 @@ func (dataSet *DataSet) read(session *network.Session) error {
 	if err != nil {
 		return err
 	}
-	dataSet.ColumnCount, err = session.GetInt(2, true, true)
+	columnCount, err := session.GetInt(2, true, true)
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,10 @@ func (dataSet *DataSet) read(session *network.Session) error {
 	if err != nil {
 		return err
 	}
-	dataSet.ColumnCount += num * 0x100
+	columnCount += num * 0x100
+	if columnCount > dataSet.ColumnCount {
+		dataSet.ColumnCount = columnCount
+	}
 	dataSet.RowCount, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err

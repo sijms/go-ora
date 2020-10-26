@@ -190,10 +190,18 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	index++
 	session.PutKeyValString("SESSION_CLIENT_LOBATTR", "1", 0)
 	index++
-	tz, _ := time.Now().Zone()
-	if !strings.Contains(tz, ":") {
-		tz += ":00"
+	_, offset := time.Now().Zone()
+	tz := ""
+	if offset == 0 {
+		tz = "00:00"
+	} else {
+		hours := int8(offset / 3600)
+		minutes := int8((offset / 60) % 60)
+		tz = fmt.Sprintf("%+03d:%02d", hours, minutes)
 	}
+	//if !strings.Contains(tz, ":") {
+	//	tz += ":00"
+	//}
 	//session.PutKeyValString("AUTH_ALTER_SESSION",
 	//	fmt.Sprintf("ALTER SESSION SET NLS_LANGUAGE='ARABIC' NLS_TERRITORY='SAUDI ARABIA'  TIME_ZONE='%s'\x00", tz), 1)
 	session.PutKeyValString("AUTH_ALTER_SESSION",

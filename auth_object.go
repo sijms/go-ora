@@ -196,7 +196,11 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 		tz = "00:00"
 	} else {
 		hours := int8(offset / 3600)
+
 		minutes := int8((offset / 60) % 60)
+		if minutes < 0 {
+			minutes = minutes * -1
+		}
 		tz = fmt.Sprintf("%+03d:%02d", hours, minutes)
 	}
 	//if !strings.Contains(tz, ":") {

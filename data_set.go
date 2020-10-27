@@ -15,6 +15,7 @@ type DataSet struct {
 	MaxRowSize      int
 	Cols            []ParameterInfo
 	Rows            []Row
+	currentRow      Row
 	index           int
 	parent          *Stmt
 }
@@ -35,6 +36,9 @@ func (dataSet *DataSet) read(session *network.Session) error {
 	columnCount += num * 0x100
 	if columnCount > dataSet.ColumnCount {
 		dataSet.ColumnCount = columnCount
+	}
+	if len(dataSet.currentRow) != dataSet.ColumnCount {
+		dataSet.currentRow = make(Row, dataSet.ColumnCount)
 	}
 	dataSet.RowCount, err = session.GetInt(4, true, true)
 	if err != nil {
@@ -59,10 +63,10 @@ func (dataSet *DataSet) setBitVector(bitVector []byte) {
 		index++
 	}
 	if len(bitVector) > 0 {
-		for x := 0; x < index; x++ {
+		for x := 0; x < len(bitVector); x++ {
 			for i := 0; i < 8; i++ {
-				if x*8+i < dataSet.ColumnCount {
-					dataSet.Cols[(x*8)+i].getDataFromServer = bitVector[x]>>i&1 > 0
+				if (x*8)+i < dataSet.ColumnCount {
+					dataSet.Cols[(x*8)+i].getDataFromServer = bitVector[x]&(1<<i) > 0
 				}
 			}
 		}
@@ -79,6 +83,20 @@ func (dataSet *DataSet) Close() error {
 }
 
 func (dataSet *DataSet) Next(dest []driver.Value) error {
+	//fmt.Println("has more row: ", dataSet.parent.hasMoreRows)
+	//fmt.Println("row length: ", len(dataSet.Rows))
+	//fmt.Println("cursor id: ", dataSet.parent.cursorID)
+	//if dataSet.parent.hasMoreRows && dataSet.index == len(dataSet.Rows) && len(dataSet.Rows) < dataSet.parent.noOfRowsToFetch {
+	//	fmt.Println("inside first fetch")
+	//	oldFetchCount := dataSet.parent.noOfRowsToFetch;
+	//	dataSet.parent.noOfRowsToFetch = oldFetchCount - len(dataSet.Rows)
+	//	err := dataSet.parent.fetch(dataSet)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	dataSet.parent.noOfRowsToFetch = oldFetchCount
+	//	fmt.Println("row count after first fetch: ", len(dataSet.Rows))
+	//}
 	if dataSet.parent.hasMoreRows && dataSet.index > 0 && dataSet.index%dataSet.parent.noOfRowsToFetch == 0 {
 		dataSet.Rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch)
 		err := dataSet.parent.fetch(dataSet)

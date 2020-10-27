@@ -275,6 +275,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			}
 			//fmt.Println(stmt.connection.session.Summary)
 			//fmt.Println(stmt.connection.session.Summary)
+
 			stmt.cursorID = stmt.connection.session.Summary.CursorID
 			if stmt.connection.session.HasError() {
 				if stmt.connection.session.Summary.RetCode == 1403 {
@@ -344,7 +345,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 						_, err = session.GetInt(2, true, true)
 					}
 				} else {
-					newRow := make(Row, dataSet.ColumnCount)
+
 					for x := 0; x < dataSet.ColumnCount; x++ {
 						if dataSet.Cols[x].getDataFromServer {
 
@@ -353,7 +354,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 								return err
 							}
 							if temp == nil {
-								newRow[x] = nil
+								dataSet.currentRow[x] = nil
 							} else {
 								//switch (this.m_definedColumnType)
 								//{
@@ -395,13 +396,13 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 								switch dataSet.Cols[x].DataType {
 								case NCHAR:
 									//fmt.Println("string value:", stmt.connection.strConv.Decode(temp))
-									newRow[x] = stmt.connection.strConv.Decode(temp)
+									dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
 								case NUMBER:
 									if dataSet.Cols[x].Scale == 0 {
-										newRow[x] = int64(converters.DecodeInt(temp))
+										dataSet.currentRow[x] = int64(converters.DecodeInt(temp))
 									} else {
 										base := math.Pow10(int(dataSet.Cols[x].Scale))
-										newRow[x] = math.Round(converters.DecodeDouble(temp)*base) / base
+										dataSet.currentRow[x] = math.Round(converters.DecodeDouble(temp)*base) / base
 									}
 								case TimeStamp:
 									fallthrough
@@ -420,22 +421,24 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 									if err != nil {
 										return err
 									}
-									newRow[x] = dateVal
+									dataSet.currentRow[x] = dateVal
 								default:
-									newRow[x] = temp
+									dataSet.currentRow[x] = temp
 								}
 							}
 						} else {
 							// copy from last row
-							if len(dataSet.Rows) > 0 {
-								lastRow := dataSet.Rows[len(dataSet.Rows)-1]
-								newRow[x] = lastRow[x]
-							} else {
-								newRow[x] = nil
-							}
+							//if len(dataSet.Rows) > 0 {
+							//	lastRow := dataSet.Rows[len(dataSet.Rows)-1]
+							//	newRow[x] = lastRow[x]
+							//} else {
+							//	newRow[x] = nil
+							//}
 						}
 
 					}
+					newRow := make(Row, dataSet.ColumnCount)
+					copy(newRow, dataSet.currentRow)
 					dataSet.Rows = append(dataSet.Rows, newRow)
 				}
 			}
@@ -553,17 +556,20 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 				_, err = session.GetDlc()
 			}
 		case 21:
-			noOfColumnSent, err := session.GetInt(2, true, true)
+			_, err := session.GetInt(2, true, true) // noOfColumnSent
 			if err != nil {
 				return err
 			}
-			bitVectorLen := noOfColumnSent / 8
-			if noOfColumnSent%8 > 0 {
+			bitVectorLen := dataSet.ColumnCount / 8
+			if dataSet.ColumnCount%8 > 0 {
 				bitVectorLen++
 			}
 			bitVector := make([]byte, bitVectorLen)
 			for x := 0; x < bitVectorLen; x++ {
 				bitVector[x], err = session.GetByte()
+				if err != nil {
+					return err
+				}
 			}
 			dataSet.setBitVector(bitVector)
 

@@ -116,6 +116,7 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 	stmt.AddParam("p_nls_timestamp_tz", "", 40, Output)
 	stmt.AddParam("p_err_code", "", 2000, Output)
 	stmt.AddParam("p_err_msg", "", 2000, Output)
+	defer stmt.Close()
 	//fmt.Println(stmt.Pars)
 	_, err := stmt.Exec(nil)
 	if err != nil {

@@ -651,6 +651,7 @@ func (stmt *Stmt) Close() error {
 
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	session := stmt.connection.session
+	stmt.Pars = nil
 	for x := 0; x < len(args); x++ {
 		stmt.AddParam("", args[x], 0, Input)
 	}

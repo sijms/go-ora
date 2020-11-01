@@ -16,7 +16,7 @@ type SummaryObject struct {
 	errorPos             int // uint16
 	sqlType              uint8
 	oerFatal             uint8
-	flags                int // uint16
+	Flags                int // uint16
 	userCursorOPT        int // uint16
 	upiParam             uint8
 	warningFlag          uint8
@@ -81,7 +81,7 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 	if err != nil {
 		return nil, err
 	}
-	result.flags, err = session.GetInt(2, true, true)
+	result.Flags, err = session.GetInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}

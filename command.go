@@ -25,23 +25,27 @@ const (
 )
 
 type Stmt struct {
-	connection      *Connection
-	Text            string
-	stmtType        StmtType
-	Pars            []ParameterInfo
-	hasReturnClause bool
-	parse           bool // means parse the command in the server this occur if the stmt is not cached
-	execute         bool
-	define          bool
-	exeOption       int
-	cursorID        int
-	noOfRowsToFetch int
-	noOfDefCols     int
-	al8i4           []byte
-	arrayBindCount  int
-	queryID         uint64
-	scnFromExe      []int
-	hasMoreRows     bool
+	connection         *Connection
+	text               string
+	reExec             bool
+	stmtType           StmtType
+	arrayBindingCount  int
+	disableCompression bool
+	columns            []ParameterInfo
+	Pars               []ParameterInfo
+	hasReturnClause    bool
+	parse              bool // means parse the command in the server this occur if the stmt is not cached
+	execute            bool
+	define             bool
+	exeOption          int
+	cursorID           int
+	noOfRowsToFetch    int
+	noOfDefCols        int
+	al8i4              []byte
+	arrayBindCount     int
+	queryID            uint64
+	scnFromExe         []int
+	hasMoreRows        bool
 }
 
 type QueryResult struct {
@@ -59,13 +63,16 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 
 func NewStmt(text string, conn *Connection) *Stmt {
 	ret := &Stmt{
-		connection: conn,
-		Text:       text,
-		parse:      true,
-		execute:    true,
-		define:     false,
-		al8i4:      make([]byte, 13),
-		scnFromExe: make([]int, 2),
+		connection:         conn,
+		text:               text,
+		reExec:             false,
+		disableCompression: true,
+		arrayBindCount:     1,
+		parse:              true,
+		execute:            true,
+		define:             false,
+		al8i4:              make([]byte, 13),
+		scnFromExe:         make([]int, 2),
 	}
 
 	// get stmt type
@@ -112,79 +119,110 @@ func NewStmt(text string, conn *Connection) *Stmt {
 }
 
 func (stmt *Stmt) write(session *network.Session) error {
-	exeOp := stmt.getExeOption()
-	session.PutBytes(3, 0x5E, 0)
-	session.PutUint(exeOp, 4, true, true)
-	session.PutUint(stmt.cursorID, 2, true, true)
-	if stmt.cursorID == 0 {
+	if !stmt.reExec {
+		exeOp := stmt.getExeOption()
+		session.PutBytes(3, 0x5E, 0)
+		session.PutUint(exeOp, 4, true, true)
+		session.PutUint(stmt.cursorID, 2, true, true)
+		if stmt.cursorID == 0 {
+			session.PutBytes(1)
+			//session.PutUint(1, 1, false, false)
+		} else {
+			session.PutBytes(0)
+			//session.PutUint(0, 1, false, false)
+		}
+		session.PutUint(len(stmt.text), 4, true, true)
 		session.PutBytes(1)
 		//session.PutUint(1, 1, false, false)
-	} else {
-		session.PutBytes(0)
-		//session.PutUint(0, 1, false, false)
-	}
-	session.PutUint(len(stmt.Text), 4, true, true)
-	session.PutBytes(1)
-	//session.PutUint(1, 1, false, false)
-	session.PutUint(13, 2, true, true)
-	session.PutBytes(0, 0)
-	if exeOp&0x40 == 0 && exeOp&0x20 != 0 && exeOp&0x1 != 0 && stmt.stmtType == SELECT {
-		session.PutBytes(0)
-		//session.PutUint(0, 1, false, false)
-		session.PutUint(stmt.noOfRowsToFetch, 4, true, true)
-	} else {
-		session.PutUint(0, 4, true, true)
-		session.PutUint(0, 4, true, true)
-	}
-	// longFetchSize == 0 marshal 1 else marshal longFetchSize
-	session.PutUint(1, 4, true, true)
-	if len(stmt.Pars) > 0 {
-		session.PutBytes(1)
-		//session.PutUint(1, 1, false, false)
-		session.PutUint(len(stmt.Pars), 2, true, true)
-	} else {
+		session.PutUint(13, 2, true, true)
 		session.PutBytes(0, 0)
-		//session.PutUint(0, 1, false, false)
-		//session.PutUint(0, 1, false, false)
-	}
-	session.PutBytes(0, 0, 0, 0, 0)
-	if stmt.define {
-		session.PutBytes(1)
-		//session.PutUint(1, 1, false, false)
-		session.PutUint(stmt.noOfDefCols, 2, true, true)
-	} else {
-		session.PutBytes(0, 0)
-		//session.PutUint(0, 1, false, false)
-		//session.PutUint(0, 1, false, false)
-	}
-	if session.TTCVersion >= 4 {
-		session.PutBytes(0, 0, 1)
-		//session.PutUint(0, 1, false, false) // dbChangeRegisterationId
-		//session.PutUint(0, 1, false, false)
-		//session.PutUint(1, 1, false, false)
-	}
-	if session.TTCVersion >= 5 {
+		if exeOp&0x40 == 0 && exeOp&0x20 != 0 && exeOp&0x1 != 0 && stmt.stmtType == SELECT {
+			session.PutBytes(0)
+			//session.PutUint(0, 1, false, false)
+			session.PutUint(stmt.noOfRowsToFetch, 4, true, true)
+		} else {
+			session.PutUint(0, 4, true, true)
+			session.PutUint(0, 4, true, true)
+		}
+		// longFetchSize == 0 marshal 1 else marshal longFetchSize
+		session.PutUint(1, 4, true, true)
+		if len(stmt.Pars) > 0 {
+			session.PutBytes(1)
+			//session.PutUint(1, 1, false, false)
+			session.PutUint(len(stmt.Pars), 2, true, true)
+		} else {
+			session.PutBytes(0, 0)
+			//session.PutUint(0, 1, false, false)
+			//session.PutUint(0, 1, false, false)
+		}
 		session.PutBytes(0, 0, 0, 0, 0)
-		//session.PutUint(0, 1, false, false)
-		//session.PutUint(0, 1, false, false)
-		//session.PutUint(0, 1, false, false)
-		//session.PutUint(0, 1, false, false)
-		//session.PutUint(0, 1, false, false)
+		if stmt.define {
+			session.PutBytes(1)
+			//session.PutUint(1, 1, false, false)
+			session.PutUint(stmt.noOfDefCols, 2, true, true)
+		} else {
+			session.PutBytes(0, 0)
+			//session.PutUint(0, 1, false, false)
+			//session.PutUint(0, 1, false, false)
+		}
+		if session.TTCVersion >= 4 {
+			session.PutBytes(0, 0, 1)
+			//session.PutUint(0, 1, false, false) // dbChangeRegisterationId
+			//session.PutUint(0, 1, false, false)
+			//session.PutUint(1, 1, false, false)
+		}
+		if session.TTCVersion >= 5 {
+			session.PutBytes(0, 0, 0, 0, 0)
+			//session.PutUint(0, 1, false, false)
+			//session.PutUint(0, 1, false, false)
+			//session.PutUint(0, 1, false, false)
+			//session.PutUint(0, 1, false, false)
+			//session.PutUint(0, 1, false, false)
+		}
+
+		session.PutBytes([]byte(stmt.text)...)
+		for x := 0; x < len(stmt.al8i4); x++ {
+			session.PutUint(stmt.al8i4[x], 2, true, true)
+		}
+		for _, par := range stmt.Pars {
+			_ = par.write(session)
+		}
+		stmt.reExec = true
+	} else {
+		exeOf := 0
+		execFlag := 0
+		count := stmt.arrayBindCount
+		if stmt.stmtType == SELECT {
+			session.PutBytes(3, 0x4E, 0)
+			count = stmt.noOfRowsToFetch
+			exeOf = 0x20
+			if stmt.hasReturnClause || stmt.stmtType == PLSQL || stmt.disableCompression {
+				exeOf |= 0x40000
+			}
+
+		} else {
+			session.PutBytes(3, 4, 0)
+		}
+		if stmt.connection.autoCommit {
+			execFlag = 1
+		}
+		session.PutUint(stmt.cursorID, 2, true, true)
+		session.PutUint(count, 2, true, true)
+		session.PutUint(exeOf, 2, true, true)
+		session.PutUint(execFlag, 2, true, true)
 	}
 
-	session.PutBytes([]byte(stmt.Text)...)
-	for x := 0; x < len(stmt.al8i4); x++ {
-		session.PutUint(stmt.al8i4[x], 2, true, true)
-	}
-	for _, par := range stmt.Pars {
-		_ = par.write(session)
-	}
 	if len(stmt.Pars) > 0 {
-		session.PutBytes(7)
-		//session.PutUint(7, 1, false, false)
-		for _, par := range stmt.Pars {
-			session.PutClr(par.Value)
+		for x := 0; x < stmt.arrayBindCount; x++ {
+			session.PutBytes(7)
+			for _, par := range stmt.Pars {
+				session.PutClr(par.Value)
+			}
 		}
+		//session.PutUint(7, 1, false, false)
+		//for _, par := range stmt.Pars {
+		//	session.PutClr(par.Value)
+		//}
 	}
 	return session.Write()
 }
@@ -288,6 +326,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			//fmt.Println(stmt.connection.session.Summary)
 
 			stmt.cursorID = stmt.connection.session.Summary.CursorID
+			stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0
 			if stmt.connection.session.HasError() {
 				if stmt.connection.session.Summary.RetCode == 1403 {
 					stmt.hasMoreRows = false
@@ -344,7 +383,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 				//}
 			} else {
 				if containOutputPars {
-					for x := 0; x < dataSet.ColumnCount; x++ {
+					for x := 0; x < len(stmt.columns); x++ {
 						if stmt.Pars[x].Direction != Input {
 							stmt.Pars[x].Value, err = session.GetClr()
 						} else {
@@ -356,8 +395,12 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 						_, err = session.GetInt(2, true, true)
 					}
 				} else {
-
-					for x := 0; x < dataSet.ColumnCount; x++ {
+					// see if it is re-execute
+					if len(dataSet.Cols) == 0 && len(stmt.columns) > 0 {
+						dataSet.Cols = make([]ParameterInfo, len(stmt.columns))
+						copy(dataSet.Cols, stmt.columns)
+					}
+					for x := 0; x < len(dataSet.Cols); x++ {
 						if dataSet.Cols[x].getDataFromServer {
 
 							temp, err := session.GetClr()
@@ -554,6 +597,8 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 					return err
 				}
 			}
+			stmt.columns = make([]ParameterInfo, noOfColumns)
+			copy(stmt.columns, dataSet.Cols)
 			_, err = session.GetDlc()
 			if session.TTCVersion >= 3 {
 				_, err = session.GetInt(4, true, true)
@@ -701,13 +746,18 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 	stmt.Pars = append(stmt.Pars, param)
 }
 
+//func (stmt *Stmt) reExec() (driver.Rows, error) {
+//
+//}
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	stmt.noOfRowsToFetch = 25
 	stmt.hasMoreRows = true
+	stmt.Pars = nil
 	for x := 0; x < len(args); x++ {
 		stmt.AddParam("", args[x], 0, Input)
 	}
 	stmt.connection.session.ResetBuffer()
+	// if re-execute
 	err := stmt.write(stmt.connection.session)
 	if err != nil {
 		return nil, err

@@ -384,7 +384,7 @@ func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, erro
 		result.RuntimeTypeAndRep = result.TypeAndRep
 	}
 	session.ResetBuffer()
-	session.PutBytes(result.bytes())
+	session.PutBytes(result.bytes()...)
 	err := session.Write()
 	if err != nil {
 		return nil, err

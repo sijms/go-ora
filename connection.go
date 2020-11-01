@@ -170,10 +170,8 @@ func (conn *Connection) Ping(ctx context.Context) error {
 func (conn *Connection) Logoff() error {
 	session := conn.session
 	session.ResetBuffer()
-	session.PutBytes([]byte{0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11,
-		0x1, 0, 0, 0, 0x1, 0, 0, 0,
-		0, 0, 0x1, 0, 0, 0, 0, 0,
-		3, 9, 0})
+	session.PutBytes(0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11, 0x1, 0, 0, 0, 0x1, 0, 0, 0, 0, 0, 0x1, 0, 0, 0, 0, 0,
+		3, 9, 0)
 	err := session.Write()
 	if err != nil {
 		return err
@@ -362,12 +360,12 @@ func (conn *Connection) Close() (err error) {
 
 func (conn *Connection) doAuth() error {
 	conn.session.ResetBuffer()
-	conn.session.PutBytes([]byte{3, 118, 0, 1})
+	conn.session.PutBytes(3, 118, 0, 1)
 	conn.session.PutUint(len(conn.conStr.UserID), 4, true, true)
 	conn.LogonMode = conn.LogonMode | NoNewPass
 	conn.session.PutUint(int(conn.LogonMode), 4, true, true)
-	conn.session.PutBytes([]byte{1, 1, 5, 1, 1})
-	conn.session.PutBytes([]byte(conn.conStr.UserID))
+	conn.session.PutBytes(1, 1, 5, 1, 1)
+	conn.session.PutBytes([]byte(conn.conStr.UserID)...)
 	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientData.HostName, 0)
 	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientData.ProgramName, 0)
 	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientData.HostName, 0)

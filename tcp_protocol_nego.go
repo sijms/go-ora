@@ -22,8 +22,8 @@ type TCPNego struct {
 
 func NewTCPNego(session *network.Session) (*TCPNego, error) {
 	session.ResetBuffer()
-	session.PutBytes([]byte{1, 6, 0})
-	session.PutBytes([]byte("OracleClientGo\x00"))
+	session.PutBytes(1, 6, 0)
+	session.PutBytes([]byte("OracleClientGo\x00")...)
 	err := session.Write()
 	if err != nil {
 		return nil, err

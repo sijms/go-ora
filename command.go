@@ -113,20 +113,24 @@ func NewStmt(text string, conn *Connection) *Stmt {
 
 func (stmt *Stmt) write(session *network.Session) error {
 	exeOp := stmt.getExeOption()
-	session.PutBytes([]byte{3, 0x5E, 0})
+	session.PutBytes(3, 0x5E, 0)
 	session.PutUint(exeOp, 4, true, true)
 	session.PutUint(stmt.cursorID, 2, true, true)
 	if stmt.cursorID == 0 {
-		session.PutUint(1, 1, false, false)
+		session.PutBytes(1)
+		//session.PutUint(1, 1, false, false)
 	} else {
-		session.PutUint(0, 1, false, false)
+		session.PutBytes(0)
+		//session.PutUint(0, 1, false, false)
 	}
 	session.PutUint(len(stmt.Text), 4, true, true)
-	session.PutUint(1, 1, false, false)
+	session.PutBytes(1)
+	//session.PutUint(1, 1, false, false)
 	session.PutUint(13, 2, true, true)
-	session.PutBytes([]byte{0, 0})
+	session.PutBytes(0, 0)
 	if exeOp&0x40 == 0 && exeOp&0x20 != 0 && exeOp&0x1 != 0 && stmt.stmtType == SELECT {
-		session.PutUint(0, 1, false, false)
+		session.PutBytes(0)
+		//session.PutUint(0, 1, false, false)
 		session.PutUint(stmt.noOfRowsToFetch, 4, true, true)
 	} else {
 		session.PutUint(0, 4, true, true)
@@ -135,34 +139,40 @@ func (stmt *Stmt) write(session *network.Session) error {
 	// longFetchSize == 0 marshal 1 else marshal longFetchSize
 	session.PutUint(1, 4, true, true)
 	if len(stmt.Pars) > 0 {
-		session.PutUint(1, 1, false, false)
+		session.PutBytes(1)
+		//session.PutUint(1, 1, false, false)
 		session.PutUint(len(stmt.Pars), 2, true, true)
 	} else {
-		session.PutUint(0, 1, false, false)
-		session.PutUint(0, 1, false, false)
+		session.PutBytes(0, 0)
+		//session.PutUint(0, 1, false, false)
+		//session.PutUint(0, 1, false, false)
 	}
-	session.PutBytes([]byte{0, 0, 0, 0, 0})
+	session.PutBytes(0, 0, 0, 0, 0)
 	if stmt.define {
-		session.PutUint(1, 1, false, false)
+		session.PutBytes(1)
+		//session.PutUint(1, 1, false, false)
 		session.PutUint(stmt.noOfDefCols, 2, true, true)
 	} else {
-		session.PutUint(0, 1, false, false)
-		session.PutUint(0, 1, false, false)
+		session.PutBytes(0, 0)
+		//session.PutUint(0, 1, false, false)
+		//session.PutUint(0, 1, false, false)
 	}
 	if session.TTCVersion >= 4 {
-		session.PutUint(0, 1, false, false) // dbChangeRegisterationId
-		session.PutUint(0, 1, false, false)
-		session.PutUint(1, 1, false, false)
+		session.PutBytes(0, 0, 1)
+		//session.PutUint(0, 1, false, false) // dbChangeRegisterationId
+		//session.PutUint(0, 1, false, false)
+		//session.PutUint(1, 1, false, false)
 	}
 	if session.TTCVersion >= 5 {
-		session.PutUint(0, 1, false, false)
-		session.PutUint(0, 1, false, false)
-		session.PutUint(0, 1, false, false)
-		session.PutUint(0, 1, false, false)
-		session.PutUint(0, 1, false, false)
+		session.PutBytes(0, 0, 0, 0, 0)
+		//session.PutUint(0, 1, false, false)
+		//session.PutUint(0, 1, false, false)
+		//session.PutUint(0, 1, false, false)
+		//session.PutUint(0, 1, false, false)
+		//session.PutUint(0, 1, false, false)
 	}
 
-	session.PutBytes([]byte(stmt.Text))
+	session.PutBytes([]byte(stmt.Text)...)
 	for x := 0; x < len(stmt.al8i4); x++ {
 		session.PutUint(stmt.al8i4[x], 2, true, true)
 	}
@@ -170,7 +180,8 @@ func (stmt *Stmt) write(session *network.Session) error {
 		_ = par.write(session)
 	}
 	if len(stmt.Pars) > 0 {
-		session.PutUint(7, 1, false, false)
+		session.PutBytes(7)
+		//session.PutUint(7, 1, false, false)
 		for _, par := range stmt.Pars {
 			session.PutClr(par.Value)
 		}
@@ -247,7 +258,7 @@ func (stmt *Stmt) getExeOption() int {
 }
 func (stmt *Stmt) fetch(dataSet *DataSet) error {
 	stmt.connection.session.ResetBuffer()
-	stmt.connection.session.PutBytes([]byte{3, 5, 0})
+	stmt.connection.session.PutBytes(3, 5, 0)
 	stmt.connection.session.PutInt(stmt.cursorID, 2, true, true)
 	stmt.connection.session.PutInt(stmt.noOfRowsToFetch, 2, true, true)
 	err := stmt.connection.session.Write()
@@ -583,7 +594,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 func (stmt *Stmt) Close() error {
 	session := stmt.connection.session
 	session.ResetBuffer()
-	session.PutBytes([]byte{17, 105, 0, 1, 1, 1})
+	session.PutBytes(17, 105, 0, 1, 1, 1)
 	session.PutInt(stmt.cursorID, 4, true, true)
 	return (&simpleObject{
 		session:     session,

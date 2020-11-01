@@ -10,14 +10,14 @@ type simpleObject struct {
 	session     *network.Session
 	operationID uint8
 	data        []byte
-	err			error
+	err         error
 }
 
-func (obj *simpleObject) write() *simpleObject{
+func (obj *simpleObject) write() *simpleObject {
 	//obj.session.ResetBuffer()
-	obj.session.PutBytes([]byte {3, obj.operationID, 0})
+	obj.session.PutBytes(3, obj.operationID, 0)
 	if obj.data != nil {
-		obj.session.PutBytes(obj.data)
+		obj.session.PutBytes(obj.data...)
 	}
 	obj.err = obj.session.Write()
 	return obj

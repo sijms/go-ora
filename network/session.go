@@ -67,7 +67,7 @@ func (session *Session) Connect() error {
 		return err
 	}
 	if connectPacket.packet.length == 58 {
-		session.PutBytes(connectPacket.buffer)
+		session.PutBytes(connectPacket.buffer...)
 		err = session.Write()
 		if err != nil {
 			return err
@@ -349,9 +349,13 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	}
 }
 
-func (session *Session) PutBytes(data []byte) {
+func (session *Session) PutBytes(data ...byte) {
 	session.outBuffer = append(session.outBuffer, data...)
 }
+
+//func (session *Session) PutByte(num byte) {
+//		session.outBuffer = append(session.outBuffer, num)
+//}
 
 func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, compress bool) {
 	var num uint64

@@ -87,8 +87,8 @@ type ParameterInfo struct {
 	DataType             OracleType
 	IsXmlType            bool
 	Flag                 uint8
-	Precision            uint16
-	Scale                uint16
+	Precision            uint8
+	Scale                uint8
 	MaxLen               int
 	MaxCharLen           int
 	MaxNoOfArrayElements int
@@ -116,8 +116,9 @@ func (par *ParameterInfo) read(session *network.Session) error {
 	if err != nil {
 		return err
 	}
-	precision, err := session.GetInt(1, false, false)
-	var scale int
+	par.Precision, err = session.GetByte()
+	//precision, err := session.GetInt(1, false, false)
+	//var scale int
 	switch par.DataType {
 	case NUMBER:
 		fallthrough
@@ -136,20 +137,29 @@ func (par *ParameterInfo) read(session *network.Session) error {
 	case TimeStampLTZ_DTY:
 		fallthrough
 	case TimeStampeLTZ:
-		scale, err = session.GetInt(2, true, true)
+		if scale, err := session.GetInt(2, true, true); err != nil {
+			return err
+		} else {
+			if scale == -127 {
+				par.Precision = uint8(math.Ceil(float64(par.Precision) * 0.30103))
+				par.Scale = 0xFF
+			} else {
+				par.Scale = uint8(scale)
+			}
+		}
 	default:
-		scale, err = session.GetInt(1, false, false)
+		par.Scale, err = session.GetByte()
+		//scale, err = session.GetInt(1, false, false)
 	}
-	if scale == -127 {
-		precision = int(math.Ceil(float64(precision) * 0.30103))
-		scale = 0xFF
+	//if par.Scale == uint8(-127) {
+	//
+	//}
+	if par.DataType == NUMBER && par.Precision == 0 && (par.Scale == 0 || par.Scale == 0xFF) {
+		par.Precision = 38
+		par.Scale = 0
 	}
-	if par.DataType == NUMBER && precision == 0 && (scale == 0 || scale == 0xFF) {
-		precision = 38
-		scale = 0xFF
-	}
-	par.Scale = uint16(scale)
-	par.Precision = uint16(precision)
+	//par.Scale = uint16(scale)
+	//par.Precision = uint16(precision)
 	par.MaxLen, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err
@@ -233,22 +243,25 @@ func (par *ParameterInfo) read(session *network.Session) error {
 	return nil
 }
 func (par *ParameterInfo) write(session *network.Session) error {
-	session.PutUint(int(par.DataType), 1, false, false)
-	session.PutUint(par.Flag, 1, false, false)
-	session.PutUint(par.Precision, 1, false, false)
-	session.PutUint(par.Scale, 1, false, false)
+	session.PutBytes(uint8(par.DataType), par.Flag, par.Precision, par.Scale)
+	//session.PutUint(int(par.DataType), 1, false, false)
+	//session.PutUint(par.Flag, 1, false, false)
+	//session.PutUint(par.Precision, 1, false, false)
+	//session.PutUint(par.Scale, 1, false, false)
 	session.PutUint(par.MaxLen, 4, true, true)
 	session.PutInt(par.MaxNoOfArrayElements, 4, true, true)
 	session.PutInt(par.ContFlag, 4, true, true)
 	if par.ToID == nil {
-		session.PutInt(0, 1, false, false)
+		session.PutBytes(0)
+		//session.PutInt(0, 1, false, false)
 	} else {
 		session.PutInt(len(par.ToID), 4, true, true)
 		session.PutClr(par.ToID)
 	}
 	session.PutUint(par.Version, 2, true, true)
 	session.PutUint(par.CharsetID, 2, true, true)
-	session.PutUint(par.CharsetForm, 1, false, false)
+	session.PutBytes(uint8(par.CharsetForm))
+	//session.PutUint(par.CharsetForm, 1, false, false)
 	session.PutUint(par.MaxCharLen, 4, true, true)
 	return nil
 }

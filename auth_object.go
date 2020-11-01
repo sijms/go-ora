@@ -137,12 +137,12 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMode, session *network.Session) error {
 	session.ResetBuffer()
 	keyValSize := 22
-	session.PutBytes([]byte{3, 0x73, 0})
+	session.PutBytes(3, 0x73, 0)
 	if len(connOption.UserID) > 0 {
 		session.PutInt(1, 1, false, false)
 		session.PutInt(len(connOption.UserID), 4, true, true)
 	} else {
-		session.PutBytes([]byte{0, 0})
+		session.PutBytes(0, 0)
 	}
 
 	if len(connOption.UserID) > 0 && len(obj.EPassword) > 0 {
@@ -151,9 +151,9 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	session.PutUint(int(mode), 4, true, true)
 	session.PutUint(1, 1, false, false)
 	session.PutUint(keyValSize, 4, true, true)
-	session.PutBytes([]byte{1, 1})
+	session.PutBytes(1, 1)
 	if len(connOption.UserID) > 0 {
-		session.PutBytes([]byte(connOption.UserID))
+		session.PutBytes([]byte(connOption.UserID)...)
 	}
 	index := 0
 	if len(obj.EClientSessKey) > 0 {

@@ -2,7 +2,6 @@ package converters
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"math"
 	"time"
@@ -146,7 +145,19 @@ func DecodeDate(data []byte) (time.Time, error) {
 	year += int(data[1]) - 100
 	nanoSec := 0
 	if len(data) > 7 {
-		nanoSec = int(binary.BigEndian.Uint32(data[7:10]))
+		dateTmp := data[7:10]
+		switch len(dateTmp) {
+		case 0:
+			nanoSec = 0
+		case 1:
+			nanoSec = int(uint32(dateTmp[0]))
+		case 2:
+			nanoSec = int(uint32(dateTmp[0]) | uint32(dateTmp[1])<<8)
+		case 3:
+			nanoSec = int(uint32(dateTmp[0]) | uint32(dateTmp[1])<<8 | uint32(dateTmp[2])<<16)
+		default:
+			nanoSec = int(uint32(dateTmp[0]) | uint32(dateTmp[1])<<8 | uint32(dateTmp[2])<<16 | uint32(dateTmp[3])<<24)
+		}
 	}
 	tzHour := 0
 	tzMin := 0

@@ -146,7 +146,7 @@ func DecodeDate(data []byte) (time.Time, error) {
 	year += int(data[1]) - 100
 	nanoSec := 0
 	if len(data) > 7 {
-		nanoSec = int(binary.BigEndian.Uint32(data[7:10]))
+		nanoSec = int(binary.BigEndian.Uint32(data[7:11]))
 	}
 	tzHour := 0
 	tzMin := 0

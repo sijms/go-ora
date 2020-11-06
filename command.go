@@ -456,7 +456,11 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 										dataSet.currentRow[x] = int64(converters.DecodeInt(temp))
 									} else {
 										base := math.Pow10(int(dataSet.Cols[x].Scale))
-										dataSet.currentRow[x] = math.Round(converters.DecodeDouble(temp)*base) / base
+										if dataSet.Cols[x].Scale < 0x80 {
+											dataSet.currentRow[x] = math.Round(converters.DecodeDouble(temp)*base) / base
+										} else {
+											dataSet.currentRow[x] = converters.DecodeDouble(temp)
+										}
 									}
 								case TimeStamp:
 									fallthrough

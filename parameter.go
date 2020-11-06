@@ -156,8 +156,9 @@ func (par *ParameterInfo) read(session *network.Session) error {
 	//}
 	if par.DataType == NUMBER && par.Precision == 0 && (par.Scale == 0 || par.Scale == 0xFF) {
 		par.Precision = 38
-		par.Scale = 0
+		par.Scale = 0xFF
 	}
+
 	//par.Scale = uint16(scale)
 	//par.Precision = uint16(precision)
 	par.MaxLen, err = session.GetInt(4, true, true)

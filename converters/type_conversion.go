@@ -126,20 +126,19 @@ func DecodeInt(inputData []byte) int64 {
 		return 0
 	}
 	data, neg := decodeSign(input)
-	length := int(int8(data[0]))
+	length := int(data[0])
 	if length > len(data[1:]) {
-		data = append(data, make([]byte, length-len(data[1:]))...)
+		data = append(data, make([]int64, length-len(data[1:]))...)
 	}
 	data = data[1 : 1+length]
 	var ret int64 = 0
 	for x := 0; x < len(data); x++ {
-		ret = (ret * 100) + int64(data[x])
+		ret = (ret * 100) + data[x]
 	}
 	if neg {
-		return ret * -1
-	} else {
-		return ret
+		ret = ret * -1
 	}
+	return ret
 }
 
 func EncodeInt64(val int64) []byte {
@@ -374,14 +373,13 @@ func EncodeDouble(num float64) ([]byte, error) {
 	return encodeSign(ret, neg), nil
 	// 192, 2, 79
 }
-func decodeSign(input []byte) (ret []byte, neg bool) {
+func decodeSign(input []byte) (ret []int64, neg bool) {
 	if input[0] > 0x80 {
 		length := int(input[0]) - 0x80 - 0x40
 		for x := 1; x < len(input); x++ {
 			input[x] = input[x] - 1
 		}
 		input[0] = uint8(length)
-		ret = input
 		neg = false
 	} else {
 		length := 0xFF - int(input[0]) - 0x80 - 0x40
@@ -393,13 +391,17 @@ func decodeSign(input []byte) (ret []byte, neg bool) {
 			input[x] = uint8(101 - input[x])
 		}
 		input[0] = uint8(length)
-		ret = input
 		neg = true
+	}
+	ret = make([]int64, len(input))
+	for x := 0; x < len(input); x++ {
+		ret[x] = int64(int8(input[x]))
 	}
 	return
 }
 
 func DecodeDouble(inputData []byte) float64 {
+	//fmt.Println(inputData)
 	input := make([]byte, len(inputData))
 	copy(input, inputData)
 	if input[0] == 0x80 {
@@ -414,7 +416,7 @@ func DecodeDouble(inputData []byte) float64 {
 	index2 := 0
 	num4 := 0
 	index1 := 1
-	length := int(int8(data[0]))
+	length := int(data[0])
 	if length > num2 || length < num3 {
 		if length > num2 {
 			index2 = -1
@@ -446,7 +448,7 @@ func DecodeDouble(inputData []byte) float64 {
 		index1++
 		num5--
 	case 2:
-		num8 := int64(data[1])*100 + int64(data[2])
+		num8 := data[1]*100 + data[2]
 		index2 += 2
 		if factorTable[index2][1] >= 1.0 {
 			num6 = float64(num8) * factorTable[index2][1]
@@ -456,7 +458,7 @@ func DecodeDouble(inputData []byte) float64 {
 		index1 += 2
 		num5 -= 2
 	case 3:
-		num9 := int64(data[1])*100 + int64(data[2])*100 + int64(data[3])
+		num9 := (data[1]*100+data[2])*100 + data[3]
 		index2 += 3
 		if factorTable[index2][1] >= 1.0 {
 			num6 = float64(num9) * factorTable[index2][1]
@@ -469,7 +471,7 @@ func DecodeDouble(inputData []byte) float64 {
 		num6 = 0.0
 	}
 	for num5 > 0 {
-		num10 := ((int64(data[index1])*100+int64(data[index1+1]))*100+int64(data[index1+2]))*100 + int64(data[index1+3])
+		num10 := ((data[index1]*100+data[index1+1])*100+data[index1+2])*100 + data[index1+3]
 		index2 += 4
 		if factorTable[index2][1] < 1.0 {
 			num6 += float64(num10) / factorTable[index2][2]
@@ -489,9 +491,9 @@ func DecodeDouble(inputData []byte) float64 {
 			index3 := index1 - 1
 			var num10 int64 = 0
 			if data[index3]%10 < 5 {
-				num10 = int64(data[index3]) / 10 * 10
+				num10 = ((data[index3] / 10) * 10) + data[index3]
 			} else {
-				num10 = ((int64(data[index3])/10 + 1) * 10) - int64(data[index3])
+				num10 = ((data[index3]/10 + 1) * 10) - data[index3]
 			}
 			num6 += float64(num10) * factorTable[index2][1]
 		}

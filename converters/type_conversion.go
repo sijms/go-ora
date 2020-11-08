@@ -18,58 +18,58 @@ var powerTable = [][]float64{
 	{2.0, 10000.0, 0.0001},
 	{1.0, 100.0, 0.01},
 }
-var factorTable = [][]float64{
-	{15.0, 1e+30, 1e-30},
-	{14.0, 1e+28, 1e-28},
-	{13.0, 1e+26, 1e-26},
-	{12.0, 1e+24, 1e-24},
-	{11.0, 1e+22, 1e-22},
-	{10.0, 1e+20, 1e-20},
-	{9.0, 1e+18, 1e-18},
-	{8.0, 1e+16, 1e-16},
-	{7.0, 100000000000000.0, 1e-14},
-	{6.0, 1000000000000.0, 1e-12},
-	{5.0, 10000000000.0, 1e-10},
-	{4.0, 100000000.0, 1e-08},
-	{3.0, 1000000.0, 1e-06},
-	{2.0, 10000.0, 0.0001},
-	{1.0, 100.0, 0.01},
-	{0.0, 1.0, 1.0},
-	{-1.0, 0.01, 100.0},
-	{-2.0, 0.0001, 10000.0},
-	{-3.0, 1e-06, 1000000.0},
-	{-4.0, 1e-08, 100000000.0},
-	{-5.0, 1e-10, 10000000000.0},
-	{-6.0, 1e-12, 1000000000000.0},
-	{-7.0, 1e-14, 100000000000000.0},
-	{-8.0, 1e-16, 1e+16},
-	{-9.0, 1e-18, 1e+18},
-	{-10.0, 1e-20, 1e+20},
-	{-11.0, 1e-22, 1e+22},
-	{-12.0, 1e-24, 1e+24},
-	{-13.0, 1e-26, 1e+26},
-	{-14.0, 1e-28, 1e+28},
-	{-15.0, 1e-30, 1e+30},
-	{-16.0, 1e-32, 1e+32},
-	{-17.0, 1e-34, 1e+34},
-	{-18.0, 1e-36, 1e+36},
-	{-19.0, 1e-38, 1e+38},
-	{-20.0, 1e-40, 1e+40},
-	{-21.0, 1e-42, 1e+42},
-	{-22.0, 1e-44, 1e+44},
-	{-23.0, 1e-46, 1e+46},
-	{-24.0, 1e-48, 1e+48},
-	{-25.0, 1e-50, 1e+50},
-	{-26.0, 1e-52, 1e+52},
-	{-27.0, 1e-54, 1e+54},
-	{-28.0, 1e-56, 1e+56},
-	{-29.0, 1e-58, 1e+58},
-	{-30.0, 1e-60, 1e+60},
-	{-31.0, 1e-62, 1e+62},
-	{-32.0, 1e-64, 1e+64},
-	{-33.0, 1e-66, 1e+66},
-	{-34.0, 1e-68, 1e+68},
-}
+// var factorTable = [][]float64{
+// 	{15.0, 1e+30, 1e-30},
+// 	{14.0, 1e+28, 1e-28},
+// 	{13.0, 1e+26, 1e-26},
+// 	{12.0, 1e+24, 1e-24},
+// 	{11.0, 1e+22, 1e-22},
+// 	{10.0, 1e+20, 1e-20},
+// 	{9.0, 1e+18, 1e-18},
+// 	{8.0, 1e+16, 1e-16},
+// 	{7.0, 100000000000000.0, 1e-14},
+// 	{6.0, 1000000000000.0, 1e-12},
+// 	{5.0, 10000000000.0, 1e-10},
+// 	{4.0, 100000000.0, 1e-08},
+// 	{3.0, 1000000.0, 1e-06},
+// 	{2.0, 10000.0, 0.0001},
+// 	{1.0, 100.0, 0.01},
+// 	{0.0, 1.0, 1.0},
+// 	{-1.0, 0.01, 100.0},
+// 	{-2.0, 0.0001, 10000.0},
+// 	{-3.0, 1e-06, 1000000.0},
+// 	{-4.0, 1e-08, 100000000.0},
+// 	{-5.0, 1e-10, 10000000000.0},
+// 	{-6.0, 1e-12, 1000000000000.0},
+// 	{-7.0, 1e-14, 100000000000000.0},
+// 	{-8.0, 1e-16, 1e+16},
+// 	{-9.0, 1e-18, 1e+18},
+// 	{-10.0, 1e-20, 1e+20},
+// 	{-11.0, 1e-22, 1e+22},
+// 	{-12.0, 1e-24, 1e+24},
+// 	{-13.0, 1e-26, 1e+26},
+// 	{-14.0, 1e-28, 1e+28},
+// 	{-15.0, 1e-30, 1e+30},
+// 	{-16.0, 1e-32, 1e+32},
+// 	{-17.0, 1e-34, 1e+34},
+// 	{-18.0, 1e-36, 1e+36},
+// 	{-19.0, 1e-38, 1e+38},
+// 	{-20.0, 1e-40, 1e+40},
+// 	{-21.0, 1e-42, 1e+42},
+// 	{-22.0, 1e-44, 1e+44},
+// 	{-23.0, 1e-46, 1e+46},
+// 	{-24.0, 1e-48, 1e+48},
+// 	{-25.0, 1e-50, 1e+50},
+// 	{-26.0, 1e-52, 1e+52},
+// 	{-27.0, 1e-54, 1e+54},
+// 	{-28.0, 1e-56, 1e+56},
+// 	{-29.0, 1e-58, 1e+58},
+// 	{-30.0, 1e-60, 1e+60},
+// 	{-31.0, 1e-62, 1e+62},
+// 	{-32.0, 1e-64, 1e+64},
+// 	{-33.0, 1e-66, 1e+66},
+// 	{-34.0, 1e-68, 1e+68},
+// }
 
 // note that int64 is different in size > 22 byte size and when make clear type you will path 1 instead of 0
 //case OraType.ORA_NUMBER:
@@ -214,6 +214,66 @@ func DecodeDate(data []byte) (time.Time, error) {
 		int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, time.UTC), nil
 }
 
+
+// DecodeDouble decode Oracle binary representation of numbers into float64
+//
+// Some documentation:
+//	https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
+//  https://www.orafaq.com/wiki/Number
+
+func DecodeDouble(inputData []byte) float64 {
+
+	if len(inputData) == 0 {
+		return math.NaN()
+	}
+	if inputData[0] == 0x80 {
+		return 0
+	}
+	var (
+		negative bool
+		exponent int
+		mantissa int64
+	)
+
+	negative = inputData[0]&0x80 == 0
+	if negative {
+		exponent = int(inputData[0]^0x7f) - 64
+	} else {
+		exponent = int(inputData[0]&0x7f) - 64
+	}
+
+	buf := inputData[1:]
+	// When negative, strip the last byte if equal 0x66
+	if negative && inputData[len(inputData)-1] == 0x66 {
+		buf = inputData[1 : len(inputData)-1]
+	}
+
+	for _, digit100 := range buf {
+		digit100--
+		if negative {
+			digit100 = 100 - digit100
+		}
+		mantissa *= 10
+		mantissa += int64(digit100 / 10)
+		mantissa *= 10
+		mantissa += int64(digit100 % 10)
+	}
+
+	digits := 0
+	temp64 := mantissa
+	for temp64 > 0 {
+		digits++
+		temp64 /= 100
+	}
+	exponent = (exponent - digits) * 2
+	if negative {
+		mantissa = -mantissa
+	}
+
+	ret := float64(mantissa) * math.Pow10(exponent)
+	return ret
+}
+
 //func DecodeDouble(inputData []byte) float64 {
 //	input := make([]byte, len(inputData))
 //	copy(input, inputData)
@@ -253,6 +313,7 @@ func DecodeDate(data []byte) (time.Time, error) {
 //	return ret
 //
 //}
+
 
 func EncodeDouble(num float64) ([]byte, error) {
 	//byte[] numArray = new byte[20];
@@ -339,123 +400,124 @@ func decodeSign(input []byte) (ret []byte, neg bool) {
 	}
 	return
 }
-func DecodeDouble(inputData []byte) float64 {
-	input := make([]byte, len(inputData))
-	copy(input, inputData)
-	if input[0] == 0x80 {
-		return 0
-	}
-	data, neg := decodeSign(input)
-	data[0] -= 1
-	// data := append([]byte{uint8(length)}, input[1:]...)
-	flag2 := data[1] < 10
-	num2 := 15  //  factorTable[0][0]; // 15
-	num3 := -15 //  factorTable[0][0] - float64(50 - 20); // -15
-	index2 := 0
-	num4 := 0
-	index1 := 1
-	length := int(data[0])
-	if length > num2 || length < num3 {
-		if length > num2 {
-			index2 = -1
-			num4 = length - num2
-		} else {
-			index2 = 50 - 20 - 1
-			num4 = length - num3
-		}
 
-	} else {
-		index2 = int(num2-length) - 1
-		num4 = 0
-	}
-	num5 := len(data) - 1
-	flag1 := false
-	if data[1] < 10 && num5 > 8 || data[1] >= 10 && num5 >= 8 {
-		num5 = 8
-		flag1 = true
-	}
-	num6 := 0.0
-	switch num5 % 4 {
-	case 1:
-		index2++
-		if factorTable[index2][1] >= 1.0 {
-			num6 = float64(data[1]) * factorTable[index2][1]
-		} else {
-			num6 = float64(data[1]) * factorTable[index2][2]
-		}
-		index1++
-		num5--
-	case 2:
-		num8 := int64(data[1])*100 + int64(data[2])
-		index2 += 2
-		if factorTable[index2][1] >= 1.0 {
-			num6 = float64(num8) * factorTable[index2][1]
-		} else {
-			num6 = float64(num8) / factorTable[index2][2]
-		}
-		index1 += 2
-		num5 -= 2
-	case 3:
-		num9 := int64(data[1])*100 + int64(data[2])*100 + int64(data[3])
-		index2 += 3
-		if factorTable[index2][1] >= 1.0 {
-			num6 = float64(num9) * factorTable[index2][1]
-		} else {
-			num6 = float64(num9) * factorTable[index2][2]
-		}
-		index1 += 3
-		num5 -= 3
-	default:
-		num6 = 0.0
-	}
-	for num5 > 0 {
-		num10 := ((int64(data[index1])*100+int64(data[index1+1]))*100+int64(data[index1+2]))*100 + int64(data[index1+3])
-		index2 += 4
-		if factorTable[index2][1] < 1.0 {
-			num6 += float64(num10) / factorTable[index2][2]
-		} else {
-			num6 += float64(num10) * factorTable[index2][1]
-		}
-		index1 += 4
-		num5 -= 4
-	}
-	if flag1 {
-		if flag2 {
-			if data[index1] > 50 {
-				num10 := 1
-				num6 += float64(num10) * factorTable[index2][1]
-			}
-		} else {
-			index3 := index1 - 1
-			var num10 int64 = 0
-			if data[index3]%10 < 5 {
-				num10 = int64(data[index3]) / 10 * 10
-			} else {
-				num10 = ((int64(data[index3])/10 + 1) * 10) - int64(data[index3])
-			}
-			num6 += float64(num10) * factorTable[index2][1]
-		}
-	}
+// func DecodeDouble(inputData []byte) float64 {
+// 	input := make([]byte, len(inputData))
+// 	copy(input, inputData)
+// 	if input[0] == 0x80 {
+// 		return 0
+// 	}
+// 	data, neg := decodeSign(input)
+// 	data[0] -= 1
+// 	// data := append([]byte{uint8(length)}, input[1:]...)
+// 	flag2 := data[1] < 10
+// 	num2 := 15  //  factorTable[0][0]; // 15
+// 	num3 := -15 //  factorTable[0][0] - float64(50 - 20); // -15
+// 	index2 := 0
+// 	num4 := 0
+// 	index1 := 1
+// 	length := int(data[0])
+// 	if length > num2 || length < num3 {
+// 		if length > num2 {
+// 			index2 = -1
+// 			num4 = length - num2
+// 		} else {
+// 			index2 = 50 - 20 - 1
+// 			num4 = length - num3
+// 		}
 
-	if num4 != 0 {
-		index3 := 0
-		for num4 > 0 {
-			if int(powerTable[index3][0]) <= num4 {
-				num4 -= int(powerTable[index3][0])
-				num6 *= powerTable[index3][1]
-			}
-			index3++
-		}
-		for num4 < 0 {
-			if int(powerTable[index3][0]) <= -num4 {
-				num4 += int(powerTable[index3][0])
-				num6 *= powerTable[index3][2]
-			}
-			index3++
-		}
-	}
-	if neg {
-		num6 = num6 * -1
-	}
-	return num6
-}
+// 	} else {
+// 		index2 = int(num2-length) - 1
+// 		num4 = 0
+// 	}
+// 	num5 := len(data) - 1
+// 	flag1 := false
+// 	if data[1] < 10 && num5 > 8 || data[1] >= 10 && num5 >= 8 {
+// 		num5 = 8
+// 		flag1 = true
+// 	}
+// 	num6 := 0.0
+// 	switch num5 % 4 {
+// 	case 1:
+// 		index2++
+// 		if factorTable[index2][1] >= 1.0 {
+// 			num6 = float64(data[1]) * factorTable[index2][1]
+// 		} else {
+// 			num6 = float64(data[1]) * factorTable[index2][2]
+// 		}
+// 		index1++
+// 		num5--
+// 	case 2:
+// 		num8 := int64(data[1])*100 + int64(data[2])
+// 		index2 += 2
+// 		if factorTable[index2][1] >= 1.0 {
+// 			num6 = float64(num8) * factorTable[index2][1]
+// 		} else {
+// 			num6 = float64(num8) / factorTable[index2][2]
+// 		}
+// 		index1 += 2
+// 		num5 -= 2
+// 	case 3:
+// 		num9 := int64(data[1])*100 + int64(data[2])*100 + int64(data[3])
+// 		index2 += 3
+// 		if factorTable[index2][1] >= 1.0 {
+// 			num6 = float64(num9) * factorTable[index2][1]
+// 		} else {
+// 			num6 = float64(num9) * factorTable[index2][2]
+// 		}
+// 		index1 += 3
+// 		num5 -= 3
+// 	default:
+// 		num6 = 0.0
+// 	}
+// 	for num5 > 0 {
+// 		num10 := ((int64(data[index1])*100+int64(data[index1+1]))*100+int64(data[index1+2]))*100 + int64(data[index1+3])
+// 		index2 += 4
+// 		if factorTable[index2][1] < 1.0 {
+// 			num6 += float64(num10) / factorTable[index2][2]
+// 		} else {
+// 			num6 += float64(num10) * factorTable[index2][1]
+// 		}
+// 		index1 += 4
+// 		num5 -= 4
+// 	}
+// 	if flag1 {
+// 		if flag2 {
+// 			if data[index1] > 50 {
+// 				num10 := 1
+// 				num6 += float64(num10) * factorTable[index2][1]
+// 			}
+// 		} else {
+// 			index3 := index1 - 1
+// 			var num10 int64 = 0
+// 			if data[index3]%10 < 5 {
+// 				num10 = int64(data[index3]) / 10 * 10
+// 			} else {
+// 				num10 = ((int64(data[index3])/10 + 1) * 10) - int64(data[index3])
+// 			}
+// 			num6 += float64(num10) * factorTable[index2][1]
+// 		}
+// 	}
+
+// 	if num4 != 0 {
+// 		index3 := 0
+// 		for num4 > 0 {
+// 			if int(powerTable[index3][0]) <= num4 {
+// 				num4 -= int(powerTable[index3][0])
+// 				num6 *= powerTable[index3][1]
+// 			}
+// 			index3++
+// 		}
+// 		for num4 < 0 {
+// 			if int(powerTable[index3][0]) <= -num4 {
+// 				num4 += int(powerTable[index3][0])
+// 				num6 *= powerTable[index3][2]
+// 			}
+// 			index3++
+// 		}
+// 	}
+// 	if neg {
+// 		num6 = num6 * -1
+// 	}
+// 	return num6
+// }

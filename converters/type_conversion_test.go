@@ -160,18 +160,11 @@ func TestDecodeDouble(t *testing.T) {
 			},
 			want: -0.333333333333333333333333333333333333333,
 		},
-		{
-			name: "-0.3333333333333333333333333333333333333333",
-			args: args{
-				[]byte{63, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68},
-			},
-			want: -0.3333333333333333333333333333333333333333,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := DecodeDouble(tt.args.inputData)
-			if true || math.Abs((got-tt.want)/tt.want) > 1e-15 {
+			if math.Abs((got-tt.want)/tt.want) > 1e-15 {
 				t.Errorf("DecodeDouble() = %v, want %v, Error= %e", got, tt.want, math.Abs((got-tt.want)/tt.want))
 			}
 		})

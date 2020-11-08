@@ -159,43 +159,63 @@ func DecodeDate(data []byte) (time.Time, error) {
 		int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, time.UTC), nil
 }
 
+// DecodeDouble decode Oracle binary representation of numbers into float64
+//
+// Some documentation:
+//	https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
+//  https://www.orafaq.com/wiki/Number
+
 func DecodeDouble(inputData []byte) float64 {
-	input := make([]byte, len(inputData))
-	copy(input, inputData)
-	if input[0] == 0x80 {
+
+	if len(inputData) == 0 {
+		return math.NaN()
+	}
+	if inputData[0] == 0x80 {
 		return 0
 	}
-	length, neg := decodeSign(input)
-	length -= 1
-	data := input[1:]
-	var ret float64
-	ret = float64(data[0])
-	for x := 1; x < len(data); x++ {
-		ret = ret + (float64(data[x]) / math.Pow(100.0, float64(x)))
-	}
-	if length < 0 {
-		for x := 0; x < 8; x++ {
-			if length&int(powerTable[x][0]) == 0 {
-				ret = ret / powerTable[x][1]
-				length += int(powerTable[x][0])
-			}
-		}
-		if length < 0 {
-			ret = ret / 100.0
-			length += 1
-		}
-	} else if length > 0 {
-		for x := 0; x < 8; x++ {
-			if length&int(powerTable[x][0]) > 0 {
-				ret = ret / powerTable[x][2]
-			}
-		}
-	}
-	if neg {
-		ret = ret * -1
-	}
-	return ret
+	var (
+		negative bool
+		exponent int
+		mantissa int64
+	)
 
+	negative = inputData[0]&0x80 == 0
+	if negative {
+		exponent = int(inputData[0]^0x7f) - 64
+	} else {
+		exponent = int(inputData[0]&0x7f) - 64
+	}
+
+	buf := inputData[1:]
+	// When negative, strip the last byte if equal 0x66
+	if negative && inputData[len(inputData)-1] == 0x66 {
+		buf = inputData[1 : len(inputData)-1]
+	}
+
+	for _, digit100 := range buf {
+		digit100--
+		if negative {
+			digit100 = 100 - digit100
+		}
+		mantissa *= 10
+		mantissa += int64(digit100 / 10)
+		mantissa *= 10
+		mantissa += int64(digit100 % 10)
+	}
+
+	digits := 0
+	temp64 := mantissa
+	for temp64 > 0 {
+		digits++
+		temp64 /= 100
+	}
+	exponent = (exponent - digits) * 2
+	if negative {
+		mantissa = -mantissa
+	}
+
+	ret := float64(mantissa) * math.Pow10(exponent)
+	return ret
 }
 
 func EncodeDouble(num float64) ([]byte, error) {

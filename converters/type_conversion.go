@@ -18,6 +18,7 @@ var powerTable = [][]float64{
 	{2.0, 10000.0, 0.0001},
 	{1.0, 100.0, 0.01},
 }
+
 // var factorTable = [][]float64{
 // 	{15.0, 1e+30, 1e-30},
 // 	{14.0, 1e+28, 1e-28},
@@ -214,6 +215,20 @@ func DecodeDate(data []byte) (time.Time, error) {
 		int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, time.UTC), nil
 }
 
+// ProtectAddFigure check if adding digit d overflows the int64 capacity.
+// Return true when overflow
+func ProtectAddFigure(m *int64, d int64) bool {
+	r := *m * 10
+	if r < 0 {
+		return true
+	}
+	r += d
+	if r < 0 {
+		return true
+	}
+	*m = r
+	return false
+}
 
 // DecodeDouble decode Oracle binary representation of numbers into float64
 //
@@ -248,24 +263,24 @@ func DecodeDouble(inputData []byte) float64 {
 		buf = inputData[1 : len(inputData)-1]
 	}
 
+	// Loop on mantissa digits, stop with the capacity of int64 is reached
+	mantissaDigits := 0
 	for _, digit100 := range buf {
 		digit100--
 		if negative {
 			digit100 = 100 - digit100
 		}
-		mantissa *= 10
-		mantissa += int64(digit100 / 10)
-		mantissa *= 10
-		mantissa += int64(digit100 % 10)
+		if ProtectAddFigure(&mantissa, int64(digit100/10)) {
+			break
+		}
+		mantissaDigits++
+		if ProtectAddFigure(&mantissa, int64(digit100%10)) {
+			break
+		}
+		mantissaDigits++
 	}
 
-	digits := 0
-	temp64 := mantissa
-	for temp64 > 0 {
-		digits++
-		temp64 /= 100
-	}
-	exponent = (exponent - digits) * 2
+	exponent = exponent*2 - mantissaDigits // Adjust exponent to the retrieved mantissa
 	if negative {
 		mantissa = -mantissa
 	}
@@ -313,7 +328,6 @@ func DecodeDouble(inputData []byte) float64 {
 //	return ret
 //
 //}
-
 
 func EncodeDouble(num float64) ([]byte, error) {
 	//byte[] numArray = new byte[20];

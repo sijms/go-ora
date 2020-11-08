@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math"
 	"time"
 )
@@ -347,10 +346,8 @@ func DecodeDouble(inputData []byte) float64 {
 		return 0
 	}
 	data, neg := decodeSign(input)
-	fmt.Println("inside neg: ", data)
 	data[0] -= 1
 	// data := append([]byte{uint8(length)}, input[1:]...)
-	fmt.Println(data)
 	flag2 := data[1] < 10
 	num2 := 15  //  factorTable[0][0]; // 15
 	num3 := -15 //  factorTable[0][0] - float64(50 - 20); // -15

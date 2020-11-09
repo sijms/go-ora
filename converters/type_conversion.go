@@ -230,13 +230,13 @@ func ProtectAddFigure(m *int64, d int64) bool {
 	return false
 }
 
-// DecodeDouble decode Oracle binary representation of numbers into float64
+// DecodeDouble2 decode Oracle binary representation of numbers into float64
 //
 // Some documentation:
 //	https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
 //  https://www.orafaq.com/wiki/Number
 
-func DecodeDouble(inputData []byte) float64 {
+func DecodeDouble2(inputData []byte) float64 {
 
 	if len(inputData) == 0 {
 		return math.NaN()

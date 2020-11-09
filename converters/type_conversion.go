@@ -18,6 +18,7 @@ var powerTable = [][]float64{
 	{2.0, 10000.0, 0.0001},
 	{1.0, 100.0, 0.01},
 }
+
 var factorTable = [][]float64{
 	{15.0, 1e+30, 1e-30},
 	{14.0, 1e+28, 1e-28},
@@ -213,64 +214,79 @@ func DecodeDate(data []byte) (time.Time, error) {
 		int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, time.UTC), nil
 }
 
-// DecodeDouble decode Oracle binary representation of numbers into float64
+// ProtectAddFigure check if adding digit d overflows the int64 capacity.
+// Return true when overflow
+func ProtectAddFigure(m *int64, d int64) bool {
+	r := *m * 10
+	if r < 0 {
+		return true
+	}
+	r += d
+	if r < 0 {
+		return true
+	}
+	*m = r
+	return false
+}
+
+// DecodeDouble2 decode Oracle binary representation of numbers into float64
 //
 // Some documentation:
 //	https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
 //  https://www.orafaq.com/wiki/Number
 
-//func DecodeDouble(inputData []byte) float64 {
-//
-//	if len(inputData) == 0 {
-//		return math.NaN()
-//	}
-//	if inputData[0] == 0x80 {
-//		return 0
-//	}
-//	var (
-//		negative bool
-//		exponent int
-//		mantissa int64
-//	)
-//
-//	negative = inputData[0]&0x80 == 0
-//	if negative {
-//		exponent = int(inputData[0]^0x7f) - 64
-//	} else {
-//		exponent = int(inputData[0]&0x7f) - 64
-//	}
-//
-//	buf := inputData[1:]
-//	// When negative, strip the last byte if equal 0x66
-//	if negative && inputData[len(inputData)-1] == 0x66 {
-//		buf = inputData[1 : len(inputData)-1]
-//	}
-//
-//	for _, digit100 := range buf {
-//		digit100--
-//		if negative {
-//			digit100 = 100 - digit100
-//		}
-//		mantissa *= 10
-//		mantissa += int64(digit100 / 10)
-//		mantissa *= 10
-//		mantissa += int64(digit100 % 10)
-//	}
-//
-//	digits := 0
-//	temp64 := mantissa
-//	for temp64 > 0 {
-//		digits++
-//		temp64 /= 100
-//	}
-//	exponent = (exponent - digits) * 2
-//	if negative {
-//		mantissa = -mantissa
-//	}
-//
-//	ret := float64(mantissa) * math.Pow10(exponent)
-//	return ret
-//}
+func DecodeDouble2(inputData []byte) float64 {
+
+	if len(inputData) == 0 {
+		return math.NaN()
+	}
+	if inputData[0] == 0x80 {
+		return 0
+	}
+	var (
+		negative bool
+		exponent int
+		mantissa int64
+	)
+
+	negative = inputData[0]&0x80 == 0
+	if negative {
+		exponent = int(inputData[0]^0x7f) - 64
+	} else {
+		exponent = int(inputData[0]&0x7f) - 64
+	}
+
+	buf := inputData[1:]
+	// When negative, strip the last byte if equal 0x66
+	if negative && inputData[len(inputData)-1] == 0x66 {
+		buf = inputData[1 : len(inputData)-1]
+	}
+
+	// Loop on mantissa digits, stop with the capacity of int64 is reached
+	mantissaDigits := 0
+	for _, digit100 := range buf {
+		digit100--
+		if negative {
+			digit100 = 100 - digit100
+		}
+		if ProtectAddFigure(&mantissa, int64(digit100/10)) {
+			break
+		}
+		mantissaDigits++
+		if ProtectAddFigure(&mantissa, int64(digit100%10)) {
+			break
+		}
+		mantissaDigits++
+	}
+
+	exponent = exponent*2 - mantissaDigits // Adjust exponent to the retrieved mantissa
+	if negative {
+		mantissa = -mantissa
+	}
+
+	ret := float64(mantissa) * math.Pow10(exponent)
+	return ret
+}
 
 //func DecodeDouble(inputData []byte) float64 {
 //	input := make([]byte, len(inputData))

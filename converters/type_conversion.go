@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math"
 	"time"
 )
@@ -402,7 +401,7 @@ func decodeSign(input []byte) (ret []int64, neg bool) {
 }
 
 func DecodeDouble(inputData []byte) float64 {
-	fmt.Println(inputData)
+	//fmt.Println(inputData)
 	input := make([]byte, len(inputData))
 	copy(input, inputData)
 	if input[0] == 0x80 {

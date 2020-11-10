@@ -27,6 +27,7 @@ type Stmt struct {
 	connection         *Connection
 	text               string
 	reExec             bool
+	reSendParDef       bool
 	stmtType           StmtType
 	arrayBindingCount  int
 	disableCompression bool
@@ -65,6 +66,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 		connection:         conn,
 		text:               text,
 		reExec:             false,
+		reSendParDef:       false,
 		disableCompression: true,
 		arrayBindCount:     1,
 		parse:              true,
@@ -94,100 +96,31 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	if err != nil {
 		ret.hasReturnClause = false
 	}
-	ret.al8i4[0] = 1
-	switch ret.stmtType {
-	case DML:
-		fallthrough
-	case PLSQL:
-		if ret.arrayBindCount <= 1 {
-			ret.al8i4[1] = 1
-		} else {
-			ret.al8i4[1] = uint8(ret.arrayBindCount)
-		}
-	case OTHERS:
-		ret.al8i4[1] = 1
-	default:
-		ret.al8i4[1] = 0
-	}
-	if ret.stmtType == SELECT {
-		ret.al8i4[7] = 1
-	} else {
-		ret.al8i4[7] = 0
-	}
+	//ret.al8i4[0] = 1
+	//switch ret.stmtType {
+	//case DML:
+	//	fallthrough
+	//case PLSQL:
+	//	if ret.arrayBindCount <= 1 {
+	//		ret.al8i4[1] = 1
+	//	} else {
+	//		ret.al8i4[1] = uint8(ret.arrayBindCount)
+	//	}
+	//case OTHERS:
+	//	ret.al8i4[1] = 1
+	//default:
+	//	ret.al8i4[1] = 0
+	//}
+	//if ret.stmtType == SELECT {
+	//	ret.al8i4[7] = 1
+	//} else {
+	//	ret.al8i4[7] = 0
+	//}
 	return ret
 }
 
 func (stmt *Stmt) write(session *network.Session) error {
-	if !stmt.reExec {
-		exeOp := stmt.getExeOption()
-		session.PutBytes(3, 0x5E, 0)
-		session.PutUint(exeOp, 4, true, true)
-		session.PutUint(stmt.cursorID, 2, true, true)
-		if stmt.cursorID == 0 {
-			session.PutBytes(1)
-			//session.PutUint(1, 1, false, false)
-		} else {
-			session.PutBytes(0)
-			//session.PutUint(0, 1, false, false)
-		}
-		session.PutUint(len(stmt.text), 4, true, true)
-		session.PutBytes(1)
-		//session.PutUint(1, 1, false, false)
-		session.PutUint(13, 2, true, true)
-		session.PutBytes(0, 0)
-		if exeOp&0x40 == 0 && exeOp&0x20 != 0 && exeOp&0x1 != 0 && stmt.stmtType == SELECT {
-			session.PutBytes(0)
-			//session.PutUint(0, 1, false, false)
-			session.PutUint(stmt.noOfRowsToFetch, 4, true, true)
-		} else {
-			session.PutUint(0, 4, true, true)
-			session.PutUint(0, 4, true, true)
-		}
-		// longFetchSize == 0 marshal 1 else marshal longFetchSize
-		session.PutUint(1, 4, true, true)
-		if len(stmt.Pars) > 0 {
-			session.PutBytes(1)
-			//session.PutUint(1, 1, false, false)
-			session.PutUint(len(stmt.Pars), 2, true, true)
-		} else {
-			session.PutBytes(0, 0)
-			//session.PutUint(0, 1, false, false)
-			//session.PutUint(0, 1, false, false)
-		}
-		session.PutBytes(0, 0, 0, 0, 0)
-		if stmt.define {
-			session.PutBytes(1)
-			//session.PutUint(1, 1, false, false)
-			session.PutUint(stmt.noOfDefCols, 2, true, true)
-		} else {
-			session.PutBytes(0, 0)
-			//session.PutUint(0, 1, false, false)
-			//session.PutUint(0, 1, false, false)
-		}
-		if session.TTCVersion >= 4 {
-			session.PutBytes(0, 0, 1)
-			//session.PutUint(0, 1, false, false) // dbChangeRegisterationId
-			//session.PutUint(0, 1, false, false)
-			//session.PutUint(1, 1, false, false)
-		}
-		if session.TTCVersion >= 5 {
-			session.PutBytes(0, 0, 0, 0, 0)
-			//session.PutUint(0, 1, false, false)
-			//session.PutUint(0, 1, false, false)
-			//session.PutUint(0, 1, false, false)
-			//session.PutUint(0, 1, false, false)
-			//session.PutUint(0, 1, false, false)
-		}
-
-		session.PutBytes([]byte(stmt.text)...)
-		for x := 0; x < len(stmt.al8i4); x++ {
-			session.PutUint(stmt.al8i4[x], 2, true, true)
-		}
-		for _, par := range stmt.Pars {
-			_ = par.write(session)
-		}
-		stmt.reExec = true
-	} else {
+	if stmt.reExec && !stmt.reSendParDef {
 		exeOf := 0
 		execFlag := 0
 		count := stmt.arrayBindCount
@@ -209,7 +142,172 @@ func (stmt *Stmt) write(session *network.Session) error {
 		session.PutUint(count, 2, true, true)
 		session.PutUint(exeOf, 2, true, true)
 		session.PutUint(execFlag, 2, true, true)
+	} else {
+		exeOp := stmt.getExeOption()
+		session.PutBytes(3, 0x5E, 0)
+		session.PutUint(exeOp, 4, true, true)
+		session.PutUint(stmt.cursorID, 2, true, true)
+		if stmt.cursorID == 0 {
+			session.PutBytes(1)
+
+		} else {
+			session.PutBytes(0)
+		}
+		if stmt.reSendParDef {
+			session.PutBytes(0, 1)
+		} else {
+			session.PutUint(len(stmt.text), 4, true, true)
+			session.PutBytes(1)
+		}
+		session.PutUint(13, 2, true, true)
+		session.PutBytes(0, 0)
+		if exeOp&0x40 == 0 && exeOp&0x20 != 0 && exeOp&0x1 != 0 && stmt.stmtType == SELECT {
+			session.PutBytes(0)
+			session.PutUint(stmt.noOfRowsToFetch, 4, true, true)
+		} else {
+			session.PutUint(0, 4, true, true)
+			session.PutUint(0, 4, true, true)
+		}
+		session.PutUint(1, 4, true, true)
+		if len(stmt.Pars) > 0 {
+			session.PutBytes(1)
+			session.PutUint(len(stmt.Pars), 2, true, true)
+		} else {
+			session.PutBytes(0, 0)
+
+		}
+		session.PutBytes(0, 0, 0, 0, 0)
+		if stmt.define {
+			session.PutBytes(1)
+			session.PutUint(stmt.noOfDefCols, 2, true, true)
+		} else {
+			session.PutBytes(0, 0)
+		}
+		if session.TTCVersion >= 4 {
+			session.PutBytes(0, 0, 1)
+		}
+		if session.TTCVersion >= 5 {
+			session.PutBytes(0, 0, 0, 0, 0)
+		}
+		if !stmt.reSendParDef {
+			session.PutBytes([]byte(stmt.text)...)
+		}
+		if exeOp&1 <= 0 {
+			stmt.al8i4[0] = 0
+		} else {
+			stmt.al8i4[0] = 1
+		}
+		switch stmt.stmtType {
+		case DML:
+			fallthrough
+		case PLSQL:
+			if stmt.arrayBindCount <= 1 {
+				stmt.al8i4[1] = 1
+			} else {
+				stmt.al8i4[1] = uint8(stmt.arrayBindCount)
+			}
+		case OTHERS:
+			stmt.al8i4[1] = 1
+		default:
+			stmt.al8i4[1] = 0
+		}
+		if len(stmt.scnFromExe) == 2 {
+			stmt.al8i4[5] = uint8(stmt.scnFromExe[0])
+			stmt.al8i4[6] = uint8(stmt.scnFromExe[1])
+		} else {
+			stmt.al8i4[5] = 0
+			stmt.al8i4[6] = 0
+		}
+		if stmt.stmtType == SELECT {
+			stmt.al8i4[7] = 1
+		} else {
+			stmt.al8i4[7] = 0
+		}
+
+		for x := 0; x < len(stmt.al8i4); x++ {
+			session.PutUint(stmt.al8i4[x], 2, true, true)
+		}
+		for _, par := range stmt.Pars {
+			_ = par.write(session)
+		}
+		stmt.reExec = true
+		stmt.parse = false
+		stmt.reSendParDef = false
+		//stmt.define = false
 	}
+	//if !stmt.reExec {
+	//exeOp := stmt.getExeOption()
+	//session.PutBytes(3, 0x5E, 0)
+	//session.PutUint(exeOp, 4, true, true)
+	//session.PutUint(stmt.cursorID, 2, true, true)
+	//if stmt.cursorID == 0 {
+	//	session.PutBytes(1)
+	//	//session.PutUint(1, 1, false, false)
+	//} else {
+	//	session.PutBytes(0)
+	//	//session.PutUint(0, 1, false, false)
+	//}
+	//session.PutUint(len(stmt.text), 4, true, true)
+	//session.PutBytes(1)
+	//session.PutUint(1, 1, false, false)
+	//session.PutUint(13, 2, true, true)
+	//session.PutBytes(0, 0)
+	//if exeOp&0x40 == 0 && exeOp&0x20 != 0 && exeOp&0x1 != 0 && stmt.stmtType == SELECT {
+	//	session.PutBytes(0)
+	//	//session.PutUint(0, 1, false, false)
+	//	session.PutUint(stmt.noOfRowsToFetch, 4, true, true)
+	//} else {
+	//	session.PutUint(0, 4, true, true)
+	//	session.PutUint(0, 4, true, true)
+	//}
+	// longFetchSize == 0 marshal 1 else marshal longFetchSize
+	//session.PutUint(1, 4, true, true)
+	//if len(stmt.Pars) > 0 {
+	//	session.PutBytes(1)
+	//	//session.PutUint(1, 1, false, false)
+	//	session.PutUint(len(stmt.Pars), 2, true, true)
+	//} else {
+	//	session.PutBytes(0, 0)
+	//	//session.PutUint(0, 1, false, false)
+	//	//session.PutUint(0, 1, false, false)
+	//}
+	//session.PutBytes(0, 0, 0, 0, 0)
+	//if stmt.define {
+	//	session.PutBytes(1)
+	//	//session.PutUint(1, 1, false, false)
+	//	session.PutUint(stmt.noOfDefCols, 2, true, true)
+	//} else {
+	//	session.PutBytes(0, 0)
+	//	//session.PutUint(0, 1, false, false)
+	//	//session.PutUint(0, 1, false, false)
+	//}
+	//if session.TTCVersion >= 4 {
+	//	session.PutBytes(0, 0, 1)
+	//	//session.PutUint(0, 1, false, false) // dbChangeRegisterationId
+	//	//session.PutUint(0, 1, false, false)
+	//	//session.PutUint(1, 1, false, false)
+	//}
+	//if session.TTCVersion >= 5 {
+	//	session.PutBytes(0, 0, 0, 0, 0)
+	//	//session.PutUint(0, 1, false, false)
+	//	//session.PutUint(0, 1, false, false)
+	//	//session.PutUint(0, 1, false, false)
+	//	//session.PutUint(0, 1, false, false)
+	//	//session.PutUint(0, 1, false, false)
+	//}
+
+	//session.PutBytes([]byte(stmt.text)...)
+	//for x := 0; x < len(stmt.al8i4); x++ {
+	//	session.PutUint(stmt.al8i4[x], 2, true, true)
+	//}
+	//for _, par := range stmt.Pars {
+	//	_ = par.write(session)
+	//}
+	//stmt.reExec = true
+	//stmt.parse = false
+	//} else {
+	//
+	//}
 
 	if len(stmt.Pars) > 0 {
 		for x := 0; x < stmt.arrayBindCount; x++ {
@@ -654,13 +752,24 @@ func (stmt *Stmt) Close() error {
 }
 
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	session := stmt.connection.session
-	if len(args) > 0 {
-		stmt.Pars = nil
-	}
 	for x := 0; x < len(args); x++ {
-		stmt.AddParam("", args[x], 0, Input)
+		par := *stmt.NewParam("", args[x], 0, Input)
+		if x < len(stmt.Pars) {
+			if par.MaxLen > stmt.Pars[x].MaxLen {
+				stmt.reSendParDef = true
+			}
+			stmt.Pars[x] = par
+		} else {
+			stmt.Pars = append(stmt.Pars, par)
+		}
 	}
+	session := stmt.connection.session
+	//if len(args) > 0 {
+	//	stmt.Pars = nil
+	//}
+	//for x := 0; x < len(args); x++ {
+	//	stmt.AddParam("", args[x], 0, Input)
+	//}
 	session.ResetBuffer()
 	err := stmt.write(session)
 	if err != nil {
@@ -677,22 +786,14 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	}
 	return result, nil
 }
-func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) {
-	param := ParameterInfo{
+func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) *ParameterInfo {
+	param := &ParameterInfo{
 		Name:        name,
 		Direction:   direction,
 		Flag:        3,
 		CharsetID:   871,
 		CharsetForm: 1,
 	}
-	//if param.Direction == Output {
-	//	if _, ok := val.(string); ok {
-	//		param.MaxCharLen = size
-	//		param.MaxLen = size * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
-	//	}
-	//	stmt.Pars = append(stmt.Pars, param)
-	//	return
-	//}
 	if val == nil {
 		param.DataType = NCHAR
 		param.Value = nil
@@ -750,8 +851,88 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 			param.Value = nil
 		}
 	}
-	stmt.Pars = append(stmt.Pars, param)
+	return param
 }
+func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) {
+	stmt.Pars = append(stmt.Pars, *stmt.NewParam(name, val, size, direction))
+
+}
+
+//func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) {
+//	param := ParameterInfo{
+//		Name:        name,
+//		Direction:   direction,
+//		Flag:        3,
+//		CharsetID:   871,
+//		CharsetForm: 1,
+//	}
+//	//if param.Direction == Output {
+//	//	if _, ok := val.(string); ok {
+//	//		param.MaxCharLen = size
+//	//		param.MaxLen = size * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
+//	//	}
+//	//	stmt.Pars = append(stmt.Pars, param)
+//	//	return
+//	//}
+//	if val == nil {
+//		param.DataType = NCHAR
+//		param.Value = nil
+//		param.ContFlag = 16
+//		param.MaxCharLen = 0
+//		param.MaxLen = 1
+//		param.CharsetForm = 1
+//	} else {
+//		switch val := val.(type) {
+//		case int64:
+//			param.Value = converters.EncodeInt64(val)
+//			param.DataType = NUMBER
+//		case int32:
+//			param.Value = converters.EncodeInt(int(val))
+//			param.DataType = NUMBER
+//		case int16:
+//			param.Value = converters.EncodeInt(int(val))
+//			param.DataType = NUMBER
+//		case int8:
+//			param.Value = converters.EncodeInt(int(val))
+//			param.DataType = NUMBER
+//		case int:
+//			param.Value = converters.EncodeInt(val)
+//			param.DataType = NUMBER
+//		case float32:
+//			param.Value, _ = converters.EncodeDouble(float64(val))
+//			param.DataType = NUMBER
+//		case float64:
+//			param.Value, _ = converters.EncodeDouble(val)
+//			param.DataType = NUMBER
+//		case time.Time:
+//			param.Value = converters.EncodeDate(val)
+//			param.DataType = DATE
+//			param.ContFlag = 0
+//			param.MaxLen = 11
+//			param.MaxCharLen = 11
+//		case string:
+//			param.Value = stmt.connection.strConv.Encode(val)
+//			param.DataType = NCHAR
+//			param.ContFlag = 16
+//			param.MaxCharLen = len(val)
+//			if size > len(val) {
+//				param.MaxCharLen = size
+//			}
+//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
+//			param.CharsetForm = 1
+//		}
+//		if param.DataType == NUMBER {
+//			param.ContFlag = 0
+//			param.MaxCharLen = 22
+//			param.MaxLen = 22
+//			param.CharsetForm = 1
+//		}
+//		if direction == Output {
+//			param.Value = nil
+//		}
+//	}
+//	stmt.Pars = append(stmt.Pars, param)
+//}
 
 //func (stmt *Stmt) reExec() (driver.Rows, error) {
 //
@@ -759,10 +940,21 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	stmt.noOfRowsToFetch = 25
 	stmt.hasMoreRows = true
-	stmt.Pars = nil
 	for x := 0; x < len(args); x++ {
-		stmt.AddParam("", args[x], 0, Input)
+		par := *stmt.NewParam("", args[x], 0, Input)
+		if x < len(stmt.Pars) {
+			if par.MaxLen > stmt.Pars[x].MaxLen {
+				stmt.reSendParDef = true
+			}
+			stmt.Pars[x] = par
+		} else {
+			stmt.Pars = append(stmt.Pars, par)
+		}
 	}
+	//stmt.Pars = nil
+	//for x := 0; x < len(args); x++ {
+	//	stmt.AddParam()
+	//}
 	stmt.connection.session.ResetBuffer()
 	// if re-execute
 	err := stmt.write(stmt.connection.session)

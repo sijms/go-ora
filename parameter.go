@@ -101,10 +101,6 @@ type ParameterInfo struct {
 	getDataFromServer    bool
 }
 
-//func (par *ParameterInfo) Read(session *network.Session) error {
-//	return nil
-//}
-
 func (par *ParameterInfo) read(session *network.Session) error {
 	par.getDataFromServer = true
 	dataType, err := session.GetByte()

@@ -459,7 +459,7 @@ func DecodeDouble(inputData []byte) float64 {
 		if factorTable[index2][1] >= 1.0 {
 			num6 = float64(data[1]) * factorTable[index2][1]
 		} else {
-			num6 = float64(data[1]) * factorTable[index2][2]
+			num6 = float64(data[1]) / factorTable[index2][2]
 		}
 		index1++
 		num5--

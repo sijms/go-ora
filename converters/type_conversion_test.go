@@ -4,6 +4,7 @@ import (
 	"math"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // Some documentation:
@@ -102,5 +103,16 @@ func TestEncodeDouble(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEncodeDate(t *testing.T) {
+	ti := time.Date(2006, 01, 02, 15, 04, 06, 0, time.UTC)
+
+	got := EncodeDate(ti)
+	want := []byte{214, 7, 1, 2, 15, 4, 5, 0}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("EncodeDate(%v) = %v, want %v", ti, got, want)
 	}
 }

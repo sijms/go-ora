@@ -39,7 +39,7 @@ func TestDecodeInt(t *testing.T) {
 func TestEncodeInt64(t *testing.T) {
 	for _, tt := range testFloatValue {
 		// Test only with interger values
-		if tt.IsInteger && tt.Integer >= 0 {
+		if tt.IsInteger {
 			t.Run(tt.SelectText, func(t *testing.T) {
 				got := EncodeInt64(tt.Integer)
 
@@ -59,7 +59,7 @@ func TestEncodeInt64(t *testing.T) {
 func TestEncodeInt(t *testing.T) {
 	for _, tt := range testFloatValue {
 		// Test only with interger values
-		if tt.IsInteger {
+		if tt.IsInteger && tt.Float >= math.MinInt64 && tt.Float <= math.MaxInt64 {
 			t.Run(tt.SelectText, func(t *testing.T) {
 				i := int(tt.Integer)
 				got := EncodeInt(i)

@@ -11,7 +11,7 @@ import (
 
 func TestDecodeDouble(t *testing.T) {
 
-	for _, tt := range testFloatVualue {
+	for _, tt := range testFloatValue {
 		t.Run(tt.SelectText, func(t *testing.T) {
 			got := DecodeDouble(tt.Binary)
 			e := math.Abs((got - tt.Float) / tt.Float)
@@ -23,15 +23,13 @@ func TestDecodeDouble(t *testing.T) {
 }
 
 func TestDecodeInt(t *testing.T) {
-	for _, tt := range testFloatVualue {
+	for _, tt := range testFloatValue {
 		// Test only with interger values
-		i, f := math.Modf(tt.Float)
-		if f == 0.0 && i >= math.MinInt64 && i <= math.MaxInt64 {
+		if tt.IsInteger {
 			t.Run(tt.SelectText, func(t *testing.T) {
-				n := int64(i)
 				got := DecodeInt(tt.Binary)
-				if got != n {
-					t.Errorf("DecodeInt() = %v, want %v", got, n)
+				if got != tt.Integer {
+					t.Errorf("DecodeInt() = %v, want %v", got, tt.Integer)
 				}
 			})
 		}
@@ -39,21 +37,40 @@ func TestDecodeInt(t *testing.T) {
 }
 
 func TestEncodeInt64(t *testing.T) {
-	for _, tt := range testFloatVualue {
+	for _, tt := range testFloatValue {
 		// Test only with interger values
-		i, f := math.Modf(tt.Float)
-		if f == 0.0 && i >= math.MinInt64 && i <= math.MaxInt64 {
+		if tt.IsInteger && tt.Integer >= 0 {
 			t.Run(tt.SelectText, func(t *testing.T) {
-				n := int64(i)
-				got := EncodeInt64(n)
+				got := EncodeInt64(tt.Integer)
 
 				n2 := DecodeInt(got)
-				if true || n2 != n {
-					t.Errorf("DecodeInt(EncodeInt64(%d)) = %v", n, n2)
+				if n2 != tt.Integer {
+					t.Errorf("DecodeInt(EncodeInt64(%d)) = %v", tt.Integer, n2)
 				}
 
-				if true || !reflect.DeepEqual(got, tt.Binary) {
+				if !reflect.DeepEqual(got, tt.Binary) {
 					t.Errorf("EncodeInt64() = %v, want %v", got, tt.Binary)
+				}
+			})
+		}
+	}
+}
+
+func TestEncodeInt(t *testing.T) {
+	for _, tt := range testFloatValue {
+		// Test only with interger values
+		if tt.IsInteger {
+			t.Run(tt.SelectText, func(t *testing.T) {
+				i := int(tt.Integer)
+				got := EncodeInt(i)
+
+				n2 := int(DecodeInt(got))
+				if n2 != i {
+					t.Errorf("DecodeInt(EncodeInt(%d)) = %v", i, n2)
+				}
+
+				if !reflect.DeepEqual(got, tt.Binary) {
+					t.Errorf("EncodeInt() = %v, want %v", got, tt.Binary)
 				}
 			})
 		}
@@ -62,7 +79,7 @@ func TestEncodeInt64(t *testing.T) {
 
 func TestEncodeDouble(t *testing.T) {
 
-	for _, tt := range testFloatVualue {
+	for _, tt := range testFloatValue {
 		t.Run(tt.SelectText, func(t *testing.T) {
 			got, err := EncodeDouble(tt.Float)
 			if err != nil {

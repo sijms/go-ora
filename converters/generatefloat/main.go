@@ -6,9 +6,11 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -101,6 +103,8 @@ var testValues = []struct {
 	{"2*asin(1)", 2. * math.Asin(1.0)},
 	{"1/3", 1.0 / 3.0},
 	{"-1/3", -1.0 / 3.0},
+	{"9223372036854775807", math.MaxInt64},
+	{"-9223372036854775808", math.MinInt64},
 }
 
 func checkErr(err error) {
@@ -114,6 +118,8 @@ type tmplRow struct {
 	SelectText string
 	OracleText string
 	Float      float64
+	Integer    int64
+	IsInteger  bool
 	Binary     string
 }
 
@@ -146,20 +152,40 @@ func main() {
 			checkErr(fmt.Errorf("Query: %s must return a row", query))
 		}
 		var (
-			asString string
-			asFloat  float64
-			dump     string
+			asString  string
+			asFloat   float64
+			asInt64   int64
+			isInteger bool
+			dump      string
 		)
 
 		err = rows.Scan(&asString, &asFloat, &dump)
 		checkErr(err)
-		i := strings.Index(dump, ": ")
-		fmt.Println(tt.asString, tt.asFloat, dump[i+2:])
+
+		// Check oracle representation to test if number is Int
+		if i := strings.Index(asString, "."); i == -1 {
+			isInteger = true
+			asInt64, err = strconv.ParseInt(asString, 10, 64)
+			if err != nil {
+				if !errors.Is(err, strconv.ErrRange) {
+					checkErr(err)
+				}
+				isInteger = false
+				asInt64 = 0
+				err = nil
+			}
+		}
+
+		if i := strings.Index(dump, ": "); i > 0 {
+			dump = dump[i+2:]
+		}
 		result = append(result, tmplRow{
 			tt.asString,
 			asString,
 			tt.asFloat,
-			dump[i+2:],
+			asInt64,
+			isInteger,
+			dump,
 		})
 
 		rows.Close()
@@ -176,16 +202,20 @@ func main() {
 
 	tmpltext := `package {{.Package}}
 
-/* This file is generated */
+/* This file is generated.
+     go run .\generatefloat\main.go converters
+*/
 
 var testFloatVualue = []struct {
 	SelectText string
 	OracleText string
 	Float float64
+	Integer int64
+	IsInteger bool
 	Binary []byte
 }{
 	{{- range .Values}}
-	{ "{{.SelectText}}", "{{.OracleText}}", {{printf "%g" .Float}}, []byte{ {{.Binary}} } },  // {{printf "%e" .Float}}
+	{ "{{.SelectText}}", "{{.OracleText}}", {{printf "%g" .Float}},  {{.Integer}}, {{.IsInteger}},  []byte{ {{.Binary}} } },  // {{printf "%e" .Float}}
 	{{- end }}
 }`
 

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
+	"strconv"
 	"time"
 )
 
@@ -536,4 +537,74 @@ func DecodeDouble(inputData []byte) float64 {
 		num6 = num6 * -1
 	}
 	return num6
+}
+
+func EncodeDouble2(num float64) ([]byte, error) {
+	if num == 0.0 {
+		return []byte{128}, nil
+	}
+
+	var (
+		err      error
+		negative bool
+		exponent int
+		mantissa int
+	)
+
+	// Let's the standard library doing the delicate work of converting binary float to decimal figures
+	s := []byte(strconv.FormatFloat(num, 'e', -1, 64))
+
+	if s[0] == '-' {
+		negative = true
+		s = s[1:]
+	}
+
+	if i := bytes.Index(s, []byte{'e'}); i >= 0 {
+		exponent, err = strconv.Atoi(string(s[i+1:]))
+		if err != nil {
+			return nil, err
+		}
+		if exponent%2 != 0 {
+			s = s[:i]
+		} else {
+			s = append([]byte("0"), s[:i]...)
+		}
+		if exponent < 0 {
+			exponent--
+		}
+	}
+
+	if i := bytes.Index(s, []byte{'.'}); i >= 0 {
+		s = append(s[:i], s[i+1:]...)
+	}
+
+	mantissa = len(s)
+	size := 1 + (mantissa+1)/2
+	if negative && mantissa < 21 {
+		size++
+	}
+	buf := make([]byte, size, size)
+
+	for i := 0; i < mantissa; i += 2 {
+		b := 10 * (s[i] - '0')
+		if i < mantissa-1 {
+			b += s[i+1] - '0'
+		}
+		if negative {
+			b = 100 - b
+		}
+		buf[1+i/2] = b + 1
+	}
+
+	if negative && mantissa < 21 {
+		buf[len(buf)-1] = 0x66
+	}
+
+	exponent = (exponent / 2) + 1
+	if negative {
+		buf[0] = byte(exponent+64) ^ 0x7f
+	} else {
+		buf[0] = byte(exponent+64) | 0x80
+	}
+	return buf, nil
 }

@@ -2,6 +2,7 @@ package converters
 
 import (
 	"math"
+	"reflect"
 	"testing"
 )
 
@@ -31,7 +32,7 @@ func TestDecodeDouble2(t *testing.T) {
 			got := DecodeDouble2(tt.Binary)
 			var e float64
 			if tt.Float != 0 {
-				e = math.Abs(got-tt.Float) / tt.Float
+				e = math.Abs((got - tt.Float) / tt.Float)
 			}
 			if e > 1e-15 {
 				t.Errorf("DecodeDouble2() = %g, want %g, Error= %e", got, tt.Float, e)
@@ -48,6 +49,61 @@ func TestDecodeDouble(t *testing.T) {
 			e := math.Abs(got - tt.Float)
 			if e > 1e-15 {
 				t.Errorf("DecodeDouble() = %v, want %v, Error= %e", got, tt.Float, e)
+			}
+		})
+	}
+}
+func TestEncodeDouble2(t *testing.T) {
+
+	for _, tt := range testFloatVualue {
+		t.Run(tt.SelectText, func(t *testing.T) {
+			got, err := EncodeDouble2(tt.Float)
+			if err != nil {
+				t.Errorf("Unexpected error: %s", err)
+				return
+			}
+
+			f := DecodeDouble2(got)
+
+			if tt.Float != 0.0 {
+				e := math.Abs((f - tt.Float) / tt.Float)
+				if e > 1e-15 {
+					t.Errorf("DecodeDouble2(EncodeDouble2(%g)) = %g,  Error= %e", tt.Float, f, e)
+				}
+			}
+
+			if len(tt.Binary) < 10 {
+				if !reflect.DeepEqual(tt.Binary, got) {
+					t.Errorf("EncodeDouble2(%g) = %v want %v", tt.Float, got, tt.Binary)
+				}
+			}
+		})
+	}
+}
+
+func TestEncodeDouble(t *testing.T) {
+
+	for _, tt := range testFloatVualue {
+		t.Run(tt.SelectText, func(t *testing.T) {
+			got, err := EncodeDouble(tt.Float)
+			if err != nil {
+				t.Errorf("Unexpected error: %s", err)
+				return
+			}
+
+			f := DecodeDouble(got)
+
+			if tt.Float != 0.0 {
+				e := math.Abs((f - tt.Float) / tt.Float)
+				if e > 1e-15 {
+					t.Errorf("DecodeDouble(EncodeDouble(%g)) = %g,  Error= %e", tt.Float, f, e)
+				}
+			}
+
+			if len(tt.Binary) < 10 {
+				if !reflect.DeepEqual(tt.Binary, got) {
+					t.Errorf("EncodeDouble(%g) = %v want %v", tt.Float, got, tt.Binary)
+				}
 			}
 		})
 	}

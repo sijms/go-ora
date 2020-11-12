@@ -11,7 +11,7 @@ import (
 
 func TestDecodeDouble(t *testing.T) {
 
-	for _, tt := range testFloatValue {
+	for _, tt := range TestFloatValue {
 		t.Run(tt.SelectText, func(t *testing.T) {
 			got := DecodeDouble(tt.Binary)
 			e := math.Abs((got - tt.Float) / tt.Float)
@@ -23,7 +23,7 @@ func TestDecodeDouble(t *testing.T) {
 }
 
 func TestDecodeInt(t *testing.T) {
-	for _, tt := range testFloatValue {
+	for _, tt := range TestFloatValue {
 		// Test only with interger values
 		if tt.IsInteger {
 			t.Run(tt.SelectText, func(t *testing.T) {
@@ -37,7 +37,7 @@ func TestDecodeInt(t *testing.T) {
 }
 
 func TestEncodeInt64(t *testing.T) {
-	for _, tt := range testFloatValue {
+	for _, tt := range TestFloatValue {
 		// Test only with interger values
 		if tt.IsInteger {
 			t.Run(tt.SelectText, func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestEncodeInt64(t *testing.T) {
 }
 
 func TestEncodeInt(t *testing.T) {
-	for _, tt := range testFloatValue {
+	for _, tt := range TestFloatValue {
 		// Test only with interger values
 		if tt.IsInteger && tt.Float >= math.MinInt64 && tt.Float <= math.MaxInt64 {
 			t.Run(tt.SelectText, func(t *testing.T) {
@@ -79,7 +79,7 @@ func TestEncodeInt(t *testing.T) {
 
 func TestEncodeDouble(t *testing.T) {
 
-	for _, tt := range testFloatValue {
+	for _, tt := range TestFloatValue {
 		t.Run(tt.SelectText, func(t *testing.T) {
 			got, err := EncodeDouble(tt.Float)
 			if err != nil {

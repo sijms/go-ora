@@ -206,7 +206,7 @@ func main() {
      go run .\generatefloat\main.go converters
 */
 
-var testFloatVualue = []struct {
+var testFloatValue = []struct {
 	SelectText string
 	OracleText string
 	Float float64

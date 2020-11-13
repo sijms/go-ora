@@ -93,11 +93,15 @@ func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int,
 	}
 
 	carry := false // get true when mantissa exceeds 64 bits
+	firstDigitWasZero := 0
 
 	// Loop on mantissa digits, stop with the capacity of int64 is reached
 	// Beyond, digits will be lost during convertion t
 	mantissaDigits = 0
-	for _, digit100 := range buf {
+	for p, digit100 := range buf {
+		if p == 0 {
+			firstDigitWasZero = -1
+		}
 		digit100--
 		if negative {
 			digit100 = 100 - digit100
@@ -117,7 +121,7 @@ func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int,
 	}
 
 	exponent = exponent*2 - mantissaDigits // Adjust exponent to the retrieved mantissa
-	return mantissa, negative, exponent, mantissaDigits, nil
+	return mantissa, negative, exponent, mantissaDigits + firstDigitWasZero, nil
 }
 
 // DecodeDouble decode NUMBER as a float64
@@ -177,11 +181,19 @@ func DecodeNumber(inputData []byte) interface{} {
 	if mantissaDigits == 0 {
 		return int64(0)
 	}
-	if exponent >= 0 && mantissaDigits+exponent < len(powerOfTen) {
+
+	if exponent >= 0 && exponent < len(powerOfTen) {
 		// exponent = mantissaDigits - exponent
 		IntMantissa := mantissa
 		IntExponent := exponent
-		_, IntMantissa = bits.Mul64(IntMantissa, powerOfTen[IntExponent])
+		var over uint64
+		over, IntMantissa = bits.Mul64(IntMantissa, powerOfTen[IntExponent])
+		if IntMantissa >= 9000000000000000000 {
+			goto fallbackToFloat
+		}
+		if over != 0 {
+			goto fallbackToFloat
+		}
 
 		if negative && (IntMantissa>>63) == 0 {
 			return -int64(IntMantissa)
@@ -189,9 +201,11 @@ func DecodeNumber(inputData []byte) interface{} {
 		return int64(IntMantissa)
 	}
 
+fallbackToFloat:
 	if negative {
 		return -float64(mantissa) * math.Pow10(exponent)
 	}
+
 	return float64(mantissa) * math.Pow10(exponent)
 }
 

@@ -103,8 +103,15 @@ var testValues = []struct {
 	{"2*asin(1)", 2. * math.Asin(1.0)},
 	{"1/3", 1.0 / 3.0},
 	{"-1/3", -1.0 / 3.0},
-	{"9223372036854775807", math.MaxInt64},
-	{"-9223372036854775808", math.MinInt64},
+	{"9000000000000000000", 9000000000000000000},
+	{"-9000000000000000000", -9000000000000000000},
+	// {"9223372036854774784", 9223372036854774784},
+	// {"-9223372036854774784", -9223372036854774784},
+	// {"-1000000000000000000", -1000000000000000000},
+	// {"9223372036854775805", 9223372036854775805},
+	// {"9223372036854775807", 9223372036854775807},
+	// {"-9223372036854775806", -9223372036854775806},
+	// {"-9223372036854775808", -9223372036854775808},
 }
 
 func checkErr(err error) {
@@ -123,11 +130,15 @@ type tmplRow struct {
 	Binary     string
 }
 
+const (
+	maxConvertibleInt = 9223372036854774784
+)
+
 func main() {
-	if len(os.Args) < 2 {
-		checkErr(fmt.Errorf("Give package name for generated file on command line"))
+	packageName := "converters"
+	if len(os.Args) >= 2 {
+		packageName = os.Args[1]
 	}
-	packageName := os.Args[1]
 
 	connStr := os.Getenv("GOORA_TESTDB")
 	if connStr == "" {
@@ -166,8 +177,8 @@ func main() {
 		if i := strings.Index(asString, "."); i == -1 {
 			isInteger = true
 			asInt64, err = strconv.ParseInt(asString, 10, 64)
-			if err != nil {
-				if !errors.Is(err, strconv.ErrRange) {
+			if err != nil || asInt64 >= 9000000000000000000 || asInt64 <= -9000000000000000000 {
+				if err != nil && !errors.Is(err, strconv.ErrRange) {
 					checkErr(err)
 				}
 				isInteger = false
@@ -203,7 +214,8 @@ func main() {
 	tmpltext := `package {{.Package}}
 
 /* This file is generated.
-     go run .\generatefloat\main.go converters
+	move to converters directory and 
+    go run .\generatefloat\main.go {{.Package}}
 */
 
 var TestFloatValue = []struct {

@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 func TestSelectBindFloat(t *testing.T) {
 	for _, tt := range converters.TestFloatValue {
 		t.Run(tt.SelectText, func(t *testing.T) {
-			query := fmt.Sprintf("select N, N||'' S from (select :1 N from dual)")
+			query := fmt.Sprintf("select :1 N from dual")
 			stmt, err := conn.Prepare(query)
 			if err != nil {
 				t.Errorf("Query can't be prepared: %s", err)
@@ -54,9 +54,8 @@ func TestSelectBindFloat(t *testing.T) {
 
 			var (
 				got float64
-				s   string
 			)
-			err = rows.Scan(&got, &s)
+			err = rows.Scan(&got)
 			if err != nil {
 				t.Errorf("Query can't scan row: %s", err)
 				return
@@ -69,8 +68,8 @@ func TestSelectBindFloat(t *testing.T) {
 				e = math.Abs(got - tt.Float)
 			}
 
-			if e > 1e-15 {
-				t.Errorf("Query expecting: %v, got %v", tt.Float, got)
+			if true || e > 1e-15 {
+				t.Errorf("Query expecting: %v, got %v, error %g", tt.Float, got, e)
 			}
 		})
 	}
@@ -81,7 +80,7 @@ func TestSelectBindInt(t *testing.T) {
 	for _, tt := range converters.TestFloatValue {
 		if tt.IsInteger {
 			t.Run(tt.SelectText, func(t *testing.T) {
-				query := fmt.Sprintf("select N, N||'' S from (select :1 N from dual)")
+				query := fmt.Sprintf("select :1 N from dual")
 				stmt, err := conn.Prepare(query)
 				if err != nil {
 					t.Errorf("Query can't be prepared: %s", err)
@@ -103,9 +102,8 @@ func TestSelectBindInt(t *testing.T) {
 
 				var (
 					got int64
-					s   string
 				)
-				err = rows.Scan(&got, &s)
+				err = rows.Scan(&got)
 				if err != nil {
 					t.Errorf("Query can't scan row: %s", err)
 					return

@@ -5,9 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/sijms/go-ora/converters"
 	"github.com/sijms/go-ora/network"
-	"time"
 
 	//charmap "golang.org/x/text/encoding/charmap"
 	"regexp"
@@ -552,7 +553,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 									if dataSet.Cols[x].Scale == 0 {
 										dataSet.currentRow[x] = int64(converters.DecodeInt(temp))
 									} else {
-										dataSet.currentRow[x] = converters.DecodeDouble2(temp)
+										dataSet.currentRow[x] = converters.DecodeDouble(temp)
 										//base := math.Pow10(int(dataSet.Cols[x].Scale))
 										//if dataSet.Cols[x].Scale < 0x80 {
 										//	dataSet.currentRow[x] = math.Round(converters.DecodeDouble(temp)*base) / base

@@ -53,12 +53,12 @@ func addDigitToMantissa(mantissaIn uint64, d byte) (mantissaOut uint64, carryOut
 	mantissaOut = mantissaIn
 
 	if mantissaIn != 0 {
-		for i := 0; i < 9; i++ {
-			mantissaOut, carry = bits.Add64(mantissaOut, mantissaIn, carry)
-			if carry != 0 {
-				return mantissaIn, true
-			}
+		var over uint64
+		over, mantissaOut = bits.Mul64(mantissaIn, uint64(10))
+		if over != 0 {
+			return mantissaIn, true
 		}
+	}
 	}
 	mantissaOut, carry = bits.Add64(mantissaOut, uint64(d), carry)
 	if carry != 0 {

@@ -4,184 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
+	"math/bits"
 	"strconv"
 	"time"
 )
 
-var powerTable = [][]float64{
-	{128.0, 1e+256, 1e-256},
-	{64.0, 1e+128, 1e-128},
-	{32.0, 1e+64, 1e-64},
-	{16.0, 1e+32, 1e-32},
-	{8.0, 1e+16, 1e-16},
-	{4.0, 100000000.0, 1e-08},
-	{2.0, 10000.0, 0.0001},
-	{1.0, 100.0, 0.01},
-}
-
-var factorTable = [][]float64{
-	{15.0, 1e+30, 1e-30},
-	{14.0, 1e+28, 1e-28},
-	{13.0, 1e+26, 1e-26},
-	{12.0, 1e+24, 1e-24},
-	{11.0, 1e+22, 1e-22},
-	{10.0, 1e+20, 1e-20},
-	{9.0, 1e+18, 1e-18},
-	{8.0, 1e+16, 1e-16},
-	{7.0, 100000000000000.0, 1e-14},
-	{6.0, 1000000000000.0, 1e-12},
-	{5.0, 10000000000.0, 1e-10},
-	{4.0, 100000000.0, 1e-08},
-	{3.0, 1000000.0, 1e-06},
-	{2.0, 10000.0, 0.0001},
-	{1.0, 100.0, 0.01},
-	{0.0, 1.0, 1.0},
-	{-1.0, 0.01, 100.0},
-	{-2.0, 0.0001, 10000.0},
-	{-3.0, 1e-06, 1000000.0},
-	{-4.0, 1e-08, 100000000.0},
-	{-5.0, 1e-10, 10000000000.0},
-	{-6.0, 1e-12, 1000000000000.0},
-	{-7.0, 1e-14, 100000000000000.0},
-	{-8.0, 1e-16, 1e+16},
-	{-9.0, 1e-18, 1e+18},
-	{-10.0, 1e-20, 1e+20},
-	{-11.0, 1e-22, 1e+22},
-	{-12.0, 1e-24, 1e+24},
-	{-13.0, 1e-26, 1e+26},
-	{-14.0, 1e-28, 1e+28},
-	{-15.0, 1e-30, 1e+30},
-	{-16.0, 1e-32, 1e+32},
-	{-17.0, 1e-34, 1e+34},
-	{-18.0, 1e-36, 1e+36},
-	{-19.0, 1e-38, 1e+38},
-	{-20.0, 1e-40, 1e+40},
-	{-21.0, 1e-42, 1e+42},
-	{-22.0, 1e-44, 1e+44},
-	{-23.0, 1e-46, 1e+46},
-	{-24.0, 1e-48, 1e+48},
-	{-25.0, 1e-50, 1e+50},
-	{-26.0, 1e-52, 1e+52},
-	{-27.0, 1e-54, 1e+54},
-	{-28.0, 1e-56, 1e+56},
-	{-29.0, 1e-58, 1e+58},
-	{-30.0, 1e-60, 1e+60},
-	{-31.0, 1e-62, 1e+62},
-	{-32.0, 1e-64, 1e+64},
-	{-33.0, 1e-66, 1e+66},
-	{-34.0, 1e-68, 1e+68},
-}
-
-// note that int64 is different in size > 22 byte size and when make clear type you will path 1 instead of 0
-//case OraType.ORA_NUMBER:
-//case OraType.ORA_VARNUM:
-//if (numArray.Length >= 22)
-//{
-//mEngine.MarshalCLR(numArray, 1, (int) numArray[0]);
-//break;
-//}
-//mEngine.MarshalCLR(numArray, 0, numArray.Length);
-func encodeSign(input []byte, neg bool) []byte {
-	if !neg {
-		input[0] = uint8(int(input[0]) + 0x80 + 0x40 + 1)
-		for x := 1; x < len(input); x++ {
-			input[x] = input[x] + 1
-		}
-	} else {
-		input[0] = 0xFF - uint8(int(input[0])+0x80+0x40+1)
-		for x := 1; x < len(input); x++ {
-			input[x] = uint8(101 - input[x])
-		}
-		if len(input) <= 20 {
-			input = append(input, 102)
-		}
-	}
-	return input
-}
-
-//func decodeSign(input []byte) (length int, neg bool) {
-//	if input[0] > 0x80 {
-//		length = int(input[0]) - 0x80 - 0x40
-//		for x := 1; x < len(input); x++ {
-//			input[x] = input[x] - 1
-//		}
-//		neg = false
-//	} else {
-//		length = 0xFF - int(input[0]) - 0x80 - 0x40
-//		if len(input) <= 20 && input[len(input)-1] == 102 {
-//			input = input[:len(input)-1]
-//		}
-//		for x := 1; x < len(input); x++ {
-//			input[x] = uint8(101 - input[x])
-//		}
-//		neg = true
-//	}
-//	return
-//}
-
-func DecodeInt(inputData []byte) int64 {
-	// take a copy of input
-	input := make([]byte, len(inputData))
-	copy(input, inputData)
-	if input[0] == 0x80 {
-		return 0
-	}
-	data, neg := decodeSign(input)
-	length := int(data[0])
-	if length > len(data[1:]) {
-		data = append(data, make([]int64, length-len(data[1:]))...)
-	}
-	data = data[1 : 1+length]
-	var ret int64 = 0
-	for x := 0; x < len(data); x++ {
-		ret = (ret * 100) + data[x]
-	}
-	if neg {
-		ret = ret * -1
-	}
-	return ret
-}
-
-func EncodeInt64(val int64) []byte {
-	if val == 0 {
-		return []byte{0x80}
-	}
-	output := make([]byte, 0, 20)
-	neg := val < 0
-	for val != 0 {
-		output = append(output, uint8(math.Abs(float64(val%100))))
-		val = val / 100
-	}
-	for i, j := 0, len(output)-1; i < j; i, j = i+1, j-1 {
-		output[i], output[j] = output[j], output[i]
-	}
-	byteLen := uint8(len(output)) - 1
-	output = bytes.TrimRight(output, "\x00")
-
-	output = append([]byte{byteLen}, output...)
-	return encodeSign(output, neg)
-}
-func EncodeInt(val int) []byte {
-	if val == 0 {
-		return []byte{0x80}
-	}
-	output := make([]byte, 0, 20)
-	neg := val < 0
-	for val != 0 {
-		output = append(output, uint8(math.Abs(float64(val%100))))
-		val = val / 100
-	}
-	for i, j := 0, len(output)-1; i < j; i, j = i+1, j-1 {
-		output[i], output[j] = output[j], output[i]
-	}
-	byteLen := uint8(len(output)) - 1
-	output = bytes.TrimRight(output, "\x00")
-
-	output = append([]byte{byteLen}, output...)
-	return encodeSign(output, neg)
-}
-
+// EncodeDate convert time.Time into oracle representation
 func EncodeDate(ti time.Time) []byte {
 	ret := make([]byte, 7)
 	ret[0] = uint8(ti.Year()/100 + 100)
@@ -194,6 +24,7 @@ func EncodeDate(ti time.Time) []byte {
 	return ret
 }
 
+// DecodeDate convert oracle time representation into time.Time
 func DecodeDate(data []byte) (time.Time, error) {
 	if len(data) < 7 {
 		return time.Now(), errors.New("abnormal data representation for date")
@@ -215,40 +46,38 @@ func DecodeDate(data []byte) (time.Time, error) {
 		int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, time.UTC), nil
 }
 
-// ProtectAddFigure check if adding digit d overflows the int64 capacity.
-// Return true when overflow
-func ProtectAddFigure(m *int64, d int64) bool {
-	r := *m * 10
-	if r < 0 {
-		return true
+// addDigitToMantissa return the mantissa with the added digit if the carry is not
+// set by the add. Othervise, return the mantissa untouched and carry = true.
+func addDigitToMantissa(mantissaIn uint64, d byte) (mantissaOut uint64, carryOut bool) {
+	var carry uint64
+	mantissaOut = mantissaIn
+
+	if mantissaIn != 0 {
+		var over uint64
+		over, mantissaOut = bits.Mul64(mantissaIn, uint64(10))
+		if over != 0 {
+			return mantissaIn, true
+		}
 	}
-	r += d
-	if r < 0 {
-		return true
+	mantissaOut, carry = bits.Add64(mantissaOut, uint64(d), carry)
+	if carry != 0 {
+		return mantissaIn, true
 	}
-	*m = r
-	return false
+	return mantissaOut, false
 }
 
-// DecodeDouble2 decode Oracle binary representation of numbers into float64
-//
+// FromNumber decode Oracle binary representation of numbers
+// and returns mantissa, negative and exponent
 // Some documentation:
 //	https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
 //  https://www.orafaq.com/wiki/Number
-
-func DecodeDouble2(inputData []byte) float64 {
-
+func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int, mantissaDigits int, err error) {
 	if len(inputData) == 0 {
-		return math.NaN()
+		return 0, false, 0, 0, fmt.Errorf("Invalid NUMBER")
 	}
 	if inputData[0] == 0x80 {
-		return 0
+		return 0, false, 0, 0, nil
 	}
-	var (
-		negative bool
-		exponent int
-		mantissa int64
-	)
 
 	negative = inputData[0]&0x80 == 0
 	if negative {
@@ -263,332 +92,146 @@ func DecodeDouble2(inputData []byte) float64 {
 		buf = inputData[1 : len(inputData)-1]
 	}
 
+	carry := false // get true when mantissa exceeds 64 bits
+	firstDigitWasZero := 0
+
 	// Loop on mantissa digits, stop with the capacity of int64 is reached
-	mantissaDigits := 0
-	for _, digit100 := range buf {
+	// Beyond, digits will be lost during convertion t
+	mantissaDigits = 0
+	for p, digit100 := range buf {
+		if p == 0 {
+			firstDigitWasZero = -1
+		}
 		digit100--
 		if negative {
 			digit100 = 100 - digit100
 		}
-		if ProtectAddFigure(&mantissa, int64(digit100/10)) {
+
+		mantissa, carry = addDigitToMantissa(mantissa, digit100/10)
+		if carry {
 			break
 		}
 		mantissaDigits++
-		if ProtectAddFigure(&mantissa, int64(digit100%10)) {
+
+		mantissa, carry = addDigitToMantissa(mantissa, digit100%10)
+		if carry {
 			break
 		}
 		mantissaDigits++
 	}
 
 	exponent = exponent*2 - mantissaDigits // Adjust exponent to the retrieved mantissa
-	if negative {
-		mantissa = -mantissa
-	}
-
-	ret := float64(mantissa) * math.Pow10(exponent)
-	return ret
+	return mantissa, negative, exponent, mantissaDigits + firstDigitWasZero, nil
 }
 
-//func DecodeDouble(inputData []byte) float64 {
-//	input := make([]byte, len(inputData))
-//	copy(input, inputData)
-//	if input[0] == 0x80 {
-//		return 0
-//	}
-//	length, neg := decodeSign(input)
-//	length -= 1
-//	data := input[1:]
-//	var ret float64
-//	ret = float64(data[0])
-//	for x := 1; x < len(data); x++ {
-//		ret = ret + (float64(data[x]) / math.Pow(100.0, float64(x)))
-//	}
-//	if length < 0 {
-//		for x := 0; x < 8; x++ {
-//			if length&int(powerTable[x][0]) == 0 {
-//				ret = ret / powerTable[x][1]
-//				length += int(powerTable[x][0])
-//			}
-//		}
-//		if length < 0 {
-//			ret = ret / 100.0
-//			length += 1
-//		}
-//	} else if length > 0 {
-//		for x := 0; x < 8; x++ {
-//			if length&int(powerTable[x][0]) > 0 {
-//				ret = ret / powerTable[x][2]
-//			}
-//		}
-//	}
-//	if neg {
-//		ret = ret * -1
-//	}
-//	fmt.Println("data: ", inputData, "\t result: ", ret)
-//	return ret
-//
-//}
-
-func EncodeDouble(num float64) ([]byte, error) {
-	//byte[] numArray = new byte[20];
-	num1 := 0
-	neg := num < 0.0
-	num = math.Abs(num)
-	if num < 1.0 {
-		for x := 0; x < 8; x++ {
-			if powerTable[x][2] >= num {
-				num1 -= int(powerTable[x][0])
-				num *= powerTable[x][1]
-			}
-		}
-		if num < 1.0 {
-			num1--
-			num *= 100.0
-		}
-	} else {
-		for x := 0; x < 8; x++ {
-			if powerTable[x][1] <= num {
-				num1 += int(powerTable[x][0])
-				num *= powerTable[x][2]
-			}
-		}
-	}
-	if num1 > 62 || num1 < -65 {
-		return nil, errors.New("overflow occur")
-	}
-	flag := num < 10.0
-	ret := make([]byte, 20)
-	num3 := uint8(num)
-	for x := 0; x < 8; x++ {
-		ret[x] = num3
-		num = (num - float64(num3)) * 100.0
-		num3 = uint8(num)
-	}
-	if flag {
-		if int(num3) >= 50 {
-			ret[7]++
-		}
-	} else {
-		ret[7] = uint8(((int(ret[7]) + 5) / 10) * 10)
-		if num1 == 62 && ((int(ret[7])+5)/10)*10 == 100 {
-			ret[7] = uint8(((int(ret[7]) - 5) / 10) * 10)
-		}
-	}
-	x := 7
-	for ret[x] == 100 {
-		if x == 0 {
-			num1++
-			ret[x] = 1
-			break
-		}
-		ret[x] = 0
-		x--
-		ret[x]++
-	}
-	ret = bytes.TrimRight(ret, "\x00")
-	ret = append([]byte{uint8(num1)}, ret...)
-	return encodeSign(ret, neg), nil
-	// 192, 2, 79
-}
-func decodeSign(input []byte) (ret []int64, neg bool) {
-	if input[0] > 0x80 {
-		length := int(input[0]) - 0x80 - 0x40
-		for x := 1; x < len(input); x++ {
-			input[x] = input[x] - 1
-		}
-		input[0] = uint8(length)
-		neg = false
-	} else {
-		length := 0xFF - int(input[0]) - 0x80 - 0x40
-		if len(input) <= 20 && input[len(input)-1] == 102 {
-			// fmt.Println("inside neg: ", input[:len(input)-1])
-			input = input[:len(input)-1]
-		}
-		for x := 1; x < len(input); x++ {
-			input[x] = uint8(101 - input[x])
-		}
-		input[0] = uint8(length)
-		neg = true
-	}
-	ret = make([]int64, len(input))
-	for x := 0; x < len(input); x++ {
-		ret[x] = int64(int8(input[x]))
-	}
-	return
-}
-
+// DecodeDouble decode NUMBER as a float64
+// Please note limitations Oracle NUMBER can have 38 significant digits while
+// Float64 have 51 bits. Convertion can't be perfect.
 func DecodeDouble(inputData []byte) float64 {
-	//fmt.Println(inputData)
-	input := make([]byte, len(inputData))
-	copy(input, inputData)
-	if input[0] == 0x80 {
+	mantissa, negative, exponent, _, err := FromNumber(inputData)
+	if err != nil {
+		return math.NaN()
+	}
+	if negative {
+		return -float64(mantissa) * math.Pow10(exponent)
+	}
+	return float64(mantissa) * math.Pow10(exponent)
+
+}
+
+// DecodeInt convert NUMBER to int64
+// Preserve all the possible bits of the mantissa when Int is between MinInt64 and MaxInt64 range
+func DecodeInt(inputData []byte) int64 {
+	mantissa, negative, exponent, _, err := FromNumber(inputData)
+	if err != nil || exponent < 0 {
 		return 0
 	}
-	data, neg := decodeSign(input)
-	data[0] -= 1
-	// data := append([]byte{uint8(length)}, input[1:]...)
-	flag2 := data[1] < 10
-	num2 := 15  //  factorTable[0][0]; // 15
-	num3 := -15 //  factorTable[0][0] - float64(50 - 20); // -15
-	index2 := 0
-	num4 := 0
-	index1 := 1
-	length := int(data[0])
-	if length > num2 || length < num3 {
-		if length > num2 {
-			index2 = -1
-			num4 = length - num2
-		} else {
-			index2 = 50 - 20 - 1
-			num4 = length - num3
-		}
 
-	} else {
-		index2 = int(num2-length) - 1
-		num4 = 0
+	for exponent > 0 {
+		mantissa *= 10
+		exponent--
 	}
-	num5 := len(data) - 1
-	flag1 := false
-	if data[1] < 10 && num5 > 8 || data[1] >= 10 && num5 >= 8 {
-		num5 = 8
-		flag1 = true
+	if negative && (mantissa>>63) == 0 {
+		return -int64(mantissa)
 	}
-	num6 := 0.0
-	switch num5 % 4 {
-	case 1:
-		index2++
-		if factorTable[index2][1] >= 1.0 {
-			num6 = float64(data[1]) * factorTable[index2][1]
-		} else {
-			num6 = float64(data[1]) / factorTable[index2][2]
-		}
-		index1++
-		num5--
-	case 2:
-		num8 := data[1]*100 + data[2]
-		index2 += 2
-		if factorTable[index2][1] >= 1.0 {
-			num6 = float64(num8) * factorTable[index2][1]
-		} else {
-			num6 = float64(num8) / factorTable[index2][2]
-		}
-		index1 += 2
-		num5 -= 2
-	case 3:
-		num9 := (data[1]*100+data[2])*100 + data[3]
-		index2 += 3
-		if factorTable[index2][1] >= 1.0 {
-			num6 = float64(num9) * factorTable[index2][1]
-		} else {
-			num6 = float64(num9) * factorTable[index2][2]
-		}
-		index1 += 3
-		num5 -= 3
-	default:
-		num6 = 0.0
-	}
-	for num5 > 0 {
-		num10 := ((data[index1]*100+data[index1+1])*100+data[index1+2])*100 + data[index1+3]
-		index2 += 4
-		if factorTable[index2][1] < 1.0 {
-			num6 += float64(num10) / factorTable[index2][2]
-		} else {
-			num6 += float64(num10) * factorTable[index2][1]
-		}
-		index1 += 4
-		num5 -= 4
-	}
-	if flag1 {
-		if flag2 {
-			if data[index1] > 50 {
-				num10 := 1
-				num6 += float64(num10) * factorTable[index2][1]
-			}
-		} else {
-			index3 := index1 - 1
-			var num10 int64 = 0
-			if data[index3]%10 < 5 {
-				num10 = ((data[index3] / 10) * 10) - data[index3]
-			} else {
-				num10 = ((data[index3]/10 + 1) * 10) - data[index3]
-			}
-			num6 += float64(num10) * factorTable[index2][1]
-		}
-	}
-
-	if num4 != 0 {
-		index3 := 0
-		for num4 > 0 {
-			if int(powerTable[index3][0]) <= num4 {
-				num4 -= int(powerTable[index3][0])
-				num6 *= powerTable[index3][1]
-			}
-			index3++
-		}
-		for num4 < 0 {
-			if int(powerTable[index3][0]) <= -num4 {
-				num4 += int(powerTable[index3][0])
-				num6 *= powerTable[index3][2]
-			}
-			index3++
-		}
-	}
-	if neg {
-		num6 = num6 * -1
-	}
-	return num6
+	return int64(mantissa)
 }
 
-func EncodeDouble2(num float64) ([]byte, error) {
-	if num == 0.0 {
-		return []byte{128}, nil
+// DecodeNumber decode the given NUMBER and return an interface{} that could be either an int64 or a float64
+//
+// If the number can be represented by an integer it returns an int64
+// Othervise, it returns a float64
+//
+// The sql.Parse will do the match with program need.
+//
+// Ex When parsing a float into an int64, the driver will try to cast the float64 into the int64.
+// If the float64 can't be represented by an int64, Parse will issue an error "invalid syntax"
+func DecodeNumber(inputData []byte) interface{} {
+	var powerOfTen = [...]uint64{
+		1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
+		10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000,
+		1000000000000000, 10000000000000000, 100000000000000000, 1000000000000000000,
+		10000000000000000000}
+
+	mantissa, negative, exponent, mantissaDigits, err := FromNumber(inputData)
+	if err != nil {
+		return math.NaN()
 	}
 
-	var (
-		err      error
-		negative bool
-		exponent int
-		mantissa int
-	)
-
-	// Let's the standard library doing the delicate work of converting binary float to decimal figures
-	s := []byte(strconv.FormatFloat(num, 'e', -1, 64))
-
-	if s[0] == '-' {
-		negative = true
-		s = s[1:]
+	if mantissaDigits == 0 {
+		return int64(0)
 	}
 
-	if i := bytes.Index(s, []byte{'e'}); i >= 0 {
-		exponent, err = strconv.Atoi(string(s[i+1:]))
-		if err != nil {
-			return nil, err
+	if exponent >= 0 && exponent < len(powerOfTen) {
+		// exponent = mantissaDigits - exponent
+		IntMantissa := mantissa
+		IntExponent := exponent
+		var over uint64
+		over, IntMantissa = bits.Mul64(IntMantissa, powerOfTen[IntExponent])
+		if IntMantissa >= 9000000000000000000 {
+			goto fallbackToFloat
 		}
-		if exponent%2 != 0 {
-			s = s[:i]
-		} else {
-			s = append([]byte("0"), s[:i]...)
+		if over != 0 {
+			goto fallbackToFloat
 		}
-		if exponent < 0 {
-			exponent--
+
+		if negative && (IntMantissa>>63) == 0 {
+			return -int64(IntMantissa)
 		}
+		return int64(IntMantissa)
 	}
 
-	if i := bytes.Index(s, []byte{'.'}); i >= 0 {
-		s = append(s[:i], s[i+1:]...)
+fallbackToFloat:
+	if negative {
+		return -float64(mantissa) * math.Pow10(exponent)
 	}
 
-	mantissa = len(s)
-	size := 1 + (mantissa+1)/2
-	if negative && mantissa < 21 {
+	return float64(mantissa) * math.Pow10(exponent)
+}
+
+// ToNumber encode mantissa, sign and exponent as a []byte expected by Oracle
+func ToNumber(mantissa []byte, negative bool, exponent int) []byte {
+
+	if len(mantissa) == 0 {
+		return []byte{128}
+	}
+
+	if exponent%2 == 0 {
+		mantissa = append([]byte{'0'}, mantissa...)
+	} else {
+	}
+
+	mantissaLen := len(mantissa)
+	size := 1 + (mantissaLen+1)/2
+	if negative && mantissaLen < 21 {
 		size++
 	}
 	buf := make([]byte, size, size)
 
-	for i := 0; i < mantissa; i += 2 {
-		b := 10 * (s[i] - '0')
-		if i < mantissa-1 {
-			b += s[i+1] - '0'
+	for i := 0; i < mantissaLen; i += 2 {
+		b := 10 * (mantissa[i] - '0')
+		if i < mantissaLen-1 {
+			b += mantissa[i+1] - '0'
 		}
 		if negative {
 			b = 100 - b
@@ -596,15 +239,68 @@ func EncodeDouble2(num float64) ([]byte, error) {
 		buf[1+i/2] = b + 1
 	}
 
-	if negative && mantissa < 21 {
+	if negative && mantissaLen < 21 {
 		buf[len(buf)-1] = 0x66
 	}
 
+	if exponent < 0 {
+		exponent--
+	}
 	exponent = (exponent / 2) + 1
 	if negative {
 		buf[0] = byte(exponent+64) ^ 0x7f
 	} else {
 		buf[0] = byte(exponent+64) | 0x80
 	}
-	return buf, nil
+	return buf
+}
+
+// EncodeInt64 encode a int64 into an oracle NUMBER internal format
+// Keep all significant bits of the int64
+func EncodeInt64(val int64) []byte {
+	mantissa := []byte(strconv.FormatInt(val, 10))
+	negative := mantissa[0] == '-'
+	if negative {
+		mantissa = mantissa[1:]
+	}
+	exponent := len(mantissa) - 1
+	trailingZeros := 0
+	for i := len(mantissa) - 1; i >= 0 && mantissa[i] == '0'; i-- {
+		trailingZeros++
+	}
+	mantissa = mantissa[:len(mantissa)-trailingZeros]
+	return ToNumber(mantissa, negative, exponent)
+}
+
+// EncodeInt encode a int into an oracle NUMBER internal format
+func EncodeInt(val int) []byte {
+	return EncodeInt64(int64(val))
+}
+
+// EncodeDouble convert a float64 into binary NUMBER representation
+func EncodeDouble(num float64) ([]byte, error) {
+	if num == 0.0 {
+		return []byte{128}, nil
+	}
+
+	var (
+		exponent int
+		err      error
+	)
+	mantissa := []byte(strconv.FormatFloat(num, 'e', -1, 64))
+	if i := bytes.Index(mantissa, []byte{'e'}); i >= 0 {
+		exponent, err = strconv.Atoi(string(mantissa[i+1:]))
+		if err != nil {
+			return nil, err
+		}
+		mantissa = mantissa[:i]
+	}
+	negative := mantissa[0] == '-'
+	if negative {
+		mantissa = mantissa[1:]
+	}
+	if i := bytes.Index(mantissa, []byte{'.'}); i >= 0 {
+		mantissa = append(mantissa[:i], mantissa[i+1:]...)
+	}
+	return ToNumber(mantissa, negative, exponent), nil
 }

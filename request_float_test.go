@@ -68,7 +68,7 @@ func TestSelectBindFloat(t *testing.T) {
 				e = math.Abs(got - tt.Float)
 			}
 
-			if true || e > 1e-15 {
+			if e > 1e-15 {
 				t.Errorf("Query expecting: %v, got %v, error %g", tt.Float, got, e)
 			}
 		})
@@ -114,5 +114,45 @@ func TestSelectBindInt(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestSelectBindFloatAsInt(t *testing.T) {
+	for _, tt := range converters.TestFloatValue {
+		t.Run(tt.SelectText, func(t *testing.T) {
+			query := fmt.Sprintf("select :1 N from dual")
+			stmt, err := conn.Prepare(query)
+			if err != nil {
+				t.Errorf("Query can't be prepared: %s", err)
+				return
+			}
+			defer stmt.Close()
+
+			rows, err := stmt.Query(tt.Float)
+			if err != nil {
+				t.Errorf("Query can't be run: %s", err)
+				return
+			}
+
+			defer rows.Close()
+			if !rows.Next() {
+				t.Errorf("Query returns no record")
+				return
+			}
+
+			var (
+				got int64
+			)
+			err = rows.Scan(&got)
+
+			if err == nil && !tt.IsInteger {
+				t.Errorf("Expecting an error when scanning a real float(%v) into an int", tt.Float)
+				return
+			}
+
+			if got != tt.Integer {
+				t.Errorf("Query expecting: %v, got %v", tt.Integer, got)
+			}
+		})
 	}
 }

@@ -59,7 +59,6 @@ func addDigitToMantissa(mantissaIn uint64, d byte) (mantissaOut uint64, carryOut
 			return mantissaIn, true
 		}
 	}
-	}
 	mantissaOut, carry = bits.Add64(mantissaOut, uint64(d), carry)
 	if carry != 0 {
 		return mantissaIn, true
@@ -72,12 +71,12 @@ func addDigitToMantissa(mantissaIn uint64, d byte) (mantissaOut uint64, carryOut
 // Some documentation:
 //	https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
 //  https://www.orafaq.com/wiki/Number
-func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int, err error) {
+func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int, mantissaDigits int, err error) {
 	if len(inputData) == 0 {
-		return 0, false, 0, fmt.Errorf("Invalid NUMBER")
+		return 0, false, 0, 0, fmt.Errorf("Invalid NUMBER")
 	}
 	if inputData[0] == 0x80 {
-		return 0, false, 0, nil
+		return 0, false, 0, 0, nil
 	}
 
 	negative = inputData[0]&0x80 == 0
@@ -93,16 +92,17 @@ func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int,
 		buf = inputData[1 : len(inputData)-1]
 	}
 
+	carry := false // get true when mantissa exceeds 64 bits
+
 	// Loop on mantissa digits, stop with the capacity of int64 is reached
 	// Beyond, digits will be lost during convertion t
-	mantissaDigits := 0
+	mantissaDigits = 0
 	for _, digit100 := range buf {
 		digit100--
 		if negative {
 			digit100 = 100 - digit100
 		}
 
-		carry := false
 		mantissa, carry = addDigitToMantissa(mantissa, digit100/10)
 		if carry {
 			break
@@ -117,14 +117,14 @@ func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int,
 	}
 
 	exponent = exponent*2 - mantissaDigits // Adjust exponent to the retrieved mantissa
-	return mantissa, negative, exponent, nil
+	return mantissa, negative, exponent, mantissaDigits, nil
 }
 
 // DecodeDouble decode NUMBER as a float64
 // Please note limitations Oracle NUMBER can have 38 significant digits while
 // Float64 have 51 bits. Convertion can't be perfect.
 func DecodeDouble(inputData []byte) float64 {
-	mantissa, negative, exponent, err := FromNumber(inputData)
+	mantissa, negative, exponent, _, err := FromNumber(inputData)
 	if err != nil {
 		return math.NaN()
 	}
@@ -138,7 +138,7 @@ func DecodeDouble(inputData []byte) float64 {
 // DecodeInt convert NUMBER to int64
 // Preserve all the possible bits of the mantissa when Int is between MinInt64 and MaxInt64 range
 func DecodeInt(inputData []byte) int64 {
-	mantissa, negative, exponent, err := FromNumber(inputData)
+	mantissa, negative, exponent, _, err := FromNumber(inputData)
 	if err != nil || exponent < 0 {
 		return 0
 	}
@@ -151,6 +151,48 @@ func DecodeInt(inputData []byte) int64 {
 		return -int64(mantissa)
 	}
 	return int64(mantissa)
+}
+
+// DecodeNumber decode the given NUMBER and return an interface{} that could be either an int64 or a float64
+//
+// If the number can be represented by an integer it returns an int64
+// Othervise, it returns a float64
+//
+// The sql.Parse will do the match with program need.
+//
+// Ex When parsing a float into an int64, the driver will try to cast the float64 into the int64.
+// If the float64 can't be represented by an int64, Parse will issue an error "invalid syntax"
+func DecodeNumber(inputData []byte) interface{} {
+	var powerOfTen = [...]uint64{
+		1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
+		10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000,
+		1000000000000000, 10000000000000000, 100000000000000000, 1000000000000000000,
+		10000000000000000000}
+
+	mantissa, negative, exponent, mantissaDigits, err := FromNumber(inputData)
+	if err != nil {
+		return math.NaN()
+	}
+
+	if mantissaDigits == 0 {
+		return int64(0)
+	}
+	if exponent >= 0 && mantissaDigits+exponent < len(powerOfTen) {
+		// exponent = mantissaDigits - exponent
+		IntMantissa := mantissa
+		IntExponent := exponent
+		_, IntMantissa = bits.Mul64(IntMantissa, powerOfTen[IntExponent])
+
+		if negative && (IntMantissa>>63) == 0 {
+			return -int64(IntMantissa)
+		}
+		return int64(IntMantissa)
+	}
+
+	if negative {
+		return -float64(mantissa) * math.Pow10(exponent)
+	}
+	return float64(mantissa) * math.Pow10(exponent)
 }
 
 // ToNumber encode mantissa, sign and exponent as a []byte expected by Oracle

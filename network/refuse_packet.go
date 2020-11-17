@@ -31,6 +31,10 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 		return nil
 	}
 	dataLen := binary.BigEndian.Uint16(packetData[10:])
+	var message string
+	if uint16(len(packetData)-1) >= 12+dataLen {
+		message = string(packetData[12 : 12+dataLen])
+	}
 	return &RefusePacket{
 		packet: Packet{
 			dataOffset: 12,
@@ -40,6 +44,6 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 		},
 		SystemReason: packetData[9],
 		UserReason:   packetData[8],
-		message:      string(packetData[12 : 12+dataLen]),
+		message:      message,
 	}
 }

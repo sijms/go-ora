@@ -5,20 +5,13 @@ import (
 )
 
 type DataPacket struct {
-	packet Packet
-	//dataOffset uint16
-	//length     uint16
-	//packetType PacketType
-	//Flag       uint8
+	packet   Packet
 	dataFlag uint16
 	buffer   []byte
 }
 
 func (pck *DataPacket) bytes() []byte {
 	output := pck.packet.bytes()
-	//binary.BigEndian.PutUint16(output, pck.length)
-	//output[4] = uint8(pck.packetType)
-	//output[5] = pck.Flag
 	binary.BigEndian.PutUint16(output[8:], pck.dataFlag)
 	if len(pck.buffer) > 0 {
 		output = append(output, pck.buffer...)

@@ -269,7 +269,39 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	case REFUSE:
 		return newRefusePacketFromData(packetData), nil
 	case REDIRECT:
-		return newRedirectPacketFromData(packetData), nil
+		if len(packetData) < 10 {
+			// error
+		}
+		pck := newRedirectPacketFromData(packetData)
+		dataLen := binary.BigEndian.Uint16(packetData[8:])
+		//var redirectAddress string
+		//var reconnectData string
+		var data string
+		if pck.packet.length <= pck.packet.dataOffset {
+			packetData, err = readPacketData(session.conn)
+			dataPck := newDataPacketFromData(packetData)
+			data = string(dataPck.buffer)
+		} else {
+			data = string(packetData[10 : 10+dataLen])
+		}
+		fmt.Println("data returned: ", data)
+		length := strings.Index(data, "\x00")
+		if pck.packet.flag&2 != 0 && length > 0 {
+			pck.redirectAddr = data[:length]
+			pck.reconnectData = data[length:]
+		} else {
+			pck.redirectAddr = data
+		}
+		fmt.Println("redirect address: ", pck.redirectAddr)
+		fmt.Println("reconnect data: ", pck.reconnectData)
+		//session.Disconnect()
+
+		// if the length > dataoffset use data in the packet
+		// else get data from the server
+		// disconnect the current session
+		// connect through redirectConnectData
+
+		return pck, nil
 	case DATA:
 		return newDataPacketFromData(packetData), nil
 	case MARKER:

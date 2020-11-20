@@ -38,17 +38,17 @@ func newRedirectPacketFromData(packetData []byte) *RedirectPacket {
 			flag:       packetData[5],
 		},
 	}
-	data := string(packetData[10 : 10+dataLen])
-	if pck.packet.flag&0x2 == 0 {
-		pck.redirectAddr = data
-		return &pck
-	}
-	length := strings.Index(data, "\x00")
-	if length > 0 {
-		pck.redirectAddr = data[:length]
-		pck.reconnectData = data[length:]
-	} else {
-		pck.redirectAddr = data
-	}
+	//data := string(packetData[10 : 10+dataLen])
+	//if pck.packet.flag&0x2 == 0 {
+	//	pck.redirectAddr = data
+	//	return &pck
+	//}
+	//length := strings.Index(data, "\x00")
+	//if length > 0 {
+	//	pck.redirectAddr = data[:length]
+	//	pck.reconnectData = data[length:]
+	//} else {
+	//	pck.redirectAddr = data
+	//}
 	return &pck
 }

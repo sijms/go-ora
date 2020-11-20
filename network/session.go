@@ -269,9 +269,6 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	case REFUSE:
 		return newRefusePacketFromData(packetData), nil
 	case REDIRECT:
-		if len(packetData) < 10 {
-			// error
-		}
 		pck := newRedirectPacketFromData(packetData)
 		dataLen := binary.BigEndian.Uint16(packetData[8:])
 		//var redirectAddress string

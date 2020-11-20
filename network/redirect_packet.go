@@ -2,7 +2,6 @@ package network
 
 import (
 	"encoding/binary"
-	"strings"
 )
 
 type RedirectPacket struct {
@@ -28,8 +27,6 @@ func newRedirectPacketFromData(packetData []byte) *RedirectPacket {
 	if len(packetData) < 10 {
 		return nil
 	}
-	dataLen := binary.BigEndian.Uint16(packetData[8:])
-
 	pck := RedirectPacket{
 		packet: Packet{
 			dataOffset: 10,

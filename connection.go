@@ -6,12 +6,13 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/converters"
-	"github.com/sijms/go-ora/network"
 	"os"
 	"os/user"
 	"strconv"
 	"strings"
+
+	"github.com/sijms/go-ora/converters"
+	"github.com/sijms/go-ora/network"
 )
 
 type ConnectionState int
@@ -304,7 +305,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	userName := ""
 	User, err := user.Current()
 	if err == nil {
-		userName = User.Name
+		userName = User.Username
 	}
 	hostName, _ := os.Hostname()
 	indexOfSlash := strings.LastIndex(os.Args[0], "/")

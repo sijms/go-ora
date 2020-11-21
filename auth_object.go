@@ -89,7 +89,10 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 		}
 		result = append([]byte(password), result...)
 		hash := sha1.New()
-		hash.Write(result)
+		_, err = hash.Write(result)
+		if err != nil {
+			return nil, err
+		}
 		key = hash.Sum(nil)           // 20 byte key
 		key = append(key, 0, 0, 0, 0) // 24 byte key
 
@@ -368,17 +371,26 @@ func CalculateKeysHash(verifierType int, key1 []byte, key2 []byte) ([]byte, erro
 			buffer[x] = key1[x] ^ key2[x]
 		}
 
-		hash.Write(buffer)
+		_, err := hash.Write(buffer)
+		if err != nil {
+			return nil, err
+		}
 		return hash.Sum(nil), nil
 	case 6949:
 		buffer := make([]byte, 24)
 		for x := 0; x < 24; x++ {
 			buffer[x] = key1[x] ^ key2[x]
 		}
-		hash.Write(buffer[:16])
+		_, err := hash.Write(buffer[:16])
+		if err != nil {
+			return nil, err
+		}
 		ret := hash.Sum(nil)
 		hash.Reset()
-		hash.Write(buffer[16:])
+		_, err = hash.Write(buffer[16:])
+		if err != nil {
+			return nil, err
+		}
 		ret = append(ret, hash.Sum(nil)...)
 		return ret[:24], nil
 	}

@@ -547,8 +547,14 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 								//}
 								switch dataSet.Cols[x].DataType {
 								case NCHAR:
-									//fmt.Println("string value:", stmt.connection.strConv.Decode(temp))
-									dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
+									if stmt.connection.strConv.LangID != dataSet.Cols[x].CharsetID {
+										tempCharset := stmt.connection.strConv.LangID
+										stmt.connection.strConv.LangID = dataSet.Cols[x].CharsetID
+										dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
+										stmt.connection.strConv.LangID = tempCharset
+									} else {
+										dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
+									}
 								case NUMBER:
 									dataSet.currentRow[x] = converters.DecodeNumber(temp)
 									// if dataSet.Cols[x].Scale == 0 {

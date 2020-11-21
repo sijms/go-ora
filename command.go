@@ -738,6 +738,9 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			loop = false
 		}
 	}
+	if stmt.connection.connOption.Tracer.IsOn() {
+		dataSet.Trace(stmt.connection.connOption.Tracer)
+	}
 	return nil
 }
 
@@ -755,6 +758,7 @@ func (stmt *Stmt) Close() error {
 }
 
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
+	stmt.connection.connOption.Tracer.Printf("Exec:\n%s", stmt.text)
 	for x := 0; x < len(args); x++ {
 		par := *stmt.NewParam("", args[x], 0, Input)
 		if x < len(stmt.Pars) {
@@ -765,6 +769,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		} else {
 			stmt.Pars = append(stmt.Pars, par)
 		}
+		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
 	}
 	session := stmt.connection.session
 	//if len(args) > 0 {
@@ -941,6 +946,7 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 //
 //}
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
+	stmt.connection.connOption.Tracer.Printf("Query:\n%s", stmt.text)
 	stmt.noOfRowsToFetch = 25
 	stmt.hasMoreRows = true
 	for x := 0; x < len(args); x++ {

@@ -228,7 +228,7 @@ func (conn *Connection) Logoff() error {
 
 func (conn *Connection) Open() error {
 
-	conn.connOption.Tracer.Print("Open :\n", conn.connOption.ConnectionData())
+	conn.connOption.Tracer.Print("Open :", conn.connOption.ConnectionData())
 
 	switch conn.conStr.DBAPrivilege {
 	case SYSDBA:

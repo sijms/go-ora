@@ -420,6 +420,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			if err != nil {
 				return err
 			}
+			stmt.connection.connOption.Tracer.Printf("Summary:\n%#v", stmt.connection.session.Summary)
 			//fmt.Println(stmt.connection.session.Summary)
 			//fmt.Println(stmt.connection.session.Summary)
 

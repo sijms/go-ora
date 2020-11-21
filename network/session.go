@@ -5,10 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/converters"
 	"log"
 	"net"
 	"strings"
+
+	"github.com/sijms/go-ora/converters"
 )
 
 type Data interface {
@@ -49,6 +50,7 @@ func NewSession(connOption ConnectionOption) *Session {
 
 func (session *Session) Connect() error {
 	session.Disconnect()
+	session.connOption.Tracer.Print("Connect")
 	var err error
 	var host string
 	if !strings.Contains(session.connOption.Host, ":") {
@@ -188,7 +190,7 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 func (session *Session) writePacket(pck PacketInterface) error {
 	session.sendPcks = append(session.sendPcks, pck)
 	tmp := pck.bytes()
-	//log.Printf("Request: %#v\n\n", tmp)
+	session.connOption.Tracer.LogPacket("Write packet:", tmp)
 	_, err := session.conn.Write(tmp)
 	if err != nil {
 		return err
@@ -251,8 +253,9 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				}
 				continue
 			}
-
-			return append(head, body...), nil
+			ret := append(head, body...)
+			session.connOption.Tracer.LogPacket("Read packet:", ret)
+			return ret, nil
 		}
 
 	}

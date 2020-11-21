@@ -11,11 +11,11 @@ import (
 // a full tracer : traceWriter
 // a no-tracer: nilTracer
 type Tracer interface {
-	Close() error
-	Print(vs ...interface{})
-	Printf(f string, s ...interface{})
-	LogPacket(s string, p []byte)
-	IsOn() bool
+	Close() error                      // To close file
+	Print(vs ...interface{})           // like fmt.Print(a,b,c ...)
+	Printf(f string, s ...interface{}) // like fmt.Printf("%d: %s",1254,"Hello")
+	LogPacket(s string, p []byte)      // to dump packet like hexdump -C f
+	IsOn() bool                        // To check if trace is enabled
 }
 
 type traceWriter struct {

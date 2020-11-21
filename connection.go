@@ -316,7 +316,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	userName := ""
 	User, err := user.Current()
 	if err == nil {
-		userName = User.Name
+		userName = User.Username
 	}
 	hostName, _ := os.Hostname()
 	indexOfSlash := strings.LastIndex(os.Args[0], "/")

@@ -3,8 +3,8 @@
 important notes:
  * the client is tested against oracle 10G, 11G and 12G and working properly
  * supported parameter types is integer, double, strings and time.Time
- * named parameter not supported to define parameter just put ':' + parameter_name in sql statment
- * integeration with sql/database is done using simple form
+ * named parameter not supported to define parameter just put ':' + parameter_name in sql statement
+ * integration with sql/database is done using simple form
 
 # Usage:
 ## there are 2 way to use the client
@@ -65,7 +65,7 @@ important notes:
   the benefit here is that you can use pl/sql and output parameters
 #### 1- import go_ora "go-ora"
 #### 2- create connection
-    conn, err := go_ora.NewConnection("oracle://user:pass@dbname/service_name")
+    conn, err := go_ora.NewConnection("oracle://user:pass@server/service_name")
     // check for error
     err = conn.Open()
     // check for error
@@ -79,3 +79,83 @@ important notes:
 #### 4- exec or query as above and pass nil for parameters
 #### 5- after that you can read the output parameters using Pars variable of stmt structure
  
+ ## Server's URL options
+The complete syntax of connection url is: 
+
+    oracle://user:pass@server/service_name[?OPTION1=VALUE1[&OPTIONn=VALUEn]...]
+
+Check possible options in `connection_string.go` 
+
+### TRACE FILE 
+This option enables logging driver activity and packet content into a file.
+
+    oracle://user:pass@server/service_name?TRACE FILE=trace.log
+
+The log file is created into the current directory.
+
+
+This produce this kind of log:
+```
+2020-11-22T07:51:42.8137: Open :(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=192.168.10.10)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=xe)(CID=(PROGRAM=C:\Users\Me\bin\hello_ora.exe)(HOST=workstation)(USER=Me))))
+2020-11-22T07:51:42.8147: Connect
+2020-11-22T07:51:42.8256: 
+Write packet:
+00000000  00 3a 00 00 01 00 00 00  01 38 01 2c 0c 01 ff ff  |.:.......8.,....|
+00000010  ff ff 4f 98 00 00 00 01  00 ea 00 3a 00 00 00 00  |..O........:....|
+00000020  04 04 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000030  00 00 00 00 00 00 00 00  00 00                    |..........|
+
+...
+
+2020-11-22T07:51:42.8705: Query:
+SELECT * FROM v$version
+2020-11-22T07:51:42.8705: 
+Write packet:
+00000000  00 55 00 00 06 00 00 00  00 00 03 5e 00 02 81 21  |.U.........^...!|
+00000010  00 01 01 17 01 01 0d 00  00 00 01 19 01 01 00 00  |................|
+00000020  00 00 00 00 00 00 00 00  00 01 00 00 00 00 00 53  |...............S|
+00000030  45 4c 45 43 54 20 2a 20  46 52 4f 4d 20 76 24 76  |ELECT * FROM v$v|
+00000040  65 72 73 69 6f 6e 01 01  00 00 00 00 00 00 01 01  |ersion..........|
+00000050  00 00 00 00 00                                    |.....|
+2020-11-22T07:51:42.9094: 
+Read packet:
+00000000  01 a7 00 00 06 00 00 00  00 00 10 17 3f d5 ec 21  |............?..!|
+00000010  d5 37 e0 67 cc 0f eb 03  cc c5 d1 d8 78 78 0b 15  |.7.g........xx..|
+00000020  0c 21 20 01 50 01 01 51  01 80 00 00 01 50 00 00  |.! .P..Q.....P..|
+00000030  00 00 02 03 69 01 01 50  01 06 01 06 06 42 41 4e  |....i..P.....BAN|
+00000040  4e 45 52 00 00 00 00 01  07 07 78 78 0b 16 07 34  |NER.......xx...4|
+00000050  2b 00 02 1f e8 01 0a 01  0a 00 06 22 01 01 00 01  |+.........."....|
+00000060  19 00 00 00 07 49 4f 72  61 63 6c 65 20 44 61 74  |.....IOracle Dat|
+00000070  61 62 61 73 65 20 31 31  67 20 45 78 70 72 65 73  |abase 11g Expres|
+00000080  73 20 45 64 69 74 69 6f  6e 20 52 65 6c 65 61 73  |s Edition Releas|
+00000090  65 20 31 31 2e 32 2e 30  2e 32 2e 30 20 2d 20 36  |e 11.2.0.2.0 - 6|
+000000a0  34 62 69 74 20 50 72 6f  64 75 63 74 69 6f 6e 07  |4bit Production.|
+000000b0  26 50 4c 2f 53 51 4c 20  52 65 6c 65 61 73 65 20  |&PL/SQL Release |
+000000c0  31 31 2e 32 2e 30 2e 32  2e 30 20 2d 20 50 72 6f  |11.2.0.2.0 - Pro|
+000000d0  64 75 63 74 69 6f 6e 15  01 01 01 07 1a 43 4f 52  |duction......COR|
+000000e0  45 09 31 31 2e 32 2e 30  2e 32 2e 30 09 50 72 6f  |E.11.2.0.2.0.Pro|
+000000f0  64 75 63 74 69 6f 6e 15  01 01 01 07 2e 54 4e 53  |duction......TNS|
+00000100  20 66 6f 72 20 4c 69 6e  75 78 3a 20 56 65 72 73  | for Linux: Vers|
+00000110  69 6f 6e 20 31 31 2e 32  2e 30 2e 32 2e 30 20 2d  |ion 11.2.0.2.0 -|
+00000120  20 50 72 6f 64 75 63 74  69 6f 6e 15 01 01 01 07  | Production.....|
+00000130  26 4e 4c 53 52 54 4c 20  56 65 72 73 69 6f 6e 20  |&NLSRTL Version |
+00000140  31 31 2e 32 2e 30 2e 32  2e 30 20 2d 20 50 72 6f  |11.2.0.2.0 - Pro|
+00000150  64 75 63 74 69 6f 6e 08  01 06 03 14 97 b7 00 01  |duction.........|
+00000160  01 01 02 00 00 00 00 00  04 01 05 01 07 01 05 02  |................|
+00000170  05 7b 00 00 01 01 00 03  00 01 20 00 00 00 00 00  |.{........ .....|
+00000180  00 00 00 00 00 00 00 01  01 00 00 00 00 19 4f 52  |..............OR|
+00000190  41 2d 30 31 34 30 33 3a  20 6e 6f 20 64 61 74 61  |A-01403: no data|
+000001a0  20 66 6f 75 6e 64 0a                              | found.|
+2020-11-22T07:51:42.9104: Summary: RetCode:1403, Error Message:"ORA-01403: no data found\n"
+2020-11-22T07:51:42.9104: Row 0
+2020-11-22T07:51:42.9104:   BANNER              : Oracle Database 11g Express Edition Release 11.2.0.2.0 - 64bit Production
+2020-11-22T07:51:42.9104: Row 1
+2020-11-22T07:51:42.9104:   BANNER              : PL/SQL Release 11.2.0.2.0 - Production
+2020-11-22T07:51:42.9104: Row 2
+2020-11-22T07:51:42.9104:   BANNER              : CORE	11.2.0.2.0	Production
+2020-11-22T07:51:42.9104: Row 3
+2020-11-22T07:51:42.9104:   BANNER              : TNS for Linux: Version 11.2.0.2.0 - Production
+2020-11-22T07:51:42.9104: Row 4
+2020-11-22T07:51:42.9104:   BANNER              : NLSRTL Version 11.2.0.2.0 - Production
+2020-11-22T07:51:42.9114: 
+```

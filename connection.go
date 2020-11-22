@@ -6,12 +6,14 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/converters"
-	"github.com/sijms/go-ora/network"
 	"os"
 	"os/user"
 	"strconv"
 	"strings"
+
+	"github.com/sijms/go-ora/converters"
+	"github.com/sijms/go-ora/network"
+	"github.com/sijms/go-ora/trace"
 )
 
 type ConnectionState int
@@ -64,6 +66,7 @@ type Connection struct {
 	strConv           *converters.StringConverter
 	NLSData           NLSData
 }
+
 type oracleDriver struct {
 }
 
@@ -76,6 +79,7 @@ func (drv *oracleDriver) Open(name string) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return conn, conn.Open()
 }
 
@@ -155,10 +159,12 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 }
 
 func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
+	conn.connOption.Tracer.Print("Prepare\n", query)
 	return NewStmt(query, conn), nil
 }
 
 func (conn *Connection) Ping(ctx context.Context) error {
+	conn.connOption.Tracer.Print("Ping")
 	conn.session.ResetBuffer()
 	return (&simpleObject{
 		session:     conn.session,
@@ -168,6 +174,7 @@ func (conn *Connection) Ping(ctx context.Context) error {
 }
 
 func (conn *Connection) Logoff() error {
+	conn.connOption.Tracer.Print("Logoff")
 	session := conn.session
 	session.ResetBuffer()
 	session.PutBytes(0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11, 0x1, 0, 0, 0, 0x1, 0, 0, 0, 0, 0, 0x1, 0, 0, 0, 0, 0,
@@ -220,6 +227,9 @@ func (conn *Connection) Logoff() error {
 }
 
 func (conn *Connection) Open() error {
+
+	conn.connOption.Tracer.Print("Open :", conn.connOption.ConnectionData())
+
 	switch conn.conStr.DBAPrivilege {
 	case SYSDBA:
 		conn.LogonMode |= SysDba
@@ -287,10 +297,12 @@ func (conn *Connection) Open() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (conn *Connection) Begin() (driver.Tx, error) {
+	conn.connOption.Tracer.Print("Begin transaction")
 	conn.autoCommit = false
 	return &Transaction{conn: conn}, nil
 }
@@ -304,7 +316,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	userName := ""
 	User, err := user.Current()
 	if err == nil {
-		userName = User.Name
+		userName = User.Username
 	}
 	hostName, _ := os.Hostname()
 	indexOfSlash := strings.LastIndex(os.Args[0], "/")
@@ -340,6 +352,16 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 		},
 		//InAddrAny:             false,
 	}
+
+	if len(conStr.Trace) > 0 {
+		tf, err := os.Create(conStr.Trace)
+		if err != nil {
+			return nil, fmt.Errorf("Can't open trace file: %w", err)
+		}
+		connOption.Tracer = trace.NewTraceWriter(tf)
+	} else {
+		connOption.Tracer = trace.NilTracer()
+	}
 	return &Connection{
 		State:      Closed,
 		conStr:     conStr,
@@ -349,16 +371,20 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 }
 
 func (conn *Connection) Close() (err error) {
+	conn.connOption.Tracer.Print("Close")
 	//var err error = nil
 	if conn.session != nil {
 		//err = conn.Logoff()
 		conn.session.Disconnect()
 		conn.session = nil
 	}
+	conn.connOption.Tracer.Print("Connection Closed")
+	conn.connOption.Tracer.Close()
 	return
 }
 
 func (conn *Connection) doAuth() error {
+	conn.connOption.Tracer.Print("doAuth")
 	conn.session.ResetBuffer()
 	conn.session.PutBytes(3, 118, 0, 1)
 	conn.session.PutUint(len(conn.conStr.UserID), 4, true, true)

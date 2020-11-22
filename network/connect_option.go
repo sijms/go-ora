@@ -2,15 +2,17 @@ package network
 
 import (
 	"strconv"
+
+	"github.com/sijms/go-ora/trace"
 )
 
 type ClientData struct {
 	ProgramPath string
 	ProgramName string
-	UserName string
-	HostName string
-	DriverName string
-	PID int
+	UserName    string
+	HostName    string
+	DriverName  string
+	PID         int
 }
 type ConnectionOption struct {
 	Port                  int
@@ -29,10 +31,10 @@ type ConnectionOption struct {
 	ServiceName  string
 	InstanceName string
 	DomainName   string
-	DBName		 string
+	DBName       string
 	ClientData   ClientData
 	//InAddrAny bool
-
+	Tracer trace.Tracer
 }
 
 func (op *ConnectionOption) ConnectionData() string {
@@ -64,4 +66,3 @@ func (op *ConnectionOption) ConnectionData() string {
 //		SessionDataUnitSize: 0xFFFF,
 //	}
 //}
-

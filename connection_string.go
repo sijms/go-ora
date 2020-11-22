@@ -86,6 +86,7 @@ type ConnectionString struct {
 	PoolReglator          int
 	ConnectionPoolTimeout int
 	PasswordlessConString string
+	Trace                 string // Trace file
 }
 
 func NewConnectionString() *ConnectionString {
@@ -149,7 +150,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	if len(ret.UserID) == 0 {
 		return nil, errors.New("empty user name")
 	}
-	if len(ret.Password) == 0{
+	if len(ret.Password) == 0 {
 		return nil, errors.New("empty password")
 	}
 	if len(ret.Host) == 0 {
@@ -250,6 +251,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			//	conStr.Password = strings.Trim(val, "\"")
 			case "PROXY PASSWORD":
 				ret.ProxyPassword = val[0]
+			case "TRACE FILE":
+				ret.Trace = val[0]
 			}
 		}
 	}

@@ -420,9 +420,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			if err != nil {
 				return err
 			}
-			stmt.connection.connOption.Tracer.Printf("Summary:\n%#v", stmt.connection.session.Summary)
-			//fmt.Println(stmt.connection.session.Summary)
-			//fmt.Println(stmt.connection.session.Summary)
+			stmt.connection.connOption.Tracer.Printf("Summary: RetCode:%d, Error Message:%q", stmt.connection.session.Summary.RetCode, string(stmt.connection.session.Summary.ErrorMessage))
 
 			stmt.cursorID = stmt.connection.session.Summary.CursorID
 			stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/sijms/go-ora/converters"
@@ -80,11 +81,32 @@ func (session *Session) Connect() error {
 		return err
 	}
 
-	acceptPacket, ok := pck.(*AcceptPacket)
-	if !ok {
-		return errors.New("connection refused by the server")
+	if acceptPacket, ok := pck.(*AcceptPacket); ok {
+		*session.Context = acceptPacket.sessionCtx
+		return nil
 	}
-	*session.Context = acceptPacket.sessionCtx
+	if redirectPacket, ok := pck.(*RedirectPacket); ok {
+		session.connOption.Tracer.Print("Redirect")
+		session.connOption.connData = redirectPacket.reconnectData
+		if len(redirectPacket.protocol()) != 0 {
+			session.connOption.Protocol = redirectPacket.protocol()
+		}
+		if len(redirectPacket.host()) != 0 {
+			session.connOption.Host = redirectPacket.host()
+		}
+		if len(redirectPacket.port()) != 0 {
+			session.connOption.Port, err = strconv.Atoi(redirectPacket.port())
+			if err != nil {
+				return errors.New("redirect packet with wrong port")
+			}
+		}
+		err = session.conn.Close()
+		if err != nil {
+			return errors.New("cannot close existing connection")
+		}
+		return session.Connect()
+	}
+	return errors.New("connection refused by the server")
 
 	//for {
 	//	err = session.writePacket(newConnectPacket(*session.Context))
@@ -102,7 +124,6 @@ func (session *Session) Connect() error {
 	//		continue
 	//	}
 	//}
-	return nil
 }
 
 func (session *Session) Disconnect() {

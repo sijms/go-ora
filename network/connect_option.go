@@ -34,10 +34,14 @@ type ConnectionOption struct {
 	DBName       string
 	ClientData   ClientData
 	//InAddrAny bool
-	Tracer trace.Tracer
+	Tracer   trace.Tracer
+	connData string
 }
 
 func (op *ConnectionOption) ConnectionData() string {
+	if len(op.connData) > 0 {
+		return op.connData
+	}
 	FulCid := "(CID=(PROGRAM=" + op.ClientData.ProgramPath + ")(HOST=" + op.ClientData.HostName + ")(USER=" + op.ClientData.UserName + "))"
 	address := "(ADDRESS=(PROTOCOL=" + op.Protocol + ")(HOST=" + op.Host + ")(PORT=" + strconv.Itoa(op.Port) + "))"
 	result := "(CONNECT_DATA="

@@ -2,6 +2,7 @@ package network
 
 import (
 	"encoding/binary"
+	"strings"
 )
 
 type RedirectPacket struct {
@@ -48,4 +49,33 @@ func newRedirectPacketFromData(packetData []byte) *RedirectPacket {
 	//	pck.redirectAddr = data
 	//}
 	return &pck
+}
+func (pck *RedirectPacket) findValue(key string) string {
+	redirectAddr := strings.ToUpper(pck.redirectAddr)
+	start := strings.Index(redirectAddr, key)
+	if start < 0 {
+		return ""
+	}
+	end := strings.Index(redirectAddr[start:], ")")
+	if end < 0 {
+		return ""
+	}
+	end = start + end
+	substr := redirectAddr[start:end]
+	words := strings.Split(substr, "=")
+	if len(words) == 2 {
+		return strings.TrimSpace(words[1])
+	} else {
+		return ""
+	}
+}
+func (pck *RedirectPacket) protocol() string {
+	return pck.findValue("PROTOCOL")
+}
+
+func (pck *RedirectPacket) host() string {
+	return pck.findValue("HOST")
+}
+func (pck *RedirectPacket) port() string {
+	return pck.findValue("PORT")
 }

@@ -2,8 +2,11 @@ package go_ora
 
 import (
 	"database/sql/driver"
-	"github.com/sijms/go-ora/network"
 	"io"
+
+	"github.com/sijms/go-ora/trace"
+
+	"github.com/sijms/go-ora/network"
 )
 
 type Row []driver.Value
@@ -123,4 +126,16 @@ func (dataSet *DataSet) Columns() []string {
 		ret[x] = dataSet.Cols[x].Name
 	}
 	return ret
+}
+
+func (dataSet DataSet) Trace(t trace.Tracer) {
+	for r, row := range dataSet.Rows {
+		if r > 25 {
+			break
+		}
+		t.Printf("Row %d", r)
+		for c, col := range dataSet.Cols {
+			t.Printf("  %-20s: %v", col.Name, row[c])
+		}
+	}
 }

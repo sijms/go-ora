@@ -545,7 +545,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 								//	throw new Exception("UnmarshalColumnData: Unimplemented type");
 								//}
 								switch dataSet.Cols[x].DataType {
-								case NCHAR:
+								case NCHAR, CHAR:
 									if stmt.connection.strConv.LangID != dataSet.Cols[x].CharsetID {
 										tempCharset := stmt.connection.strConv.LangID
 										stmt.connection.strConv.LangID = dataSet.Cols[x].CharsetID

@@ -9,6 +9,16 @@ import (
 	"github.com/sijms/go-ora/network"
 )
 
+// Compile time Sentinels for implemented Interfaces.
+var _ = driver.Rows((*DataSet)(nil))
+var _ = driver.RowsColumnTypeDatabaseTypeName((*DataSet)(nil))
+var _ = driver.RowsColumnTypeLength((*DataSet)(nil))
+var _ = driver.RowsColumnTypeNullable((*DataSet)(nil))
+
+// var _ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
+// var _ = driver.RowsColumnTypeScanType((*DataSet)(nil))
+// var _ = driver.RowsNextResultSet((*DataSet)(nil))
+
 type Row []driver.Value
 
 type DataSet struct {
@@ -138,4 +148,23 @@ func (dataSet DataSet) Trace(t trace.Tracer) {
 			t.Printf("  %-20s: %v", col.Name, row[c])
 		}
 	}
+}
+
+func (dataSet DataSet) ColumnTypeDatabaseTypeName(index int) string {
+	return dataSet.Cols[index].DataType.String()
+}
+
+func (dataSet DataSet) ColumnTypeLength(index int) (length int64, ok bool) {
+	switch dataSet.Cols[index].DataType {
+	case NCHAR, CHAR:
+		return int64(dataSet.Cols[index].MaxCharLen), true
+	case NUMBER:
+		return int64(dataSet.Cols[index].Precision), true
+	}
+	return int64(0), false
+
+}
+
+func (dataSet DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {
+	return dataSet.Cols[index].AllowNull, true
 }

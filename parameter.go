@@ -1,9 +1,10 @@
 package go_ora
 
 import (
-	"github.com/sijms/go-ora/network"
 	"math"
 	"strings"
+
+	"github.com/sijms/go-ora/network"
 )
 
 type OracleType int
@@ -22,6 +23,9 @@ const (
 //Input = 32,
 //InputOutput = 48,
 //}
+
+//go:generate stringer -type=OracleType
+
 const (
 	NCHAR            OracleType = 1
 	NUMBER           OracleType = 2

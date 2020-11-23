@@ -100,10 +100,10 @@ func (session *Session) Connect() error {
 				return errors.New("redirect packet with wrong port")
 			}
 		}
-		err = session.conn.Close()
-		if err != nil {
-			return errors.New("cannot close existing connection")
-		}
+		//err = session.conn.Close()
+		//if err != nil {
+		//	return errors.New("cannot close existing connection")
+		//}
 		return session.Connect()
 	}
 	return errors.New("connection refused by the server")

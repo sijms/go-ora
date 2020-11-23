@@ -61,7 +61,7 @@ func (pck *RedirectPacket) findValue(key string) string {
 		return ""
 	}
 	end = start + end
-	substr := redirectAddr[start:end]
+	substr := pck.redirectAddr[start:end]
 	words := strings.Split(substr, "=")
 	if len(words) == 2 {
 		return strings.TrimSpace(words[1])
@@ -70,7 +70,7 @@ func (pck *RedirectPacket) findValue(key string) string {
 	}
 }
 func (pck *RedirectPacket) protocol() string {
-	return pck.findValue("PROTOCOL")
+	return strings.ToLower(pck.findValue("PROTOCOL"))
 }
 
 func (pck *RedirectPacket) host() string {

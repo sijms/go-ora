@@ -169,7 +169,7 @@ func (stmt *Stmt) write(session *network.Session) error {
 			session.PutUint(0, 4, true, true)
 			session.PutUint(0, 4, true, true)
 		}
-		session.PutUint(1, 4, true, true)
+		session.PutUint(0x7FFFFFFF, 4, true, true)
 		if len(stmt.Pars) > 0 {
 			session.PutBytes(1)
 			session.PutUint(len(stmt.Pars), 2, true, true)
@@ -224,7 +224,6 @@ func (stmt *Stmt) write(session *network.Session) error {
 		} else {
 			stmt.al8i4[7] = 0
 		}
-
 		for x := 0; x < len(stmt.al8i4); x++ {
 			session.PutUint(stmt.al8i4[x], 2, true, true)
 		}
@@ -367,7 +366,7 @@ func (stmt *Stmt) getExeOption() int {
 		op |= 0x40000
 	}
 
-	if stmt.connection.autoCommit {
+	if stmt.connection.autoCommit && stmt.stmtType == DML {
 		op |= 0x100
 	}
 	if stmt.parse {
@@ -545,7 +544,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 								//	throw new Exception("UnmarshalColumnData: Unimplemented type");
 								//}
 								switch dataSet.Cols[x].DataType {
-								case NCHAR, CHAR:
+								case NCHAR, CHAR, LONG:
 									if stmt.connection.strConv.LangID != dataSet.Cols[x].CharsetID {
 										tempCharset := stmt.connection.strConv.LangID
 										stmt.connection.strConv.LangID = dataSet.Cols[x].CharsetID
@@ -589,16 +588,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 									dataSet.currentRow[x] = temp
 								}
 							}
-						} else {
-							// copy from last row
-							//if len(dataSet.Rows) > 0 {
-							//	lastRow := dataSet.Rows[len(dataSet.Rows)-1]
-							//	newRow[x] = lastRow[x]
-							//} else {
-							//	newRow[x] = nil
-							//}
 						}
-
 					}
 					newRow := make(Row, dataSet.ColumnCount)
 					copy(newRow, dataSet.currentRow)
@@ -680,11 +670,11 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 				}
 			}
 		case 16:
-			size, err := session.GetInt(1, false, false)
+			size, err := session.GetByte()
 			if err != nil {
 				return err
 			}
-			_, err = session.GetBytes(size)
+			_, err = session.GetBytes(int(size))
 			if err != nil {
 				return err
 			}
@@ -697,7 +687,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 				return err
 			}
 			if noOfColumns > 0 {
-				_, err = session.GetInt(1, false, false)
+				_, err = session.GetByte() // session.GetInt(1, false, false)
 			}
 			dataSet.Cols = make([]ParameterInfo, noOfColumns)
 			for x := 0; x < noOfColumns; x++ {

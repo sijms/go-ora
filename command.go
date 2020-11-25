@@ -169,6 +169,7 @@ func (stmt *Stmt) write(session *network.Session) error {
 			session.PutUint(0, 4, true, true)
 			session.PutUint(0, 4, true, true)
 		}
+		// add fetch size = max(int32)
 		session.PutUint(0x7FFFFFFF, 4, true, true)
 		if len(stmt.Pars) > 0 {
 			session.PutBytes(1)

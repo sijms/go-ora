@@ -41,6 +41,10 @@ func DecodeDate(data []byte) (time.Time, error) {
 		tzHour = int(data[11]) - 20
 		tzMin = int(data[12]) - 60
 	}
+	if tzHour == 0 && tzMin == 0 {
+		return time.Date(year, time.Month(data[2]), int(data[3]),
+			int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, time.UTC), nil
+	}
 	loc, err := time.Parse("-0700", fmt.Sprintf("%+03d%02d", tzHour, tzMin))
 	if err != nil {
 		return time.Date(year, time.Month(data[2]), int(data[3]),

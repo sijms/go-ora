@@ -96,35 +96,31 @@ func (dataSet *DataSet) Close() error {
 }
 
 func (dataSet *DataSet) Next(dest []driver.Value) error {
-	//fmt.Println("has more row: ", dataSet.parent.hasMoreRows)
-	//fmt.Println("row length: ", len(dataSet.Rows))
-	//fmt.Println("cursor id: ", dataSet.parent.cursorID)
-	//if dataSet.parent.hasMoreRows && dataSet.index == len(dataSet.Rows) && len(dataSet.Rows) < dataSet.parent.noOfRowsToFetch {
-	//	fmt.Println("inside first fetch")
-	//	oldFetchCount := dataSet.parent.noOfRowsToFetch;
-	//	dataSet.parent.noOfRowsToFetch = oldFetchCount - len(dataSet.Rows)
-	//	err := dataSet.parent.fetch(dataSet)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	dataSet.parent.noOfRowsToFetch = oldFetchCount
-	//	fmt.Println("row count after first fetch: ", len(dataSet.Rows))
-	//}
-	if dataSet.parent.hasMoreRows && dataSet.index%dataSet.parent.noOfRowsToFetch == 0 {
+	if dataSet.index >= len(dataSet.Rows) {
+		// At the end of current chunks
+		if !dataSet.parent.hasMoreRows {
+			return io.EOF
+		}
+
 		dataSet.Rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch)
 		err := dataSet.parent.fetch(dataSet)
+
 		if err != nil {
 			return err
 		}
-	}
-	if dataSet.index%dataSet.parent.noOfRowsToFetch < len(dataSet.Rows) {
-		for x := 0; x < len(dataSet.Rows[dataSet.index%dataSet.parent.noOfRowsToFetch]); x++ {
-			dest[x] = driver.Value(dataSet.Rows[dataSet.index%dataSet.parent.noOfRowsToFetch][x])
+		if len(dataSet.Rows) == 0 {
+			// No more chunk
+			return io.EOF
 		}
-		dataSet.index++
-		return nil
 	}
-	return io.EOF
+
+	r := dataSet.Rows[dataSet.index]
+	for x := 0; x < len(r); x++ {
+		dest[x] = driver.Value(r[x])
+	}
+	dataSet.index++
+	return nil
+
 }
 
 func (dataSet *DataSet) Columns() []string {

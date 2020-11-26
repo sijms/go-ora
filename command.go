@@ -409,6 +409,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 	containOutputPars := false
 	dataSet.parent = stmt
 	session := stmt.connection.session
+	dataSet.index = 0
 	for loop {
 		msg, err := session.GetByte()
 		if err != nil {

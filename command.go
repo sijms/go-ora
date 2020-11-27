@@ -366,7 +366,9 @@ func (stmt *Stmt) getExeOption() int {
 	if stmt.stmtType == PLSQL || stmt.hasReturnClause {
 		op |= 0x40000
 	}
-
+	if stmt.arrayBindCount > 1 {
+		op |= 0x80000
+	}
 	if stmt.connection.autoCommit && stmt.stmtType == DML {
 		op |= 0x100
 	}
@@ -376,6 +378,9 @@ func (stmt *Stmt) getExeOption() int {
 	if stmt.execute {
 		op |= 0x20
 	}
+	if !stmt.parse && !stmt.execute {
+		op |= 0x40
+	}
 	if len(stmt.Pars) > 0 {
 		op |= 0x8
 		if stmt.stmtType == PLSQL || stmt.hasReturnClause {
@@ -384,6 +389,9 @@ func (stmt *Stmt) getExeOption() int {
 	}
 	if stmt.stmtType != PLSQL && !stmt.hasReturnClause {
 		op |= 0x8000
+	}
+	if stmt.define {
+		op |= 0x10
 	}
 	return op
 
@@ -493,6 +501,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 					}
 				} else {
 					// see if it is re-execute
+					//fmt.Println(dataSet.Cols)
 					if len(dataSet.Cols) == 0 && len(stmt.columns) > 0 {
 						dataSet.Cols = make([]ParameterInfo, len(stmt.columns))
 						copy(dataSet.Cols, stmt.columns)
@@ -501,6 +510,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 						if dataSet.Cols[x].getDataFromServer {
 
 							temp, err := session.GetClr()
+							//fmt.Println("buffer: ", temp)
 							if err != nil {
 								return err
 							}
@@ -544,6 +554,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 								//default:
 								//	throw new Exception("UnmarshalColumnData: Unimplemented type");
 								//}
+								//fmt.Println("type: ", dataSet.Cols[x].DataType)
 								switch dataSet.Cols[x].DataType {
 								case NCHAR, CHAR, LONG:
 									if stmt.connection.strConv.LangID != dataSet.Cols[x].CharsetID {

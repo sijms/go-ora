@@ -110,7 +110,7 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 	//	dataSet.parent.noOfRowsToFetch = oldFetchCount
 	//	fmt.Println("row count after first fetch: ", len(dataSet.Rows))
 	//}
-	if dataSet.parent.hasMoreRows && dataSet.index%dataSet.parent.noOfRowsToFetch == 0 {
+	if dataSet.parent.hasMoreRows && dataSet.index != 0 && dataSet.index%dataSet.parent.noOfRowsToFetch == 0 {
 		dataSet.Rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch)
 		err := dataSet.parent.fetch(dataSet)
 		if err != nil {

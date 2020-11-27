@@ -215,7 +215,7 @@ func (par *ParameterInfo) read(session *network.Session) error {
 		return err
 	}
 	par.AllowNull = num1 > 0
-	_, err = session.GetInt(1, false, false)
+	_, err = session.GetByte() //  session.GetInt(1, false, false)
 	if err != nil {
 		return err
 	}

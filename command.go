@@ -32,6 +32,8 @@ type Stmt struct {
 	stmtType           StmtType
 	arrayBindingCount  int
 	disableCompression bool
+	hasLONG            bool
+	hasBLOB            bool
 	columns            []ParameterInfo
 	Pars               []ParameterInfo
 	hasReturnClause    bool
@@ -68,6 +70,8 @@ func NewStmt(text string, conn *Connection) *Stmt {
 		text:               text,
 		reExec:             false,
 		reSendParDef:       false,
+		hasLONG:            false,
+		hasBLOB:            false,
 		disableCompression: true,
 		arrayBindCount:     1,
 		parse:              true,
@@ -121,7 +125,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 }
 
 func (stmt *Stmt) write(session *network.Session) error {
-	if stmt.reExec && !stmt.reSendParDef {
+	if !stmt.parse && stmt.stmtType == DML && !stmt.reSendParDef {
 		exeOf := 0
 		execFlag := 0
 		count := stmt.arrayBindCount
@@ -154,7 +158,7 @@ func (stmt *Stmt) write(session *network.Session) error {
 		} else {
 			session.PutBytes(0)
 		}
-		if stmt.reSendParDef {
+		if !stmt.parse {
 			session.PutBytes(0, 1)
 		} else {
 			session.PutUint(len(stmt.text), 4, true, true)
@@ -181,7 +185,7 @@ func (stmt *Stmt) write(session *network.Session) error {
 		session.PutBytes(0, 0, 0, 0, 0)
 		if stmt.define {
 			session.PutBytes(1)
-			session.PutUint(stmt.noOfDefCols, 2, true, true)
+			session.PutUint(len(stmt.columns), 2, true, true)
 		} else {
 			session.PutBytes(0, 0)
 		}
@@ -191,49 +195,61 @@ func (stmt *Stmt) write(session *network.Session) error {
 		if session.TTCVersion >= 5 {
 			session.PutBytes(0, 0, 0, 0, 0)
 		}
-		if !stmt.reSendParDef {
+		if stmt.parse {
 			session.PutBytes([]byte(stmt.text)...)
 		}
-		if exeOp&1 <= 0 {
-			stmt.al8i4[0] = 0
-		} else {
-			stmt.al8i4[0] = 1
-		}
-		switch stmt.stmtType {
-		case DML:
-			fallthrough
-		case PLSQL:
-			if stmt.arrayBindCount <= 1 {
-				stmt.al8i4[1] = 1
-			} else {
-				stmt.al8i4[1] = uint8(stmt.arrayBindCount)
+		if stmt.define {
+			session.PutBytes(0)
+			for x := 0; x < len(stmt.columns); x++ {
+				stmt.columns[x].Flag = 3
+				stmt.columns[x].CharsetForm = 1
+				//stmt.columns[x].MaxLen = 0x7fffffff
+				stmt.columns[x].write(session)
+				session.PutBytes(0)
 			}
-		case OTHERS:
-			stmt.al8i4[1] = 1
-		default:
-			stmt.al8i4[1] = 0
-		}
-		if len(stmt.scnFromExe) == 2 {
-			stmt.al8i4[5] = uint8(stmt.scnFromExe[0])
-			stmt.al8i4[6] = uint8(stmt.scnFromExe[1])
 		} else {
-			stmt.al8i4[5] = 0
-			stmt.al8i4[6] = 0
-		}
-		if stmt.stmtType == SELECT {
-			stmt.al8i4[7] = 1
-		} else {
-			stmt.al8i4[7] = 0
-		}
-		for x := 0; x < len(stmt.al8i4); x++ {
-			session.PutUint(stmt.al8i4[x], 2, true, true)
+			if exeOp&1 <= 0 {
+				stmt.al8i4[0] = 0
+			} else {
+				stmt.al8i4[0] = 1
+			}
+			switch stmt.stmtType {
+			case DML:
+				fallthrough
+			case PLSQL:
+				if stmt.arrayBindCount <= 1 {
+					stmt.al8i4[1] = 1
+				} else {
+					stmt.al8i4[1] = uint8(stmt.arrayBindCount)
+				}
+			case OTHERS:
+				stmt.al8i4[1] = 1
+			default:
+				stmt.al8i4[1] = 0
+			}
+			if len(stmt.scnFromExe) == 2 {
+				stmt.al8i4[5] = uint8(stmt.scnFromExe[0])
+				stmt.al8i4[6] = uint8(stmt.scnFromExe[1])
+			} else {
+				stmt.al8i4[5] = 0
+				stmt.al8i4[6] = 0
+			}
+			if stmt.stmtType == SELECT {
+				stmt.al8i4[7] = 1
+			} else {
+				stmt.al8i4[7] = 0
+			}
+			for x := 0; x < len(stmt.al8i4); x++ {
+				session.PutUint(stmt.al8i4[x], 2, true, true)
+			}
 		}
 		for _, par := range stmt.Pars {
 			_ = par.write(session)
 		}
-		stmt.reExec = true
+		//stmt.reExec = true
 		stmt.parse = false
 		stmt.reSendParDef = false
+		stmt.define = false
 		//stmt.define = false
 	}
 	//if !stmt.reExec {
@@ -325,42 +341,6 @@ func (stmt *Stmt) write(session *network.Session) error {
 	return session.Write()
 }
 
-//func (stmt *Stmt) NoQuery() error {
-//	stmt.autoCommit = true
-//	stmt.connection.session.ResetBuffer()
-//	err := stmt.write(stmt.connection.session)
-//	if err != nil {
-//		return err
-//	}
-//	err = stmt.connection.session.write()
-//	if err != nil {
-//		return err
-//	}
-//	dataSet := new(DataSet)
-//	return stmt.read(dataSet)
-//}
-
-//func (stmt *Stmt) QueryN() (*DataSet, error) {
-//	stmt.autoCommit = false
-//	stmt.noOfRowsToFetch = 25
-//	stmt.connection.session.ResetBuffer()
-//	err := stmt.write(stmt.connection.session)
-//	if err != nil {
-//		return nil, err
-//	}
-//	err = stmt.connection.session.write()
-//	if err != nil {
-//		return nil, err
-//	}
-//	dataSet := new(DataSet)
-//	err = stmt.read(dataSet)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return dataSet, nil
-//
-//}
-
 func (stmt *Stmt) getExeOption() int {
 	op := 0
 	if stmt.stmtType == PLSQL || stmt.hasReturnClause {
@@ -400,6 +380,7 @@ func (stmt *Stmt) getExeOption() int {
 	Regex.IsMatch(cmdText, "\\bRETURNING\\b"
 	*/
 }
+
 func (stmt *Stmt) fetch(dataSet *DataSet) error {
 	stmt.connection.session.ResetBuffer()
 	stmt.connection.session.PutBytes(3, 5, 0)
@@ -596,6 +577,28 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 										return err
 									}
 									dataSet.currentRow[x] = dateVal
+								case OCIBlobLocator:
+									data, err := session.GetClr()
+									if err != nil {
+										return err
+									}
+									lob := &Lob{
+										sourceLocator: data,
+									}
+									session.SaveState()
+									dataSize, err := lob.getSize(session)
+									if err != nil {
+										return err
+									}
+									lobData, err := lob.getData(session)
+									if err != nil {
+										return err
+									}
+									if dataSize != int64(len(lobData)) {
+										return errors.New("error reading lob data")
+									}
+									dataSet.currentRow[x] = lobData
+									session.LoadState()
 								default:
 									dataSet.currentRow[x] = temp
 								}
@@ -706,6 +709,12 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 				err = dataSet.Cols[x].read(session)
 				if err != nil {
 					return err
+				}
+				if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
+					stmt.hasLONG = true
+				}
+				if dataSet.Cols[x].DataType == OCIClobLocator || dataSet.Cols[x].DataType == OCIBlobLocator {
+					stmt.hasBLOB = true
 				}
 			}
 			stmt.columns = make([]ParameterInfo, noOfColumns)

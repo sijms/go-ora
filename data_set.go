@@ -117,13 +117,19 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 			return err
 		}
 	}
+	if dataSet.parent.hasMoreRows && dataSet.parent.hasBLOB && dataSet.index == 0 {
+		if err := dataSet.parent.fetch(dataSet); err != nil {
+			return err
+		}
+	}
 	if dataSet.index%dataSet.parent.noOfRowsToFetch < len(dataSet.Rows) {
 		for x := 0; x < len(dataSet.Rows[dataSet.index%dataSet.parent.noOfRowsToFetch]); x++ {
-			dest[x] = driver.Value(dataSet.Rows[dataSet.index%dataSet.parent.noOfRowsToFetch][x])
+			dest[x] = dataSet.Rows[dataSet.index%dataSet.parent.noOfRowsToFetch][x]
 		}
 		dataSet.index++
 		return nil
 	}
+
 	return io.EOF
 }
 

@@ -17,7 +17,13 @@ type Data interface {
 	Write(session *Session) error
 	Read(session *Session) error
 }
-
+type sessionState struct {
+	summary   *SummaryObject
+	sendPcks  []PacketInterface
+	inBuffer  []byte
+	outBuffer []byte
+	index     int
+}
 type Session struct {
 	conn              net.Conn
 	connOption        ConnectionOption
@@ -34,6 +40,7 @@ type Session struct {
 	HasEOSCapability  bool
 	HasFSAPCapability bool
 	Summary           *SummaryObject
+	states            []sessionState
 	StrConv           *converters.StringConverter
 }
 
@@ -46,6 +53,33 @@ func NewSession(connOption ConnectionOption) *Session {
 		connOption: connOption,
 		Context:    NewSessionContext(connOption),
 		Summary:    nil,
+	}
+}
+
+func (session *Session) SaveState() {
+	session.states = append(session.states, sessionState{
+		summary:   session.Summary,
+		sendPcks:  session.sendPcks,
+		inBuffer:  session.inBuffer,
+		outBuffer: session.outBuffer,
+		index:     session.index,
+	})
+}
+
+func (session *Session) LoadState() {
+	index := len(session.states) - 1
+	if index >= 0 {
+		currentState := session.states[index]
+		session.Summary = currentState.summary
+		session.sendPcks = currentState.sendPcks
+		session.inBuffer = currentState.inBuffer
+		session.outBuffer = currentState.outBuffer
+		session.index = currentState.index
+		if index == 0 {
+			session.states = nil
+		} else {
+			session.states = session.states[:index]
+		}
 	}
 }
 

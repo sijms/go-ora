@@ -117,7 +117,7 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 			return err
 		}
 	}
-	if dataSet.parent.hasMoreRows && dataSet.parent.hasBLOB && dataSet.index == 0 {
+	if dataSet.parent.hasMoreRows && (dataSet.parent.hasBLOB || dataSet.parent.hasLONG) && dataSet.index == 0 {
 		if err := dataSet.parent.fetch(dataSet); err != nil {
 			return err
 		}

@@ -82,7 +82,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	}
 
 	// get stmt type
-	uCmdText := strings.Trim(strings.ToUpper(text), " ")
+	uCmdText := strings.TrimSpace(strings.ToUpper(text))
 	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
 		ret.stmtType = SELECT
 	} else if strings.HasPrefix(uCmdText, "UPDATE") ||
@@ -330,7 +330,14 @@ func (stmt *Stmt) write(session *network.Session) error {
 		for x := 0; x < stmt.arrayBindCount; x++ {
 			session.PutBytes(7)
 			for _, par := range stmt.Pars {
-				session.PutClr(par.Value)
+				if par.DataType != RAW {
+					session.PutClr(par.Value)
+				}
+			}
+			for _, par := range stmt.Pars {
+				if par.DataType == RAW {
+					session.PutClr(par.Value)
+				}
 			}
 		}
 		//session.PutUint(7, 1, false, false)
@@ -863,12 +870,19 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			}
 			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
 			param.CharsetForm = 1
+		case []byte:
+			param.Value = val
+			param.DataType = RAW
+			param.MaxLen = len(val)
+			param.ContFlag = 0
+			param.MaxCharLen = 0
+			param.CharsetForm = 0
 		}
 		if param.DataType == NUMBER {
 			param.ContFlag = 0
-			param.MaxCharLen = 22
+			param.MaxCharLen = 0
 			param.MaxLen = 22
-			param.CharsetForm = 1
+			param.CharsetForm = 0
 		}
 		if direction == Output {
 			param.Value = nil

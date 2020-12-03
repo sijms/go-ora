@@ -45,13 +45,18 @@ func (op *ConnectionOption) ConnectionData() string {
 	FulCid := "(CID=(PROGRAM=" + op.ClientData.ProgramPath + ")(HOST=" + op.ClientData.HostName + ")(USER=" + op.ClientData.UserName + "))"
 	address := "(ADDRESS=(PROTOCOL=" + op.Protocol + ")(HOST=" + op.Host + ")(PORT=" + strconv.Itoa(op.Port) + "))"
 	result := "(CONNECT_DATA="
-	if op.ServiceName != "" {
-		result += "(SERVICE_NAME=" + op.ServiceName + ")"
+	if op.SID != "" {
+		result += "(SID=" + op.SID + ")"
 	} else {
-		if op.SID != "" {
-			result += "(SID=" + op.SID + ")"
-		}
+		result += "(SERVICE_NAME=" + op.ServiceName + ")"
 	}
+	//if op.ServiceName != "" {
+	//
+	//} else {
+	//	if op.SID != "" {
+	//
+	//	}
+	//}
 	if op.InstanceName != "" {
 		result += "(INSTANCE_NAME=" + op.InstanceName + ")"
 	}

@@ -496,7 +496,6 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 					}
 					for x := 0; x < len(dataSet.Cols); x++ {
 						if dataSet.Cols[x].getDataFromServer {
-
 							temp, err := session.GetClr()
 							//fmt.Println("buffer: ", temp)
 							if err != nil {
@@ -504,6 +503,16 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 							}
 							if temp == nil {
 								dataSet.currentRow[x] = nil
+								if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
+									_, err = session.GetBytes(2)
+									if err != nil {
+										return err
+									}
+									_, err = session.GetInt(4, true, true)
+									if err != nil {
+										return err
+									}
+								}
 							} else {
 								//switch (this.m_definedColumnType)
 								//{

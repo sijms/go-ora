@@ -146,7 +146,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		}
 	}
 	ret.Host = u.Host
-	ret.SID = strings.Trim(u.Path, "/")
+	ret.ServiceName = strings.Trim(u.Path, "/")
 	if len(ret.UserID) == 0 {
 		return nil, errors.New("empty user name")
 	}
@@ -163,6 +163,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			//	conStr.DataSource = val
 			case "SERVICE NAME":
 				ret.ServiceName = val[0]
+			case "SID":
+				ret.SID = val[0]
 			case "INSTANCE NAME":
 				ret.InstanceName = val[0]
 			case "DBA PRIVILEGE":

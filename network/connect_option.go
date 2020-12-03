@@ -49,7 +49,7 @@ func (op *ConnectionOption) ConnectionData() string {
 		result += "(SERVICE_NAME=" + op.ServiceName + ")"
 	} else {
 		if op.SID != "" {
-			result += "(SERVICE_NAME=" + op.SID + ")"
+			result += "(SID=" + op.SID + ")"
 		}
 	}
 	if op.InstanceName != "" {

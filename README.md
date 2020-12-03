@@ -2,7 +2,8 @@
 ## Pure go oracle client
 important notes:
  * the client is tested against oracle 10G, 11G and 12G and working properly
- * supported parameter types is integer, double, strings and time.Time
+ * supported parameter types is integer, double, string, time.Time and []byte
+ * BLOB is now supported in SELECT and DML statement
  * named parameter not supported to define parameter just put ':' + parameter_name in sql statement
  * integration with sql/database is done using simple form
 

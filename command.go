@@ -562,6 +562,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 									} else {
 										dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
 									}
+
 								case NUMBER:
 									dataSet.currentRow[x] = converters.DecodeNumber(temp)
 									// if dataSet.Cols[x].Scale == 0 {
@@ -617,6 +618,16 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 									session.LoadState()
 								default:
 									dataSet.currentRow[x] = temp
+								}
+								if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
+									_, err = session.GetInt(4, true, true)
+									if err != nil {
+										return err
+									}
+									_, err = session.GetInt(4, true, true)
+									if err != nil {
+										return err
+									}
 								}
 							}
 						}

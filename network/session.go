@@ -726,7 +726,6 @@ func (session *Session) GetClr() (output []byte, err error) {
 		var size1 uint8
 		size1, err = session.GetByte()
 		if err != nil || size1 == 0 {
-			_, err = session.GetBytes(2)
 			break
 		}
 		rb, err = session.read(int(size1))

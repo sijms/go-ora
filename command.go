@@ -594,7 +594,29 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 										return err
 									}
 									dataSet.currentRow[x] = dateVal
-								case OCIBlobLocator:
+								//case :
+								//	data, err := session.GetClr()
+								//	if err != nil {
+								//		return err
+								//	}
+								//	lob := &Lob{
+								//		sourceLocator: data,
+								//	}
+								//	session.SaveState()
+								//	dataSize, err := lob.getSize(session)
+								//	if err != nil {
+								//		return err
+								//	}
+								//	lobData, err := lob.getData(session)
+								//	if err != nil {
+								//		return err
+								//	}
+								//	if dataSize != int64(len(lobData)) {
+								//		return errors.New("error reading lob data")
+								//	}
+								//	session.LoadState()
+								//
+								case OCIBlobLocator, OCIClobLocator:
 									data, err := session.GetClr()
 									if err != nil {
 										return err
@@ -614,8 +636,19 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 									if dataSize != int64(len(lobData)) {
 										return errors.New("error reading lob data")
 									}
-									dataSet.currentRow[x] = lobData
 									session.LoadState()
+									if dataSet.Cols[x].DataType == OCIBlobLocator {
+										dataSet.currentRow[x] = lobData
+									} else {
+										if stmt.connection.strConv.LangID != dataSet.Cols[x].CharsetID {
+											tempCharset := stmt.connection.strConv.LangID
+											stmt.connection.strConv.LangID = dataSet.Cols[x].CharsetID
+											dataSet.currentRow[x] = stmt.connection.strConv.Decode(lobData)
+											stmt.connection.strConv.LangID = tempCharset
+										} else {
+											dataSet.currentRow[x] = stmt.connection.strConv.Decode(lobData)
+										}
+									}
 								default:
 									dataSet.currentRow[x] = temp
 								}

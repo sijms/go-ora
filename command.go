@@ -161,7 +161,7 @@ func (stmt *Stmt) write(session *network.Session) error {
 		if !stmt.parse {
 			session.PutBytes(0, 1)
 		} else {
-			session.PutUint(len(stmt.text), 4, true, true)
+			session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
 			session.PutBytes(1)
 		}
 		session.PutUint(13, 2, true, true)
@@ -196,7 +196,7 @@ func (stmt *Stmt) write(session *network.Session) error {
 			session.PutBytes(0, 0, 0, 0, 0)
 		}
 		if stmt.parse {
-			session.PutBytes([]byte(stmt.text)...)
+			session.PutBytes(stmt.connection.strConv.Encode(stmt.text)...)
 		}
 		if stmt.define {
 			session.PutBytes(0)

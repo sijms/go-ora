@@ -757,15 +757,15 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			if err != nil {
 				return err
 			}
-			noOfColumns, err := session.GetInt(4, true, true)
+			dataSet.ColumnCount, err = session.GetInt(4, true, true)
 			if err != nil {
 				return err
 			}
-			if noOfColumns > 0 {
+			if dataSet.ColumnCount > 0 {
 				_, err = session.GetByte() // session.GetInt(1, false, false)
 			}
-			dataSet.Cols = make([]ParameterInfo, noOfColumns)
-			for x := 0; x < noOfColumns; x++ {
+			dataSet.Cols = make([]ParameterInfo, dataSet.ColumnCount)
+			for x := 0; x < dataSet.ColumnCount; x++ {
 				err = dataSet.Cols[x].read(session)
 				if err != nil {
 					return err
@@ -777,7 +777,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 					stmt.hasBLOB = true
 				}
 			}
-			stmt.columns = make([]ParameterInfo, noOfColumns)
+			stmt.columns = make([]ParameterInfo, dataSet.ColumnCount)
 			copy(stmt.columns, dataSet.Cols)
 			_, err = session.GetDlc()
 			if session.TTCVersion >= 3 {

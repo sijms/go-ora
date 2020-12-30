@@ -204,7 +204,10 @@ func (stmt *Stmt) write(session *network.Session) error {
 				stmt.columns[x].Flag = 3
 				stmt.columns[x].CharsetForm = 1
 				//stmt.columns[x].MaxLen = 0x7fffffff
-				stmt.columns[x].write(session)
+				err := stmt.columns[x].write(session)
+				if err != nil {
+					return err
+				}
 				session.PutBytes(0)
 			}
 		} else {
@@ -914,15 +917,20 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.MaxLen = 11
 			param.MaxCharLen = 11
 		case string:
-			param.Value = stmt.connection.strConv.Encode(val)
 			param.DataType = NCHAR
 			param.ContFlag = 16
 			param.MaxCharLen = len(val)
-			if size > len(val) {
-				param.MaxCharLen = size
-			}
-			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
 			param.CharsetForm = 1
+			if string(val) == "" && direction == Input {
+				param.Value = nil
+				param.MaxLen = 1
+			} else {
+				param.Value = stmt.connection.strConv.Encode(val)
+				if size > len(val) {
+					param.MaxCharLen = size
+				}
+				param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
+			}
 		case []byte:
 			param.Value = val
 			param.DataType = RAW

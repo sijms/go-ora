@@ -128,31 +128,31 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 	}
 	for _, par := range stmt.Pars {
 		if par.Name == "p_nls_calendar" {
-			conn.NLSData.Calender = conn.strConv.Decode(par.Value)
+			conn.NLSData.Calender = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_comp" {
-			conn.NLSData.Comp = conn.strConv.Decode(par.Value)
+			conn.NLSData.Comp = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_length_semantics" {
-			conn.NLSData.LengthSemantics = conn.strConv.Decode(par.Value)
+			conn.NLSData.LengthSemantics = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_nchar_conv_excep" {
-			conn.NLSData.NCharConvExcep = conn.strConv.Decode(par.Value)
+			conn.NLSData.NCharConvExcep = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_date_lang" {
-			conn.NLSData.DateLang = conn.strConv.Decode(par.Value)
+			conn.NLSData.DateLang = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_sort" {
-			conn.NLSData.Sort = conn.strConv.Decode(par.Value)
+			conn.NLSData.Sort = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_currency" {
-			conn.NLSData.Currency = conn.strConv.Decode(par.Value)
+			conn.NLSData.Currency = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_date_format" {
-			conn.NLSData.DateFormat = conn.strConv.Decode(par.Value)
+			conn.NLSData.DateFormat = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_iso_currency" {
-			conn.NLSData.IsoCurrency = conn.strConv.Decode(par.Value)
+			conn.NLSData.IsoCurrency = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_numeric_chars" {
-			conn.NLSData.NumericChars = conn.strConv.Decode(par.Value)
+			conn.NLSData.NumericChars = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_dual_currency" {
-			conn.NLSData.DualCurrency = conn.strConv.Decode(par.Value)
+			conn.NLSData.DualCurrency = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_timestamp" {
-			conn.NLSData.Timestamp = conn.strConv.Decode(par.Value)
+			conn.NLSData.Timestamp = conn.strConv.Decode(par.BValue)
 		} else if par.Name == "p_nls_timestamp_tz" {
-			conn.NLSData.TimestampTZ = conn.strConv.Decode(par.Value)
+			conn.NLSData.TimestampTZ = conn.strConv.Decode(par.BValue)
 		}
 	}
 	return &conn.NLSData, nil

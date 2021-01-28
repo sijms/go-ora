@@ -1,6 +1,7 @@
 package go_ora
 
 import (
+	"database/sql/driver"
 	"math"
 	"strings"
 
@@ -51,7 +52,7 @@ const (
 	CHARZ            OracleType = 97
 	IBFloat          OracleType = 100
 	IBDouble         OracleType = 101
-	RefCursor        OracleType = 102
+	REFCURSOR        OracleType = 102
 	NOT              OracleType = 108
 	XMLType          OracleType = 108
 	OCIRef           OracleType = 110
@@ -101,11 +102,12 @@ type ParameterInfo struct {
 	Version              int
 	CharsetID            int
 	CharsetForm          int
-	Value                []byte
+	BValue               []byte
+	Value                driver.Value
 	getDataFromServer    bool
 }
 
-func (par *ParameterInfo) read(session *network.Session) error {
+func (par *ParameterInfo) load(session *network.Session) error {
 	par.getDataFromServer = true
 	dataType, err := session.GetByte()
 	if err != nil {
@@ -278,7 +280,7 @@ func (par *ParameterInfo) write(session *network.Session) error {
 //		MaxLen:      22,
 //		CharsetID:   871,
 //		CharsetForm: 1,
-//		Value:       converters.EncodeInt(val),
+//		BValue:       converters.EncodeInt(val),
 //	}
 //	return &ret
 //}
@@ -293,7 +295,7 @@ func (par *ParameterInfo) write(session *network.Session) error {
 //		MaxLen:      size,
 //		CharsetID:   871,
 //		CharsetForm: 1,
-//		Value:       []byte(val),
+//		BValue:       []byte(val),
 //	}
 //	return &ret
 //}

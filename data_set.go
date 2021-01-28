@@ -2,9 +2,8 @@ package go_ora
 
 import (
 	"database/sql/driver"
-	"io"
-
 	"github.com/sijms/go-ora/trace"
+	"io"
 
 	"github.com/sijms/go-ora/network"
 )
@@ -30,10 +29,10 @@ type DataSet struct {
 	Rows            []Row
 	currentRow      Row
 	index           int
-	parent          *Stmt
+	parent          StmtInterface
 }
 
-func (dataSet *DataSet) read(session *network.Session) error {
+func (dataSet *DataSet) load(session *network.Session) error {
 	_, err := session.GetByte()
 	if err != nil {
 		return err
@@ -110,28 +109,62 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 	//	dataSet.parent.noOfRowsToFetch = oldFetchCount
 	//	fmt.Println("row count after first fetch: ", len(dataSet.Rows))
 	//}
-	if dataSet.parent.hasMoreRows && dataSet.index != 0 && dataSet.index%dataSet.parent.noOfRowsToFetch == 0 {
-		dataSet.Rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch)
-		err := dataSet.parent.fetch(dataSet)
-		if err != nil {
-			return err
+	hasMoreRows := dataSet.parent.hasMoreRows()
+	noOfRowsToFetch := len(dataSet.Rows) // dataSet.parent.noOfRowsToFetch()
+	hasBLOB := dataSet.parent.hasBLOB()
+	hasLONG := dataSet.parent.hasLONG()
+	if !hasMoreRows && noOfRowsToFetch == 0 {
+		return io.EOF
+	}
+	if dataSet.index > 0 && dataSet.index%len(dataSet.Rows) == 0 {
+		if hasMoreRows {
+			dataSet.Rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
+			err := dataSet.parent.fetch(dataSet)
+			if err != nil {
+				return err
+			}
+			noOfRowsToFetch = len(dataSet.Rows)
+			hasMoreRows = dataSet.parent.hasMoreRows()
+			dataSet.index = 0
+			if !hasMoreRows && noOfRowsToFetch == 0 {
+				return io.EOF
+			}
+		} else {
+			return io.EOF
 		}
 	}
-	if dataSet.parent.hasMoreRows && (dataSet.parent.hasBLOB || dataSet.parent.hasLONG) && dataSet.index == 0 {
+	//if hasMoreRows && dataSet.index != 0 && dataSet.index%noOfRowsToFetch == 0 {
+	//
+	//}
+	if hasMoreRows && (hasBLOB || hasLONG) && dataSet.index == 0 {
 		if err := dataSet.parent.fetch(dataSet); err != nil {
 			return err
 		}
 	}
-	if dataSet.index%dataSet.parent.noOfRowsToFetch < len(dataSet.Rows) {
-		for x := 0; x < len(dataSet.Rows[dataSet.index%dataSet.parent.noOfRowsToFetch]); x++ {
-			dest[x] = dataSet.Rows[dataSet.index%dataSet.parent.noOfRowsToFetch][x]
+	if dataSet.index%noOfRowsToFetch < len(dataSet.Rows) {
+		for x := 0; x < len(dataSet.Rows[dataSet.index%noOfRowsToFetch]); x++ {
+			dest[x] = dataSet.Rows[dataSet.index%noOfRowsToFetch][x]
 		}
 		dataSet.index++
 		return nil
 	}
-
 	return io.EOF
 }
+
+//func (dataSet *DataSet) NextRow(args... interface{}) error {
+//	var values = make([]driver.Value, len(args))
+//	err := dataSet.Next(values)
+//	if err != nil {
+//		return err
+//	}
+//	for index, arg := range args {
+//		*arg = values[index]
+//		//if val, ok := values[index].(t); !ok {
+//		//
+//		//}
+//	}
+//	return nil
+//}
 
 func (dataSet *DataSet) Columns() []string {
 	if len(dataSet.Cols) == 0 {

@@ -24,31 +24,166 @@ const (
 	OTHERS StmtType = 4
 )
 
-type Stmt struct {
+type StmtInterface interface {
+	hasMoreRows() bool
+	noOfRowsToFetch() int
+	fetch(dataSet *DataSet) error
+	hasBLOB() bool
+	hasLONG() bool
+	//write() error
+	//getExeOption() int
+	read(dataSet *DataSet) error
+	//Close() error
+	//Exec(args []driver.Value) (driver.Result, error)
+	//Query(args []driver.Value) (driver.Rows, error)
+}
+type defaultStmt struct {
 	connection         *Connection
 	text               string
-	reExec             bool
-	reSendParDef       bool
-	stmtType           StmtType
 	arrayBindingCount  int
 	disableCompression bool
-	hasLONG            bool
-	hasBLOB            bool
-	columns            []ParameterInfo
-	Pars               []ParameterInfo
-	hasReturnClause    bool
-	parse              bool // means parse the command in the server this occur if the stmt is not cached
-	execute            bool
-	define             bool
-	exeOption          int
+	_hasLONG           bool
+	_hasBLOB           bool
+	_hasMoreRows       bool
+	_hasReturnClause   bool
+	_noOfRowsToFetch   int
+	stmtType           StmtType
 	cursorID           int
-	noOfRowsToFetch    int
-	noOfDefCols        int
-	al8i4              []byte
-	arrayBindCount     int
 	queryID            uint64
+	Pars               []ParameterInfo
+	columns            []ParameterInfo
 	scnFromExe         []int
-	hasMoreRows        bool
+	arrayBindCount     int
+}
+
+func (stmt *defaultStmt) hasMoreRows() bool {
+	return stmt._hasMoreRows
+}
+func (stmt *defaultStmt) noOfRowsToFetch() int {
+	return stmt._noOfRowsToFetch
+}
+func (stmt *defaultStmt) hasLONG() bool {
+	return stmt._hasLONG
+}
+func (stmt *defaultStmt) hasBLOB() bool {
+	return stmt._hasBLOB
+}
+
+func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
+	session := stmt.connection.session
+	session.PutBytes(3, 0x5E, 0)
+	session.PutUint(exeOp, 4, true, true)
+	session.PutUint(stmt.cursorID, 2, true, true)
+	if stmt.cursorID == 0 {
+		session.PutBytes(1)
+
+	} else {
+		session.PutBytes(0)
+	}
+	if parse {
+		session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
+		session.PutBytes(1)
+	} else {
+		session.PutBytes(0, 1)
+	}
+	session.PutUint(13, 2, true, true)
+	session.PutBytes(0, 0)
+	if exeOp&0x40 == 0 && exeOp&0x20 != 0 && exeOp&0x1 != 0 && stmt.stmtType == SELECT {
+		session.PutBytes(0)
+		session.PutUint(stmt._noOfRowsToFetch, 4, true, true)
+	} else {
+		session.PutUint(0, 4, true, true)
+		session.PutUint(0, 4, true, true)
+	}
+	// add fetch size = max(int32)
+	session.PutUint(0x7FFFFFFF, 4, true, true)
+	if len(stmt.Pars) > 0 {
+		session.PutBytes(1)
+		session.PutUint(len(stmt.Pars), 2, true, true)
+	} else {
+		session.PutBytes(0, 0)
+
+	}
+	session.PutBytes(0, 0, 0, 0, 0)
+	if define {
+		session.PutBytes(1)
+		session.PutUint(len(stmt.columns), 2, true, true)
+	} else {
+		session.PutBytes(0, 0)
+	}
+	if session.TTCVersion >= 4 {
+		session.PutBytes(0, 0, 1)
+	}
+	if session.TTCVersion >= 5 {
+		session.PutBytes(0, 0, 0, 0, 0)
+	}
+	if parse {
+		session.PutBytes(stmt.connection.strConv.Encode(stmt.text)...)
+	}
+	if define {
+		session.PutBytes(0)
+		for x := 0; x < len(stmt.columns); x++ {
+			stmt.columns[x].Flag = 3
+			stmt.columns[x].CharsetForm = 1
+			//stmt.columns[x].MaxLen = 0x7fffffff
+			err := stmt.columns[x].write(session)
+			if err != nil {
+				return err
+			}
+			session.PutBytes(0)
+		}
+	} else {
+		al8i4 := make([]int, 13)
+		if exeOp&1 <= 0 {
+			al8i4[0] = 0
+		} else {
+			al8i4[0] = 1
+		}
+		switch stmt.stmtType {
+		case DML:
+			fallthrough
+		case PLSQL:
+			if stmt.arrayBindCount <= 1 {
+				al8i4[1] = 1
+			} else {
+				al8i4[1] = stmt.arrayBindCount
+			}
+		case OTHERS:
+			al8i4[1] = 1
+		default:
+			al8i4[1] = stmt._noOfRowsToFetch
+		}
+		if len(stmt.scnFromExe) == 2 {
+			al8i4[5] = stmt.scnFromExe[0]
+			al8i4[6] = stmt.scnFromExe[1]
+		} else {
+			al8i4[5] = 0
+			al8i4[6] = 0
+		}
+		if stmt.stmtType == SELECT {
+			al8i4[7] = 1
+		} else {
+			al8i4[7] = 0
+		}
+		for x := 0; x < len(al8i4); x++ {
+			session.PutUint(al8i4[x], 4, true, true)
+		}
+	}
+	for _, par := range stmt.Pars {
+		_ = par.write(session)
+	}
+	return nil
+}
+
+type Stmt struct {
+	defaultStmt
+	//reExec           bool
+	reSendParDef bool
+	parse        bool // means parse the command in the server this occur if the stmt is not cached
+	execute      bool
+	define       bool
+
+	//noOfDefCols        int
 }
 
 type QueryResult struct {
@@ -66,21 +201,29 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 
 func NewStmt(text string, conn *Connection) *Stmt {
 	ret := &Stmt{
-		connection:         conn,
-		text:               text,
-		reExec:             false,
-		reSendParDef:       false,
-		hasLONG:            false,
-		hasBLOB:            false,
-		disableCompression: true,
-		arrayBindCount:     1,
-		parse:              true,
-		execute:            true,
-		define:             false,
-		al8i4:              make([]byte, 13),
-		scnFromExe:         make([]int, 2),
+		//connection:         conn,
+		//text:               text,
+		//reExec:             false,
+		reSendParDef: false,
+		parse:        true,
+		execute:      true,
+		define:       false,
+		//hasLONG:            false,
+		//hasBLOB:            false,
+		//disableCompression: true,
+		//arrayBindCount:     1,
+		//parse:              true,
+		//execute:            true,
+		//define:             false,
+		//scnFromExe:         make([]int, 2),
 	}
-
+	ret.connection = conn
+	ret.text = text
+	ret._hasBLOB = false
+	ret._hasLONG = false
+	ret.disableCompression = true
+	ret.arrayBindCount = 1
+	ret.scnFromExe = make([]int, 2)
 	// get stmt type
 	uCmdText := strings.TrimSpace(strings.ToUpper(text))
 	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
@@ -95,32 +238,12 @@ func NewStmt(text string, conn *Connection) *Stmt {
 		ret.stmtType = OTHERS
 	}
 
-	// returning cluase
+	// returning clause
 	var err error
-	ret.hasReturnClause, err = regexp.MatchString(`\bRETURNING\b`, uCmdText)
+	ret._hasReturnClause, err = regexp.MatchString(`\bRETURNING\b`, uCmdText)
 	if err != nil {
-		ret.hasReturnClause = false
+		ret._hasReturnClause = false
 	}
-	//ret.al8i4[0] = 1
-	//switch ret.stmtType {
-	//case DML:
-	//	fallthrough
-	//case PLSQL:
-	//	if ret.arrayBindCount <= 1 {
-	//		ret.al8i4[1] = 1
-	//	} else {
-	//		ret.al8i4[1] = uint8(ret.arrayBindCount)
-	//	}
-	//case OTHERS:
-	//	ret.al8i4[1] = 1
-	//default:
-	//	ret.al8i4[1] = 0
-	//}
-	//if ret.stmtType == SELECT {
-	//	ret.al8i4[7] = 1
-	//} else {
-	//	ret.al8i4[7] = 0
-	//}
 	return ret
 }
 
@@ -131,9 +254,9 @@ func (stmt *Stmt) write(session *network.Session) error {
 		count := stmt.arrayBindCount
 		if stmt.stmtType == SELECT {
 			session.PutBytes(3, 0x4E, 0)
-			count = stmt.noOfRowsToFetch
+			count = stmt._noOfRowsToFetch
 			exeOf = 0x20
-			if stmt.hasReturnClause || stmt.stmtType == PLSQL || stmt.disableCompression {
+			if stmt._hasReturnClause || stmt.stmtType == PLSQL || stmt.disableCompression {
 				exeOf |= 0x40000
 			}
 
@@ -148,112 +271,14 @@ func (stmt *Stmt) write(session *network.Session) error {
 		session.PutUint(exeOf, 2, true, true)
 		session.PutUint(execFlag, 2, true, true)
 	} else {
-		exeOp := stmt.getExeOption()
-		session.PutBytes(3, 0x5E, 0)
-		session.PutUint(exeOp, 4, true, true)
-		session.PutUint(stmt.cursorID, 2, true, true)
-		if stmt.cursorID == 0 {
-			session.PutBytes(1)
-
-		} else {
-			session.PutBytes(0)
-		}
-		if !stmt.parse {
-			session.PutBytes(0, 1)
-		} else {
-			session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
-			session.PutBytes(1)
-		}
-		session.PutUint(13, 2, true, true)
-		session.PutBytes(0, 0)
-		if exeOp&0x40 == 0 && exeOp&0x20 != 0 && exeOp&0x1 != 0 && stmt.stmtType == SELECT {
-			session.PutBytes(0)
-			session.PutUint(stmt.noOfRowsToFetch, 4, true, true)
-		} else {
-			session.PutUint(0, 4, true, true)
-			session.PutUint(0, 4, true, true)
-		}
-		// add fetch size = max(int32)
-		session.PutUint(0x7FFFFFFF, 4, true, true)
-		if len(stmt.Pars) > 0 {
-			session.PutBytes(1)
-			session.PutUint(len(stmt.Pars), 2, true, true)
-		} else {
-			session.PutBytes(0, 0)
-
-		}
-		session.PutBytes(0, 0, 0, 0, 0)
-		if stmt.define {
-			session.PutBytes(1)
-			session.PutUint(len(stmt.columns), 2, true, true)
-		} else {
-			session.PutBytes(0, 0)
-		}
-		if session.TTCVersion >= 4 {
-			session.PutBytes(0, 0, 1)
-		}
-		if session.TTCVersion >= 5 {
-			session.PutBytes(0, 0, 0, 0, 0)
-		}
-		if stmt.parse {
-			session.PutBytes(stmt.connection.strConv.Encode(stmt.text)...)
-		}
-		if stmt.define {
-			session.PutBytes(0)
-			for x := 0; x < len(stmt.columns); x++ {
-				stmt.columns[x].Flag = 3
-				stmt.columns[x].CharsetForm = 1
-				//stmt.columns[x].MaxLen = 0x7fffffff
-				err := stmt.columns[x].write(session)
-				if err != nil {
-					return err
-				}
-				session.PutBytes(0)
-			}
-		} else {
-			if exeOp&1 <= 0 {
-				stmt.al8i4[0] = 0
-			} else {
-				stmt.al8i4[0] = 1
-			}
-			switch stmt.stmtType {
-			case DML:
-				fallthrough
-			case PLSQL:
-				if stmt.arrayBindCount <= 1 {
-					stmt.al8i4[1] = 1
-				} else {
-					stmt.al8i4[1] = uint8(stmt.arrayBindCount)
-				}
-			case OTHERS:
-				stmt.al8i4[1] = 1
-			default:
-				stmt.al8i4[1] = 0
-			}
-			if len(stmt.scnFromExe) == 2 {
-				stmt.al8i4[5] = uint8(stmt.scnFromExe[0])
-				stmt.al8i4[6] = uint8(stmt.scnFromExe[1])
-			} else {
-				stmt.al8i4[5] = 0
-				stmt.al8i4[6] = 0
-			}
-			if stmt.stmtType == SELECT {
-				stmt.al8i4[7] = 1
-			} else {
-				stmt.al8i4[7] = 0
-			}
-			for x := 0; x < len(stmt.al8i4); x++ {
-				session.PutUint(stmt.al8i4[x], 2, true, true)
-			}
-		}
-		for _, par := range stmt.Pars {
-			_ = par.write(session)
-		}
 		//stmt.reExec = true
+		err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
+		if err != nil {
+			return err
+		}
 		stmt.parse = false
-		stmt.reSendParDef = false
 		stmt.define = false
-		//stmt.define = false
+		stmt.reSendParDef = false
 	}
 	//if !stmt.reExec {
 	//exeOp := stmt.getExeOption()
@@ -334,18 +359,18 @@ func (stmt *Stmt) write(session *network.Session) error {
 			session.PutBytes(7)
 			for _, par := range stmt.Pars {
 				if par.DataType != RAW {
-					session.PutClr(par.Value)
+					session.PutClr(par.BValue)
 				}
 			}
 			for _, par := range stmt.Pars {
 				if par.DataType == RAW {
-					session.PutClr(par.Value)
+					session.PutClr(par.BValue)
 				}
 			}
 		}
 		//session.PutUint(7, 1, false, false)
 		//for _, par := range stmt.Pars {
-		//	session.PutClr(par.Value)
+		//	session.PutClr(par.BValue)
 		//}
 	}
 	return session.Write()
@@ -353,7 +378,7 @@ func (stmt *Stmt) write(session *network.Session) error {
 
 func (stmt *Stmt) getExeOption() int {
 	op := 0
-	if stmt.stmtType == PLSQL || stmt.hasReturnClause {
+	if stmt.stmtType == PLSQL || stmt._hasReturnClause {
 		op |= 0x40000
 	}
 	if stmt.arrayBindCount > 1 {
@@ -373,11 +398,11 @@ func (stmt *Stmt) getExeOption() int {
 	}
 	if len(stmt.Pars) > 0 {
 		op |= 0x8
-		if stmt.stmtType == PLSQL || stmt.hasReturnClause {
+		if stmt.stmtType == PLSQL || stmt._hasReturnClause {
 			op |= 0x400
 		}
 	}
-	if stmt.stmtType != PLSQL && !stmt.hasReturnClause {
+	if stmt.stmtType != PLSQL && !stmt._hasReturnClause {
 		op |= 0x8000
 	}
 	if stmt.define {
@@ -391,18 +416,18 @@ func (stmt *Stmt) getExeOption() int {
 	*/
 }
 
-func (stmt *Stmt) fetch(dataSet *DataSet) error {
+func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	stmt.connection.session.ResetBuffer()
 	stmt.connection.session.PutBytes(3, 5, 0)
 	stmt.connection.session.PutInt(stmt.cursorID, 2, true, true)
-	stmt.connection.session.PutInt(stmt.noOfRowsToFetch, 2, true, true)
+	stmt.connection.session.PutInt(stmt._noOfRowsToFetch, 2, true, true)
 	err := stmt.connection.session.Write()
 	if err != nil {
 		return err
 	}
 	return stmt.read(dataSet)
 }
-func (stmt *Stmt) read(dataSet *DataSet) error {
+func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	loop := true
 	after7 := false
 	containOutputPars := false
@@ -425,7 +450,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0
 			if stmt.connection.session.HasError() {
 				if stmt.connection.session.Summary.RetCode == 1403 {
-					stmt.hasMoreRows = false
+					stmt._hasMoreRows = false
 					stmt.connection.session.Summary = nil
 				} else {
 					return errors.New(stmt.connection.session.GetError())
@@ -435,7 +460,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			loop = false
 		case 6:
 			//_, err = session.GetByte()
-			err = dataSet.read(session)
+			err = dataSet.load(session)
 			if err != nil {
 				return err
 			}
@@ -446,7 +471,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			}
 		case 7:
 			after7 = true
-			if stmt.hasReturnClause {
+			if stmt._hasReturnClause {
 				//if (bHasReturningParams && bindAccessors != null)
 				//{
 				//	int paramLen = bindAccessors.Length;
@@ -479,16 +504,28 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 				//}
 			} else {
 				if containOutputPars {
-					for x := 0; x < len(stmt.columns); x++ {
-						if stmt.Pars[x].Direction != Input {
-							stmt.Pars[x].Value, err = session.GetClr()
+					for x := 0; x < len(stmt.Pars); x++ {
+						if stmt.Pars[x].DataType == REFCURSOR {
+							cursor := RefCursor{}
+							cursor.connection = stmt.connection
+							cursor.parent = stmt
+							err = cursor.load(session)
+							if err != nil {
+								return err
+							}
+							stmt.Pars[x].Value = cursor
+
 						} else {
-							_, err = session.GetClr()
+							if stmt.Pars[x].Direction != Input {
+								stmt.Pars[x].BValue, err = session.GetClr()
+							} else {
+								_, err = session.GetClr()
+							}
+							if err != nil {
+								return err
+							}
+							_, err = session.GetInt(2, true, true)
 						}
-						if err != nil {
-							return err
-						}
-						_, err = session.GetInt(2, true, true)
 					}
 				} else {
 					// see if it is re-execute
@@ -726,7 +763,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			}
 
 		case 11:
-			err = dataSet.read(session)
+			err = dataSet.load(session)
 			if err != nil {
 				return err
 			}
@@ -769,15 +806,15 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 			}
 			dataSet.Cols = make([]ParameterInfo, dataSet.ColumnCount)
 			for x := 0; x < dataSet.ColumnCount; x++ {
-				err = dataSet.Cols[x].read(session)
+				err = dataSet.Cols[x].load(session)
 				if err != nil {
 					return err
 				}
 				if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
-					stmt.hasLONG = true
+					stmt._hasLONG = true
 				}
 				if dataSet.Cols[x].DataType == OCIClobLocator || dataSet.Cols[x].DataType == OCIBlobLocator {
-					stmt.hasBLOB = true
+					stmt._hasBLOB = true
 				}
 			}
 			stmt.columns = make([]ParameterInfo, dataSet.ColumnCount)
@@ -822,7 +859,7 @@ func (stmt *Stmt) read(dataSet *DataSet) error {
 	return nil
 }
 
-func (stmt *Stmt) Close() error {
+func (stmt *defaultStmt) Close() error {
 	session := stmt.connection.session
 	session.ResetBuffer()
 	session.PutBytes(17, 105, 0, 1, 1, 1)
@@ -882,7 +919,7 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 	}
 	if val == nil {
 		param.DataType = NCHAR
-		param.Value = nil
+		param.BValue = nil
 		param.ContFlag = 16
 		param.MaxCharLen = 0
 		param.MaxLen = 1
@@ -890,28 +927,28 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 	} else {
 		switch val := val.(type) {
 		case int64:
-			param.Value = converters.EncodeInt64(val)
+			param.BValue = converters.EncodeInt64(val)
 			param.DataType = NUMBER
 		case int32:
-			param.Value = converters.EncodeInt(int(val))
+			param.BValue = converters.EncodeInt(int(val))
 			param.DataType = NUMBER
 		case int16:
-			param.Value = converters.EncodeInt(int(val))
+			param.BValue = converters.EncodeInt(int(val))
 			param.DataType = NUMBER
 		case int8:
-			param.Value = converters.EncodeInt(int(val))
+			param.BValue = converters.EncodeInt(int(val))
 			param.DataType = NUMBER
 		case int:
-			param.Value = converters.EncodeInt(val)
+			param.BValue = converters.EncodeInt(val)
 			param.DataType = NUMBER
 		case float32:
-			param.Value, _ = converters.EncodeDouble(float64(val))
+			param.BValue, _ = converters.EncodeDouble(float64(val))
 			param.DataType = NUMBER
 		case float64:
-			param.Value, _ = converters.EncodeDouble(val)
+			param.BValue, _ = converters.EncodeDouble(val)
 			param.DataType = NUMBER
 		case time.Time:
-			param.Value = converters.EncodeDate(val)
+			param.BValue = converters.EncodeDate(val)
 			param.DataType = DATE
 			param.ContFlag = 0
 			param.MaxLen = 11
@@ -921,18 +958,18 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.ContFlag = 16
 			param.MaxCharLen = len(val)
 			param.CharsetForm = 1
-			if string(val) == "" && direction == Input {
-				param.Value = nil
+			if val == "" && direction == Input {
+				param.BValue = nil
 				param.MaxLen = 1
 			} else {
-				param.Value = stmt.connection.strConv.Encode(val)
+				param.BValue = stmt.connection.strConv.Encode(val)
 				if size > len(val) {
 					param.MaxCharLen = size
 				}
 				param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
 			}
 		case []byte:
-			param.Value = val
+			param.BValue = val
 			param.DataType = RAW
 			param.MaxLen = len(val)
 			param.ContFlag = 0
@@ -946,7 +983,7 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.CharsetForm = 0
 		}
 		if direction == Output {
-			param.Value = nil
+			param.BValue = nil
 		}
 	}
 	return param
@@ -955,8 +992,15 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 	stmt.Pars = append(stmt.Pars, *stmt.NewParam(name, val, size, direction))
 
 }
+func (stmt *Stmt) AddRefCursorParam(name string) {
+	par := stmt.NewParam("1", nil, 0, Output)
+	par.DataType = REFCURSOR
+	par.ContFlag = 0
+	par.CharsetForm = 0
+	stmt.Pars = append(stmt.Pars, *par)
+}
 
-//func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) {
+//func (stmt *Stmt) AddParam(name string, val driver.BValue, size int, direction ParameterDirection) {
 //	param := ParameterInfo{
 //		Name:        name,
 //		Direction:   direction,
@@ -974,7 +1018,7 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 //	//}
 //	if val == nil {
 //		param.DataType = NCHAR
-//		param.Value = nil
+//		param.BValue = nil
 //		param.ContFlag = 16
 //		param.MaxCharLen = 0
 //		param.MaxLen = 1
@@ -982,34 +1026,34 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 //	} else {
 //		switch val := val.(type) {
 //		case int64:
-//			param.Value = converters.EncodeInt64(val)
+//			param.BValue = converters.EncodeInt64(val)
 //			param.DataType = NUMBER
 //		case int32:
-//			param.Value = converters.EncodeInt(int(val))
+//			param.BValue = converters.EncodeInt(int(val))
 //			param.DataType = NUMBER
 //		case int16:
-//			param.Value = converters.EncodeInt(int(val))
+//			param.BValue = converters.EncodeInt(int(val))
 //			param.DataType = NUMBER
 //		case int8:
-//			param.Value = converters.EncodeInt(int(val))
+//			param.BValue = converters.EncodeInt(int(val))
 //			param.DataType = NUMBER
 //		case int:
-//			param.Value = converters.EncodeInt(val)
+//			param.BValue = converters.EncodeInt(val)
 //			param.DataType = NUMBER
 //		case float32:
-//			param.Value, _ = converters.EncodeDouble(float64(val))
+//			param.BValue, _ = converters.EncodeDouble(float64(val))
 //			param.DataType = NUMBER
 //		case float64:
-//			param.Value, _ = converters.EncodeDouble(val)
+//			param.BValue, _ = converters.EncodeDouble(val)
 //			param.DataType = NUMBER
 //		case time.Time:
-//			param.Value = converters.EncodeDate(val)
+//			param.BValue = converters.EncodeDate(val)
 //			param.DataType = DATE
 //			param.ContFlag = 0
 //			param.MaxLen = 11
 //			param.MaxCharLen = 11
 //		case string:
-//			param.Value = stmt.connection.strConv.Encode(val)
+//			param.BValue = stmt.connection.strConv.Encode(val)
 //			param.DataType = NCHAR
 //			param.ContFlag = 16
 //			param.MaxCharLen = len(val)
@@ -1026,7 +1070,7 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 //			param.CharsetForm = 1
 //		}
 //		if direction == Output {
-//			param.Value = nil
+//			param.BValue = nil
 //		}
 //	}
 //	stmt.Pars = append(stmt.Pars, param)
@@ -1037,8 +1081,8 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 //}
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	stmt.connection.connOption.Tracer.Printf("Query:\n%s", stmt.text)
-	stmt.noOfRowsToFetch = 25
-	stmt.hasMoreRows = true
+	stmt._noOfRowsToFetch = 25
+	stmt._hasMoreRows = true
 	for x := 0; x < len(args); x++ {
 		par := *stmt.NewParam("", args[x], 0, Input)
 		if x < len(stmt.Pars) {

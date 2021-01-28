@@ -160,3 +160,57 @@ Read packet:
 2020-11-22T07:51:42.9104:   BANNER              : NLSRTL Version 11.2.0.2.0 - Production
 2020-11-22T07:51:42.9114: 
 ```
+
+###RefCursor
+to use RefCursor follow these steps:
+* create the connection object and open
+* create NewStmt from connection
+* pass RefCursorParam
+* cast parameter to go_ora.RefCursor
+* call cursor.Query()
+* reterive records use for loop 
+####code:
+```buildoutcfg
+conn, err := go_ora.NewConnection(url)
+// check error
+
+err = conn.Open()
+// check error
+
+defer conn.Close()
+
+cmdText := `BEGIN    
+    proc_1(:1); 
+end;`
+stmt := go_ora.NewStmt(cmdText, conn)
+stmt.AddRefCursorParam("1")
+defer stmt.Close()
+
+_, err = stmt.Exec(nil)
+//check errors
+
+if cursor, ok := stmt.Pars[0].Value.(go_ora.RefCursor); ok {
+    defer cursor.Close()
+    rows, err := cursor.Query()
+    // check for error
+    
+    var (
+        var_1 int64
+        var_2 string
+    )
+    values := make([]driver.Value, 2)
+    for {
+        err = rows.Next(values)
+        // check for error and if == io.EOF break
+        
+        if var_1, ok = values[0].(int64); !ok {
+            // error
+        }
+        if var_2, ok = values[1].(string); !ok {
+            // error
+        }
+        fmt.Println(var_1, var_2)
+    }
+}
+
+```

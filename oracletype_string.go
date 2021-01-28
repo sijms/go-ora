@@ -32,7 +32,7 @@ func _() {
 	_ = x[CHARZ-97]
 	_ = x[IBFloat-100]
 	_ = x[IBDouble-101]
-	_ = x[RefCursor-102]
+	_ = x[REFCURSOR-102]
 	_ = x[NOT-108]
 	_ = x[XMLType-108]
 	_ = x[OCIRef-110]

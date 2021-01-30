@@ -169,7 +169,7 @@ to use RefCursor follow these steps:
 * cast parameter to go_ora.RefCursor
 * call cursor.Query()
 * reterive records use for loop 
-####code:
+#### code:
 ```buildoutcfg
 conn, err := go_ora.NewConnection(url)
 // check error

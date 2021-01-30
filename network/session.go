@@ -30,7 +30,7 @@ type Session struct {
 	Context           *SessionContext
 	sendPcks          []PacketInterface
 	inBuffer          []byte
-	outBuffer         []byte
+	outBuffer         bytes.Buffer
 	index             int
 	key               []byte
 	salt              []byte
@@ -48,7 +48,6 @@ func NewSession(connOption ConnectionOption) *Session {
 	return &Session{
 		conn:       nil,
 		inBuffer:   nil,
-		outBuffer:  nil,
 		index:      0,
 		connOption: connOption,
 		Context:    NewSessionContext(connOption),
@@ -61,7 +60,7 @@ func (session *Session) SaveState() {
 		summary:   session.Summary,
 		sendPcks:  session.sendPcks,
 		inBuffer:  session.inBuffer,
-		outBuffer: session.outBuffer,
+		outBuffer: session.outBuffer.Bytes(),
 		index:     session.index,
 	})
 }
@@ -73,7 +72,8 @@ func (session *Session) LoadState() {
 		session.Summary = currentState.summary
 		session.sendPcks = currentState.sendPcks
 		session.inBuffer = currentState.inBuffer
-		session.outBuffer = currentState.outBuffer
+		session.outBuffer.Reset()
+		session.outBuffer.Write(currentState.outBuffer) //  = currentState.outBuffer
 		session.index = currentState.index
 		if index == 0 {
 			session.states = nil
@@ -172,7 +172,8 @@ func (session *Session) ResetBuffer() {
 	session.Summary = nil
 	session.sendPcks = nil
 	session.inBuffer = nil
-	session.outBuffer = nil
+	//session.outBuffer = nil
+	session.outBuffer.Reset()
 	session.index = 0
 }
 
@@ -194,27 +195,29 @@ func (session *Session) DumpOut() {
 }
 
 func (session *Session) Write() error {
-	size := uint(len(session.outBuffer))
+	outputBytes := session.outBuffer.Bytes()
+	size := session.outBuffer.Len()
 	if size == 0 {
 		// send empty data packet
 		return session.writePacket(newDataPacket(nil))
 		//return errors.New("the output buffer is empty")
 	}
-	segment := uint(session.Context.SessionDataUnit - 20)
-	offset := uint(0)
+	segment := int(session.Context.SessionDataUnit - 20)
+	offset := 0
+
 	for size > segment {
-		err := session.writePacket(newDataPacket(session.outBuffer[offset : offset+segment]))
+		err := session.writePacket(newDataPacket(outputBytes[offset : offset+segment]))
 		if err != nil {
-			session.outBuffer = nil
+			session.outBuffer.Reset()
 			return err
 		}
 		size -= segment
 		offset += segment
 	}
 	if size != 0 {
-		err := session.writePacket(newDataPacket(session.outBuffer[offset:]))
+		err := session.writePacket(newDataPacket(outputBytes[offset:]))
 		if err != nil {
-			session.outBuffer = nil
+			session.outBuffer.Reset()
 			return err
 		}
 	}
@@ -434,7 +437,8 @@ func (session *Session) readPacket() (PacketInterface, error) {
 }
 
 func (session *Session) PutBytes(data ...byte) {
-	session.outBuffer = append(session.outBuffer, data...)
+	session.outBuffer.Write(data)
+	//session.outBuffer = append(session.outBuffer, )
 }
 
 //func (session *Session) PutByte(num byte) {
@@ -468,7 +472,8 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 		panic("you need to pass an integer to this function")
 	}
 	if size == 1 {
-		session.outBuffer = append(session.outBuffer, uint8(num))
+		session.outBuffer.WriteByte(uint8(num))
+		//session.outBuffer = append(session.outBuffer, uint8(num))
 		return
 	}
 	if compress {
@@ -480,10 +485,13 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 			size = uint8(len(temp))
 		}
 		if size == 0 {
-			session.outBuffer = append(session.outBuffer, 0)
+			session.outBuffer.WriteByte(0)
+			//session.outBuffer = append(session.outBuffer, 0)
 		} else {
-			session.outBuffer = append(session.outBuffer, size)
-			session.outBuffer = append(session.outBuffer, temp...)
+			session.outBuffer.WriteByte(size)
+			session.outBuffer.Write(temp)
+			//session.outBuffer = append(session.outBuffer, size)
+			//session.outBuffer = append(session.outBuffer, temp...)
 		}
 	} else {
 		temp := make([]byte, size)
@@ -506,7 +514,8 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 				binary.LittleEndian.PutUint64(temp, num)
 			}
 		}
-		session.outBuffer = append(session.outBuffer, temp...)
+		session.outBuffer.Write(temp)
+		//session.outBuffer = append(session.outBuffer, temp...)
 	}
 }
 
@@ -545,18 +554,22 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 			size = uint8(len(temp))
 		}
 		if size == 0 {
-			session.outBuffer = append(session.outBuffer, 0)
+			session.outBuffer.WriteByte(0)
+			//session.outBuffer = append(session.outBuffer, 0)
 		} else {
 			if num < 0 {
 				num = num * -1
 				size = size & 0x80
 			}
-			session.outBuffer = append(session.outBuffer, size)
-			session.outBuffer = append(session.outBuffer, temp...)
+			session.outBuffer.WriteByte(size)
+			session.outBuffer.Write(temp)
+			//session.outBuffer = append(session.outBuffer, size)
+			//session.outBuffer = append(session.outBuffer, temp...)
 		}
 	} else {
 		if size == 1 {
-			session.outBuffer = append(session.outBuffer, uint8(num))
+			session.outBuffer.WriteByte(uint8(num))
+			//session.outBuffer = append(session.outBuffer, uint8(num))
 		} else {
 			temp := make([]byte, size)
 			if bigEndian {
@@ -578,7 +591,8 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 					binary.LittleEndian.PutUint64(temp, uint64(num))
 				}
 			}
-			session.outBuffer = append(session.outBuffer, temp...)
+			session.outBuffer.Write(temp)
+			//session.outBuffer = append(session.outBuffer, temp...)
 		}
 	}
 }
@@ -586,11 +600,13 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 func (session *Session) PutClr(data []byte) {
 	dataLen := len(data)
 	if dataLen == 0 {
-		session.outBuffer = append(session.outBuffer, 0)
+		session.outBuffer.WriteByte(0)
+		//session.outBuffer = append(session.outBuffer, 0)
 		return
 	}
 	if dataLen > 0x40 {
-		session.outBuffer = append(session.outBuffer, 0xFE)
+		session.outBuffer.WriteByte(0xFE)
+		//session.outBuffer = append(session.outBuffer, 0xFE)
 	}
 	start := 0
 	for start < dataLen {
@@ -599,12 +615,15 @@ func (session *Session) PutClr(data []byte) {
 			end = dataLen
 		}
 		temp := data[start:end]
-		session.outBuffer = append(session.outBuffer, uint8(len(temp)))
-		session.outBuffer = append(session.outBuffer, temp...)
+		session.outBuffer.WriteByte(uint8(len(temp)))
+		session.outBuffer.Write(temp)
+		//session.outBuffer = append(session.outBuffer, uint8(len(temp)))
+		//session.outBuffer = append(session.outBuffer, temp...)
 		start += 64
 	}
 	if dataLen > 0x40 {
-		session.outBuffer = append(session.outBuffer, 0)
+		session.outBuffer.WriteByte(0)
+		//session.outBuffer = append(session.outBuffer, 0)
 	}
 }
 
@@ -614,13 +633,15 @@ func (session *Session) PutKeyValString(key string, val string, num uint8) {
 
 func (session *Session) PutKeyVal(key []byte, val []byte, num uint8) {
 	if len(key) == 0 {
-		session.outBuffer = append(session.outBuffer, 0)
+		session.outBuffer.WriteByte(0)
+		//session.outBuffer = append(session.outBuffer, 0)
 	} else {
 		session.PutUint(len(key), 4, true, true)
 		session.PutClr(key)
 	}
 	if len(val) == 0 {
-		session.outBuffer = append(session.outBuffer, 0)
+		session.outBuffer.WriteByte(0)
+		//session.outBuffer = append(session.outBuffer, 0)
 	} else {
 		session.PutUint(len(val), 4, true, true)
 		session.PutClr(val)

@@ -173,58 +173,58 @@ func (conn *Connection) Ping(ctx context.Context) error {
 	}).write().read()
 }
 
-func (conn *Connection) Logoff() error {
-	conn.connOption.Tracer.Print("Logoff")
-	session := conn.session
-	session.ResetBuffer()
-	session.PutBytes(0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11, 0x1, 0, 0, 0, 0x1, 0, 0, 0, 0, 0, 0x1, 0, 0, 0, 0, 0,
-		3, 9, 0)
-	err := session.Write()
-	if err != nil {
-		return err
-	}
-	loop := true
-	for loop {
-		msg, err := session.GetByte()
-		if err != nil {
-			return err
-		}
-		switch msg {
-		case 4:
-			session.Summary, err = network.NewSummary(session)
-			if err != nil {
-				return err
-			}
-			loop = false
-		case 9:
-			if session.HasEOSCapability {
-				if session.Summary == nil {
-					session.Summary = new(network.SummaryObject)
-				}
-				session.Summary.EndOfCallStatus, err = session.GetInt(4, true, true)
-				if err != nil {
-					return err
-				}
-			}
-			if session.HasFSAPCapability {
-				if session.Summary == nil {
-					session.Summary = new(network.SummaryObject)
-				}
-				session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
-				if err != nil {
-					return err
-				}
-			}
-			loop = false
-		default:
-			return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 4, 9", msg))
-		}
-	}
-	if session.HasError() {
-		return errors.New(session.GetError())
-	}
-	return nil
-}
+//func (conn *Connection) Logoff() error {
+//	conn.connOption.Tracer.Print("Logoff")
+//	session := conn.session
+//	session.ResetBuffer()
+//	session.PutBytes(0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11, 0x1, 0, 0, 0, 0x1, 0, 0, 0, 0, 0, 0x1, 0, 0, 0, 0, 0,
+//		3, 9, 0)
+//	err := session.Write()
+//	if err != nil {
+//		return err
+//	}
+//	loop := true
+//	for loop {
+//		msg, err := session.GetByte()
+//		if err != nil {
+//			return err
+//		}
+//		switch msg {
+//		case 4:
+//			session.Summary, err = network.NewSummary(session)
+//			if err != nil {
+//				return err
+//			}
+//			loop = false
+//		case 9:
+//			if session.HasEOSCapability {
+//				if session.Summary == nil {
+//					session.Summary = new(network.SummaryObject)
+//				}
+//				session.Summary.EndOfCallStatus, err = session.GetInt(4, true, true)
+//				if err != nil {
+//					return err
+//				}
+//			}
+//			if session.HasFSAPCapability {
+//				if session.Summary == nil {
+//					session.Summary = new(network.SummaryObject)
+//				}
+//				session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
+//				if err != nil {
+//					return err
+//				}
+//			}
+//			loop = false
+//		default:
+//			return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 4, 9", msg))
+//		}
+//	}
+//	if session.HasError() {
+//		return errors.New(session.GetError())
+//	}
+//	return nil
+//}
 
 func (conn *Connection) Open() error {
 
@@ -293,10 +293,10 @@ func (conn *Connection) Open() error {
 	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
-	_, err = conn.GetNLS()
-	if err != nil {
-		return err
-	}
+	//_, err = conn.GetNLS()
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }
@@ -324,8 +324,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	if indexOfSlash < 0 {
 		indexOfSlash = 0
 	}
-	//userName = "samy"
-	//hostName = "LABMANAGER"
+
 	connOption := &network.ConnectionOption{
 		Port:                  conStr.Port,
 		TransportConnectTo:    0xFFFF,

@@ -161,7 +161,7 @@ Read packet:
 2020-11-22T07:51:42.9114: 
 ```
 
-###RefCursor
+### RefCursor
 to use RefCursor follow these steps:
 * create the connection object and open
 * create NewStmt from connection
@@ -169,7 +169,7 @@ to use RefCursor follow these steps:
 * cast parameter to go_ora.RefCursor
 * call cursor.Query()
 * reterive records use for loop 
-####code:
+#### code:
 ```buildoutcfg
 conn, err := go_ora.NewConnection(url)
 // check error

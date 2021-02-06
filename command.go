@@ -359,7 +359,11 @@ func (stmt *Stmt) write(session *network.Session) error {
 			session.PutBytes(7)
 			for _, par := range stmt.Pars {
 				if par.DataType != RAW {
-					session.PutClr(par.BValue)
+					if par.DataType == REFCURSOR {
+						session.PutBytes(1, 0)
+					} else {
+						session.PutClr(par.BValue)
+					}
 				}
 			}
 			for _, par := range stmt.Pars {
@@ -518,13 +522,14 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 						} else {
 							if stmt.Pars[x].Direction != Input {
 								stmt.Pars[x].BValue, err = session.GetClr()
+								if err != nil {
+									return err
+								}
+								_, err = session.GetInt(2, true, true)
 							} else {
-								_, err = session.GetClr()
+								//_, err = session.GetClr()
 							}
-							if err != nil {
-								return err
-							}
-							_, err = session.GetInt(2, true, true)
+
 						}
 					}
 				} else {

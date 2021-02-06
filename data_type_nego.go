@@ -1,6 +1,7 @@
 package go_ora
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -438,42 +439,53 @@ func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, erro
 }
 
 func (nego *DataTypeNego) bytes() []byte {
-	var result = make([]byte, 7, 1000)
+	var result bytes.Buffer
+	//var result = make([]byte, 7, 1000)
 	if nego.Server.ServerCompileTimeCaps == nil || len(nego.Server.ServerCompileTimeCaps) <= 27 || nego.Server.ServerCompileTimeCaps[27] == 0 {
 		nego.CompileTimeCaps[27] = 0
 	}
-	result[0] = nego.MessageCode
-	//binary.BigEndian.PutUint16(result[2:], 0)
-	//binary.BigEndian.PutUint16(result[4:], 0)
-	result[5] = nego.Server.ServerFlags
-	result[6] = uint8(len(nego.CompileTimeCaps))
-	result = append(result, nego.CompileTimeCaps...)
-	result = append(result, uint8(len(nego.RuntimeCap)))
-	result = append(result, nego.RuntimeCap...)
+	//result.WriteByte(nego.MessageCode)
+	result.Write([]byte{nego.MessageCode, 0, 0, 0, 0, nego.Server.ServerFlags, uint8(len(nego.CompileTimeCaps))})
+	result.Write(nego.CompileTimeCaps)
+	result.WriteByte(uint8(len(nego.RuntimeCap)))
+	result.Write(nego.RuntimeCap)
+	//result[0] = nego.MessageCode
+	//result[5] = nego.Server.ServerFlags
+	//result[6] = uint8(len(nego.CompileTimeCaps))
+	//result = append(result, nego.CompileTimeCaps...)
+	//result = append(result, uint8(len(nego.RuntimeCap)))
+	//result = append(result, nego.RuntimeCap...)
 	if nego.RuntimeCap[1]&1 == 1 {
-		result = append(result, TZBytes()...)
+		result.Write(TZBytes())
+		//result = append(result, TZBytes()...)
 		if nego.CompileTimeCaps[37]&2 == 2 {
-			result = append(result, []byte{0, 0, 0, 0}...)
+			result.Write([]byte{0, 0, 0, 0})
+			//result = append(result, []byte{0, 0, 0, 0}...)
 		}
 	}
 	temp := []byte{0, 0}
 	binary.LittleEndian.PutUint16(temp, uint16(nego.Server.ServernCharset))
-	result = append(result, temp...)
+	result.Write(temp)
+	//result = append(result, temp...)
 	// marshal type reps
 	size := nego.RuntimeTypeAndRep[0]
 	if nego.CompileTimeCaps[27] == 0 {
 		for _, x := range nego.RuntimeTypeAndRep[1:size] {
-			result = append(result, uint8(x))
+			result.WriteByte(uint8(x))
+			//result = append(result, uint8(x))
 		}
-		result = append(result, 0)
+		result.WriteByte(0)
+		//result = append(result, 0)
 	} else {
 		for _, x := range nego.RuntimeTypeAndRep[1:size] {
 			binary.BigEndian.PutUint16(temp, uint16(x))
-			result = append(result, temp...)
+			//result = append(result, temp...)
+			result.Write(temp)
 		}
-		result = append(result, []byte{0, 0}...)
+		result.Write([]byte{0, 0})
+		//result = append(result, []byte{0, 0}...)
 	}
-	return result
+	return result.Bytes()
 }
 
 func TZBytes() []byte {

@@ -107,18 +107,19 @@ func NewConnectionString() *ConnectionString {
 		ConnectionPoolTimeout: 15,
 	}
 }
-func NewConnectionStringFromString(connectionString string) (*ConnectionString, error) {
-	// initialize
-	ret := NewConnectionString()
-	// parse
-	err := ret.Parse(connectionString)
-	if err != nil {
-		return nil, err
-	}
-	// validate
-	ret.validate()
-	return ret, nil
-}
+
+//func NewConnectionStringFromString(connectionString string) (*ConnectionString, error) {
+//	// initialize
+//	ret := NewConnectionString()
+//	// parse
+//	err := ret.Parse(connectionString)
+//	if err != nil {
+//		return nil, err
+//	}
+//	// validate
+//	ret.validate()
+//	return ret, nil
+//}
 
 func (connStr *ConnectionString) validate() {
 	if !connStr.Pooling {
@@ -213,7 +214,11 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				if err != nil {
 					return nil, errors.New("CONNECTION POOL TIMEOUT value must be an integer")
 				}
-			//case "CONNECTION LIFETIME":
+			case "CONNECTION LIFETIME":
+				ret.ConnectionLifeTime, err = strconv.Atoi(val[0])
+				if err != nil {
+					return nil, errors.New("CONNECTION LIFETIME value must be an integer")
+				}
 			case "PERSIST SECURITY INFO":
 				ret.PasswordSecurityInfo = val[0] == "TRUE"
 			case "POOLING":
@@ -264,111 +269,116 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	ret.validate()
 	return ret, nil
 }
-func (conStr *ConnectionString) Parse(s string) error {
 
-	var upperInvariant = strings.ToUpper(s)
-	var attribs = strings.Split(upperInvariant, ";")
-	for _, attrib := range attribs {
-		fields := strings.Split(attrib, "=")
-		if len(fields) != 2 {
-			return errors.New("error in connection string")
-		}
-		key := fields[0]
-		val := fields[1]
-		var err error
-		switch key {
-		case "DATA SOURCE":
-			conStr.DataSource = val
-		case "DBA PRIVILEGE":
-			conStr.DBAPrivilege = DBAPrivilegeFromString(val)
-		case "ENLIST":
-			conStr.EnList = EnListFromString(val)
-		case "CONNECT TIMEOUT":
-			fallthrough
-		case "CONNECTION TIMEOUT":
-			conStr.ConnectionTimeOut, err = strconv.Atoi(val)
-			if err != nil {
-				return errors.New("CONNECTION TIMEOUT value must be an integer")
-			}
-		case "INC POOL SIZE":
-			conStr.IncrPoolSize, err = strconv.Atoi(val)
-			if err != nil {
-				return errors.New("INC POOL SIZE value must be an integer")
-			}
-		case "DECR POOL SIZE":
-			conStr.DecrPoolSize, err = strconv.Atoi(val)
-			if err != nil {
-				return errors.New("DECR POOL SIZE value must be an integer")
-			}
-		case "MAX POOL SIZE":
-			conStr.MaxPoolSize, err = strconv.Atoi(val)
-			if err != nil {
-				return errors.New("MAX POOL SIZE value must be an integer")
-			}
-		case "MIN POOL SIZE":
-			conStr.MinPoolSize, err = strconv.Atoi(val)
-			if err != nil {
-				return errors.New("MIN POOL SIZE value must be an integer")
-			}
-		case "POOL REGULATOR":
-			conStr.PoolReglator, err = strconv.Atoi(val)
-			if err != nil {
-				return errors.New("POOL REGULATOR value must be an integer")
-			}
-		case "STATEMENT CACHE SIZE":
-			conStr.StmtCacheSize, err = strconv.Atoi(val)
-			if err != nil {
-				return errors.New("STATEMENT CACHE SIZE value must be an integer")
-			}
-		case "CONNECTION POOL TIMEOUT":
-			conStr.ConnectionPoolTimeout, err = strconv.Atoi(val)
-			if err != nil {
-				return errors.New("CONNECTION POOL TIMEOUT value must be an integer")
-			}
-		case "CONNECTION LIFETIME":
-		case "PERSIST SECURITY INFO":
-			conStr.PasswordSecurityInfo = val == "TRUE"
-		case "POOLING":
-			conStr.Pooling = val == "TRUE"
-		case "VALIDATE CONNECTION":
-			conStr.ValidateConnection = val == "TRUE"
-		case "STATEMENT CACHE PURGE":
-			conStr.StmtCachePurge = val == "TRUE"
-		case "HA EVENTS":
-			conStr.HaEvent = val == "TRUE"
-		case "LOAD BALANCING":
-			conStr.LoadBalance = val == "TRUE"
-		case "METADATA POOLING":
-			conStr.MetadataBooling = val == "TRUE"
-		case "SELF TUNING":
-			conStr.SelfTuning = val == "TRUE"
-		case "CONTEXT CONNECTION":
-			conStr.ContextConnection = val == "TRUE"
-		case "PROMOTABLE TRANSACTION":
-			if val == "ROMOTABLE" {
-				conStr.PromotableTransaction = Promotable
-			} else {
-				conStr.PromotableTransaction = Local
-			}
-		case "APPLICATION EDITION":
-			conStr.ApplicationEdition = val
-		case "USER ID":
-			val = strings.Trim(val, "'")
-			conStr.UserID = strings.Trim(val, "\"")
-			if conStr.UserID == "\\" {
-				// get os user and password
-			}
-		case "PROXY USER ID":
-			val = strings.Trim(val, "'")
-			conStr.ProxyUserID = strings.Trim(val, "\"")
-		case "PASSWORD":
-			val = strings.Trim(val, "'")
-			conStr.Password = strings.Trim(val, "\"")
-		case "PROXY PASSWORD":
-			val = strings.Trim(val, "'")
-			conStr.ProxyPassword = strings.Trim(val, "\"")
-		}
-
-	}
-	return nil
-}
+//func (conStr *ConnectionString) Parse(s string) error {
+//
+//	var upperInvariant = strings.ToUpper(s)
+//	var attribs = strings.Split(upperInvariant, ";")
+//	for _, attrib := range attribs {
+//		fields := strings.Split(attrib, "=")
+//		if len(fields) != 2 {
+//			return errors.New("error in connection string")
+//		}
+//		key := fields[0]
+//		val := fields[1]
+//		var err error
+//		switch key {
+//		case "DATA SOURCE":
+//			conStr.DataSource = val
+//		case "DBA PRIVILEGE":
+//			conStr.DBAPrivilege = DBAPrivilegeFromString(val)
+//		case "ENLIST":
+//			conStr.EnList = EnListFromString(val)
+//		case "CONNECT TIMEOUT":
+//			fallthrough
+//		case "CONNECTION TIMEOUT":
+//			conStr.ConnectionTimeOut, err = strconv.Atoi(val)
+//			if err != nil {
+//				return errors.New("CONNECTION TIMEOUT value must be an integer")
+//			}
+//		case "INC POOL SIZE":
+//			conStr.IncrPoolSize, err = strconv.Atoi(val)
+//			if err != nil {
+//				return errors.New("INC POOL SIZE value must be an integer")
+//			}
+//		case "DECR POOL SIZE":
+//			conStr.DecrPoolSize, err = strconv.Atoi(val)
+//			if err != nil {
+//				return errors.New("DECR POOL SIZE value must be an integer")
+//			}
+//		case "MAX POOL SIZE":
+//			conStr.MaxPoolSize, err = strconv.Atoi(val)
+//			if err != nil {
+//				return errors.New("MAX POOL SIZE value must be an integer")
+//			}
+//		case "MIN POOL SIZE":
+//			conStr.MinPoolSize, err = strconv.Atoi(val)
+//			if err != nil {
+//				return errors.New("MIN POOL SIZE value must be an integer")
+//			}
+//		case "POOL REGULATOR":
+//			conStr.PoolReglator, err = strconv.Atoi(val)
+//			if err != nil {
+//				return errors.New("POOL REGULATOR value must be an integer")
+//			}
+//		case "STATEMENT CACHE SIZE":
+//			conStr.StmtCacheSize, err = strconv.Atoi(val)
+//			if err != nil {
+//				return errors.New("STATEMENT CACHE SIZE value must be an integer")
+//			}
+//		case "CONNECTION POOL TIMEOUT":
+//			conStr.ConnectionPoolTimeout, err = strconv.Atoi(val)
+//			if err != nil {
+//				return errors.New("CONNECTION POOL TIMEOUT value must be an integer")
+//			}
+//		case "CONNECTION LIFETIME":
+//			conStr.ConnectionLifeTime, err = strconv.Atoi(val)
+//			if err != nil {
+//				return errors.New("CONNECTION LIFETIME value must be an integer")
+//			}
+//		case "PERSIST SECURITY INFO":
+//			conStr.PasswordSecurityInfo = val == "TRUE"
+//		case "POOLING":
+//			conStr.Pooling = val == "TRUE"
+//		case "VALIDATE CONNECTION":
+//			conStr.ValidateConnection = val == "TRUE"
+//		case "STATEMENT CACHE PURGE":
+//			conStr.StmtCachePurge = val == "TRUE"
+//		case "HA EVENTS":
+//			conStr.HaEvent = val == "TRUE"
+//		case "LOAD BALANCING":
+//			conStr.LoadBalance = val == "TRUE"
+//		case "METADATA POOLING":
+//			conStr.MetadataBooling = val == "TRUE"
+//		case "SELF TUNING":
+//			conStr.SelfTuning = val == "TRUE"
+//		case "CONTEXT CONNECTION":
+//			conStr.ContextConnection = val == "TRUE"
+//		case "PROMOTABLE TRANSACTION":
+//			if val == "ROMOTABLE" {
+//				conStr.PromotableTransaction = Promotable
+//			} else {
+//				conStr.PromotableTransaction = Local
+//			}
+//		case "APPLICATION EDITION":
+//			conStr.ApplicationEdition = val
+//		case "USER ID":
+//			val = strings.Trim(val, "'")
+//			conStr.UserID = strings.Trim(val, "\"")
+//			if conStr.UserID == "\\" {
+//				// get os user and password
+//			}
+//		case "PROXY USER ID":
+//			val = strings.Trim(val, "'")
+//			conStr.ProxyUserID = strings.Trim(val, "\"")
+//		case "PASSWORD":
+//			val = strings.Trim(val, "'")
+//			conStr.Password = strings.Trim(val, "\"")
+//		case "PROXY PASSWORD":
+//			val = strings.Trim(val, "'")
+//			conStr.ProxyPassword = strings.Trim(val, "\"")
+//		}
+//
+//	}
+//	return nil
+//}

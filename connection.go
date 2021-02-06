@@ -163,7 +163,7 @@ func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
 	return NewStmt(query, conn), nil
 }
 
-func (conn *Connection) Ping(ctx context.Context) error {
+func (conn *Connection) Ping(_ context.Context) error {
 	conn.connOption.Tracer.Print("Ping")
 	conn.session.ResetBuffer()
 	return (&simpleObject{
@@ -293,10 +293,10 @@ func (conn *Connection) Open() error {
 	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
-	//_, err = conn.GetNLS()
-	//if err != nil {
-	//	return err
-	//}
+	_, err = conn.GetNLS()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -355,6 +355,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	if len(conStr.Trace) > 0 {
 		tf, err := os.Create(conStr.Trace)
 		if err != nil {
+			//noinspection GoErrorStringFormat
 			return nil, fmt.Errorf("Can't open trace file: %w", err)
 		}
 		connOption.Tracer = trace.NewTraceWriter(tf)

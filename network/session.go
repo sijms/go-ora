@@ -742,7 +742,8 @@ func (session *Session) GetClr() (output []byte, err error) {
 		output, err = session.read(int(size))
 		return
 	}
-	output = make([]byte, 0, 1000)
+	//output = make([]byte, 0, 1000)
+	var tempBuffer bytes.Buffer
 	for {
 		var size1 uint8
 		size1, err = session.GetByte()
@@ -753,8 +754,9 @@ func (session *Session) GetClr() (output []byte, err error) {
 		if err != nil {
 			return
 		}
-		output = append(output, rb...)
+		tempBuffer.Write(rb)
 	}
+	output = tempBuffer.Bytes()
 	return
 }
 

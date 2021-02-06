@@ -1,6 +1,7 @@
 package go_ora
 
 import (
+	"bytes"
 	"errors"
 	"github.com/sijms/go-ora/network"
 )
@@ -13,7 +14,7 @@ type Lob struct {
 	destOffset    int
 	charsetID     int
 	size          int64
-	data          []byte
+	data          bytes.Buffer
 }
 
 func (lob *Lob) getSize(session *network.Session) (size int64, err error) {
@@ -38,7 +39,7 @@ func (lob *Lob) getData(session *network.Session) (data []byte, err error) {
 	if err != nil {
 		return
 	}
-	data = lob.data
+	data = lob.data.Bytes()
 	return
 }
 func (lob *Lob) write(session *network.Session, operationID int) error {
@@ -220,7 +221,7 @@ func (lob *Lob) readData(session *network.Session) error {
 			if err != nil {
 				return err
 			}
-			lob.data = append(lob.data, chunk...)
+			lob.data.Write(chunk)
 			num1 += int(chunkSize)
 			num4 = 4
 		case 2:
@@ -238,7 +239,7 @@ func (lob *Lob) readData(session *network.Session) error {
 			if err != nil {
 				return err
 			}
-			lob.data = append(lob.data, chunk...)
+			lob.data.Write(chunk)
 			num1 += int(chunkSize)
 			//num3 += chunkSize
 			num4 = 2

@@ -678,21 +678,27 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 									if err != nil {
 										return err
 									}
-									if dataSize != int64(len(lobData)) {
-										return errors.New("error reading lob data")
-									}
 									session.LoadState()
 									if dataSet.Cols[x].DataType == OCIBlobLocator {
+										if dataSize != int64(len(lobData)) {
+											return errors.New("error reading lob data")
+										}
 										dataSet.currentRow[x] = lobData
 									} else {
+										var resultClobString string
 										if stmt.connection.strConv.LangID != dataSet.Cols[x].CharsetID {
 											tempCharset := stmt.connection.strConv.LangID
 											stmt.connection.strConv.LangID = dataSet.Cols[x].CharsetID
-											dataSet.currentRow[x] = stmt.connection.strConv.Decode(lobData)
+											resultClobString = stmt.connection.strConv.Decode(lobData)
 											stmt.connection.strConv.LangID = tempCharset
 										} else {
-											dataSet.currentRow[x] = stmt.connection.strConv.Decode(lobData)
+											resultClobString = stmt.connection.strConv.Decode(lobData)
+
 										}
+										if dataSize != int64(len([]rune(resultClobString))) {
+											return errors.New("error reading clob data")
+										}
+										dataSet.currentRow[x] = resultClobString
 									}
 								default:
 									dataSet.currentRow[x] = temp

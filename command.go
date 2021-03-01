@@ -873,16 +873,19 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 }
 
 func (stmt *defaultStmt) Close() error {
-	session := stmt.connection.session
-	session.ResetBuffer()
-	session.PutBytes(17, 105, 0, 1, 1, 1)
-	session.PutInt(stmt.cursorID, 4, true, true)
-	return (&simpleObject{
-		session:     session,
-		operationID: 0x93,
-		data:        nil,
-		err:         nil,
-	}).write().read()
+	if stmt.cursorID != 0 {
+		session := stmt.connection.session
+		session.ResetBuffer()
+		session.PutBytes(17, 105, 0, 1, 1, 1)
+		session.PutInt(stmt.cursorID, 4, true, true)
+		return (&simpleObject{
+			session:     session,
+			operationID: 0x93,
+			data:        nil,
+			err:         nil,
+		}).write().read()
+	}
+	return nil
 }
 
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {

@@ -17,6 +17,18 @@ type Lob struct {
 	data          bytes.Buffer
 }
 
+func (lob *Lob) variableWidthChar() bool {
+	if len(lob.sourceLocator) > 6 && lob.sourceLocator[6]&128 == 128 {
+		return true
+	}
+	return false
+}
+func (lob *Lob) littleEndianClob() bool {
+	if len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&64 > 0 {
+		return true
+	}
+	return false
+}
 func (lob *Lob) getSize(session *network.Session) (size int64, err error) {
 	err = lob.write(session, 1)
 	if err != nil {

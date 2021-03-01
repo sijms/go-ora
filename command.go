@@ -685,16 +685,18 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 										}
 										dataSet.currentRow[x] = lobData
 									} else {
-										var resultClobString string
-										if stmt.connection.strConv.LangID != dataSet.Cols[x].CharsetID {
-											tempCharset := stmt.connection.strConv.LangID
-											stmt.connection.strConv.LangID = dataSet.Cols[x].CharsetID
-											resultClobString = stmt.connection.strConv.Decode(lobData)
-											stmt.connection.strConv.LangID = tempCharset
+										tempCharset := stmt.connection.strConv.LangID
+										if lob.variableWidthChar() {
+											if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
+												stmt.connection.strConv.LangID = 2002
+											} else {
+												stmt.connection.strConv.LangID = 2000
+											}
 										} else {
-											resultClobString = stmt.connection.strConv.Decode(lobData)
-
+											stmt.connection.strConv.LangID = dataSet.Cols[x].CharsetID
 										}
+										resultClobString := stmt.connection.strConv.Decode(lobData)
+										stmt.connection.strConv.LangID = tempCharset
 										if dataSize != int64(len([]rune(resultClobString))) {
 											return errors.New("error reading clob data")
 										}
@@ -1003,7 +1005,7 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 	stmt.Pars = append(stmt.Pars, *stmt.NewParam(name, val, size, direction))
 
 }
-func (stmt *Stmt) AddRefCursorParam(name string) {
+func (stmt *Stmt) AddRefCursorParam(_ string) {
 	par := stmt.NewParam("1", nil, 0, Output)
 	par.DataType = REFCURSOR
 	par.ContFlag = 0

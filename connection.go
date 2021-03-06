@@ -84,25 +84,36 @@ func (drv *oracleDriver) Open(name string) (driver.Conn, error) {
 }
 
 func (conn *Connection) GetNLS() (*NLSData, error) {
-	cmdText := `DECLARE
+
+	// we read from nls_session_parameters ONCE
+	cmdText := `
+DECLARE
 	err_code VARCHAR2(2000);
 	err_msg  VARCHAR2(2000);
 	BEGIN
-		SELECT VALUE into :p_nls_calendar from nls_session_parameters where PARAMETER='NLS_CALENDAR';
-		SELECT VALUE into :p_nls_comp from nls_session_parameters where PARAMETER='NLS_COMP';
-		SELECT VALUE into :p_nls_length_semantics from nls_session_parameters where PARAMETER='NLS_LENGTH_SEMANTICS';
-		SELECT VALUE into :p_nls_nchar_conv_excep from nls_session_parameters where PARAMETER='NLS_NCHAR_CONV_EXCP';
-		SELECT VALUE into :p_nls_date_lang from nls_session_parameters where PARAMETER='NLS_DATE_LANGUAGE';
-		SELECT VALUE into :p_nls_sort from nls_session_parameters where PARAMETER='NLS_SORT';
-		SELECT VALUE into :p_nls_currency from nls_session_parameters where PARAMETER='NLS_CURRENCY';
-		SELECT VALUE into :p_nls_date_format from nls_session_parameters where PARAMETER='NLS_DATE_FORMAT';
-		SELECT VALUE into :p_nls_iso_currency from nls_session_parameters where PARAMETER='NLS_ISO_CURRENCY';
-		SELECT VALUE into :p_nls_numeric_chars from nls_session_parameters where PARAMETER='NLS_NUMERIC_CHARACTERS';
-		SELECT VALUE into :p_nls_dual_currency from nls_session_parameters where PARAMETER='NLS_DUAL_CURRENCY';
-		SELECT VALUE into :p_nls_timestamp from nls_session_parameters where PARAMETER='NLS_TIMESTAMP_FORMAT';
-		SELECT VALUE into :p_nls_timestamp_tz from nls_session_parameters where PARAMETER='NLS_TIMESTAMP_TZ_FORMAT';
-		SELECT '0' into :p_err_code from dual;
-		SELECT '0' into :p_err_msg from dual;
+		SELECT 
+			MAX(CASE WHEN PARAMETER='NLS_CALENDAR' THEN VALUE END) AS NLS_CALENDAR,
+			MAX(CASE WHEN PARAMETER='NLS_COMP' THEN VALUE END) AS NLS_COMP,
+			MAX(CASE WHEN PARAMETER='NLS_LENGTH_SEMANTICS' THEN VALUE END) AS NLS_LENGTH_SEMANTICS,
+			MAX(CASE WHEN PARAMETER='NLS_NCHAR_CONV_EXCP' THEN VALUE END) AS NLS_NCHAR_CONV_EXCP,
+			MAX(CASE WHEN PARAMETER='NLS_DATE_LANGUAGE' THEN VALUE END) AS NLS_DATE_LANGUAGE,
+			MAX(CASE WHEN PARAMETER='NLS_SORT' THEN VALUE END) AS NLS_SORT,
+			MAX(CASE WHEN PARAMETER='NLS_CURRENCY' THEN VALUE END) AS NLS_CURRENCY,
+			MAX(CASE WHEN PARAMETER='NLS_DATE_FORMAT' THEN VALUE END) AS NLS_DATE_FORMAT,
+			MAX(CASE WHEN PARAMETER='NLS_ISO_CURRENCY' THEN VALUE END) AS NLS_ISO_CURRENCY,
+			MAX(CASE WHEN PARAMETER='NLS_NUMERIC_CHARACTERS' THEN VALUE END) AS NLS_NUMERIC_CHARACTERS,
+			MAX(CASE WHEN PARAMETER='NLS_DUAL_CURRENCY' THEN VALUE END) AS NLS_DUAL_CURRENCY,
+			MAX(CASE WHEN PARAMETER='NLS_TIMESTAMP_FORMAT' THEN VALUE END) AS NLS_TIMESTAMP_FORMAT,
+			MAX(CASE WHEN PARAMETER='NLS_TIMESTAMP_TZ_FORMAT' THEN VALUE END) AS NLS_TIMESTAMP_TZ_FORMAT,
+			'0' AS p_err_code,
+			'0' AS p_err_msg
+			into :p_nls_calendar, :p_nls_comp, :p_nls_length_semantics, :p_nls_nchar_conv_excep, 
+				:p_nls_date_lang, :p_nls_sort, :p_nls_currency, :p_nls_date_format, :p_nls_iso_currency,
+				:p_nls_numeric_chars, :p_nls_dual_currency, :p_nls_timestamp, :p_nls_timestamp_tz,
+				:p_err_code, :p_err_msg
+		FROM
+			nls_session_parameters
+		;
 	END;`
 	stmt := NewStmt(cmdText, conn)
 	stmt.AddParam("p_nls_calendar", "", 40, Output)
@@ -126,35 +137,55 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, par := range stmt.Pars {
-		if par.Name == "p_nls_calendar" {
-			conn.NLSData.Calender = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_comp" {
-			conn.NLSData.Comp = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_length_semantics" {
-			conn.NLSData.LengthSemantics = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_nchar_conv_excep" {
-			conn.NLSData.NCharConvExcep = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_date_lang" {
-			conn.NLSData.DateLang = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_sort" {
-			conn.NLSData.Sort = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_currency" {
-			conn.NLSData.Currency = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_date_format" {
-			conn.NLSData.DateFormat = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_iso_currency" {
-			conn.NLSData.IsoCurrency = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_numeric_chars" {
-			conn.NLSData.NumericChars = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_dual_currency" {
-			conn.NLSData.DualCurrency = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_timestamp" {
-			conn.NLSData.Timestamp = conn.strConv.Decode(par.BValue)
-		} else if par.Name == "p_nls_timestamp_tz" {
-			conn.NLSData.TimestampTZ = conn.strConv.Decode(par.BValue)
-		}
+
+	if len(stmt.Pars) >= 10 {
+		conn.NLSData.Calender = conn.strConv.Decode(stmt.Pars[0].BValue)
+		conn.NLSData.Comp = conn.strConv.Decode(stmt.Pars[1].BValue)
+		conn.NLSData.LengthSemantics = conn.strConv.Decode(stmt.Pars[2].BValue)
+		conn.NLSData.NCharConvExcep = conn.strConv.Decode(stmt.Pars[3].BValue)
+		conn.NLSData.DateLang = conn.strConv.Decode(stmt.Pars[4].BValue)
+		conn.NLSData.Sort = conn.strConv.Decode(stmt.Pars[5].BValue)
+		conn.NLSData.Currency = conn.strConv.Decode(stmt.Pars[6].BValue)
+		conn.NLSData.DateFormat = conn.strConv.Decode(stmt.Pars[7].BValue)
+		conn.NLSData.IsoCurrency = conn.strConv.Decode(stmt.Pars[8].BValue)
+		conn.NLSData.NumericChars = conn.strConv.Decode(stmt.Pars[9].BValue)
+		conn.NLSData.DualCurrency = conn.strConv.Decode(stmt.Pars[10].BValue)
+		conn.NLSData.Timestamp = conn.strConv.Decode(stmt.Pars[11].BValue)
+		conn.NLSData.TimestampTZ = conn.strConv.Decode(stmt.Pars[12].BValue)
 	}
+
+	/*
+		for _, par := range stmt.Pars {
+			if par.Name == "p_nls_calendar" {
+				conn.NLSData.Calender = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_comp" {
+				conn.NLSData.Comp = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_length_semantics" {
+				conn.NLSData.LengthSemantics = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_nchar_conv_excep" {
+				conn.NLSData.NCharConvExcep = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_date_lang" {
+				conn.NLSData.DateLang = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_sort" {
+				conn.NLSData.Sort = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_currency" {
+				conn.NLSData.Currency = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_date_format" {
+				conn.NLSData.DateFormat = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_iso_currency" {
+				conn.NLSData.IsoCurrency = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_numeric_chars" {
+				conn.NLSData.NumericChars = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_dual_currency" {
+				conn.NLSData.DualCurrency = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_timestamp" {
+				conn.NLSData.Timestamp = conn.strConv.Decode(par.BValue)
+			} else if par.Name == "p_nls_timestamp_tz" {
+				conn.NLSData.TimestampTZ = conn.strConv.Decode(par.BValue)
+			}
+		}
+	*/
+
 	return &conn.NLSData, nil
 }
 
@@ -278,21 +309,26 @@ func (conn *Connection) Open() error {
 		return err
 	}
 
-	sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)
-	if err != nil {
-		return err
+	if len(conn.SessionProperties) == 0 {
+		//return errors.New(fmt.Sprint("Session properties is null"))
+	} else {
+		sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)
+		if err != nil {
+			return err
+		}
+		conn.sessionID = int(sessionID)
+		serialNum, err := strconv.ParseUint(conn.SessionProperties["AUTH_SERIAL_NUM"], 10, 32)
+		if err != nil {
+			return err
+		}
+		conn.serialID = int(serialNum)
+		conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
+		conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
+		conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
+		conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
+		conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
 	}
-	conn.sessionID = int(sessionID)
-	serialNum, err := strconv.ParseUint(conn.SessionProperties["AUTH_SERIAL_NUM"], 10, 32)
-	if err != nil {
-		return err
-	}
-	conn.serialID = int(serialNum)
-	conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
-	conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
-	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
-	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
-	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
+
 	_, err = conn.GetNLS()
 	if err != nil {
 		return err

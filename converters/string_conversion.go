@@ -96,8 +96,11 @@ func (conv *StringConverter) Decode(input []byte) string {
 		return string(input)
 	case 2000:
 		index := 0
+		var inputData []byte
 		if len(input)%2 > 0 {
-			input = append(input, 0)
+			inputData = make([]byte, len(input))
+			copy(inputData, input)
+			input = append(inputData, 0)
 		}
 		output := make([]uint16, len(input)/2)
 		for index < len(input) {
@@ -107,8 +110,11 @@ func (conv *StringConverter) Decode(input []byte) string {
 		return string(utf16.Decode(output))
 	case 2002:
 		index := 0
+		var inputData []byte
 		if len(input)%2 > 0 {
-			input = append(input, 0)
+			inputData = make([]byte, len(input))
+			copy(inputData, input)
+			input = append(inputData, 0)
 		}
 		output := make([]uint16, len(input)/2)
 		for index < len(input) {

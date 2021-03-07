@@ -3,6 +3,7 @@ package go_ora
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/sijms/go-ora/network"
 )
 
@@ -29,25 +30,27 @@ func (lob *Lob) littleEndianClob() bool {
 	}
 	return false
 }
-func (lob *Lob) getSize(session *network.Session) (size int64, err error) {
+func (lob *Lob) getSize(connection *Connection) (size int64, err error) {
+	session := connection.session
 	err = lob.write(session, 1)
 	if err != nil {
 		return
 	}
-	err = lob.read(session)
+	err = lob.read(connection)
 	if err != nil {
 		return
 	}
 	size = lob.size
 	return
 }
-func (lob *Lob) getData(session *network.Session) (data []byte, err error) {
+func (lob *Lob) getData(connection *Connection) (data []byte, err error) {
+	session := connection.session
 	lob.sourceOffset = 1
 	err = lob.write(session, 2)
 	if err != nil {
 		return
 	}
-	err = lob.read(session)
+	err = lob.read(connection)
 	if err != nil {
 		return
 	}
@@ -137,8 +140,9 @@ func (lob *Lob) write(session *network.Session, operationID int) error {
 	return session.Write()
 }
 
-func (lob *Lob) read(session *network.Session) error {
+func (lob *Lob) read(connection *Connection) error {
 	loop := true
+	session := connection.session
 	for loop {
 		msg, err := session.GetByte()
 		if err != nil {
@@ -204,7 +208,25 @@ func (lob *Lob) read(session *network.Session) error {
 			if err != nil {
 				return err
 			}
+		case 15:
+			warning, err := network.NewWarningObject(session)
+			if err != nil {
+				return err
+			}
+			if warning != nil {
+				fmt.Println(warning)
+			}
+		case 23:
+			opCode, err := session.GetByte()
+			if err != nil {
+				return err
+			}
+			err = connection.getServerNetworkInformation(opCode)
+			if err != nil {
+				return err
+			}
 		default:
+			fmt.Println(msg)
 			return errors.New("TTC error")
 		}
 	}
@@ -212,24 +234,25 @@ func (lob *Lob) read(session *network.Session) error {
 }
 func (lob *Lob) readData(session *network.Session) error {
 	num1 := 0 // data readed in the call of this function
-	var chunkSize byte = 0
+	var chunkSize int = 0
 	var err error
 	//num3 := offset // the data readed from the start of read operation
 	num4 := 0
 	for num4 != 4 {
 		switch num4 {
 		case 0:
-			chunkSize, err = session.GetByte()
+			nb, err := session.GetByte()
 			if err != nil {
 				return err
 			}
+			chunkSize = int(nb)
 			if chunkSize == 0xFE {
 				num4 = 2
 			} else {
 				num4 = 1
 			}
 		case 1:
-			chunk, err := session.GetBytes(int(chunkSize))
+			chunk, err := session.GetBytes(chunkSize)
 			if err != nil {
 				return err
 			}
@@ -237,7 +260,13 @@ func (lob *Lob) readData(session *network.Session) error {
 			num1 += int(chunkSize)
 			num4 = 4
 		case 2:
-			chunkSize, err = session.GetByte()
+			if session.UseBigClrChunks {
+				chunkSize, err = session.GetInt(4, true, true)
+			} else {
+				var nb byte
+				nb, err = session.GetByte()
+				chunkSize = int(nb)
+			}
 			if err != nil {
 				return err
 			}

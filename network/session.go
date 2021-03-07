@@ -42,16 +42,20 @@ type Session struct {
 	Summary           *SummaryObject
 	states            []sessionState
 	StrConv           *converters.StringConverter
+	UseBigClrChunks   bool
+	ClrChunkSize      int
 }
 
 func NewSession(connOption ConnectionOption) *Session {
 	return &Session{
-		conn:       nil,
-		inBuffer:   nil,
-		index:      0,
-		connOption: connOption,
-		Context:    NewSessionContext(connOption),
-		Summary:    nil,
+		conn:            nil,
+		inBuffer:        nil,
+		index:           0,
+		connOption:      connOption,
+		Context:         NewSessionContext(connOption),
+		Summary:         nil,
+		UseBigClrChunks: false,
+		ClrChunkSize:    0x40,
 	}
 }
 
@@ -103,7 +107,7 @@ func (session *Session) Connect() error {
 	if err != nil {
 		return err
 	}
-	if connectPacket.packet.length == 58 {
+	if uint16(connectPacket.packet.length) == connectPacket.packet.dataOffset {
 		session.PutBytes(connectPacket.buffer...)
 		err = session.Write()
 		if err != nil {
@@ -117,6 +121,16 @@ func (session *Session) Connect() error {
 
 	if acceptPacket, ok := pck.(*AcceptPacket); ok {
 		*session.Context = acceptPacket.sessionCtx
+		session.Context.handshakeComplete = true
+
+		//if (this.m_sessionCtx.m_ACFL0 & 1) != 0 &&
+		//   (this.m_sessionCtx.m_ACFL0 & 4) == 0 &&
+		//   (this.m_sessionCtx.m_ACFL1 & 8) == 0 {
+		//        this.m_sessionCtx.m_ano.StartNegotiation();
+		//   } else {
+		//        this.m_sessionCtx.m_bAnoEnabled = false;
+		//        this.m_sessionCtx.m_ano = (Ano) null;
+		//      }
 		return nil
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
@@ -199,14 +213,14 @@ func (session *Session) Write() error {
 	size := session.outBuffer.Len()
 	if size == 0 {
 		// send empty data packet
-		return session.writePacket(newDataPacket(nil))
+		return session.writePacket(newDataPacket(nil, session.Context))
 		//return errors.New("the output buffer is empty")
 	}
 	segment := int(session.Context.SessionDataUnit - 20)
 	offset := 0
 
 	for size > segment {
-		err := session.writePacket(newDataPacket(outputBytes[offset : offset+segment]))
+		err := session.writePacket(newDataPacket(outputBytes[offset:offset+segment], session.Context))
 		if err != nil {
 			session.outBuffer.Reset()
 			return err
@@ -215,7 +229,7 @@ func (session *Session) Write() error {
 		offset += segment
 	}
 	if size != 0 {
-		err := session.writePacket(newDataPacket(outputBytes[offset:]))
+		err := session.writePacket(newDataPacket(outputBytes[offset:], session.Context))
 		if err != nil {
 			session.outBuffer.Reset()
 			return err
@@ -285,22 +299,28 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			if err != nil {
 				return nil, err
 			}
-			length := binary.BigEndian.Uint16(head)
+			pckType := PacketType(head[4])
+			var length uint32
+			if session.Context.handshakeComplete && session.Context.Version >= 315 {
+				length = binary.BigEndian.Uint32(head)
+			} else {
+				length = uint32(binary.BigEndian.Uint16(head))
+			}
 			length -= 8
 			body := make([]byte, length)
-			index := uint16(0)
+			index := uint32(0)
 			for index < length {
 				temp, err := conn.Read(body[index:])
 				if err != nil {
 					if e, ok := err.(net.Error); ok && e.Timeout() && temp != 0 {
-						index += uint16(temp)
+						index += uint32(temp)
 						continue
 					}
 					return nil, err
 				}
-				index += uint16(temp)
+				index += uint32(temp)
 			}
-			pckType := PacketType(head[4])
+
 			if pckType == RESEND {
 				for _, pck := range session.sendPcks {
 					//log.Printf("Request: %#v\n\n", pck.bytes())
@@ -333,9 +353,9 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		pck := newRedirectPacketFromData(packetData)
 		dataLen := binary.BigEndian.Uint16(packetData[8:])
 		var data string
-		if pck.packet.length <= pck.packet.dataOffset {
+		if uint16(pck.packet.length) <= pck.packet.dataOffset {
 			packetData, err = readPacketData(session.conn)
-			dataPck := newDataPacketFromData(packetData)
+			dataPck := newDataPacketFromData(packetData, session.Context)
 			data = string(dataPck.buffer)
 		} else {
 			data = string(packetData[10 : 10+dataLen])
@@ -358,9 +378,9 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		// connect through redirectConnectData
 		return pck, nil
 	case DATA:
-		return newDataPacketFromData(packetData), nil
+		return newDataPacketFromData(packetData, session.Context), nil
 	case MARKER:
-		pck := newMarkerPacketFromData(packetData)
+		pck := newMarkerPacketFromData(packetData, session.Context)
 		breakConnection := false
 		resetConnection := false
 		switch pck.markerType {
@@ -384,7 +404,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			if err != nil {
 				return nil, err
 			}
-			pck = newMarkerPacketFromData(packetData)
+			pck = newMarkerPacketFromData(packetData, session.Context)
 			if pck == nil {
 				return nil, errors.New("connection break")
 			}
@@ -403,7 +423,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			trials++
 		}
 		session.ResetBuffer()
-		err = session.writePacket(newMarkerPacket(2))
+		err = session.writePacket(newMarkerPacket(2, session.Context))
 		if err != nil {
 			return nil, err
 		}
@@ -411,7 +431,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		if err != nil {
 			return nil, err
 		}
-		dataPck := newDataPacketFromData(packetData)
+		dataPck := newDataPacketFromData(packetData, session.Context)
 		if dataPck == nil {
 			return nil, errors.New("connection break")
 		}
@@ -434,6 +454,15 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	default:
 		return nil, nil
 	}
+}
+
+func (session *Session) PutString(data string) {
+	session.PutClr([]byte(data))
+}
+
+func (session *Session) GetString(length int) (string, error) {
+	ret, err := session.GetClr()
+	return string(ret[:length]), err
 }
 
 func (session *Session) PutBytes(data ...byte) {
@@ -599,31 +628,29 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 
 func (session *Session) PutClr(data []byte) {
 	dataLen := len(data)
-	if dataLen == 0 {
-		session.outBuffer.WriteByte(0)
-		//session.outBuffer = append(session.outBuffer, 0)
-		return
-	}
-	if dataLen > 0x40 {
+	if dataLen > 0xFC {
 		session.outBuffer.WriteByte(0xFE)
-		//session.outBuffer = append(session.outBuffer, 0xFE)
-	}
-	start := 0
-	for start < dataLen {
-		end := start + 0x40
-		if end > dataLen {
-			end = dataLen
+		start := 0
+		for start < dataLen {
+			end := start + session.ClrChunkSize
+			if end > dataLen {
+				end = dataLen
+			}
+			temp := data[start:end]
+			if session.UseBigClrChunks {
+				session.PutInt(len(temp), 4, true, true)
+			} else {
+				session.outBuffer.WriteByte(uint8(len(temp)))
+			}
+			session.outBuffer.Write(temp)
+			start += session.ClrChunkSize
 		}
-		temp := data[start:end]
-		session.outBuffer.WriteByte(uint8(len(temp)))
-		session.outBuffer.Write(temp)
-		//session.outBuffer = append(session.outBuffer, uint8(len(temp)))
-		//session.outBuffer = append(session.outBuffer, temp...)
-		start += 64
-	}
-	if dataLen > 0x40 {
 		session.outBuffer.WriteByte(0)
-		//session.outBuffer = append(session.outBuffer, 0)
+	} else if dataLen == 0 {
+		session.outBuffer.WriteByte(0)
+	} else {
+		session.outBuffer.WriteByte(uint8(len(data)))
+		session.outBuffer.Write(data)
 	}
 }
 
@@ -729,10 +756,10 @@ func (session *Session) GetClr() (output []byte, err error) {
 	if err != nil {
 		return
 	}
-	if size == 253 {
-		err = errors.New("TTC error")
-		return
-	}
+	//if size == 253 {
+	//	err = errors.New("TTC error")
+	//	return
+	//}
 	if size == 0 || size == 0xFF {
 		output = nil
 		err = nil
@@ -745,12 +772,16 @@ func (session *Session) GetClr() (output []byte, err error) {
 	//output = make([]byte, 0, 1000)
 	var tempBuffer bytes.Buffer
 	for {
-		var size1 uint8
-		size1, err = session.GetByte()
+		var size1 int
+		if session.UseBigClrChunks {
+			size1, err = session.GetInt(4, true, true)
+		} else {
+			size1, err = session.GetInt(1, true, true)
+		}
 		if err != nil || size1 == 0 {
 			break
 		}
-		rb, err = session.read(int(size1))
+		rb, err = session.read(size1)
 		if err != nil {
 			return
 		}
@@ -792,62 +823,3 @@ func (session *Session) GetKeyVal() (key []byte, val []byte, num int, err error)
 	num, err = session.GetInt(4, true, true)
 	return
 }
-
-//func (session *Session) DoAuth(logonMode int) error{
-//	index := strings.LastIndex(session.connOption.ClientData.ProgramName, "/")
-//	if index < 0 {
-//		index = 0
-//	} else {
-//		index += 1
-//	}
-//	ikeys := []string{"AUTH_TERMINAL", "AUTH_PROGRAM_NM", "AUTH_MACHINE", "AUTH_PID", "AUTH_SID"}
-//	ivals := []string{
-//		session.connOption.ClientData.HostName,
-//		session.connOption.ClientData.ProgramName[index:],
-//		session.connOption.ClientData.HostName,
-//		fmt.Sprintf("%d", session.connOption.ClientData.PID),
-//		session.connOption.ClientData.UserName,
-//	}
-//	inums := []int{0, 0, 0, 0, 0}
-//
-//	var pck = newDataPacket([]byte {3, 118, 0, 1}) // message_code, function_code, sequence_number, 1
-//	pck.AppendInt(len(session.connOption.UserID), 4, false, true)
-//	pck.AppendInt(logonMode | 1, 4, false, true)
-//	pck.AppendBytes([]byte{1, 1, 5, 1, 1}, false)
-//	pck.AppendBytes([]byte(session.connOption.UserID), false)
-//	pck.AppendKeyVal(ikeys, ivals, inums)
-//	authData, err := session.SendData(pck.Data())
-//	if err != nil {
-//		return err
-//	}
-//	rPck := newDataPacket(authData)
-//	messageCode, err := rPck.ReadInt(1, false, false)
-//	if err != nil {
-//		return err
-//	}
-//	if messageCode != 8 {
-//		return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", messageCode))
-//	}
-//	dictLen, err := rPck.ReadInt(4, true, true)
-//	if err != nil {
-//		return err
-//	}
-//	keys, vals, nums, err := rPck.ReadKeyVal(int(dictLen))
-//	if err != nil {
-//		fmt.Println(err)
-//		return err
-//	}
-//	for x:=0; x < len(keys); x++ {
-//		if bytes.Compare(keys[x], []byte("AUTH_SESSKEY")) == 0 {
-//			session.key = vals[x]
-//		} else if bytes.Compare(keys[x], []byte("AUTH_VFR_DATA")) == 0 {
-//			session.salt = vals[x]
-//			session.verifierType = nums[x]
-//		}
-//	}
-//	if len(session.key) != 64 && len(session.key) != 96 {
-//		return errors.New("TCC Error: SessionKey should be either 64 or 96 bytes long.")
-//	}
-//	// load the error object
-//	return nil
-//}

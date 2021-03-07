@@ -38,7 +38,7 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	return &RefusePacket{
 		packet: Packet{
 			dataOffset: 12,
-			length:     binary.BigEndian.Uint16(packetData),
+			length:     uint32(binary.BigEndian.Uint16(packetData)),
 			packetType: PacketType(packetData[4]),
 			flag:       0,
 		},

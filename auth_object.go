@@ -5,9 +5,11 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/des"
+	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/sha512"
 	"errors"
 	"fmt"
 	"github.com/sijms/go-ora/network"
@@ -18,20 +20,32 @@ import (
 
 // E infront of the variable means encrypted
 type AuthObject struct {
-	EServerSessKey string
-	EClientSessKey string
-	EPassword      string
-	ServerSessKey  []byte
-	ClientSessKey  []byte
-	KeyHash        []byte
-	Salt           string
-	VerifierType   int
-	tcpNego        *TCPNego
+	EServerSessKey   string
+	EClientSessKey   string
+	EPassword        string
+	ESpeedyKey       string
+	ServerSessKey    []byte
+	ClientSessKey    []byte
+	KeyHash          []byte
+	Salt             string
+	pbkdf2ChkSalt    string
+	pbkdf2VgenCount  int
+	pbkdf2SderCount  int
+	globalUniqueDBID string
+	usePadding       bool
+	customHash       bool
+	VerifierType     int
+	tcpNego          *TCPNego
 }
 
 func NewAuthObject(username string, password string, tcpNego *TCPNego, session *network.Session) (*AuthObject, error) {
 	ret := new(AuthObject)
 	ret.tcpNego = tcpNego
+	ret.usePadding = false
+	ret.customHash = ret.tcpNego.ServerCompileTimeCaps[4]&32 != 0
+	// the parameter srvCS_Multibyte will affect may thing in the logon process
+	//if (Conv.GetMaxBytesPerChar((int) this.m_serverCharacterSet) > 1)
+	//this.m_marshallingEngine.m_bSvrCSMultibyte = true;
 	loop := true
 	for loop {
 		messageCode, err := session.GetByte()
@@ -59,20 +73,55 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 					return nil, err
 				}
 				if bytes.Compare(key, []byte("AUTH_SESSKEY")) == 0 {
-					ret.EServerSessKey = string(val)
+					if len(ret.EServerSessKey) == 0 {
+						ret.EServerSessKey = string(val)
+					}
 				} else if bytes.Compare(key, []byte("AUTH_VFR_DATA")) == 0 {
-					ret.Salt = string(val)
-					ret.VerifierType = num
+					if len(ret.Salt) == 0 {
+						ret.Salt = string(val)
+						ret.VerifierType = num
+					}
+				} else if bytes.Compare(key, []byte("AUTH_PBKDF2_CSK_SALT")) == 0 {
+					if len(ret.pbkdf2ChkSalt) == 0 {
+						ret.pbkdf2ChkSalt = string(val)
+						if len(ret.pbkdf2ChkSalt) != 32 {
+							return nil, errors.New("ORA-28041: Authentication protocol internal error")
+						}
+					}
+				} else if bytes.Compare(key, []byte("AUTH_PBKDF2_VGEN_COUNT")) == 0 {
+					if ret.pbkdf2VgenCount == 0 {
+						ret.pbkdf2VgenCount, err = strconv.Atoi(string(val))
+						if err != nil {
+							return nil, errors.New("ORA-28041: Authentication protocol internal error")
+						}
+						if ret.pbkdf2VgenCount < 4096 || ret.pbkdf2VgenCount > 100000000 {
+							ret.pbkdf2VgenCount = 4096
+						}
+					}
+				} else if bytes.Compare(key, []byte("AUTH_PBKDF2_SDER_COUNT")) == 0 {
+					ret.pbkdf2SderCount, err = strconv.Atoi(string(val))
+					if ret.pbkdf2SderCount == 0 {
+						if err != nil {
+							return nil, errors.New("ORA-28041: Authentication protocol internal error")
+						}
+						if ret.pbkdf2SderCount < 3 || ret.pbkdf2SderCount > 100000000 {
+							ret.pbkdf2SderCount = 3
+						}
+					}
 				}
 			}
 		default:
 			return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", messageCode))
 		}
 	}
-
+	if len(ret.EServerSessKey) != 64 && len(ret.EServerSessKey) != 96 {
+		return nil, errors.New("session key should be either 64, 96 bytes long")
+	}
 	var key []byte
+	var speedyKey []byte
 	padding := false
 	var err error
+
 	if ret.VerifierType == 2361 {
 		key, err = getKeyFromUserNameAndPassword(username, password)
 		if err != nil {
@@ -95,7 +144,18 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 		}
 		key = hash.Sum(nil)           // 20 byte key
 		key = append(key, 0, 0, 0, 0) // 24 byte key
+	} else if ret.VerifierType == 18453 {
+		salt, err := HexStringToBytes(ret.Salt)
+		if err != nil {
+			return nil, err
+		}
+		message := append(salt, []byte("AUTH_PBKDF2_SPEEDY_KEY")...)
+		speedyKey = generateSpeedyKey(message, []byte(password), ret.pbkdf2VgenCount)
 
+		buffer := append(speedyKey, salt...)
+		hash := sha512.New()
+		hash.Write(buffer)
+		key = hash.Sum(nil)[:32]
 	} else {
 		return nil, errors.New("unsupported verifier type")
 	}
@@ -105,6 +165,7 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 		return nil, err
 	}
 
+	// note if serverSessKey length is less than the expected length according to verifier generate random one
 	// generate new key for client
 	ret.ClientSessKey = make([]byte, len(ret.ServerSessKey))
 	for {
@@ -124,13 +185,21 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 	}
 
 	// get the hash key form server and client session key
-	ret.KeyHash, err = CalculateKeysHash(ret.VerifierType, ret.ServerSessKey[16:], ret.ClientSessKey[16:])
+	newKey, err := ret.generatePasswordEncKey()
 	if err != nil {
 		return nil, err
 	}
-
+	if ret.VerifierType == 18453 {
+		padding = false
+	} else {
+		padding = true
+	}
 	// encrypt the password
-	ret.EPassword, err = EncryptPassword(password, ret.KeyHash)
+	ret.EPassword, err = EncryptPassword([]byte(password), newKey, true)
+	if err != nil {
+		return nil, err
+	}
+	ret.ESpeedyKey, err = EncryptPassword(speedyKey, newKey, padding)
 	if err != nil {
 		return nil, err
 	}
@@ -138,60 +207,52 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 }
 
 func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMode, session *network.Session) error {
-	session.ResetBuffer()
-	keyValSize := 22
-	session.PutBytes(3, 0x73, 0)
-	if len(connOption.UserID) > 0 {
-		session.PutInt(1, 1, false, false)
-		session.PutInt(len(connOption.UserID), 4, true, true)
-	} else {
-		session.PutBytes(0, 0)
-	}
-
-	if len(connOption.UserID) > 0 && len(obj.EPassword) > 0 {
-		mode |= UserAndPass
-	}
-	session.PutUint(int(mode), 4, true, true)
-	session.PutUint(1, 1, false, false)
-	session.PutUint(keyValSize, 4, true, true)
-	session.PutBytes(1, 1)
-	if len(connOption.UserID) > 0 {
-		session.PutBytes([]byte(connOption.UserID)...)
+	var keys = make([]string, 0, 20)
+	var values = make([]string, 0, 20)
+	var flags = make([]uint8, 0, 20)
+	appendKeyVal := func(key, val string, f uint8) {
+		keys = append(keys, key)
+		values = append(values, val)
+		flags = append(flags, f)
 	}
 	index := 0
 	if len(obj.EClientSessKey) > 0 {
-		session.PutKeyValString("AUTH_SESSKEY", obj.EClientSessKey, 1)
+		appendKeyVal("AUTH_SESSKEY", obj.EClientSessKey, 1)
 		index++
 	}
 	if len(obj.EPassword) > 0 {
-		session.PutKeyValString("AUTH_PASSWORD", obj.EPassword, 0)
+		appendKeyVal("AUTH_PASSWORD", obj.EPassword, 0)
 		index++
 	}
 	// if newpassword encrypt and add {
 	//	session.PutKeyValString("AUTH_NEWPASSWORD", ENewPassword, 0)
 	//	index ++
 	//}
-	session.PutKeyValString("AUTH_TERMINAL", connOption.ClientData.HostName, 0)
+	if len(obj.ESpeedyKey) > 0 {
+		appendKeyVal("AUTH_PBKDF2_SPEEDY_KEY", obj.ESpeedyKey, 0)
+		index++
+	}
+	appendKeyVal("AUTH_TERMINAL", connOption.ClientData.HostName, 0)
 	index++
-	session.PutKeyValString("AUTH_PROGRAM_NM", connOption.ClientData.ProgramName, 0)
+	appendKeyVal("AUTH_PROGRAM_NM", connOption.ClientData.ProgramName, 0)
 	index++
-	session.PutKeyValString("AUTH_MACHINE", connOption.ClientData.HostName, 0)
+	appendKeyVal("AUTH_MACHINE", connOption.ClientData.HostName, 0)
 	index++
-	session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", connOption.ClientData.PID), 0)
+	appendKeyVal("AUTH_PID", fmt.Sprintf("%d", connOption.ClientData.PID), 0)
 	index++
-	session.PutKeyValString("AUTH_SID", connOption.ClientData.UserName, 0)
+	appendKeyVal("AUTH_SID", connOption.ClientData.UserName, 0)
 	index++
-	session.PutKeyValString("AUTH_CONNECT_STRING", connOption.ConnectionData(), 0)
+	appendKeyVal("AUTH_CONNECT_STRING", connOption.ConnectionData(), 0)
 	index++
-	session.PutKeyValString("SESSION_CLIENT_CHARSET", strconv.Itoa(int(obj.tcpNego.ServerCharset)), 0)
+	appendKeyVal("SESSION_CLIENT_CHARSET", strconv.Itoa(int(obj.tcpNego.ServerCharset)), 0)
 	index++
-	session.PutKeyValString("SESSION_CLIENT_LIB_TYPE", "0", 0)
+	appendKeyVal("SESSION_CLIENT_LIB_TYPE", "0", 0)
 	index++
-	session.PutKeyValString("SESSION_CLIENT_DRIVER_NAME", connOption.ClientData.DriverName, 0)
+	appendKeyVal("SESSION_CLIENT_DRIVER_NAME", connOption.ClientData.DriverName, 0)
 	index++
-	session.PutKeyValString("SESSION_CLIENT_VERSION", "1.0.0.0", 0)
+	appendKeyVal("SESSION_CLIENT_VERSION", "2.0.0.0", 0)
 	index++
-	session.PutKeyValString("SESSION_CLIENT_LOBATTR", "1", 0)
+	appendKeyVal("SESSION_CLIENT_LOBATTR", "1", 0)
 	index++
 	_, offset := time.Now().Zone()
 	tz := ""
@@ -206,12 +267,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 		}
 		tz = fmt.Sprintf("%+03d:%02d", hours, minutes)
 	}
-	//if !strings.Contains(tz, ":") {
-	//	tz += ":00"
-	//}
-	//session.PutKeyValString("AUTH_ALTER_SESSION",
-	//	fmt.Sprintf("ALTER SESSION SET NLS_LANGUAGE='ARABIC' NLS_TERRITORY='SAUDI ARABIA'  TIME_ZONE='%s'\x00", tz), 1)
-	session.PutKeyValString("AUTH_ALTER_SESSION",
+	appendKeyVal("AUTH_ALTER_SESSION",
 		fmt.Sprintf("ALTER SESSION SET NLS_LANGUAGE='AMERICAN' NLS_TERRITORY='AMERICA'  TIME_ZONE='%s'\x00", tz), 1)
 	index++
 	//if (!string.IsNullOrEmpty(proxyClientName))
@@ -229,16 +285,53 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	//	keys[index1] = this.m_authSerialNum;
 	//	values[index1++] = this.m_marshallingEngine.m_dbCharSetConv.ConvertStringToBytes(serialNum.ToString(), 0, serialNum.ToString().Length, true);
 	//}
-	// fill remaining values with zeros
-	for index < keyValSize {
-		session.PutKeyVal(nil, nil, 0)
-		index++
+	session.ResetBuffer()
+	session.PutBytes(3, 0x73, 0)
+	if len(connOption.UserID) > 0 {
+		session.PutBytes(1)
+		session.PutInt(len(connOption.UserID), 4, true, true)
+	} else {
+		session.PutBytes(0, 0)
 	}
-	err := session.Write()
-	if err != nil {
-		return err
+	// if proxy auth logonMode |= 0x400
+	if len(connOption.UserID) > 0 && len(obj.EPassword) > 0 {
+		mode |= UserAndPass
 	}
-	return nil
+	session.PutUint(int(mode), 4, true, true)
+	session.PutBytes(1)
+	session.PutUint(index, 4, true, true)
+	session.PutBytes(1, 1)
+	if len(connOption.UserID) > 0 {
+		session.PutString(connOption.UserID)
+	}
+	for i := 0; i < index; i++ {
+		session.PutKeyValString(keys[i], values[i], flags[i])
+	}
+	//fill remaining values with zeros
+	//for index < 30 {
+	//	session.PutKeyVal(nil, nil, 0)
+	//	index++
+	//}
+	return session.Write()
+
+}
+
+func generateSpeedyKey(buffer, key []byte, turns int) []byte {
+	mac := hmac.New(sha512.New, key)
+	mac.Write(append(buffer, 0, 0, 0, 1))
+	firstHash := mac.Sum(nil)
+	tempHash := make([]byte, len(firstHash))
+	copy(tempHash, firstHash)
+	for index1 := 2; index1 <= turns; index1++ {
+		//mac = hmac.New(sha512.New, []byte("ter1234"))
+		mac.Reset()
+		mac.Write(tempHash)
+		tempHash = mac.Sum(nil)
+		for index2 := 0; index2 < 64; index2++ {
+			firstHash[index2] = firstHash[index2] ^ tempHash[index2]
+		}
+	}
+	return firstHash
 }
 
 func getKeyFromUserNameAndPassword(username string, password string) ([]byte, error) {
@@ -303,6 +396,7 @@ func HexStringToBytes(input string) ([]byte, error) {
 	}
 	return result, nil
 }
+
 func decryptSessionKey(padding bool, encKey []byte, sessionKey string) ([]byte, error) {
 	result, err := HexStringToBytes(sessionKey)
 	if err != nil {
@@ -343,58 +437,114 @@ func EncryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, 
 		return "", err
 	}
 	enc := cipher.NewCBCEncrypter(blk, make([]byte, 16))
-	if padding {
-		sessionKey = PKCS5Padding(sessionKey, blk.BlockSize())
-	}
+	originalLen := len(sessionKey)
+	sessionKey = PKCS5Padding(sessionKey, blk.BlockSize())
+	//if padding {
+	//
+	//}
 	output := make([]byte, len(sessionKey))
 	enc.CryptBlocks(output, sessionKey)
+	if !padding {
+		return fmt.Sprintf("%X", output[:originalLen]), nil
+	}
 	return fmt.Sprintf("%X", output), nil
+
+	//cryptoServiceProvider.Mode = CipherMode.CBC;
+	//cryptoServiceProvider.KeySize = key.Length * 8;
+	//cryptoServiceProvider.BlockSize = O5LogonHelper.d;
+	//cryptoServiceProvider.Key = key;
+	//cryptoServiceProvider.IV = O5LogonHelper.f;
+	//numArray = cryptoServiceProvider.CreateEncryptor().TransformFinalBlock(buffer, 0, buffer.Length);
 }
 
-func EncryptPassword(password string, key []byte) (string, error) {
+func EncryptPassword(password, key []byte, padding bool) (string, error) {
 	buff1 := make([]byte, 0x10)
 	_, err := rand.Read(buff1)
 	//buff_1 = []byte{109, 250, 127, 252, 157, 165, 29, 6, 165, 174, 50, 93, 165, 202, 192, 100}
 	if err != nil {
 		return "", nil
 	}
-	buffer := append(buff1, []byte(password)...)
-	return EncryptSessionKey(true, key, buffer)
+	buffer := append(buff1, password...)
+	return EncryptSessionKey(padding, key, buffer)
 }
 
-func CalculateKeysHash(verifierType int, key1 []byte, key2 []byte) ([]byte, error) {
+//func bytesToHexString(input []byte) []byte {
+//	byteToHex := func(x uint8) uint8 {
+//		x &= 0xF
+//		if x < 10 {
+//			return x + 48
+//		} else {
+//			return x - 10 + 65
+//		}
+//	}
+//	output := make([]byte, len(input)*2)
+//
+//	for i := 0; i < len(input); i++ {
+//		output[i*2] = byteToHex((input[i] & 0xF0) >> 4)
+//		output[i*2+1] = byteToHex(input[i] & 0xF)
+//	}
+//	return output
+//}
+func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 	hash := md5.New()
-	switch verifierType {
-	case 2361:
-		buffer := make([]byte, 16)
-		for x := 0; x < 16; x++ {
-			buffer[x] = key1[x] ^ key2[x]
+	key1 := obj.ServerSessKey
+	key2 := obj.ClientSessKey
+	start := 16
+	logonCompatibility := obj.tcpNego.ServerCompileTimeCaps[4]
+	if logonCompatibility&32 != 0 {
+		var keyBuffer string
+		switch obj.VerifierType {
+		case 2361:
+			buffer := append(key2[:len(key2)/2], key1[:len(key1)/2]...)
+			keyBuffer = fmt.Sprintf("%X", buffer)
+		case 6949:
+			buffer := append(key2[:24], key1[:24]...)
+			keyBuffer = fmt.Sprintf("%X", buffer)
+		case 18453:
+			buffer := append(key2, key1...)
+			keyBuffer = fmt.Sprintf("%X", buffer)
+		default:
+			return nil, errors.New("unsupported verifier type")
+		}
+		df2key, err := HexStringToBytes(obj.pbkdf2ChkSalt)
+		if err != nil {
+			return nil, err
+		}
+		return generateSpeedyKey(df2key, []byte(keyBuffer), obj.pbkdf2SderCount)[:32], nil
+	} else {
+		switch obj.VerifierType {
+		case 2361:
+			buffer := make([]byte, 16)
+			for x := 0; x < 16; x++ {
+				buffer[x] = key1[x+start] ^ key2[x+start]
+			}
+			_, err := hash.Write(buffer)
+			if err != nil {
+				return nil, err
+			}
+			return hash.Sum(nil), nil
+		case 6949:
+			buffer := make([]byte, 24)
+			for x := 0; x < 24; x++ {
+				buffer[x] = key1[x+start] ^ key2[x+start]
+			}
+			_, err := hash.Write(buffer[:16])
+			if err != nil {
+				return nil, err
+			}
+			ret := hash.Sum(nil)
+			hash.Reset()
+			_, err = hash.Write(buffer[16:])
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, hash.Sum(nil)...)
+			return ret[:24], nil
+		default:
+			return nil, errors.New("unsupported verifier type")
 		}
 
-		_, err := hash.Write(buffer)
-		if err != nil {
-			return nil, err
-		}
-		return hash.Sum(nil), nil
-	case 6949:
-		buffer := make([]byte, 24)
-		for x := 0; x < 24; x++ {
-			buffer[x] = key1[x] ^ key2[x]
-		}
-		_, err := hash.Write(buffer[:16])
-		if err != nil {
-			return nil, err
-		}
-		ret := hash.Sum(nil)
-		hash.Reset()
-		_, err = hash.Write(buffer[16:])
-		if err != nil {
-			return nil, err
-		}
-		ret = append(ret, hash.Sum(nil)...)
-		return ret[:24], nil
 	}
-	return nil, nil
 }
 
 func (obj *AuthObject) VerifyResponse(response string) bool {
@@ -408,4 +558,54 @@ func (obj *AuthObject) VerifyResponse(response string) bool {
 	//KZSR_SVR_RESPONSE = new byte[16]{ (byte) 83, (byte) 69, (byte) 82, (byte) 86, (byte) 69, (byte) 82, (byte) 95, (byte) 84, (byte) 79,
 	//(byte) 95, (byte) 67, (byte) 76, (byte) 73, (byte) 69, (byte) 78, (byte) 84 };
 
+}
+
+func (obj *AuthObject) TestResponse(password, pbkdf2ChkSalt string, vGenCount, sDerCount int) error {
+	padding := false
+	obj.pbkdf2ChkSalt = pbkdf2ChkSalt
+	obj.pbkdf2VgenCount = vGenCount
+	obj.pbkdf2SderCount = sDerCount
+	obj.tcpNego = &TCPNego{
+		MessageCode:           0,
+		ProtocolServerVersion: 0,
+		ProtocolServerString:  "",
+		OracleVersion:         0,
+		ServerCharset:         0,
+		ServerFlags:           0,
+		CharsetElem:           0,
+		ServernCharset:        0,
+		ServerCompileTimeCaps: []byte{0, 0, 0, 0, 32},
+		ServerRuntimeCaps:     nil,
+	}
+	salt, err := HexStringToBytes(obj.Salt)
+	if err != nil {
+		return err
+	}
+	message := append(salt, []byte("AUTH_PBKDF2_SPEEDY_KEY")...)
+	speedyKey := generateSpeedyKey(message, []byte(password), obj.pbkdf2VgenCount)
+
+	buffer := append(speedyKey, salt...)
+	hash := sha512.New()
+	hash.Write(buffer)
+	key := hash.Sum(nil)[:32]
+	obj.ServerSessKey, err = decryptSessionKey(padding, key, obj.EServerSessKey)
+	if err != nil {
+		return err
+	}
+	obj.ClientSessKey, err = decryptSessionKey(padding, key, obj.EClientSessKey)
+	if err != nil {
+		return err
+	}
+	newKey, err := obj.generatePasswordEncKey()
+	if err != nil {
+		return err
+	}
+	fmt.Println(decryptSessionKey(padding, newKey, obj.EPassword))
+
+	obj.EPassword, err = EncryptPassword([]byte(password), newKey, false)
+	if err != nil {
+		return err
+	}
+	obj.ESpeedyKey, err = EncryptPassword(speedyKey, newKey, false)
+	return err
 }

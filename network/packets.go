@@ -28,7 +28,7 @@ const (
 type Packet struct {
 	//sessionCtx SessionContext
 	dataOffset uint16
-	length     uint16
+	length     uint32
 	packetType PacketType
 	flag       uint8
 	//NSPFSID    int
@@ -47,7 +47,7 @@ type Packet struct {
 
 func newPacket(packetData []byte) *Packet {
 	return &Packet{
-		length:     binary.BigEndian.Uint16(packetData),
+		length:     uint32(binary.BigEndian.Uint16(packetData)),
 		packetType: PacketType(packetData[4]),
 		flag:       packetData[5],
 	}
@@ -58,7 +58,7 @@ func (pck *Packet) bytes() []byte {
 	if pck.dataOffset > 8 {
 		output = append(output, make([]byte, pck.dataOffset-8)...)
 	}
-	binary.BigEndian.PutUint16(output, pck.length)
+	binary.BigEndian.PutUint16(output, uint16(pck.length))
 	output[4] = uint8(pck.packetType)
 	output[5] = pck.flag
 	return output

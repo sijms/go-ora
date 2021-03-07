@@ -28,7 +28,7 @@ func GetDBVersion(session *network.Session) (*DBVersion, error) {
 	if err != nil {
 		return nil, err
 	}
-	msg, err := session.GetInt(1, false, false)
+	msg, err := session.GetByte()
 	if msg != 8 {
 		return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", msg))
 	}
@@ -36,7 +36,7 @@ func GetDBVersion(session *network.Session) (*DBVersion, error) {
 	if err != nil {
 		return nil, err
 	}
-	info, err := session.GetBytes(int(length))
+	info, err := session.GetString(int(length))
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func GetDBVersion(session *network.Session) (*DBVersion, error) {
 		number>>12&0xF, number>>8&0xF, number&0xFF)
 
 	ret := &DBVersion{
-		Info:            string(info),
+		Info:            info,
 		Text:            text,
 		Number:          uint16(version),
 		MajorVersion:    int(number >> 24 & 0xFF),

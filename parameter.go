@@ -105,6 +105,7 @@ type ParameterInfo struct {
 	BValue               []byte
 	Value                driver.Value
 	getDataFromServer    bool
+	oaccollid            int
 }
 
 func (par *ParameterInfo) load(session *network.Session) error {
@@ -191,7 +192,11 @@ func (par *ParameterInfo) load(session *network.Session) error {
 	if err != nil {
 		return err
 	}
-	par.ContFlag, err = session.GetInt(4, true, true)
+	if session.TTCVersion >= 10 {
+		par.ContFlag, err = session.GetInt(8, true, true)
+	} else {
+		par.ContFlag, err = session.GetInt(4, true, true)
+	}
 	if err != nil {
 		return err
 	}
@@ -211,6 +216,9 @@ func (par *ParameterInfo) load(session *network.Session) error {
 	par.MaxCharLen, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err
+	}
+	if session.TTCVersion >= 8 {
+		par.oaccollid, err = session.GetInt(4, true, true)
 	}
 	num1, err := session.GetInt(1, false, false)
 	if err != nil {
@@ -253,7 +261,11 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	//session.PutUint(par.Scale, 1, false, false)
 	session.PutUint(par.MaxLen, 4, true, true)
 	session.PutInt(par.MaxNoOfArrayElements, 4, true, true)
-	session.PutInt(par.ContFlag, 4, true, true)
+	if session.TTCVersion >= 10 {
+		session.PutInt(par.ContFlag, 8, true, true)
+	} else {
+		session.PutInt(par.ContFlag, 4, true, true)
+	}
 	if par.ToID == nil {
 		session.PutBytes(0)
 		//session.PutInt(0, 1, false, false)
@@ -266,6 +278,9 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	session.PutBytes(uint8(par.CharsetForm))
 	//session.PutUint(par.CharsetForm, 1, false, false)
 	session.PutUint(par.MaxCharLen, 4, true, true)
+	if session.TTCVersion >= 8 {
+		session.PutInt(par.oaccollid, 4, true, true)
+	}
 	return nil
 }
 

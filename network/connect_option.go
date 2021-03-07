@@ -19,8 +19,8 @@ type ConnectionOption struct {
 	TransportConnectTo    int
 	SSLVersion            string
 	WalletDict            string
-	TransportDataUnitSize uint16
-	SessionDataUnitSize   uint16
+	TransportDataUnitSize uint32
+	SessionDataUnitSize   uint32
 	Protocol              string
 	Host                  string
 	UserID                string
@@ -34,8 +34,9 @@ type ConnectionOption struct {
 	DBName       string
 	ClientData   ClientData
 	//InAddrAny bool
-	Tracer   trace.Tracer
-	connData string
+	Tracer    trace.Tracer
+	connData  string
+	SNOConfig map[string]string
 }
 
 func (op *ConnectionOption) ConnectionData() string {

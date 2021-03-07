@@ -10,7 +10,7 @@ type RefCursor struct {
 	MaxRowSize int
 	parent     *defaultStmt
 	//ID         int
-	//scnFromExe []int
+	//scnForSnapshot []int
 	//connection *Connection
 	//noOfRowsToFetch int
 	//hasMoreRows bool
@@ -24,7 +24,7 @@ func (cursor *RefCursor) load(session *network.Session) error {
 	cursor._hasReturnClause = false
 	cursor.disableCompression = true
 	cursor.arrayBindCount = 1
-	cursor.scnFromExe = make([]int, 2)
+	cursor.scnForSnapshot = make([]int, 2)
 	cursor.stmtType = SELECT
 	var err error
 	cursor.len, err = session.GetByte()
@@ -106,8 +106,8 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	cursor.connection.connOption.Tracer.Printf("Query RefCursor: %d", cursor.cursorID)
 	cursor._noOfRowsToFetch = 25
 	cursor._hasMoreRows = true
-	if len(cursor.parent.scnFromExe) > 0 {
-		copy(cursor.scnFromExe, cursor.parent.scnFromExe)
+	if len(cursor.parent.scnForSnapshot) > 0 {
+		copy(cursor.scnForSnapshot, cursor.parent.scnForSnapshot)
 	}
 	session := cursor.connection.session
 	session.ResetBuffer()

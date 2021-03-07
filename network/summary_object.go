@@ -151,7 +151,11 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 		flag := num == 0xFE
 		for x := 0; x < length; x++ {
 			if flag {
-				_, _ = session.GetByte()
+				if session.UseBigClrChunks {
+					_, _ = session.GetInt(4, true, true)
+				} else {
+					_, _ = session.GetByte()
+				}
 			}
 			result.bindErrors[x].errorCode, err = session.GetInt(2, true, true)
 			if err != nil {
@@ -174,7 +178,11 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 		flag := num == 0xFE
 		for x := 0; x < length; x++ {
 			if flag {
-				_, _ = session.GetByte()
+				if session.UseBigClrChunks {
+					_, _ = session.GetInt(4, true, true)
+				} else {
+					_, _ = session.GetByte()
+				}
 			}
 			result.bindErrors[x].rowOffset, err = session.GetInt(4, true, true)
 			if err != nil {
@@ -202,6 +210,16 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			}
 			_, _ = session.GetByte()
 			_, _ = session.GetByte()
+		}
+	}
+	if session.TTCVersion >= 7 {
+		result.RetCode, err = session.GetInt(4, true, true)
+		if err != nil {
+			return nil, err
+		}
+		result.CurRowNumber, err = session.GetInt(8, true, true)
+		if err != nil {
+			return nil, err
 		}
 	}
 	if result.RetCode != 0 {

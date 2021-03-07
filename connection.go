@@ -268,8 +268,8 @@ func (conn *Connection) Ping(_ context.Context) error {
 //}
 
 func (conn *Connection) Open() error {
-
-	conn.connOption.Tracer.Print("Open :", conn.connOption.ConnectionData())
+	tracer := conn.connOption.Tracer
+	tracer.Print("Open :", conn.connOption.ConnectionData())
 
 	switch conn.conStr.DBAPrivilege {
 	case SYSDBA:
@@ -288,6 +288,7 @@ func (conn *Connection) Open() error {
 	}
 	// advanced negotiation
 	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
+		tracer.Print("Advance Negotiation")
 		ano, err := advanced_nego.NewAdvNego(conn.connOption)
 		if err != nil {
 			return err
@@ -300,21 +301,22 @@ func (conn *Connection) Open() error {
 		if err != nil {
 			return err
 		}
-		//fmt.Printf("%#v\n", ano)
-		//return errors.New("stop connection")
-		//start advanced negotionation
-		//session.Context.Ano
-	} else {
-
 	}
+	//else {
+	//
+	//}
+	tracer.Print("TCP Negotiation")
 	conn.tcpNego, err = NewTCPNego(conn.session)
 	if err != nil {
 		return err
 	}
+	tracer.Print("Server Charset: ", conn.tcpNego.ServerCharset)
+	tracer.Print("Server National Charset: ", conn.tcpNego.ServernCharset)
 	// create string converter object
 	conn.strConv = converters.NewStringConverter(conn.tcpNego.ServerCharset)
 	conn.session.StrConv = conn.strConv
 	conn.tcpNego.ServerFlags |= 2
+	tracer.Print("Data Type Negotiation")
 	conn.dataNego = buildTypeNego(conn.tcpNego, conn.session)
 	err = conn.dataNego.write(conn.session)
 	if err != nil {
@@ -328,7 +330,7 @@ func (conn *Connection) Open() error {
 	if conn.tcpNego.ServerCompileTimeCaps[7] < conn.session.TTCVersion {
 		conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
 	}
-
+	tracer.Print("TTC Version: ", conn.session.TTCVersion)
 	//this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
 	//this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
 	//this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompiletimeCapabilities[7] >= (byte) 8;
@@ -342,7 +344,8 @@ func (conn *Connection) Open() error {
 	if err != nil {
 		return err
 	}
-
+	tracer.Print("Connected")
+	tracer.Print("Database Version: ", conn.dBVersion.Text)
 	sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)
 	if err != nil {
 		return err

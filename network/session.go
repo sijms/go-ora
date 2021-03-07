@@ -122,7 +122,7 @@ func (session *Session) Connect() error {
 	if acceptPacket, ok := pck.(*AcceptPacket); ok {
 		*session.Context = acceptPacket.sessionCtx
 		session.Context.handshakeComplete = true
-
+		session.connOption.Tracer.Print("Handshake Complete")
 		//if (this.m_sessionCtx.m_ACFL0 & 1) != 0 &&
 		//   (this.m_sessionCtx.m_ACFL0 & 4) == 0 &&
 		//   (this.m_sessionCtx.m_ACFL1 & 8) == 0 {

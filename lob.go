@@ -32,6 +32,7 @@ func (lob *Lob) littleEndianClob() bool {
 }
 func (lob *Lob) getSize(connection *Connection) (size int64, err error) {
 	session := connection.session
+	connection.connOption.Tracer.Print("Read Lob Size")
 	err = lob.write(session, 1)
 	if err != nil {
 		return
@@ -41,9 +42,11 @@ func (lob *Lob) getSize(connection *Connection) (size int64, err error) {
 		return
 	}
 	size = lob.size
+	connection.connOption.Tracer.Print("Lob Size: ", size)
 	return
 }
 func (lob *Lob) getData(connection *Connection) (data []byte, err error) {
+	connection.connOption.Tracer.Print("Read Lob Data")
 	session := connection.session
 	lob.sourceOffset = 1
 	err = lob.write(session, 2)

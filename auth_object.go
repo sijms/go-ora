@@ -199,9 +199,11 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 	if err != nil {
 		return nil, err
 	}
-	ret.ESpeedyKey, err = EncryptPassword(speedyKey, newKey, padding)
-	if err != nil {
-		return nil, err
+	if ret.VerifierType == 18453 {
+		ret.ESpeedyKey, err = EncryptPassword(speedyKey, newKey, padding)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return ret, nil
 }

@@ -19,11 +19,15 @@ type DBVersion struct {
 
 func GetDBVersion(session *network.Session) (*DBVersion, error) {
 	session.ResetBuffer()
-	session.PutBytes(3, 0x3B, 0)
-	session.PutUint(1, 1, false, false)
+	session.PutBytes(3, 0x3B, 0, 1)
+	//session.PutUint(1, 1, false, false)
 	session.PutUint(0x100, 2, true, true)
-	session.PutUint(1, 1, false, false)
-	session.PutUint(1, 1, false, false)
+	session.PutBytes(1, 1)
+	//session.PutUint(1, 1, false, false)
+	//session.PutUint(1, 1, false, false)
+	if session.TTCVersion >= 11 {
+		session.PutUint(1, 4, true, true)
+	}
 	err := session.Write()
 	if err != nil {
 		return nil, err

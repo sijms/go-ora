@@ -492,10 +492,11 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 	key1 := obj.ServerSessKey
 	key2 := obj.ClientSessKey
 	start := 16
-	var retKeyLen int
+
 	logonCompatibility := obj.tcpNego.ServerCompileTimeCaps[4]
 	if logonCompatibility&32 != 0 {
 		var keyBuffer string
+		var retKeyLen int
 		switch obj.VerifierType {
 		case 2361:
 			buffer := append(key2[:len(key2)/2], key1[:len(key1)/2]...)

@@ -361,11 +361,12 @@ func (conn *Connection) Open() error {
 	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
-	//_, err = conn.GetNLS()
-	//if err != nil {
-	//	return err
-	//}
-
+	if len(conn.NLSData.Language) == 0 {
+		_, err = conn.GetNLS()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -941,7 +941,7 @@ func (stmt *defaultStmt) Close() error {
 		session.PutBytes(17, 105, 0, 1, 1, 1)
 		session.PutInt(stmt.cursorID, 4, true, true)
 		return (&simpleObject{
-			session:     session,
+			connection:  stmt.connection,
 			operationID: 0x93,
 			data:        nil,
 			err:         nil,

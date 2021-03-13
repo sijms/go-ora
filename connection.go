@@ -208,7 +208,7 @@ func (conn *Connection) Ping(_ context.Context) error {
 	conn.connOption.Tracer.Print("Ping")
 	conn.session.ResetBuffer()
 	return (&simpleObject{
-		session:     conn.session,
+		connection:  conn,
 		operationID: 0x93,
 		data:        nil,
 	}).write().read()

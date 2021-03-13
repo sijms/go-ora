@@ -81,7 +81,7 @@ func (obj *simpleObject) read() error {
 				return err
 			}
 		default:
-			return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 4, 9, 15, 23", msg))
+			return errors.New(fmt.Sprintf("TTC error: received code %d during simple object read", msg))
 		}
 	}
 	if session.HasError() {

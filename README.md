@@ -1,4 +1,14 @@
 # go-ora
+## what's new:
+### version 2.1-beta
+* support more charsets (0x33D, 0x33E, 0x33F, 0x340, 0x352)
+### version 2.0-beta
+* update client version to 317
+* update ttc version to: 9
+* use 4 byte packet length instead of 2 bytes
+* use advanced negotiation
+* use big clear chunks
+* use more verifier type in authentication object
 ## Pure go oracle client
 important notes:
  * the client is tested against oracle 10G, 11G and 12G and working properly

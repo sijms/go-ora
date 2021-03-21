@@ -3,10 +3,10 @@ package network
 const (
 	DefaultAddress string = "(Description=(Address=(Protocol=tcp)(IP=loopback)(port=1521))(CONNECT_DATA=(SID="
 )
+
 type AddressResolution struct {
 	InstanceName string
-	TNSAddress string
-
+	TNSAddress   string
 }
 
 //func ResolveEZConnect(tnsAlias string, instanceName string) (*ConnectionOption, error) {

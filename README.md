@@ -1,7 +1,7 @@
 # go-ora
 ## what's new:
 ### version 2.1-beta
-* support more charsets (0x33D, 0x33E, 0x33F, 0x340, 0x352)
+* support more charsets (0x33D, 0x33E, 0x33F, 0x340, 0x352, 0x353, 0x354)
 ### version 2.0-beta
 * update client version to 317
 * update ttc version to: 9

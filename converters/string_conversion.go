@@ -20719,6 +20719,7 @@ func NewStringConverter(langID int) *StringConverter {
 				58564, 58565, 65535,
 			},
 		}
+
 	case 0x35e: // 862
 		return &StringConverter{
 			LangID:    862,

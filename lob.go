@@ -229,7 +229,6 @@ func (lob *Lob) read(connection *Connection) error {
 				return err
 			}
 		default:
-			fmt.Println(msg)
 			return errors.New(fmt.Sprintf("TTC error: received code %d during LOB reading", msg))
 		}
 	}

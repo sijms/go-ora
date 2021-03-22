@@ -923,9 +923,17 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				}
 			}
 			dataSet.setBitVector(bitVector)
-
+		case 23:
+			opCode, err := session.GetByte()
+			if err != nil {
+				return err
+			}
+			err = stmt.connection.getServerNetworkInformation(opCode)
+			if err != nil {
+				return err
+			}
 		default:
-			loop = false
+			return errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
 		}
 	}
 	if stmt.connection.connOption.Tracer.IsOn() {
@@ -1207,3 +1215,54 @@ execute = true
 fetch = true if hasReturn or PLSQL
 define = false
 */
+
+//func ReadFromExternalBuffer(buffer []byte) error {
+//	connOption := &network.ConnectionOption{
+//		Port:                  0,
+//		TransportConnectTo:    0,
+//		SSLVersion:            "",
+//		WalletDict:            "",
+//		TransportDataUnitSize: 0,
+//		SessionDataUnitSize:   0,
+//		Protocol:              "",
+//		Host:                  "",
+//		UserID:                "",
+//		SID:                   "",
+//		ServiceName:           "",
+//		InstanceName:          "",
+//		DomainName:            "",
+//		DBName:                "",
+//		ClientData:            network.ClientData{},
+//		Tracer:                trace.NilTracer(),
+//		SNOConfig:             nil,
+//	}
+//	conn := &Connection {
+//		State:             Opened,
+//		LogonMode:         0,
+//		SessionProperties: nil,
+//		connOption: connOption,
+//	}
+//	conn.session = &network.Session{
+//		Context:         nil,
+//		Summary:         nil,
+//		UseBigClrChunks: true,
+//		ClrChunkSize:    0x40,
+//	}
+//	conn.strConv = converters.NewStringConverter(871)
+//	conn.session.StrConv = conn.strConv
+//	conn.session.FillInBuffer(buffer)
+//	conn.session.TTCVersion = 11
+//	stmt := &Stmt{
+//		defaultStmt:  defaultStmt{
+//			connection: conn,
+//			scnForSnapshot: make([]int, 2),
+//		},
+//		reSendParDef: false,
+//		parse:        true,
+//		execute:      true,
+//		define:       false,
+//	}
+//	dataSet := new(DataSet)
+//	err := stmt.read(dataSet)
+//	return err
+//}

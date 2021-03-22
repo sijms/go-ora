@@ -823,3 +823,7 @@ func (session *Session) GetKeyVal() (key []byte, val []byte, num int, err error)
 	num, err = session.GetInt(4, true, true)
 	return
 }
+
+//func (session *Session) FillInBuffer(buffer []byte) {
+//	session.inBuffer = buffer
+//}

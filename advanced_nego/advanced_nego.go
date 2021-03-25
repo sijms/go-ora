@@ -33,7 +33,7 @@ func NewAdvNego(connOption *network.ConnectionOption) (*AdvNego, error) {
 	return output, nil
 }
 func (nego *AdvNego) readHeader(session *network.Session) ([]int, error) {
-	num, err := session.GetInt(4, false, true)
+	num, err := session.GetInt64(4, false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (nego *AdvNego) Write(session *network.Session) error {
 		size = size + 8 + nego.serviceList[i].getServiceDataLength()
 	}
 	size += 13
-	session.PutInt(0xDEADBEEF, 4, true, false)
+	session.PutInt(uint64(0xDEADBEEF), 4, true, false)
 	session.PutInt(size, 2, true, false)
 	session.PutInt(nego.serviceList[1].getVersion(), 4, true, false)
 	session.PutInt(4, 2, true, false)

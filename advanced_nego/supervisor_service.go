@@ -45,7 +45,7 @@ func (serv *supervisorService) readServiceData(session *network.Session, subPack
 	if err != nil {
 		return err
 	}
-	num1, err := session.GetInt(4, false, true)
+	num1, err := session.GetInt64(4, false, true)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (serv *supervisorService) writeServiceData(session *network.Session) error 
 	if err != nil {
 		return err
 	}
-	session.PutInt(0xDEADBEEF, 4, true, false)
+	session.PutInt(uint64(0xDEADBEEF), 4, true, false)
 	session.PutInt(3, 2, true, false)
 	session.PutInt(len(serv.servArray), 4, true, false)
 	for i := 0; i < len(serv.servArray); i++ {

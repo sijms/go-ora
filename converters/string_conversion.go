@@ -99,6 +99,14 @@ func (conv *StringConverter) Decode(input []byte) string {
 		return ""
 	}
 	switch conv.LangID {
+	case 852: // ZHS16GBK
+		dec := zhs.GBK.NewDecoder()
+		buf := make([]byte, len(input)*2)
+		nDst, _, err := dec.Transform(buf, input, false)
+		if err == nil && nDst > 0 {
+			return string(buf[0:nDst])
+		}
+		return string(input)
 	case 870:
 		fallthrough
 	case 871:
@@ -146,39 +154,6 @@ func (conv *StringConverter) Decode(input []byte) string {
 		output := make([]uint16, 0, len(input))
 		for index < len(input) {
 			if input[index] > 127 {
-				if index+1 > len(input) {
-					return string(input)
-				}
-				result = int(binary.BigEndian.Uint16(input[index:]))
-				index++
-			} else {
-				result = int(input[index])
-			}
-			index++
-			index1 := (result >> 8) & 0xFF
-			index2 := result & 0xFF
-			char1 := conv.dBuffer[index1]
-			if char1 == 0xFFFF {
-				output = append(output, uint16(conv.dReplace))
-				continue
-			}
-			char := conv.dBuffer2[char1+index2]
-			if char == 0xFFFF {
-				output = append(output, uint16(conv.dReplace))
-				continue
-			}
-			if uint(char) > 0xFFFF {
-				output = append(output, uint16(char>>16))
-			}
-			output = append(output, uint16(char))
-		}
-		return string(utf16.Decode(output))
-	case 0x354:
-		index := 0
-		result := 0
-		output := make([]uint16, 0, len(input))
-		for index < len(input) {
-			if input[index] > 128 {
 				if index+1 > len(input) {
 					return string(input)
 				}

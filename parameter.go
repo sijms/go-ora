@@ -233,7 +233,7 @@ func (par *ParameterInfo) load(session *network.Session) error {
 	if err != nil {
 		return err
 	}
-	par.Name = string(bName)
+	par.Name = session.StrConv.Decode(bName)
 	_, err = session.GetDlc()
 	bName, err = session.GetDlc()
 	if err != nil {

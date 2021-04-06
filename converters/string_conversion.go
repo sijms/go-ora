@@ -2,6 +2,7 @@ package converters
 
 import (
 	"encoding/binary"
+	zhs "golang.org/x/text/encoding/simplifiedchinese"
 	"unicode/utf16"
 )
 
@@ -25,6 +26,8 @@ func MaxBytePerChar(charsetID int) int {
 		fallthrough
 	case 873:
 		return 4
+	case 852: // ZHS16GBK
+		fallthrough
 	case 2000:
 		fallthrough
 	case 2002:
@@ -40,6 +43,16 @@ func (conv *StringConverter) Encode(input string) []byte {
 	}
 	temp := utf16.Encode([]rune(input))
 	switch conv.LangID {
+	case 852: // ZHS16GBK
+		enc := zhs.GBK.NewEncoder()
+		runes := []rune(input)
+		buf := make([]byte, len(runes)*2)
+		src := []byte(input)
+		nDst, _, err := enc.Transform(buf, src, false)
+		if err == nil && nDst > 0 {
+			return buf[0:nDst]
+		}
+		return src
 	case 870:
 		fallthrough
 	case 871:

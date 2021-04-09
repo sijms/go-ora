@@ -34,9 +34,10 @@ type ConnectionOption struct {
 	DBName       string
 	ClientData   ClientData
 	//InAddrAny bool
-	Tracer    trace.Tracer
-	connData  string
-	SNOConfig map[string]string
+	Tracer       trace.Tracer
+	connData     string
+	SNOConfig    map[string]string
+	PrefetchRows int
 }
 
 func (op *ConnectionOption) ConnectionData() string {

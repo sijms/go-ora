@@ -87,6 +87,7 @@ type ConnectionString struct {
 	ConnectionPoolTimeout int
 	PasswordlessConString string
 	Trace                 string // Trace file
+	PrefetchRows          int
 }
 
 func NewConnectionString() *ConnectionString {
@@ -105,6 +106,7 @@ func NewConnectionString() *ConnectionString {
 		SelfTuning:            true,
 		PoolReglator:          100,
 		ConnectionPoolTimeout: 15,
+		PrefetchRows:          25,
 	}
 }
 
@@ -260,6 +262,11 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				ret.ProxyPassword = val[0]
 			case "TRACE FILE":
 				ret.Trace = val[0]
+			case "PREFETCH_ROWS":
+				ret.PrefetchRows, err = strconv.Atoi(val[0])
+				if err != nil {
+					ret.PrefetchRows = 25
+				}
 			}
 		}
 	}

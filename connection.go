@@ -410,6 +410,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 		//Server:                conn.conStr.Host,
 		ServiceName:  conStr.ServiceName,
 		InstanceName: conStr.InstanceName,
+		PrefetchRows: conStr.PrefetchRows,
 		ClientData: network.ClientData{
 			ProgramPath: os.Args[0],
 			ProgramName: os.Args[0][indexOfSlash:],

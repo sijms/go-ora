@@ -104,7 +104,7 @@ func (cursor *RefCursor) getExeOptions() int {
 }
 func (cursor *RefCursor) Query() (*DataSet, error) {
 	cursor.connection.connOption.Tracer.Printf("Query RefCursor: %d", cursor.cursorID)
-	cursor._noOfRowsToFetch = 25
+	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
 	cursor._hasMoreRows = true
 	if len(cursor.parent.scnForSnapshot) > 0 {
 		copy(cursor.scnForSnapshot, cursor.parent.scnForSnapshot)

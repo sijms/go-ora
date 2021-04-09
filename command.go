@@ -1170,7 +1170,7 @@ func (stmt *Stmt) AddRefCursorParam(name string) {
 //}
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	stmt.connection.connOption.Tracer.Printf("Query:\n%s", stmt.text)
-	stmt._noOfRowsToFetch = 25
+	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	stmt._hasMoreRows = true
 	for x := 0; x < len(args); x++ {
 		par := *stmt.NewParam("", args[x], 0, Input)

@@ -639,11 +639,11 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 								//fmt.Println("type: ", dataSet.Cols[x].DataType)
 								switch dataSet.Cols[x].DataType {
 								case NCHAR, CHAR, LONG:
-									if stmt.connection.strConv.LangID != dataSet.Cols[x].CharsetID {
-										tempCharset := stmt.connection.strConv.LangID
-										stmt.connection.strConv.LangID = dataSet.Cols[x].CharsetID
+									if stmt.connection.strConv.GetLangID() != dataSet.Cols[x].CharsetID {
+										tempCharset := stmt.connection.strConv.GetLangID()
+										stmt.connection.strConv.SetLangID(dataSet.Cols[x].CharsetID)
 										dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
-										stmt.connection.strConv.LangID = tempCharset
+										stmt.connection.strConv.SetLangID(tempCharset)
 									} else {
 										dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
 									}
@@ -725,18 +725,18 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 										}
 										dataSet.currentRow[x] = lobData
 									} else {
-										tempCharset := stmt.connection.strConv.LangID
+										tempCharset := stmt.connection.strConv.GetLangID()
 										if lob.variableWidthChar() {
 											if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
-												stmt.connection.strConv.LangID = 2002
+												stmt.connection.strConv.SetLangID(2002)
 											} else {
-												stmt.connection.strConv.LangID = 2000
+												stmt.connection.strConv.SetLangID(2000)
 											}
 										} else {
-											stmt.connection.strConv.LangID = dataSet.Cols[x].CharsetID
+											stmt.connection.strConv.SetLangID(dataSet.Cols[x].CharsetID)
 										}
 										resultClobString := stmt.connection.strConv.Decode(lobData)
-										stmt.connection.strConv.LangID = tempCharset
+										stmt.connection.strConv.SetLangID(tempCharset)
 										if dataSize != int64(len([]rune(resultClobString))) {
 											return errors.New("error reading clob data")
 										}
@@ -1048,10 +1048,10 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 				param.BValue = nil
 				param.MaxLen = 1
 			} else {
-				tempCharset := stmt.connection.strConv.LangID
-				stmt.connection.strConv.LangID = param.CharsetID
+				tempCharset := stmt.connection.strConv.GetLangID()
+				stmt.connection.strConv.SetLangID(param.CharsetID)
 				param.BValue = stmt.connection.strConv.Encode(val)
-				stmt.connection.strConv.LangID = tempCharset
+				stmt.connection.strConv.SetLangID(tempCharset)
 				if size > len(val) {
 					param.MaxCharLen = size
 				}

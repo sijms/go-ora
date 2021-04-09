@@ -5,6 +5,13 @@ import (
 	"unicode/utf16"
 )
 
+type IStringConverter interface {
+	Encode(string) []byte
+	Decode([]byte) string
+	GetLangID() int
+	SetLangID(langID int)
+}
+
 type StringConverter struct {
 	LangID    int
 	CharWidth int
@@ -33,7 +40,12 @@ func MaxBytePerChar(charsetID int) int {
 		return 1
 	}
 }
-
+func (conv *StringConverter) GetLangID() int {
+	return conv.LangID
+}
+func (conv *StringConverter) SetLangID(langID int) {
+	conv.LangID = langID
+}
 func (conv *StringConverter) Encode(input string) []byte {
 	if len(input) == 0 {
 		return nil

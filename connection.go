@@ -73,7 +73,7 @@ type Connection struct {
 	sessionID         int
 	serialID          int
 	transactionID     []byte
-	strConv           *converters.StringConverter
+	strConv           converters.IStringConverter
 	NLSData           NLSData
 }
 

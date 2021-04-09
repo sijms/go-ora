@@ -41,7 +41,7 @@ type Session struct {
 	HasFSAPCapability bool
 	Summary           *SummaryObject
 	states            []sessionState
-	StrConv           *converters.StringConverter
+	StrConv           converters.IStringConverter
 	UseBigClrChunks   bool
 	ClrChunkSize      int
 }

@@ -93,6 +93,11 @@ func (drv *oracleDriver) Open(name string) (driver.Conn, error) {
 	return conn, conn.Open()
 }
 
+func (conn *Connection) SetStringConveter(conveter converters.IStringConverter) {
+	conn.strConv = conveter
+	conn.session.StrConv = conveter
+}
+
 func (conn *Connection) GetNLS() (*NLSData, error) {
 
 	// we read from nls_session_parameters ONCE

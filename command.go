@@ -589,7 +589,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 								if rowid == nil {
 									dataSet.currentRow[x] = nil
 								} else {
-									fmt.Println(rowid.getBytes())
 									dataSet.currentRow[x] = string(rowid.getBytes())
 								}
 								continue

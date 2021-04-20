@@ -1,6 +1,8 @@
 package go_ora
 
-import "github.com/sijms/go-ora/network"
+import (
+	"github.com/sijms/go-ora/network"
+)
 
 type rowid struct {
 	rba         int64
@@ -58,7 +60,11 @@ func convertRowIDToByte(number int64, size int) []byte {
 	output := make([]byte, size)
 	for x := size; x > 0; x-- {
 		output[x-1] = buffer[number&0x3F]
-		number = number >> 6
+		if number >= 0 {
+			number = number >> 6
+		} else {
+			number = (number >> 6) + (2 << (32 + ^6))
+		}
 	}
 	return output
 }
@@ -70,3 +76,5 @@ func (id *rowid) getBytes() []byte {
 	output = append(output, convertRowIDToByte(id.slotNumber, 3)...)
 	return output
 }
+
+//// internal static long URShift(long number, int bits) => number >= 0L ? number >> bits : (number >> bits) + (2L << ~bits);

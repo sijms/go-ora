@@ -581,6 +581,19 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					}
 					for x := 0; x < len(dataSet.Cols); x++ {
 						if dataSet.Cols[x].getDataFromServer {
+							if dataSet.Cols[x].DataType == ROWID {
+								rowid, err := newRowID(session)
+								if err != nil {
+									return err
+								}
+								if rowid == nil {
+									dataSet.currentRow[x] = nil
+								} else {
+									fmt.Println(rowid.getBytes())
+									dataSet.currentRow[x] = string(rowid.getBytes())
+								}
+								continue
+							}
 							temp, err := session.GetClr()
 							//fmt.Println("buffer: ", temp)
 							if err != nil {

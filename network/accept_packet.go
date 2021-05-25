@@ -103,7 +103,7 @@ func newAcceptPacketFromData(packetData []byte) *AcceptPacket {
 		},
 	}
 	pck.buffer = packetData[int(pck.packet.dataOffset):]
-	if pck.sessionCtx.Version > 315 {
+	if pck.sessionCtx.Version >= 315 {
 		pck.sessionCtx.SessionDataUnit = binary.BigEndian.Uint32(packetData[32:])
 		pck.sessionCtx.TransportDataUnit = binary.BigEndian.Uint32(packetData[36:])
 	}

@@ -25,9 +25,7 @@ important notes:
 #### 1- importing:
     import (
       "database/sql"
-      "fmt"
-      _ "go-ora"
-      "time"
+      _ "github.com/sijms/go-ora/v2"
     )
       
 #### 2- create the connection

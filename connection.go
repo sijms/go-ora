@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sijms/go-ora/advanced_nego"
 	"github.com/sijms/go-ora/converters"
 	"github.com/sijms/go-ora/network"
 	"github.com/sijms/go-ora/trace"
@@ -38,25 +37,17 @@ const (
 type NLSData struct {
 	Calender        string
 	Comp            string
-	Language        string
 	LengthSemantics string
 	NCharConvExcep  string
-	NCharConvImp    string
 	DateLang        string
 	Sort            string
 	Currency        string
 	DateFormat      string
-	TimeFormat      string
 	IsoCurrency     string
 	NumericChars    string
 	DualCurrency    string
-	UnionCurrency   string
 	Timestamp       string
 	TimestampTZ     string
-	TTimezoneFormat string
-	NTimezoneFormat string
-	Territory       string
-	Charset         string
 }
 type Connection struct {
 	State             ConnectionState
@@ -72,7 +63,6 @@ type Connection struct {
 	dBVersion         *DBVersion
 	sessionID         int
 	serialID          int
-	transactionID     []byte
 	strConv           converters.IStringConverter
 	NLSData           NLSData
 }
@@ -213,7 +203,7 @@ func (conn *Connection) Ping(_ context.Context) error {
 	conn.connOption.Tracer.Print("Ping")
 	conn.session.ResetBuffer()
 	return (&simpleObject{
-		connection:  conn,
+		session:     conn.session,
 		operationID: 0x93,
 		data:        nil,
 	}).write().read()
@@ -284,32 +274,12 @@ func (conn *Connection) Open() error {
 	default:
 		conn.LogonMode = 0
 	}
-
 	conn.session = network.NewSession(*conn.connOption)
-	session := conn.session
-	err := session.Connect()
+	err := conn.session.Connect()
 	if err != nil {
 		return err
 	}
-	// advanced negotiation
-	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
-		tracer.Print("Advance Negotiation")
-		ano, err := advanced_nego.NewAdvNego(conn.connOption)
-		if err != nil {
-			return err
-		}
-		err = ano.Write(session)
-		if err != nil {
-			return err
-		}
-		err = ano.Read(session)
-		if err != nil {
-			return err
-		}
-	}
-	//else {
-	//
-	//}
+
 	tracer.Print("TCP Negotiation")
 	conn.tcpNego, err = NewTCPNego(conn.session)
 	if err != nil {
@@ -320,26 +290,18 @@ func (conn *Connection) Open() error {
 	// create string converter object
 	conn.strConv = converters.NewStringConverter(conn.tcpNego.ServerCharset)
 	conn.session.StrConv = conn.strConv
-	conn.tcpNego.ServerFlags |= 2
 	tracer.Print("Data Type Negotiation")
-	conn.dataNego = buildTypeNego(conn.tcpNego, conn.session)
-	err = conn.dataNego.write(conn.session)
+	conn.dataNego, err = buildTypeNego(conn.tcpNego, conn.session)
 	if err != nil {
 		return err
 	}
-	err = conn.dataNego.read(conn.session)
-	if err != nil {
-		return err
-	}
+
 	conn.session.TTCVersion = conn.dataNego.CompileTimeCaps[7]
+
 	if conn.tcpNego.ServerCompileTimeCaps[7] < conn.session.TTCVersion {
 		conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
 	}
 	tracer.Print("TTC Version: ", conn.session.TTCVersion)
-	//this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
-	//this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
-	//this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompiletimeCapabilities[7] >= (byte) 8;
-
 	err = conn.doAuth()
 	if err != nil {
 		return err
@@ -351,27 +313,31 @@ func (conn *Connection) Open() error {
 	}
 	tracer.Print("Connected")
 	tracer.Print("Database Version: ", conn.dBVersion.Text)
-	sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)
-	if err != nil {
-		return err
-	}
-	conn.sessionID = int(sessionID)
-	serialNum, err := strconv.ParseUint(conn.SessionProperties["AUTH_SERIAL_NUM"], 10, 32)
-	if err != nil {
-		return err
-	}
-	conn.serialID = int(serialNum)
-	conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
-	conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
-	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
-	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
-	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
-	if len(conn.NLSData.Language) == 0 {
-		_, err = conn.GetNLS()
+	if len(conn.SessionProperties) == 0 {
+		//return errors.New(fmt.Sprint("Session properties is null"))
+	} else {
+		sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)
 		if err != nil {
 			return err
 		}
+		conn.sessionID = int(sessionID)
+		serialNum, err := strconv.ParseUint(conn.SessionProperties["AUTH_SERIAL_NUM"], 10, 32)
+		if err != nil {
+			return err
+		}
+		conn.serialID = int(serialNum)
+		conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
+		conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
+		conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
+		conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
+		conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
 	}
+
+	_, err = conn.GetNLS()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -466,8 +432,7 @@ func (conn *Connection) doAuth() error {
 	conn.LogonMode = conn.LogonMode | NoNewPass
 	conn.session.PutUint(int(conn.LogonMode), 4, true, true)
 	conn.session.PutBytes(1, 1, 5, 1, 1)
-	conn.session.PutString(conn.conStr.UserID)
-	//conn.session.PutBytes([]byte()...)
+	conn.session.PutBytes([]byte(conn.conStr.UserID)...)
 	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientData.HostName, 0)
 	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientData.ProgramName, 0)
 	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientData.HostName, 0)
@@ -489,7 +454,7 @@ func (conn *Connection) doAuth() error {
 	}
 	stop := false
 	for !stop {
-		msg, err := conn.session.GetByte()
+		msg, err := conn.session.GetInt(1, false, false)
 		if err != nil {
 			return err
 		}
@@ -504,7 +469,7 @@ func (conn *Connection) doAuth() error {
 			}
 			stop = true
 		case 8:
-			dictLen, err := conn.session.GetInt(2, true, true)
+			dictLen, err := conn.session.GetInt(4, true, true)
 			if err != nil {
 				return err
 			}
@@ -524,22 +489,7 @@ func (conn *Connection) doAuth() error {
 			if warning != nil {
 				fmt.Println(warning)
 			}
-		case 23:
-			opCode, err := conn.session.GetByte()
-			if err != nil {
-				return err
-			}
-			if opCode == 5 {
-				err = conn.loadNLSData()
-				if err != nil {
-					return err
-				}
-			} else {
-				err = conn.getServerNetworkInformation(opCode)
-				if err != nil {
-					return err
-				}
-			}
+			stop = true
 		default:
 			return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", msg))
 		}
@@ -548,229 +498,4 @@ func (conn *Connection) doAuth() error {
 	// if verifyResponse == true
 	// conn.authObject.VerifyResponse(conn.SessionProperties["AUTH_SVR_RESPONSE"])
 	return nil
-}
-func (conn *Connection) loadNLSData() error {
-	_, err := conn.session.GetInt(2, true, true)
-	if err != nil {
-		return err
-	}
-	_, err = conn.session.GetByte()
-	if err != nil {
-		return err
-	}
-	length, err := conn.session.GetInt(4, true, true)
-	if err != nil {
-		return err
-	}
-	_, err = conn.session.GetByte()
-	if err != nil {
-		return err
-	}
-	for i := 0; i < length; i++ {
-		nlsKey, nlsVal, nlsCode, err := conn.session.GetKeyVal()
-		if err != nil {
-			return err
-		}
-		conn.NLSData.SaveNLSValue(string(nlsKey), string(nlsVal), nlsCode)
-	}
-	_, err = conn.session.GetInt(4, true, true)
-	return err
-}
-
-func (conn *Connection) getServerNetworkInformation(code uint8) error {
-	session := conn.session
-	if code == 0 {
-		_, err := session.GetByte()
-		return err
-	}
-	switch code - 1 {
-	case 1:
-		// receive OCOSPID
-		length, err := session.GetInt(2, true, true)
-		if err != nil {
-			return err
-		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		_, err = session.GetBytes(length)
-		if err != nil {
-			return err
-		}
-	case 3:
-		// receive OCSESSRET session return values
-		_, err := session.GetInt(2, true, true)
-		if err != nil {
-			return err
-		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		length, err := session.GetInt(2, true, true)
-		if err != nil {
-			return err
-		}
-		// get nls data
-		for i := 0; i < length; i++ {
-			nlsKey, nlsVal, nlsCode, err := session.GetKeyVal()
-			if err != nil {
-				return err
-			}
-			conn.NLSData.SaveNLSValue(string(nlsKey), string(nlsVal), nlsCode)
-		}
-		flag, err := session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		sessionID, err := session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		serialID, err := session.GetInt(2, true, true)
-		if err != nil {
-			return err
-		}
-		if flag&4 == 4 {
-			conn.sessionID = sessionID
-			conn.serialID = serialID
-			// save session id and serial number to connection
-		}
-	case 4:
-		err := conn.loadNLSData()
-		if err != nil {
-			return err
-		}
-	case 6:
-		length, err := session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		conn.transactionID, err = session.GetClr()
-		if len(conn.transactionID) > length {
-			conn.transactionID = conn.transactionID[:length]
-		}
-	case 7:
-		_, err := session.GetInt(2, true, true)
-		if err != nil {
-			return err
-		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		_, err = session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		_, err = session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		_, err = session.GetDlc()
-		if err != nil {
-			return err
-		}
-	case 8:
-		_, err := session.GetInt(2, true, true)
-		if err != nil {
-			return err
-		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (nls *NLSData) SaveNLSValue(key, value string, code int) {
-	key = strings.ToUpper(key)
-	if len(key) > 0 {
-		switch key {
-		case "AUTH_NLS_LXCCURRENCY":
-			code = 0
-		case "AUTH_NLS_LXCISOCURR":
-			code = 1
-		case "AUTH_NLS_LXCNUMERICS":
-			code = 2
-		case "AUTH_NLS_LXCDATEFM":
-			code = 7
-		case "AUTH_NLS_LXCDATELANG":
-			code = 8
-		case "AUTH_NLS_LXCTERRITORY":
-			code = 9
-		case "SESSION_NLS_LXCCHARSET":
-			code = 10
-		case "AUTH_NLS_LXCSORT":
-			code = 11
-		case "AUTH_NLS_LXCCALENDAR":
-			code = 12
-		case "AUTH_NLS_LXLAN":
-			code = 16
-		case "AL8KW_NLSCOMP":
-			code = 50
-		case "AUTH_NLS_LXCUNIONCUR":
-			code = 52
-		case "AUTH_NLS_LXCTIMEFM":
-			code = 57
-		case "AUTH_NLS_LXCSTMPFM":
-			code = 58
-		case "AUTH_NLS_LXCTTZNFM":
-			code = 59
-		case "AUTH_NLS_LXCSTZNFM":
-			code = 60
-		case "SESSION_NLS_LXCNLSLENSEM":
-			code = 61
-		case "SESSION_NLS_LXCNCHAREXCP":
-			code = 62
-		case "SESSION_NLS_LXCNCHARIMP":
-			code = 63
-		}
-	}
-	switch code {
-	case 0:
-		nls.Currency = value
-	case 1:
-		nls.IsoCurrency = value
-	case 2:
-		nls.NumericChars = value
-	case 7:
-		nls.DateFormat = value
-	case 8:
-		nls.DateLang = value
-	case 9:
-		nls.Territory = value
-	case 10:
-		nls.Charset = value
-	case 11:
-		nls.Sort = value
-	case 12:
-		nls.Calender = value
-	case 16:
-		nls.Language = value
-	case 50:
-		nls.Comp = value
-	case 52:
-		nls.UnionCurrency = value
-	case 57:
-		nls.TimeFormat = value
-	case 58:
-		nls.Timestamp = value
-	case 59:
-		nls.TTimezoneFormat = value
-	case 60:
-		nls.NTimezoneFormat = value
-	case 61:
-		nls.LengthSemantics = value
-	case 62:
-		nls.NCharConvExcep = value
-	case 63:
-		nls.NCharConvImp = value
-	}
 }

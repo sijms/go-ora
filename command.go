@@ -52,7 +52,7 @@ type defaultStmt struct {
 	queryID            uint64
 	Pars               []ParameterInfo
 	columns            []ParameterInfo
-	scnForSnapshot     []int
+	scnFromExe         []int
 	arrayBindCount     int
 }
 
@@ -95,26 +95,14 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutUint(0, 4, true, true)
 		session.PutUint(0, 4, true, true)
 	}
-	//switch (longFetchSize)
-	//{
-	//case -1:
-	//	this.m_marshallingEngine.MarshalUB4((long) int.MaxValue);
-	//	break;
-	//case 0:
-	//	this.m_marshallingEngine.MarshalUB4(1L);
-	//	break;
-	//default:
-	//	this.m_marshallingEngine.MarshalUB4((long) longFetchSize);
-	//	break;
-	//}
-	// we use here int.MaxValue
+	// add fetch size = max(int32)
 	session.PutUint(0x7FFFFFFF, 4, true, true)
-	//session.PutInt(1, 4, true, true)
 	if len(stmt.Pars) > 0 {
 		session.PutBytes(1)
 		session.PutUint(len(stmt.Pars), 2, true, true)
 	} else {
 		session.PutBytes(0, 0)
+
 	}
 	session.PutBytes(0, 0, 0, 0, 0)
 	if define {
@@ -129,23 +117,8 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	if session.TTCVersion >= 5 {
 		session.PutBytes(0, 0, 0, 0, 0)
 	}
-	if session.TTCVersion >= 7 {
-		if stmt.stmtType == DML && stmt.arrayBindCount > 0 {
-			session.PutBytes(1)
-			session.PutInt(stmt.arrayBindCount, 4, true, true)
-			session.PutBytes(1)
-		} else {
-			session.PutBytes(0, 0, 0)
-		}
-	}
-	if session.TTCVersion >= 8 {
-		session.PutBytes(0, 0, 0, 0, 0)
-	}
-	if session.TTCVersion >= 9 {
-		session.PutBytes(0, 0)
-	}
 	if parse {
-		session.PutString(string(stmt.connection.strConv.Encode(stmt.text)))
+		session.PutBytes(stmt.connection.strConv.Encode(stmt.text)...)
 	}
 	if define {
 		session.PutBytes(0)
@@ -170,23 +143,19 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		case DML:
 			fallthrough
 		case PLSQL:
-			if stmt.arrayBindCount > 0 {
-				al8i4[1] = stmt.arrayBindCount
-				if stmt.stmtType == DML {
-					al8i4[9] = 0x4000
-				}
-			} else {
+			if stmt.arrayBindCount <= 1 {
 				al8i4[1] = 1
+			} else {
+				al8i4[1] = stmt.arrayBindCount
 			}
 		case OTHERS:
 			al8i4[1] = 1
 		default:
-			//this.m_al8i4[1] = !fetch ? 0L : noOfRowsToFetch;
 			al8i4[1] = stmt._noOfRowsToFetch
 		}
-		if len(stmt.scnForSnapshot) == 2 {
-			al8i4[5] = stmt.scnForSnapshot[0]
-			al8i4[6] = stmt.scnForSnapshot[1]
+		if len(stmt.scnFromExe) == 2 {
+			al8i4[5] = stmt.scnFromExe[0]
+			al8i4[6] = stmt.scnFromExe[1]
 		} else {
 			al8i4[5] = 0
 			al8i4[6] = 0
@@ -195,11 +164,6 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 			al8i4[7] = 1
 		} else {
 			al8i4[7] = 0
-		}
-		if exeOp&32 != 0 {
-			al8i4[9] |= 0x8000
-		} else {
-			al8i4[9] &= -0x8000
 		}
 		for x := 0; x < len(al8i4); x++ {
 			session.PutUint(al8i4[x], 4, true, true)
@@ -251,15 +215,15 @@ func NewStmt(text string, conn *Connection) *Stmt {
 		//parse:              true,
 		//execute:            true,
 		//define:             false,
-		//scnForSnapshot:         make([]int, 2),
+		//scnFromExe:         make([]int, 2),
 	}
 	ret.connection = conn
 	ret.text = text
 	ret._hasBLOB = false
 	ret._hasLONG = false
 	ret.disableCompression = true
-	ret.arrayBindCount = 0
-	ret.scnForSnapshot = make([]int, 2)
+	ret.arrayBindCount = 1
+	ret.scnFromExe = make([]int, 2)
 	// get stmt type
 	uCmdText := strings.TrimSpace(strings.ToUpper(text))
 	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
@@ -284,13 +248,10 @@ func NewStmt(text string, conn *Connection) *Stmt {
 }
 
 func (stmt *Stmt) write(session *network.Session) error {
-	if !stmt.parse && !stmt.reSendParDef {
+	if !stmt.parse && stmt.stmtType == DML && !stmt.reSendParDef {
 		exeOf := 0
 		execFlag := 0
-		count := 1
-		if stmt.arrayBindCount > 0 {
-			count = stmt.arrayBindCount
-		}
+		count := stmt.arrayBindCount
 		if stmt.stmtType == SELECT {
 			session.PutBytes(3, 0x4E, 0)
 			count = stmt._noOfRowsToFetch
@@ -394,24 +355,23 @@ func (stmt *Stmt) write(session *network.Session) error {
 	//}
 
 	if len(stmt.Pars) > 0 {
-		session.PutBytes(7)
-		for _, par := range stmt.Pars {
-			if par.DataType != RAW {
-				if par.DataType == REFCURSOR {
-					session.PutBytes(1, 0)
-				} else {
+		for x := 0; x < stmt.arrayBindCount; x++ {
+			session.PutBytes(7)
+			for _, par := range stmt.Pars {
+				if par.DataType != RAW {
+					if par.DataType == REFCURSOR {
+						session.PutBytes(1, 0)
+					} else {
+						session.PutClr(par.BValue)
+					}
+				}
+			}
+			for _, par := range stmt.Pars {
+				if par.DataType == RAW {
 					session.PutClr(par.BValue)
 				}
 			}
 		}
-		for _, par := range stmt.Pars {
-			if par.DataType == RAW {
-				session.PutClr(par.BValue)
-			}
-		}
-		//for x := 0; x < stmt.arrayBindCount; x++ {
-		//
-		//}
 		//session.PutUint(7, 1, false, false)
 		//for _, par := range stmt.Pars {
 		//	session.PutClr(par.BValue)
@@ -781,7 +741,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				return err
 			}
 			for x := 0; x < 2; x++ {
-				stmt.scnForSnapshot[x], err = session.GetInt(4, true, true)
+				stmt.scnFromExe[x], err = session.GetInt(4, true, true)
 				if err != nil {
 					return err
 				}
@@ -793,15 +753,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				}
 			}
 			_, err = session.GetInt(2, true, true)
-			if err != nil {
-				return err
-			}
-			//if num > 0 {
-			//	_, err = session.GetBytes(num)
-			//	if err != nil {
-			//		return err
-			//	}
-			//}
 			//fmt.Println(num)
 			//if (num > 0)
 			//	this.m_marshallingEngine.UnmarshalNBytes_ScanOnly(num);
@@ -835,20 +786,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					}
 				}
 			}
-			if session.TTCVersion >= 7 && stmt.stmtType == DML && stmt.arrayBindCount > 0 {
-				length, err := session.GetInt(4, true, true)
-				if err != nil {
-					return err
-				}
-				//for (int index = 0; index < length3; ++index)
-				//	rowsAffectedByArrayBind[index] = this.m_marshallingEngine.UnmarshalSB8();
-				for i := 0; i < length; i++ {
-					_, err = session.GetInt(8, true, true)
-					if err != nil {
-						return err
-					}
-				}
-			}
+
 		case 11:
 			err = dataSet.load(session)
 			if err != nil {
@@ -935,17 +873,9 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				}
 			}
 			dataSet.setBitVector(bitVector)
-		case 23:
-			opCode, err := session.GetByte()
-			if err != nil {
-				return err
-			}
-			err = stmt.connection.getServerNetworkInformation(opCode)
-			if err != nil {
-				return err
-			}
+
 		default:
-			return errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
+			loop = false
 		}
 	}
 	if stmt.connection.connOption.Tracer.IsOn() {
@@ -961,7 +891,7 @@ func (stmt *defaultStmt) Close() error {
 		session.PutBytes(17, 105, 0, 1, 1, 1)
 		session.PutInt(stmt.cursorID, 4, true, true)
 		return (&simpleObject{
-			connection:  stmt.connection,
+			session:     session,
 			operationID: 0x93,
 			data:        nil,
 			err:         nil,
@@ -1012,7 +942,7 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 		Name:        name,
 		Direction:   direction,
 		Flag:        3,
-		CharsetID:   stmt.connection.tcpNego.ServernCharset,
+		CharsetID:   871,
 		CharsetForm: 1,
 	}
 	if val == nil {
@@ -1054,16 +984,13 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 		case string:
 			param.DataType = NCHAR
 			param.ContFlag = 16
-			param.MaxCharLen = len([]rune(val))
-			param.CharsetForm = 2
+			param.MaxCharLen = len(val)
+			param.CharsetForm = 1
 			if val == "" && direction == Input {
 				param.BValue = nil
 				param.MaxLen = 1
 			} else {
-				tempCharset := stmt.connection.strConv.GetLangID()
-				stmt.connection.strConv.SetLangID(param.CharsetID)
 				param.BValue = stmt.connection.strConv.Encode(val)
-				stmt.connection.strConv.SetLangID(tempCharset)
 				if size > len(val) {
 					param.MaxCharLen = size
 				}
@@ -1093,7 +1020,7 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 	stmt.Pars = append(stmt.Pars, *stmt.NewParam(name, val, size, direction))
 
 }
-func (stmt *Stmt) AddRefCursorParam(name string) {
+func (stmt *Stmt) AddRefCursorParam(_ string) {
 	par := stmt.NewParam("1", nil, 0, Output)
 	par.DataType = REFCURSOR
 	par.ContFlag = 0
@@ -1227,54 +1154,3 @@ execute = true
 fetch = true if hasReturn or PLSQL
 define = false
 */
-
-//func ReadFromExternalBuffer(buffer []byte) error {
-//	connOption := &network.ConnectionOption{
-//		Port:                  0,
-//		TransportConnectTo:    0,
-//		SSLVersion:            "",
-//		WalletDict:            "",
-//		TransportDataUnitSize: 0,
-//		SessionDataUnitSize:   0,
-//		Protocol:              "",
-//		Host:                  "",
-//		UserID:                "",
-//		SID:                   "",
-//		ServiceName:           "",
-//		InstanceName:          "",
-//		DomainName:            "",
-//		DBName:                "",
-//		ClientData:            network.ClientData{},
-//		Tracer:                trace.NilTracer(),
-//		SNOConfig:             nil,
-//	}
-//	conn := &Connection {
-//		State:             Opened,
-//		LogonMode:         0,
-//		SessionProperties: nil,
-//		connOption: connOption,
-//	}
-//	conn.session = &network.Session{
-//		Context:         nil,
-//		Summary:         nil,
-//		UseBigClrChunks: true,
-//		ClrChunkSize:    0x40,
-//	}
-//	conn.strConv = converters.NewStringConverter(871)
-//	conn.session.StrConv = conn.strConv
-//	conn.session.FillInBuffer(buffer)
-//	conn.session.TTCVersion = 11
-//	stmt := &Stmt{
-//		defaultStmt:  defaultStmt{
-//			connection: conn,
-//			scnForSnapshot: make([]int, 2),
-//		},
-//		reSendParDef: false,
-//		parse:        true,
-//		execute:      true,
-//		define:       false,
-//	}
-//	dataSet := new(DataSet)
-//	err := stmt.read(dataSet)
-//	return err
-//}

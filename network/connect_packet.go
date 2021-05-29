@@ -17,22 +17,11 @@ func (pck *ConnectPacket) bytes() []byte {
 	binary.BigEndian.PutUint16(output[8:], pck.sessionCtx.Version)
 	binary.BigEndian.PutUint16(output[10:], pck.sessionCtx.LoVersion)
 	binary.BigEndian.PutUint16(output[12:], pck.sessionCtx.Options)
-	num := uint16(pck.sessionCtx.SessionDataUnit)
-	if pck.sessionCtx.SessionDataUnit > 0xFFFF {
-		num = 0xFFFF
-	}
-	binary.BigEndian.PutUint16(output[14:], num)
-	binary.BigEndian.PutUint32(output[58:], pck.sessionCtx.SessionDataUnit)
-	num = uint16(pck.sessionCtx.TransportDataUnit)
-	if pck.sessionCtx.TransportDataUnit > 0xFFFF {
-		num = 0xFFFF
-	}
-	binary.BigEndian.PutUint16(output[16:], num)
-	binary.BigEndian.PutUint32(output[62:], pck.sessionCtx.TransportDataUnit)
-	binary.BigEndian.PutUint32(output[66:], 0)
+	binary.BigEndian.PutUint16(output[14:], pck.sessionCtx.SessionDataUnit)
+	binary.BigEndian.PutUint16(output[16:], pck.sessionCtx.TransportDataUnit)
 	output[18] = 79
 	output[19] = 152
-	binary.BigEndian.PutUint16(output[22:], pck.sessionCtx.OurOne)
+	binary.BigEndian.PutUint16(output[22:], pck.sessionCtx.Histone)
 	binary.BigEndian.PutUint16(output[24:], uint16(len(pck.buffer)))
 	binary.BigEndian.PutUint16(output[26:], pck.packet.dataOffset)
 	output[32] = pck.sessionCtx.ACFL0
@@ -47,23 +36,21 @@ func (pck *ConnectPacket) getPacketType() PacketType {
 	return pck.packet.packetType
 }
 func newConnectPacket(sessionCtx SessionContext) *ConnectPacket {
-	connectData := sessionCtx.ConnOption.ConnectionData()
-	length := uint32(len(connectData))
+	connectData := sessionCtx.connOption.ConnectionData()
+	length := uint16(len(connectData))
 	if length > 230 {
 		length = 0
 	}
-	length += 70
+	length += 58
 
 	sessionCtx.Histone = 1
-	sessionCtx.ACFL0 = 1
-	sessionCtx.ACFL1 = 1
-	//sessionCtx.ACFL0 = 4
-	//sessionCtx.ACFL1 = 4
+	sessionCtx.ACFL0 = 4
+	sessionCtx.ACFL1 = 4
 
 	return &ConnectPacket{
 		sessionCtx: sessionCtx,
 		packet: Packet{
-			dataOffset: 70,
+			dataOffset: 58,
 			length:     length,
 			packetType: CONNECT,
 			flag:       0,

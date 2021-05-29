@@ -19,20 +19,16 @@ type DBVersion struct {
 
 func GetDBVersion(session *network.Session) (*DBVersion, error) {
 	session.ResetBuffer()
-	session.PutBytes(3, 0x3B, 0, 1)
-	//session.PutUint(1, 1, false, false)
+	session.PutBytes(3, 0x3B, 0)
+	session.PutUint(1, 1, false, false)
 	session.PutUint(0x100, 2, true, true)
-	session.PutBytes(1, 1)
-	//session.PutUint(1, 1, false, false)
-	//session.PutUint(1, 1, false, false)
-	if session.TTCVersion >= 11 {
-		session.PutUint(1, 4, true, true)
-	}
+	session.PutUint(1, 1, false, false)
+	session.PutUint(1, 1, false, false)
 	err := session.Write()
 	if err != nil {
 		return nil, err
 	}
-	msg, err := session.GetByte()
+	msg, err := session.GetInt(1, false, false)
 	if msg != 8 {
 		return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", msg))
 	}
@@ -40,7 +36,7 @@ func GetDBVersion(session *network.Session) (*DBVersion, error) {
 	if err != nil {
 		return nil, err
 	}
-	info, err := session.GetString(int(length))
+	info, err := session.GetBytes(int(length))
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +49,7 @@ func GetDBVersion(session *network.Session) (*DBVersion, error) {
 		number>>12&0xF, number>>8&0xF, number&0xFF)
 
 	ret := &DBVersion{
-		Info:            info,
+		Info:            string(info),
 		Text:            text,
 		Number:          uint16(version),
 		MajorVersion:    int(number >> 24 & 0xFF),

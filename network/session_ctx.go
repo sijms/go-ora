@@ -11,7 +11,7 @@ package network
 
 type SessionContext struct {
 	//conn net.Conn
-	ConnOption ConnectionOption
+	connOption ConnectionOption
 	//PortNo int
 	//InstanceName string
 	//HostName string
@@ -32,13 +32,12 @@ type SessionContext struct {
 	OurOne            uint16
 	Histone           uint16
 	ReconAddr         string
-	handshakeComplete bool
 	//internal Ano m_ano;
 	//internal bool m_bAnoEnabled;
 	ACFL0               uint8
 	ACFL1               uint8
-	SessionDataUnit     uint32
-	TransportDataUnit   uint32
+	SessionDataUnit     uint16
+	TransportDataUnit   uint16
 	UsingAsyncReceivers bool
 	IsNTConnected       bool
 	OnBreakReset        bool
@@ -49,10 +48,10 @@ func NewSessionContext(connOption ConnectionOption) *SessionContext {
 	return &SessionContext{
 		SessionDataUnit:   connOption.SessionDataUnitSize,
 		TransportDataUnit: connOption.TransportDataUnitSize,
-		Version:           317,
+		Version:           312,
 		LoVersion:         300,
-		Options:           1 | 1024 | 2048, /*1024 for urgent data transport*/
+		Options:           1 | 1024 | 2048,
 		OurOne:            1,
-		ConnOption:        connOption,
+		connOption:        connOption,
 	}
 }

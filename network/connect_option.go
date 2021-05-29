@@ -19,8 +19,8 @@ type ConnectionOption struct {
 	TransportConnectTo    int
 	SSLVersion            string
 	WalletDict            string
-	TransportDataUnitSize uint32
-	SessionDataUnitSize   uint32
+	TransportDataUnitSize uint16
+	SessionDataUnitSize   uint16
 	Protocol              string
 	Host                  string
 	UserID                string
@@ -36,7 +36,6 @@ type ConnectionOption struct {
 	//InAddrAny bool
 	Tracer       trace.Tracer
 	connData     string
-	SNOConfig    map[string]string
 	PrefetchRows int
 }
 

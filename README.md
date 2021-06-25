@@ -1,7 +1,18 @@
 # go-ora
-## what's new:
+## Pure go oracle client
 ### note:
     to use version 2 you will need to import github.com/sijms/go-ora/v2
+### version 2.1.20
+* add new type **go_ora.NVarChar**
+now you can pass string parameter in 2 way: 
+#### 1- varchar string:
+```
+_, err := conn.Exec(inputSql, "7586")
+```
+#### 2- nvarchar string:
+```
+_, err := conn.Exec(inputSql, go_ora.NVarChar("7586"))
+```
 ### version 2.1.19
 * support more charsets (0x33D, 0x33E, 0x33F, 0x340, 0x352, 0x353, 0x354)
 ### version 2.0-beta
@@ -11,13 +22,6 @@
 * use advanced negotiation
 * use big clear chunks
 * use more verifier type in authentication object
-## Pure go oracle client
-important notes:
- * the client is tested against oracle 10G, 11G and 12G and working properly
- * supported parameter types is integer, double, string, time.Time and []byte
- * BLOB is now supported in SELECT and DML statement
- * named parameter not supported to define parameter just put ':' + parameter_name in sql statement
- * integration with sql/database is done using simple form
 
 # Usage:
 ## there are 2 way to use the client

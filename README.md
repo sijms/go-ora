@@ -176,8 +176,10 @@ Read packet:
 2020-11-22T07:51:42.9104:   BANNER              : NLSRTL Version 11.2.0.2.0 - Production
 2020-11-22T07:51:42.9114: 
 ```
-
-### RefCursor
+### PREFETCH_ROWS
+Default value is 25 increase this value to higher level will significantly
+speed up the query
+## RefCursor
 to use RefCursor follow these steps:
 * create the connection object and open
 * create NewStmt from connection
@@ -230,3 +232,5 @@ if cursor, ok := stmt.Pars[0].Value.(go_ora.RefCursor); ok {
 }
 
 ```
+
+

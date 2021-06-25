@@ -1,7 +1,8 @@
 # go-ora
 ## Pure go oracle client
 ### note:
-    to use version 2 you will need to import github.com/sijms/go-ora/v2
+    - Use version 2 you will need to import github.com/sijms/go-ora/v2
+    - V2 is more preferred for oracle servers 10.2 and above
 ### version 2.1.20
 * add new type **go_ora.NVarChar**
 now you can pass string parameter in 2 way:

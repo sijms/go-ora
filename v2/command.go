@@ -1007,12 +1007,17 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	}
 	return result, nil
 }
+
+func (stmt *Stmt) CheckNamedValue(named *driver.NamedValue) error {
+	return nil
+}
+
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) *ParameterInfo {
 	param := &ParameterInfo{
 		Name:        name,
 		Direction:   direction,
 		Flag:        3,
-		CharsetID:   stmt.connection.tcpNego.ServernCharset,
+		CharsetID:   stmt.connection.tcpNego.ServerCharset,
 		CharsetForm: 1,
 	}
 	if val == nil {
@@ -1051,11 +1056,33 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.ContFlag = 0
 			param.MaxLen = 11
 			param.MaxCharLen = 11
+		//case ParameterInfo:
+		//	fmt.Println("parameter info")
+
+		case NVarChar:
+			param.DataType = NCHAR
+			param.CharsetID = stmt.connection.tcpNego.ServernCharset
+			param.ContFlag = 16
+			param.MaxCharLen = len(val)
+			param.CharsetForm = 2
+			if len(val) == 0 && direction == Input {
+				param.BValue = nil
+				param.MaxLen = 1
+			} else {
+				tempCharset := stmt.connection.strConv.GetLangID()
+				stmt.connection.strConv.SetLangID(param.CharsetID)
+				param.BValue = stmt.connection.strConv.Encode(string(val))
+				stmt.connection.strConv.SetLangID(tempCharset)
+				if size > len(val) {
+					param.MaxCharLen = size
+				}
+				param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+			}
 		case string:
 			param.DataType = NCHAR
 			param.ContFlag = 16
 			param.MaxCharLen = len([]rune(val))
-			param.CharsetForm = 2
+			param.CharsetForm = 1
 			if val == "" && direction == Input {
 				param.BValue = nil
 				param.MaxLen = 1

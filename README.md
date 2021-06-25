@@ -4,15 +4,17 @@
     to use version 2 you will need to import github.com/sijms/go-ora/v2
 ### version 2.1.20
 * add new type **go_ora.NVarChar**
-now you can pass string parameter in 2 way: 
-#### 1- varchar string:
+now you can pass string parameter in 2 way:
+##### &nbsp; &nbsp; 1- varchar string:
+
 ```
-_, err := conn.Exec(inputSql, "7586")
+   _, err := conn.Exec(inputSql, "7586")
 ```
-#### 2- nvarchar string:
+##### &nbsp; &nbsp;2- nvarchar string:
 ```
 _, err := conn.Exec(inputSql, go_ora.NVarChar("7586"))
 ```
+
 ### version 2.1.19
 * support more charsets (0x33D, 0x33E, 0x33F, 0x340, 0x352, 0x353, 0x354)
 ### version 2.0-beta

@@ -12,9 +12,9 @@ type OracleType int
 type ParameterDirection int
 type NVarChar string
 
-func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
-	return driver.Value(string(*n)), nil
-}
+//func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
+//	return driver.Value(string(*n)), nil
+//}
 
 func (n *NVarChar) Value() (driver.Value, error) {
 	return driver.Value(string(*n)), nil

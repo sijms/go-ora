@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 )
 
 type DataPacket struct {
@@ -30,23 +31,33 @@ func (pck *DataPacket) bytes() []byte {
 	return output.Bytes()
 }
 
-func newDataPacket(initialData []byte, sessionCtx *SessionContext) *DataPacket {
+func newDataPacket(initialData []byte, sessionCtx *SessionContext) (*DataPacket, error) {
+	var outputData []byte = initialData
+	var err error
+	if sessionCtx.AdvancedService.CryptAlgo != nil {
+		outputData = make([]byte, len(initialData))
+		copy(outputData, initialData)
+		outputData, err = sessionCtx.AdvancedService.CryptAlgo.Encrypt(outputData)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &DataPacket{
 		Packet: Packet{
 			dataOffset: 0xA,
-			length:     uint32(len(initialData)) + 0xA,
+			length:     uint32(len(outputData)) + 0xA,
 			packetType: DATA,
 			flag:       0,
 		},
 		sessionCtx: sessionCtx,
 		dataFlag:   0,
-		buffer:     initialData,
-	}
+		buffer:     outputData,
+	}, nil
 }
 
-func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext) *DataPacket {
+func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext) (*DataPacket, error) {
 	if len(packetData) <= 0xA || PacketType(packetData[4]) != DATA {
-		return nil
+		return nil, errors.New("Not data packet")
 	}
 	pck := &DataPacket{
 		Packet: Packet{
@@ -64,7 +75,14 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext) *DataP
 	} else {
 		pck.length = uint32(binary.BigEndian.Uint16(packetData))
 	}
-	return pck
+	var err error
+	if sessionCtx.AdvancedService.CryptAlgo != nil {
+		pck.buffer, err = sessionCtx.AdvancedService.CryptAlgo.Decrypt(pck.buffer)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return pck, nil
 }
 
 //func (pck *DataPacket) Data() []byte {

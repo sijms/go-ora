@@ -1,8 +1,10 @@
 package network
 
+import "github.com/sijms/go-ora/v2/network/security"
+
 type SessionContext struct {
 	//conn net.Conn
-	ConnOption ConnectionOption
+	ConnOption *ConnectionOption
 	//PortNo int
 	//InstanceName string
 	//HostName string
@@ -27,9 +29,15 @@ type SessionContext struct {
 	IsNTConnected       bool
 	OnBreakReset        bool
 	GotReset            bool
+	AdvancedService     struct {
+		CryptAlgo  security.OracleNetworkEncryption
+		HashAlgo   security.OracleNetworkDataEntegrity
+		SessionKey []byte
+		IV         []byte
+	}
 }
 
-func NewSessionContext(connOption ConnectionOption) *SessionContext {
+func NewSessionContext(connOption *ConnectionOption) *SessionContext {
 	return &SessionContext{
 		SessionDataUnit:   connOption.SessionDataUnitSize,
 		TransportDataUnit: connOption.TransportDataUnitSize,

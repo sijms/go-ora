@@ -24,6 +24,7 @@ type sessionState struct {
 	outBuffer []byte
 	index     int
 }
+
 type Session struct {
 	conn              net.Conn
 	connOption        ConnectionOption
@@ -46,12 +47,12 @@ type Session struct {
 	ClrChunkSize      int
 }
 
-func NewSession(connOption ConnectionOption) *Session {
+func NewSession(connOption *ConnectionOption) *Session {
 	return &Session{
 		conn:            nil,
 		inBuffer:        nil,
 		index:           0,
-		connOption:      connOption,
+		connOption:      *connOption,
 		Context:         NewSessionContext(connOption),
 		Summary:         nil,
 		UseBigClrChunks: false,
@@ -210,26 +211,61 @@ func (session *Session) DumpOut() {
 
 func (session *Session) Write() error {
 	outputBytes := session.outBuffer.Bytes()
+	//if session.AdvancedService.CryptAlgo > 0 {
+	//	switch session.AdvancedService.CryptAlgo {
+	//	case 17:
+	//		blk, err := aes.NewCipher(session.AdvancedService.SessionKey[:32])
+	//		if err != nil {
+	//			return err
+	//		}
+	//		enc := cipher.NewCBCEncrypter(blk, make([]byte, 16))
+	//		remainingLen := 0
+	//		if len(outputBytes) % 16 > 0 {
+	//			remainingLen = 16 - (len(outputBytes) % 16)
+	//		}
+	//		if remainingLen > 0 {
+	//			outputBytes = append(outputBytes, make([]byte, remainingLen)...)
+	//		}
+	//
+	//		outputBytesEnc := make([]byte, len(outputBytes))
+	//		enc.CryptBlocks(outputBytesEnc, outputBytes)
+	//		foldinKey := uint8(0)
+	//		outputBytes = append(outputBytesEnc, uint8(remainingLen + 1), foldinKey)
+	//	}
+	//}
 	size := session.outBuffer.Len()
 	if size == 0 {
 		// send empty data packet
-		return session.writePacket(newDataPacket(nil, session.Context))
+		pck, err := newDataPacket(nil, session.Context)
+		if err != nil {
+			return err
+		}
+		return session.writePacket(pck)
 		//return errors.New("the output buffer is empty")
 	}
-	segment := int(session.Context.SessionDataUnit - 20)
+
+	segmentLen := int(session.Context.SessionDataUnit - 20)
 	offset := 0
 
-	for size > segment {
-		err := session.writePacket(newDataPacket(outputBytes[offset:offset+segment], session.Context))
+	for size > segmentLen {
+		pck, err := newDataPacket(outputBytes[offset:offset+segmentLen], session.Context)
+		if err != nil {
+			return err
+		}
+		err = session.writePacket(pck)
 		if err != nil {
 			session.outBuffer.Reset()
 			return err
 		}
-		size -= segment
-		offset += segment
+		size -= segmentLen
+		offset += segmentLen
 	}
 	if size != 0 {
-		err := session.writePacket(newDataPacket(outputBytes[offset:], session.Context))
+		pck, err := newDataPacket(outputBytes[offset:], session.Context)
+		if err != nil {
+			return err
+		}
+		err = session.writePacket(pck)
 		if err != nil {
 			session.outBuffer.Reset()
 			return err
@@ -346,7 +382,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	//log.Printf("Response: %#v\n\n", packetData)
 	switch pckType {
 	case ACCEPT:
-		return newAcceptPacketFromData(packetData), nil
+		return newAcceptPacketFromData(packetData, session.Context.ConnOption), nil
 	case REFUSE:
 		return newRefusePacketFromData(packetData), nil
 	case REDIRECT:
@@ -355,7 +391,10 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		var data string
 		if uint16(pck.packet.length) <= pck.packet.dataOffset {
 			packetData, err = readPacketData(session.conn)
-			dataPck := newDataPacketFromData(packetData, session.Context)
+			dataPck, err := newDataPacketFromData(packetData, session.Context)
+			if err != nil {
+				return nil, err
+			}
 			data = string(dataPck.buffer)
 		} else {
 			data = string(packetData[10 : 10+dataLen])
@@ -378,7 +417,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		// connect through redirectConnectData
 		return pck, nil
 	case DATA:
-		return newDataPacketFromData(packetData, session.Context), nil
+		return newDataPacketFromData(packetData, session.Context)
 	case MARKER:
 		pck := newMarkerPacketFromData(packetData, session.Context)
 		breakConnection := false
@@ -431,7 +470,10 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		if err != nil {
 			return nil, err
 		}
-		dataPck := newDataPacketFromData(packetData, session.Context)
+		dataPck, err := newDataPacketFromData(packetData, session.Context)
+		if err != nil {
+			return nil, err
+		}
 		if dataPck == nil {
 			return nil, errors.New("connection break")
 		}

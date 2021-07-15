@@ -2,7 +2,6 @@ package advanced_nego
 
 import (
 	"errors"
-	"github.com/sijms/go-ora/v2/network"
 	"runtime"
 )
 
@@ -13,9 +12,10 @@ type authService struct {
 	active      bool
 }
 
-func NewAuthService(connOption *network.ConnectionOption) (*authService, error) {
+func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
 	output := &authService{
 		defaultService: defaultService{
+			comm:        comm,
 			serviceType: 1,
 			level:       -1,
 			version:     0xB200200,
@@ -31,6 +31,7 @@ func NewAuthService(connOption *network.ConnectionOption) (*authService, error) 
 		output.availableServiceIDs = []int{2}
 	}
 	str := ""
+	connOption := comm.session.Context.ConnOption
 	if connOption != nil {
 		snConfig := connOption.SNOConfig
 		if snConfig != nil {
@@ -56,83 +57,50 @@ func NewAuthService(connOption *network.ConnectionOption) (*authService, error) 
 	return output*/
 }
 
-func (serv *authService) writeServiceData(session *network.Session) error {
-	serv.writeHeader(session, 3+(len(serv.selectedIndices)*2))
-	err := serv.writeVersion(session)
-	if err != nil {
-		return err
-	}
-	err = serv.writePacketHeader(session, 2, 3)
-	if err != nil {
-		return err
-	}
-	session.PutInt(0xE0E1, 2, true, false)
-	err = serv.writePacketHeader(session, 2, 6)
-	if err != nil {
-		return err
-	}
-	session.PutInt(serv.status, 2, true, false)
+func (serv *authService) writeServiceData() error {
+	serv.writeHeader(3 + (len(serv.selectedIndices) * 2))
+	comm := serv.comm
+	comm.writeVersion(serv.getVersion())
+	comm.writeUB2(0xE0E1)
+	comm.writeStatus(serv.status)
 	for i := 0; i < len(serv.selectedIndices); i++ {
 		index := serv.selectedIndices[i]
-		session.PutBytes(uint8(serv.availableServiceIDs[index]))
-		session.PutBytes([]byte(serv.availableServiceNames[index])...)
+		comm.writeUB1(uint8(serv.availableServiceIDs[index]))
+		comm.writeString(serv.availableServiceNames[index])
 	}
 	return nil
 }
 
-func (serv *authService) readServiceData(session *network.Session, subPacketNum int) error {
+func (serv *authService) readServiceData(subPacketNum int) error {
 	// read version
 	var err error
-	serv.version, err = serv.readVersion(session)
+	comm := serv.comm
+	serv.version, err = comm.readVersion()
 	if err != nil {
 		return err
 	}
 	// read status
-	_, err = serv.readPacketHeader(session, 6)
-	if err != nil {
-		return err
-	}
-	status, err := session.GetInt(2, false, true)
+	status, err := comm.readStatus()
 	if err != nil {
 		return err
 	}
 	if status == 0xFAFF && subPacketNum > 2 {
 		// get 1 byte with header
-		_, err = serv.readPacketHeader(session, 2)
+		_, err = comm.readUB1()
+		serv.serviceName, err = comm.readString()
 		if err != nil {
 			return err
 		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		stringLen, err := serv.readPacketHeader(session, 0)
-		if err != nil {
-			return err
-		}
-		serviceNameBytes, err := session.GetBytes(stringLen)
-		if err != nil {
-			return err
-		}
-		serv.serviceName = string(serviceNameBytes)
 		if subPacketNum > 4 {
-			_, err = serv.readVersion(session)
+			_, err = comm.readVersion()
 			if err != nil {
 				return err
 			}
-			_, err = serv.readPacketHeader(session, 4)
+			_, err = comm.readUB4()
 			if err != nil {
 				return err
 			}
-			_, err = session.GetInt(4, false, true)
-			if err != nil {
-				return err
-			}
-			_, err = serv.readPacketHeader(session, 4)
-			if err != nil {
-				return err
-			}
-			_, err = session.GetInt(4, false, true)
+			_, err = comm.readUB4()
 			if err != nil {
 				return err
 			}

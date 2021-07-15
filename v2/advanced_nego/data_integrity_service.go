@@ -1,19 +1,24 @@
 package advanced_nego
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/network"
+	"math/big"
 )
 
 type dataIntegrityService struct {
 	defaultService
-	algoID int
+	algoID    int
+	publicKey []byte
+	sharedKey []byte
+	iV        []byte
 }
 
-func NewDataIntegrityService(connOption *network.ConnectionOption) (*dataIntegrityService, error) {
+func NewDataIntegrityService(comm *AdvancedNegoComm) (*dataIntegrityService, error) {
 	output := &dataIntegrityService{
 		defaultService: defaultService{
+			comm:                  comm,
 			serviceType:           3,
 			version:               0xB200200,
 			availableServiceNames: []string{"", "MD5", "SHA1", "SHA512", "SHA256", "SHA384"},
@@ -22,6 +27,7 @@ func NewDataIntegrityService(connOption *network.ConnectionOption) (*dataIntegri
 	}
 	str := ""
 	level := ""
+	connOption := comm.session.Context.ConnOption
 	if connOption != nil {
 		snConfig := connOption.SNOConfig
 		if snConfig != nil {
@@ -46,17 +52,14 @@ func NewDataIntegrityService(connOption *network.ConnectionOption) (*dataIntegri
 	return output, nil
 }
 
-func (serv *dataIntegrityService) readServiceData(session *network.Session, subPacketNum int) error {
+func (serv *dataIntegrityService) readServiceData(subPacketNum int) error {
 	var err error
-	serv.version, err = serv.readVersion(session)
+	comm := serv.comm
+	serv.version, err = comm.readVersion()
 	if err != nil {
 		return err
 	}
-	_, err = serv.readPacketHeader(session, 2)
-	if err != nil {
-		return err
-	}
-	resp, err := session.GetByte()
+	resp, err := comm.readUB1()
 	if err != nil {
 		return err
 	}
@@ -64,53 +67,73 @@ func (serv *dataIntegrityService) readServiceData(session *network.Session, subP
 	if subPacketNum != 8 {
 		return nil
 	}
-	return errors.New("diffie hellman key exchange still under development")
-	//dhGroupGLen, err := session.GetInt(2, false, true)
-	//if err != nil {
-	//	return err
-	//}
-	//dhGroupPLen, err := session.GetInt(2, false, true)
-	//if err != nil {
-	//	return err
-	//}
-	//raw1, err := serv.readBytes(session)
-	//if err != nil {
-	//	return err
-	//}
-	//raw2, err := serv.readBytes(session)
-	//if err != nil {
-	//	return err
-	//}
-	//raw3, err := serv.readBytes(session)
-	//if err != nil {
-	//	return err
-	//}
-	//raw4, err := serv.readBytes(session)
-	//if err != nil {
-	//	return err
-	//}
-	//if dhGroupGLen <= 0 || dhGroupPLen <= 0 {
-	//	return errors.New("advanced negotiation error: bad parameter from server")
-	//}
-	//byteLen := (dhGroupPLen + 7) / 8
-	//if len(raw3) != byteLen || len(raw2) != byteLen {
-	//	return errors.New("advanced negotiation error: DiffieHellman negotiation out of sync")
-	//}
+	dhGenLen, err := comm.readUB2()
+	if err != nil {
+		return err
+	}
+	dhPrimLen, err := comm.readUB2()
+	if err != nil {
+		return err
+	}
+	genBytes, err := comm.readBytes()
+	if err != nil {
+		return err
+	}
+	primeBytes, err := comm.readBytes()
+	if err != nil {
+		return err
+	}
+	serverPublicKeyBytes, err := comm.readBytes()
+	if err != nil {
+		return err
+	}
+	serv.iV, err = comm.readBytes()
+	if err != nil {
+		return err
+	}
+	if dhGenLen <= 0 || dhPrimLen <= 0 {
+		return errors.New("advanced negotiation error: bad parameter from server")
+	}
+	byteLen := (dhGenLen + 7) / 8 // this means  if dhGroupPLen % 8 > 0 then byteLen += 1
+	if len(serverPublicKeyBytes) != byteLen || len(primeBytes) != byteLen {
+		return errors.New("advanced negotiation error: DiffieHellman negotiation out of sync")
+	}
+	privateKeyBytes := make([]byte, byteLen)
+	_, err = rand.Read(privateKeyBytes)
+	if err != nil {
+		return errors.New("advanced negotiation error: DiffieHellman random private key")
+	}
+	gen := new(big.Int).SetBytes(genBytes)
+	prime := new(big.Int).SetBytes(primeBytes)
+	privateKey := new(big.Int).SetBytes(privateKeyBytes)
+	serverPublicKey := new(big.Int).SetBytes(serverPublicKeyBytes)
+	publicKey := new(big.Int).Exp(gen, privateKey, prime)
+	sharedKey := new(big.Int).Exp(serverPublicKey, privateKey, prime)
+	serv.publicKey = make([]byte, byteLen)
+	publicKey.FillBytes(serv.publicKey)
+	serv.sharedKey = make([]byte, byteLen)
+	sharedKey.FillBytes(serv.sharedKey)
+	tracer := comm.session.Context.ConnOption.Tracer
+	tracer.Print("Diffie Hellman Keys:")
+	tracer.LogPacket("Generator:", genBytes)
+	tracer.LogPacket("Prime:", primeBytes)
+	tracer.LogPacket("Private Key:", privateKeyBytes)
+	tracer.LogPacket("Public Key:", serv.publicKey)
+	tracer.LogPacket("Server Public Key:", serverPublicKeyBytes)
+	tracer.LogPacket("Shared Key:", serv.sharedKey)
+	return nil
 }
-func (serv *dataIntegrityService) writeServiceData(session *network.Session) error {
-	serv.writeHeader(session, 2)
-	err := serv.writeVersion(session)
-	if err != nil {
-		return err
-	}
-	err = serv.writePacketHeader(session, len(serv.selectedIndices), 1)
-	if err != nil {
-		return err
-	}
+func (serv *dataIntegrityService) writeServiceData() error {
+	serv.writeHeader(2)
+	comm := serv.comm
+	comm.writeVersion(serv.getVersion())
+	selectedIndices := make([]byte, len(serv.selectedIndices))
 	for i := 0; i < len(serv.selectedIndices); i++ {
 		index := serv.selectedIndices[i]
-		session.PutBytes(uint8(serv.availableServiceIDs[index]))
+		selectedIndices[i] = uint8(serv.availableServiceIDs[index])
+		//comm.session.PutBytes(uint8(serv.availableServiceIDs[index]))
 	}
+	comm.writeBytes(selectedIndices)
 	return nil
 }
 
@@ -119,6 +142,8 @@ func (serv *dataIntegrityService) getServiceDataLength() int {
 }
 
 func (serv *dataIntegrityService) activateAlgorithm() error {
+	serv.comm.session.Context.AdvancedService.SessionKey = serv.sharedKey
+	serv.comm.session.Context.AdvancedService.IV = serv.iV
 	if serv.algoID == 0 {
 		return nil
 	} else {

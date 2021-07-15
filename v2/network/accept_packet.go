@@ -65,7 +65,7 @@ func (pck *AcceptPacket) getPacketType() PacketType {
 //	return &pck
 //}
 
-func newAcceptPacketFromData(packetData []byte) *AcceptPacket {
+func newAcceptPacketFromData(packetData []byte, connOption *ConnectionOption) *AcceptPacket {
 	if len(packetData) < 32 {
 		return nil
 	}
@@ -83,7 +83,7 @@ func newAcceptPacketFromData(packetData []byte) *AcceptPacket {
 			flag:       packetData[5],
 		},
 		sessionCtx: SessionContext{
-			ConnOption:          ConnectionOption{},
+			ConnOption:          connOption,
 			SID:                 nil,
 			Version:             binary.BigEndian.Uint16(packetData[8:]),
 			LoVersion:           0,

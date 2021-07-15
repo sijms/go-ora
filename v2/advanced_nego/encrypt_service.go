@@ -3,7 +3,7 @@ package advanced_nego
 import (
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/network/security"
 )
 
 type encryptService struct {
@@ -11,9 +11,10 @@ type encryptService struct {
 	algoID int
 }
 
-func NewEncryptService(connOption *network.ConnectionOption) (*encryptService, error) {
+func NewEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
 	output := &encryptService{
 		defaultService: defaultService{
+			comm:        comm,
 			serviceType: 2,
 			version:     0xB200200,
 			availableServiceNames: []string{"", "RC4_40", "RC4_56", "RC4_128", "RC4_256",
@@ -23,6 +24,7 @@ func NewEncryptService(connOption *network.ConnectionOption) (*encryptService, e
 	}
 	str := ""
 	level := ""
+	connOption := comm.session.Context.ConnOption
 	if connOption != nil {
 		snConfig := connOption.SNOConfig
 		if snConfig != nil {
@@ -47,43 +49,33 @@ func NewEncryptService(connOption *network.ConnectionOption) (*encryptService, e
 	return output, nil
 }
 
-func (serv *encryptService) readServiceData(session *network.Session, subPacketnum int) error {
+func (serv *encryptService) readServiceData(subPacketnum int) error {
 	var err error
-	serv.version, err = serv.readVersion(session)
+	comm := serv.comm
+	serv.version, err = comm.readVersion()
 	if err != nil {
 		return err
 	}
-	_, err = serv.readPacketHeader(session, 2)
-	if err != nil {
-		return err
-	}
-	resp, err := session.GetByte()
+	resp, err := comm.readUB1()
 	if err != nil {
 		return err
 	}
 	serv.algoID = int(resp)
+
 	return nil
 }
-func (serv *encryptService) writeServiceData(session *network.Session) error {
-	serv.writeHeader(session, 3)
-	err := serv.writeVersion(session)
-	if err != nil {
-		return err
-	}
-	err = serv.writePacketHeader(session, len(serv.selectedIndices), 1)
-	if err != nil {
-		return err
-	}
+func (serv *encryptService) writeServiceData() error {
+	serv.writeHeader(3)
+	comm := serv.comm
+	comm.writeVersion(serv.getVersion())
+	selectedIndices := make([]byte, len(serv.selectedIndices))
 	for i := 0; i < len(serv.selectedIndices); i++ {
 		index := serv.selectedIndices[i]
-		session.PutBytes(uint8(serv.availableServiceIDs[index]))
+		selectedIndices[i] = uint8(serv.availableServiceIDs[index])
 	}
+	comm.writeBytes(selectedIndices)
 	// send selected driver
-	err = serv.writePacketHeader(session, 1, 2)
-	if err != nil {
-		return err
-	}
-	session.PutBytes(1)
+	comm.writeUB1(1)
 	return nil
 }
 
@@ -92,11 +84,33 @@ func (serv *encryptService) getServiceDataLength() int {
 }
 
 func (serv *encryptService) activateAlgorithm() error {
-	if serv.algoID == 0 {
+	key := serv.comm.session.Context.AdvancedService.SessionKey
+	iv := make([]byte, 16)
+	switch serv.algoID {
+	case 0:
 		return nil
-	} else {
+	case 15:
+		algo, err := security.NewOracleNetworkCBCEncrypter(key[:16], iv)
+		if err != nil {
+			return err
+		}
+		serv.comm.session.Context.AdvancedService.CryptAlgo = algo
+	case 16:
+		algo, err := security.NewOracleNetworkCBCEncrypter(key[:24], iv)
+		if err != nil {
+			return err
+		}
+		serv.comm.session.Context.AdvancedService.CryptAlgo = algo
+	case 17:
+		algo, err := security.NewOracleNetworkCBCEncrypter(key[:32], iv)
+		if err != nil {
+			return err
+		}
+		serv.comm.session.Context.AdvancedService.CryptAlgo = algo
+	default:
 		return errors.New(fmt.Sprintf("advanced negotiation error: encryption service algorithm: %d still not supported", serv.algoID))
 	}
+	return nil
 	//switch (this.m_algID)
 	//{
 	//case 1:

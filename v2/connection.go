@@ -285,7 +285,7 @@ func (conn *Connection) Open() error {
 		conn.LogonMode = 0
 	}
 
-	conn.session = network.NewSession(*conn.connOption)
+	conn.session = network.NewSession(conn.connOption)
 	session := conn.session
 	err := session.Connect()
 	if err != nil {
@@ -294,19 +294,21 @@ func (conn *Connection) Open() error {
 	// advanced negotiation
 	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
 		tracer.Print("Advance Negotiation")
-		ano, err := advanced_nego.NewAdvNego(conn.connOption)
+		ano, err := advanced_nego.NewAdvNego(session)
 		if err != nil {
 			return err
 		}
-		err = ano.Write(session)
+		err = ano.Write()
 		if err != nil {
 			return err
 		}
-		err = ano.Read(session)
+		err = ano.Read()
 		if err != nil {
 			return err
 		}
+		ano.StartServices()
 	}
+
 	//else {
 	//
 	//}

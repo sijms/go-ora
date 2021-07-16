@@ -5,10 +5,11 @@
     - V2 is more preferred for oracle servers 10.2 and above
 ### version 2.1.21
 * now support data packet encryption using AES. 
-  key is exchanged between server and client using
+* key is exchanged between server and client using
   Diffie Hellman method
-#### note:
-to enable AES encryption add the following line to sqlnet.ora
+* note:
+to enable AES encryption add the following line to sqlnet.ora 
+  of the server
 ```bigquery
 # other values ([accepted | rejected | requested | required])
 SQLNET.ENCRYPTION_SERVER = required

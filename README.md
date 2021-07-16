@@ -11,9 +11,9 @@
 to enable AES encryption add the following line to sqlnet.ora 
   of the server
 ```bigquery
-# other values ([accepted | rejected | requested | required])
+# possible values ([accepted | rejected | requested | required])
 SQLNET.ENCRYPTION_SERVER = required
-# other values (AES256 | AES192 | AES128)
+# possible values for AES (AES256 | AES192 | AES128)
 SQLNET.ENCRYPTION_TYPES_SERVER = AES256
 ```
 

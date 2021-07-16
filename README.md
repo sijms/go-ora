@@ -3,13 +3,26 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+### version 2.1.21
+* now support data packet encryption using AES. 
+  key is exchanged between server and client using
+  Diffie Hellman method
+#### note:
+to enable AES encryption add the following line to sqlnet.ora
+```bigquery
+# other values ([accepted | rejected | requested | required])
+SQLNET.ENCRYPTION_SERVER = required
+# other values (AES256 | AES192 | AES128)
+SQLNET.ENCRYPTION_TYPES_SERVER = AES256
+```
+
 ### version 2.1.20
 * add new type **go_ora.NVarChar**
 now you can pass string parameter in 2 way:
 ##### &nbsp; &nbsp; 1- varchar string:
 
 ```
-   _, err := conn.Exec(inputSql, "7586")
+_, err := conn.Exec(inputSql, "7586")
 ```
 ##### &nbsp; &nbsp;2- nvarchar string:
 ```
@@ -18,6 +31,7 @@ _, err := conn.Exec(inputSql, go_ora.NVarChar("7586"))
 
 ### version 2.1.19
 * support more charsets (0x33D, 0x33E, 0x33F, 0x340, 0x352, 0x353, 0x354)
+
 ### version 2.0-beta
 * update client version to 317
 * update ttc version to: 9
@@ -231,7 +245,6 @@ if cursor, ok := stmt.Pars[0].Value.(go_ora.RefCursor); ok {
         fmt.Println(var_1, var_2)
     }
 }
-
 ```
 
 

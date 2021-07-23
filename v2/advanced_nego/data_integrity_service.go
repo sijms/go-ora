@@ -1,9 +1,12 @@
 package advanced_nego
 
 import (
+	"crypto"
+	"crypto/md5"
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/network/security"
 	"math/big"
 )
 
@@ -144,19 +147,39 @@ func (serv *dataIntegrityService) getServiceDataLength() int {
 func (serv *dataIntegrityService) activateAlgorithm() error {
 	serv.comm.session.Context.AdvancedService.SessionKey = serv.sharedKey
 	serv.comm.session.Context.AdvancedService.IV = serv.iV
-	if serv.algoID == 0 {
-		return nil
-	} else {
-		return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
-
-		switch serv.availableServiceNames[serv.algoID] {
-		case "MD5":
-		case "SHA1":
-		case "SHA512":
-		case "SHA256":
-		case "SHA384":
+	//return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
+	var err error
+	switch serv.algoID {
+	case 0:
+		serv.comm.session.Context.AdvancedService.HashAlgo = nil
+	case 1:
+		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash(md5.New(), serv.sharedKey, serv.iV)
+		if err != nil {
+			return err
 		}
-		return nil
-		// you can use also IDs
+	case 3:
+		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash(crypto.SHA1.New(), serv.sharedKey, serv.iV)
+		if err != nil {
+			return err
+		}
+	case 4:
+		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash2(crypto.SHA512.New(), serv.sharedKey, serv.iV)
+		if err != nil {
+			return err
+		}
+	case 5:
+		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash2(crypto.SHA256.New(), serv.sharedKey, serv.iV)
+		if err != nil {
+			return err
+		}
+	case 6:
+		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash2(crypto.SHA384.New(), serv.sharedKey, serv.iV)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
 	}
+	return nil
+	// you can use also IDs
 }

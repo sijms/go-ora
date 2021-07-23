@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/network/security"
 	"strconv"
 	"strings"
 	"time"
@@ -272,21 +273,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	appendKeyVal("AUTH_ALTER_SESSION",
 		fmt.Sprintf("ALTER SESSION SET NLS_LANGUAGE='AMERICAN' NLS_TERRITORY='AMERICA'  TIME_ZONE='%s'\x00", tz), 1)
 	index++
-	//if (!string.IsNullOrEmpty(proxyClientName))
-	//{
-	//	keys[index1] = this.m_authProxyClientName;
-	//	values[index1++] = this.m_marshallingEngine.m_dbCharSetConv.ConvertStringToBytes(proxyClientName, 0, proxyClientName.Length, true);
-	//}
-	//if (sessionId != -1)
-	//{
-	//	keys[index1] = this.m_authSessionId;
-	//	values[index1++] = this.m_marshallingEngine.m_dbCharSetConv.ConvertStringToBytes(sessionId.ToString(), 0, sessionId.ToString().Length, true);
-	//}
-	//if (serialNum != -1)
-	//{
-	//	keys[index1] = this.m_authSerialNum;
-	//	values[index1++] = this.m_marshallingEngine.m_dbCharSetConv.ConvertStringToBytes(serialNum.ToString(), 0, serialNum.ToString().Length, true);
-	//}
+
 	session.ResetBuffer()
 	session.PutBytes(3, 0x73, 0)
 	if len(connOption.UserID) > 0 {
@@ -309,11 +296,6 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	for i := 0; i < index; i++ {
 		session.PutKeyValString(keys[i], values[i], flags[i])
 	}
-	//fill remaining values with zeros
-	//for index < 30 {
-	//	session.PutKeyVal(nil, nil, 0)
-	//	index++
-	//}
 	return session.Write()
 
 }
@@ -381,11 +363,11 @@ func getKeyFromUserNameAndPassword(username string, password string) ([]byte, er
 	return append(key2, make([]byte, 8)...), nil
 }
 
-func PKCS5Padding(cipherText []byte, blockSize int) []byte {
-	padding := blockSize - len(cipherText)%blockSize
-	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(cipherText, padtext...)
-}
+//func PKCS5Padding(cipherText []byte, blockSize int) []byte {
+//	padding := blockSize - len(cipherText)%blockSize
+//	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
+//	return append(cipherText, padtext...)
+//}
 
 func HexStringToBytes(input string) ([]byte, error) {
 	result := make([]byte, len(input)/2)
@@ -440,7 +422,7 @@ func EncryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, 
 	}
 	enc := cipher.NewCBCEncrypter(blk, make([]byte, 16))
 	originalLen := len(sessionKey)
-	sessionKey = PKCS5Padding(sessionKey, blk.BlockSize())
+	sessionKey = security.PKCS5Padding(sessionKey, blk.BlockSize())
 	//if padding {
 	//
 	//}

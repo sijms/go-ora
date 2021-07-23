@@ -851,7 +851,7 @@ func (nego *DataTypeNego) write(session *network.Session) error {
 }
 
 //func (nego *DataTypeNego) bytes() []byte {
-//	//var result bytes.Buffer
+//	//var result bytes.buffer
 //	//var result = make([]byte, 7, 1000)
 //	if nego.Server.ServerCompileTimeCaps == nil || len(nego.Server.ServerCompileTimeCaps) <= 27 || nego.Server.ServerCompileTimeCaps[27] == 0 {
 //		nego.CompileTimeCaps[27] = 0

@@ -111,35 +111,4 @@ func (serv *encryptService) activateAlgorithm() error {
 		return errors.New(fmt.Sprintf("advanced negotiation error: encryption service algorithm: %d still not supported", serv.algoID))
 	}
 	return nil
-	//switch (this.m_algID)
-	//{
-	//case 1:
-	//	this.m_sessCtx.encryptionAlg = (EncryptionAlgorithm) new RC4(true, 40);
-	//	break;
-	//case 6:
-	//	this.m_sessCtx.encryptionAlg = (EncryptionAlgorithm) new RC4(true, 256);
-	//	break;
-	//case 8:
-	//	this.m_sessCtx.encryptionAlg = (EncryptionAlgorithm) new RC4(true, 56);
-	//	break;
-	//case 10:
-	//	this.m_sessCtx.encryptionAlg = (EncryptionAlgorithm) new RC4(true, 128);
-	//	break;
-	//case 11:
-	//	this.m_sessCtx.encryptionAlg = (EncryptionAlgorithm) new DES112();
-	//	break;
-	//case 12:
-	//	this.m_sessCtx.encryptionAlg = (EncryptionAlgorithm) new DES168();
-	//	break;
-	//case 15:
-	//	this.m_sessCtx.encryptionAlg = (EncryptionAlgorithm) new AES(1, 1);
-	//	break;
-	//case 16:
-	//	this.m_sessCtx.encryptionAlg = (EncryptionAlgorithm) new AES(1, 2);
-	//	break;
-	//case 17:
-	//	this.m_sessCtx.encryptionAlg = (EncryptionAlgorithm) new AES(1, 3);
-	//	break;
-	//}
-	//this.m_sessCtx.encryptionAlg.init(ano.skey, ano.getInitializationVector());
 }

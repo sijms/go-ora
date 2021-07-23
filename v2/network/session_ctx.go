@@ -31,7 +31,7 @@ type SessionContext struct {
 	GotReset            bool
 	AdvancedService     struct {
 		CryptAlgo  security.OracleNetworkEncryption
-		HashAlgo   security.OracleNetworkDataEntegrity
+		HashAlgo   security.OracleNetworkDataIntegrity
 		SessionKey []byte
 		IV         []byte
 	}

@@ -466,6 +466,12 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		if err != nil {
 			return nil, err
 		}
+		if resetConnection && session.Context.AdvancedService.HashAlgo != nil {
+			err = session.Context.AdvancedService.HashAlgo.Init()
+			if err != nil {
+				return nil, err
+			}
+		}
 		packetData, err = readPacketData(session.conn)
 		if err != nil {
 			return nil, err

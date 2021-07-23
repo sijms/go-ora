@@ -162,7 +162,7 @@ func (comm *AdvancedNegoComm) readUB2Array() ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	num1, err := comm.session.GetInt(4, false, true)
+	num1, err := comm.session.GetInt64(4, false, true)
 	if err != nil {
 		return nil, err
 	}

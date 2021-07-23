@@ -3,6 +3,19 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+### version 2.1.22
+* now support data packet integrity check using MD5, SHA1,
+ SHA256, SHA384, SHA512
+* key is exchanged between server and client using
+  Diffie Hellman method
+* note:
+to enable data integrity check add the following line to sqlnet.ora of the server
+```bigquery
+# possible values ([accepted | rejected | requested | required])
+SQLNET.CRYPTO_CHECKSUM_SERVER = required
+# possible values ([MD5 | SHA1 | SHA256 | SHA384 | SHA512])
+SQLNET.CRYPTO_CHECKSUM_TYPES_SERVER = SHA512
+```
 ### version 2.1.21
 * now support data packet encryption using AES. 
 * key is exchanged between server and client using

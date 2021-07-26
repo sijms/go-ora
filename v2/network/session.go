@@ -155,7 +155,14 @@ func (session *Session) Connect() error {
 		//}
 		return session.Connect()
 	}
-	return errors.New("connection refused by the server")
+	if refusePacket, ok := pck.(*RefusePacket); ok {
+		errorMessage := fmt.Sprintf(`connection refused by the server:
+user reason: %d
+system reason: %d
+error message: %s`, refusePacket.UserReason, refusePacket.SystemReason, refusePacket.message)
+		return errors.New(errorMessage)
+	}
+	return errors.New("connection refused by the server due to unknown reason")
 
 	//for {
 	//	err = session.writePacket(newConnectPacket(*session.Context))

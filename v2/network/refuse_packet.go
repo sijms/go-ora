@@ -32,7 +32,7 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	}
 	dataLen := binary.BigEndian.Uint16(packetData[10:])
 	var message string
-	if uint16(len(packetData)-1) >= 12+dataLen {
+	if uint16(len(packetData)) >= 12+dataLen {
 		message = string(packetData[12 : 12+dataLen])
 	}
 	return &RefusePacket{

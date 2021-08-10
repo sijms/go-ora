@@ -2,7 +2,9 @@ package go_ora
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -88,6 +90,7 @@ type ConnectionString struct {
 	PasswordlessConString string
 	Trace                 string // Trace file
 	PrefetchRows          int
+	WalletPath            string
 }
 
 func NewConnectionString() *ConnectionString {
@@ -150,12 +153,6 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	}
 	ret.Host = u.Host
 	ret.ServiceName = strings.Trim(u.Path, "/")
-	if len(ret.UserID) == 0 {
-		return nil, errors.New("empty user name")
-	}
-	if len(ret.Password) == 0 {
-		return nil, errors.New("empty password")
-	}
 	if len(ret.Host) == 0 {
 		return nil, errors.New("empty host name (server name)")
 	}
@@ -170,6 +167,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				ret.SID = val[0]
 			case "INSTANCE NAME":
 				ret.InstanceName = val[0]
+			case "WALLET":
+				ret.WalletPath = val[0]
 			case "DBA PRIVILEGE":
 				ret.DBAPrivilege = DBAPrivilegeFromString(val[0])
 			case "ENLIST":
@@ -269,6 +268,39 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				}
 			}
 		}
+	}
+	if len(ret.WalletPath) > 0 {
+		colonPos := strings.Index(ret.Host, ":")
+		var serv string
+		if colonPos == -1 {
+			serv = ret.Host
+		} else {
+			serv = ret.Host[:colonPos]
+		}
+		if len(ret.ServiceName) == 0 {
+			return nil, errors.New("you should specify server/service if you will use wallet")
+		}
+		w, err := NewWallet(path.Join(ret.WalletPath, "cwallet.sso"))
+		if err != nil {
+			return nil, err
+		}
+		cred, err := w.getCredential(serv, p, ret.ServiceName, ret.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if cred == nil {
+			return nil, errors.New(
+				fmt.Sprintf("cannot find credentials for server: %s, service: %s,  username: %s",
+					ret.Host, ret.ServiceName, ret.UserID))
+		}
+		ret.UserID = cred.username
+		ret.Password = cred.password
+	}
+	if len(ret.UserID) == 0 {
+		return nil, errors.New("empty user name")
+	}
+	if len(ret.Password) == 0 {
+		return nil, errors.New("empty password")
 	}
 	if len(ret.SID) == 0 && len(ret.ServiceName) == 0 {
 		return nil, errors.New("empty SID and service name")

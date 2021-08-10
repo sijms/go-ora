@@ -3,12 +3,26 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+### version 2.1.23
+* now support auto-login oracle wallet (non-local)
+* **note**:
+to use wallet you need to specify directory path for wallet the directory
+  should contain cwallet.sso file "the file that will be used"
+```bigquery
+sqlQuery := "oracle://user@127.0.0.1:1522/service"
+sqlQuery += "?TRACE FILE=trace.log"
+sqlQuery += "&wallet=path_to_wallet_directory"
+conn, err := sql.open("oracle", sqlQuery)
+```
+###### server:port/service ---> should be supplied when using wallet
+###### user ---> is optional when omitted the reader will return first matched dsn
+###### password ---> should be empty as it will be supplied from wallet
 ### version 2.1.22
 * now support data packet integrity check using MD5, SHA1,
  SHA256, SHA384, SHA512
 * key is exchanged between server and client using
   Diffie Hellman method
-* note:
+* **note**:
 to enable data integrity check add the following line to sqlnet.ora of the server
 ```bigquery
 # possible values ([accepted | rejected | requested | required])

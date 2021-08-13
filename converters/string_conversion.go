@@ -34,9 +34,9 @@ func MaxBytePerChar(charsetID int) int {
 	    return 2
 	case 0x352:
 	    fallthrough
-	case 0x353
+	case 0x353:
 	    fallthrough
-	case 0x354
+	case 0x354:
 	    return 2
 	case 870:
 		fallthrough

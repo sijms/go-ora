@@ -24,6 +24,20 @@ type StringConverter struct {
 
 func MaxBytePerChar(charsetID int) int {
 	switch charsetID {
+	case 0x33D:
+	    return 2
+	case 0x33E:
+	    fallthrough
+	case 0x33F:
+	    return 3
+	case 0x340:
+	    return 2
+	case 0x352:
+	    fallthrough
+	case 0x353
+	    fallthrough
+	case 0x354
+	    return 2
 	case 870:
 		fallthrough
 	case 871:

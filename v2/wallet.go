@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"regexp"
 	"strconv"
@@ -176,9 +177,14 @@ func (w *wallet) decrypt(encryptedData []byte) error {
 					input = append(input, make([]byte, num3)...)
 				}
 			}
+			fmt.Println(input)
 			type struct1 struct {
 				Id   asn1.ObjectIdentifier
 				Data asn1.RawValue
+			}
+			type struct2 struct {
+				Num  int
+				Obj1 struct1
 			}
 			type WalletCredentialData struct {
 				Id    string
@@ -188,8 +194,10 @@ func (w *wallet) decrypt(encryptedData []byte) error {
 				temp1  []struct1
 				temp2  struct1
 				temp3  WalletCredentialData
+				temp4  struct2
 				output = make([]walletCredential, 0)
 			)
+			objectType := 0
 			_, err := asn1.Unmarshal(input, &temp1)
 			if err != nil {
 				return nil, err
@@ -198,7 +206,56 @@ func (w *wallet) decrypt(encryptedData []byte) error {
 			for _, tmp := range temp1 {
 				_, err = asn1.Unmarshal(tmp.Data.Bytes, &temp2)
 				if err != nil {
-					return nil, err
+					// try to read struct2
+					_, err := asn1.Unmarshal(tmp.Data.Bytes, &temp4)
+					fmt.Println(temp4)
+					if err != nil {
+						return nil, err
+					}
+					objectType = 1
+					continue
+				}
+				if objectType == 1 {
+					var data []byte
+					_, err = asn1.Unmarshal(temp2.Data.Bytes, &data)
+					if err != nil {
+						return nil, err
+					}
+					type struct4 struct {
+						Id   asn1.ObjectIdentifier
+						Name string
+					}
+					type struct3 struct {
+						Obj1 struct {
+							Num  *big.Int `asn1:"integer"`
+							Obj1 struct {
+								ObjSET []struct4 `asn1:"set"`
+							}
+							Obj2 struct {
+								Obj1 struct1
+								Bit1 asn1.BitString
+							}
+							Data asn1.RawValue
+						}
+						Obj2 struct {
+							Id       asn1.ObjectIdentifier
+							DataNULL asn1.RawValue
+						}
+						Bit1 asn1.BitString
+					}
+
+					var b struct3
+					//var c struct4
+					_, err := asn1.Unmarshal(data, &b)
+					if err != nil {
+						return nil, err
+					}
+					fmt.Println(b)
+					//rest, err := asn1.Unmarshal(b.Obj1.Obj1.Data.Bytes, &c)
+					//fmt.Println(rest)
+					//fmt.Println(c)
+					//return nil, errors.New("interrupt")
+					continue
 				}
 				_, err = asn1.Unmarshal(temp2.Data.Bytes, &temp3)
 				if err != nil {
@@ -226,8 +283,11 @@ func (w *wallet) decrypt(encryptedData []byte) error {
 					output[length-1].username = temp3.Value
 				case "oracle.security.client.password":
 					output[length-1].password = temp3.Value
+				default:
+					return nil, errors.New(fmt.Sprintf("cannot find entry for: %s", matches[1]))
 				}
 			}
+			fmt.Println(output)
 			return output, nil
 		}
 		w.credentials, err = extractCredentials(output)

@@ -324,7 +324,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 //				return errors.New("MIN POOL SIZE value must be an integer")
 //			}
 //		case "POOL REGULATOR":
-//			conStr.PoolReglator, err = strconv.Atoi(val)
+//			conStr.PoolRegulator, err = strconv.Atoi(val)
 //			if err != nil {
 //				return errors.New("POOL REGULATOR value must be an integer")
 //			}

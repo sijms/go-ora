@@ -18,6 +18,7 @@ import (
 	"unicode/utf16"
 )
 
+//type CertificateData
 type wallet struct {
 	file          string
 	password      []byte
@@ -25,6 +26,11 @@ type wallet struct {
 	sha1Iteration int
 	algType       int
 	credentials   []walletCredential
+	certificates  [][]byte
+	//certificates  []*x509.Certificate
+	privateKeys         [][]byte
+	certificateRequests [][]byte
+	//Certificates  []*x509.Certificate
 }
 type walletCredential struct {
 	dsn      string
@@ -168,150 +174,131 @@ func (w *wallet) decrypt(encryptedData []byte) error {
 				output = output[:len(output)-num]
 			}
 		}
-		extractCredentials := func(input []byte) ([]walletCredential, error) {
-			if input[1] == 130 {
-				num2 := int(input[2])*256 + int(input[3])
-				if len(input) < num2+4 {
-					num3 = num2 + 4 - len(input)
-					input = append(input, make([]byte, num3)...)
-				}
-			}
-			type struct1 struct {
-				Id   asn1.ObjectIdentifier
-				Data asn1.RawValue
-			}
-			type struct2 struct {
-				Num  int
-				Obj1 struct1
-			}
-			type WalletCredentialData struct {
-				Id    string
-				Value string
-			}
-			var (
-				temp1 []struct1
-				temp2 struct1
-				temp3 WalletCredentialData
-				//temp4  struct2
-				output = make([]walletCredential, 0)
-			)
-			//objectType := 0
-			_, err := asn1.Unmarshal(input, &temp1)
-			if err != nil {
-				return nil, err
-			}
-			//var a []asn1.RawValue
-			for _, tmp := range temp1 {
-				// check the Id of the tmp first
-				switch tmp.Id.String() {
-				case "1.2.840.113549.1.12.10.1.5":
-					_, err = asn1.Unmarshal(tmp.Data.Bytes, &temp2)
-					if err != nil {
-						return nil, err
-					}
-					if temp2.Id.String() != "1.2.840.113549.1.16.12.12" {
-						continue
-					}
-					_, err = asn1.Unmarshal(temp2.Data.Bytes, &temp3)
-					if err != nil {
-						return nil, err
-					}
-					r, err := regexp.Compile("(^.+)([0-9]+)")
-					if err != nil {
-						return nil, err
-					}
-					matches := r.FindStringSubmatch(temp3.Id)
-					if len(matches) != 3 {
-						continue
-					}
-					length, err := strconv.Atoi(matches[2])
-					if err != nil {
-						continue
-					}
-					for len(output) < length {
-						output = append(output, walletCredential{})
-					}
-					switch matches[1] {
-					case "oracle.security.client.connect_string":
-						output[length-1].dsn = temp3.Value
-					case "oracle.security.client.username":
-						output[length-1].username = temp3.Value
-					case "oracle.security.client.password":
-						output[length-1].password = temp3.Value
-					default:
-						return nil, errors.New(fmt.Sprintf("cannot find entry for: %s", matches[1]))
-					}
-				case "1.2.840.113549.1.12.10.1.1":
-					continue
-				case "1.2.840.113549.1.12.10.1.3":
-					continue
-				default:
-					continue
-				}
-				//if err != nil {
-				//	// try to read struct2
-				//	_, err := asn1.Unmarshal(tmp.Data.Bytes, &temp4)
-				//	fmt.Println(temp4)
-				//	if err != nil {
-				//		return nil, err
-				//	}
-				//	objectType = 1
-				//	continue
-				//}
-				//if objectType == 1 {
-				//	var data []byte
-				//	_, err = asn1.Unmarshal(temp2.Data.Bytes, &data)
-				//	if err != nil {
-				//		return nil, err
-				//	}
-				//	type struct4 struct {
-				//		Id   asn1.ObjectIdentifier
-				//		Name string
-				//	}
-				//	type struct3 struct {
-				//		Obj1 struct {
-				//			Num  *big.Int `asn1:"integer"`
-				//			Obj1 struct {
-				//				ObjSET []struct4 `asn1:"set"`
-				//			}
-				//			Obj2 struct {
-				//				Obj1 struct1
-				//				Bit1 asn1.BitString
-				//			}
-				//			Data asn1.RawValue
-				//		}
-				//		Obj2 struct {
-				//			Id       asn1.ObjectIdentifier
-				//			DataNULL asn1.RawValue
-				//		}
-				//		Bit1 asn1.BitString
-				//	}
-				//
-				//	var b struct3
-				//	//var c struct4
-				//	_, err := asn1.Unmarshal(data, &b)
-				//	if err != nil {
-				//		return nil, err
-				//	}
-				//	fmt.Println(b)
-				//	//rest, err := asn1.Unmarshal(b.Obj1.Obj1.Data.Bytes, &c)
-				//	//fmt.Println(rest)
-				//	//fmt.Println(c)
-				//	//return nil, errors.New("interrupt")
-				//	continue
-				//}
-
-			}
-			//fmt.Println(output)
-			return output, nil
-		}
-		w.credentials, err = extractCredentials(output)
-		if err != nil {
-			return err
-		}
-		return nil
+		return w.readCredentials(output)
 	}
 	return errors.New("unsupported algorithm type")
+}
+
+func (w *wallet) readCredentials(input []byte) error {
+	w.certificates = nil
+	w.credentials = nil
+	if input[1] == 130 {
+		num2 := int(input[2])*256 + int(input[3])
+		if len(input) < num2+4 {
+			num3 := num2 + 4 - len(input)
+			input = append(input, make([]byte, num3)...)
+		}
+	}
+	type struct1 struct {
+		Id   asn1.ObjectIdentifier
+		Data asn1.RawValue
+	}
+	type WalletCredentialData struct {
+		Id    string
+		Value string
+	}
+	var (
+		temp1 []struct1
+		temp2 struct1
+		temp3 WalletCredentialData
+	)
+	//objectType := 0
+	_, err := asn1.Unmarshal(input, &temp1)
+	if err != nil {
+		return err
+	}
+	//var a []asn1.RawValue
+	for _, tmp := range temp1 {
+		// check the Id of the tmp first
+		switch tmp.Id.String() {
+		case "1.2.840.113549.1.12.10.1.5":
+			_, err = asn1.Unmarshal(tmp.Data.Bytes, &temp2)
+			if err != nil {
+				return err
+			}
+			if temp2.Id.String() == "0.22.72.134.247.13.1.10" {
+				// certificate request
+				var a []byte
+				_, err := asn1.Unmarshal(temp2.Data.Bytes, &a)
+				if err != nil {
+					return err
+				}
+				w.certificateRequests = append(w.certificateRequests, a)
+			}
+			if temp2.Id.String() != "1.2.840.113549.1.16.12.12" {
+				continue
+			}
+
+			_, err = asn1.Unmarshal(temp2.Data.Bytes, &temp3)
+			if err != nil {
+				return err
+			}
+			r, err := regexp.Compile("(^.+)([0-9]+)")
+			if err != nil {
+				return err
+			}
+			matches := r.FindStringSubmatch(temp3.Id)
+			if len(matches) != 3 {
+				continue
+			}
+			length, err := strconv.Atoi(matches[2])
+			if err != nil {
+				continue
+			}
+			for len(w.credentials) < length {
+				w.credentials = append(w.credentials, walletCredential{})
+			}
+			switch matches[1] {
+			case "oracle.security.client.connect_string":
+				w.credentials[length-1].dsn = temp3.Value
+			case "oracle.security.client.username":
+				w.credentials[length-1].username = temp3.Value
+			case "oracle.security.client.password":
+				w.credentials[length-1].password = temp3.Value
+			default:
+				return errors.New(fmt.Sprintf("cannot find entry for: %s", matches[1]))
+			}
+		case "1.2.840.113549.1.12.10.1.1":
+			var a struct {
+				Num int
+				F1  struct {
+					Id asn1.ObjectIdentifier
+					F1 asn1.RawValue
+				}
+				PrivateKeyData []byte
+			}
+			_, err = asn1.Unmarshal(tmp.Data.Bytes, &a)
+			if err != nil {
+				return err
+			}
+			w.privateKeys = append(w.privateKeys, a.PrivateKeyData)
+		case "1.2.840.113549.1.12.10.1.3":
+			var a struct {
+				Id asn1.ObjectIdentifier
+				F1 struct {
+					Data []byte
+				} `asn1:"class:2,tag:0"`
+			}
+			_, err = asn1.Unmarshal(tmp.Data.Bytes, &a)
+			if err != nil {
+				return err
+			}
+			found := false
+			for _, cert := range w.certificates {
+				if bytes.Equal(cert, a.F1.Data) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				w.certificates = append(w.certificates, a.F1.Data)
+			}
+		default:
+			continue
+		}
+
+	}
+	return nil
 }
 
 func (w *wallet) decodeASN1(buffer []byte) (encryptedData []byte, err error) {

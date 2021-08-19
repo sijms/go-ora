@@ -75,6 +75,7 @@ type Connection struct {
 	transactionID     []byte
 	strConv           converters.IStringConverter
 	NLSData           NLSData
+	w                 *wallet
 }
 
 type oracleDriver struct {
@@ -286,6 +287,24 @@ func (conn *Connection) Open() error {
 	}
 
 	conn.session = network.NewSession(conn.connOption)
+	//conn.session.SSL.Certificates = conn.w.certificates
+	//conn.session.SSL.CertificateRequest = conn.w.certificateRequests
+	//conn.session.SSL.PrivateKeys = conn.w.privateKeys
+	if conn.connOption.SSL && conn.w != nil {
+		err := conn.session.LoadSSLData(conn.w.certificates, conn.w.privateKeys, conn.w.certificateRequests)
+		if err != nil {
+			return err
+		}
+	}
+
+	//if conn.w != nil && len(conn.w.certificates) > 0{
+	//	for _, cert := range conn.w.certificates {
+	//		err := conn.session.AddCert(cert)
+	//		if err != nil {
+	//			return err
+	//		}
+	//	}
+	//}
 	session := conn.session
 	err := session.Connect()
 	if err != nil {
@@ -306,7 +325,10 @@ func (conn *Connection) Open() error {
 		if err != nil {
 			return err
 		}
-		ano.StartServices()
+		err = ano.StartServices()
+		if err != nil {
+			return err
+		}
 	}
 
 	//else {
@@ -426,9 +448,12 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 			DriverName:  "OracleClientGo",
 			PID:         os.Getpid(),
 		},
+		SSL: conStr.SSL,
 		//InAddrAny:             false,
 	}
-
+	if conStr.SSL {
+		connOption.Protocol = "tcps"
+	}
 	if len(conStr.Trace) > 0 {
 		tf, err := os.Create(conStr.Trace)
 		if err != nil {
@@ -444,6 +469,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 		conStr:     conStr,
 		connOption: connOption,
 		autoCommit: true,
+		w:          conStr.w,
 	}, nil
 }
 
@@ -551,6 +577,7 @@ func (conn *Connection) doAuth() error {
 	// conn.authObject.VerifyResponse(conn.SessionProperties["AUTH_SVR_RESPONSE"])
 	return nil
 }
+
 func (conn *Connection) loadNLSData() error {
 	_, err := conn.session.GetInt(2, true, true)
 	if err != nil {

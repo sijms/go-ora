@@ -84,13 +84,14 @@ type ConnectionString struct {
 	MetadataBooling       bool
 	ContextConnection     bool
 	SelfTuning            bool
+	SSL                   bool
 	ApplicationEdition    string
-	PoolReglator          int
+	PoolRegulator         int
 	ConnectionPoolTimeout int
-	PasswordlessConString string
 	Trace                 string // Trace file
 	PrefetchRows          int
 	WalletPath            string
+	w                     *wallet
 }
 
 func NewConnectionString() *ConnectionString {
@@ -107,7 +108,7 @@ func NewConnectionString() *ConnectionString {
 		StmtCacheSize:         20,
 		MetadataBooling:       true,
 		SelfTuning:            true,
-		PoolReglator:          100,
+		PoolRegulator:         100,
 		ConnectionPoolTimeout: 15,
 		PrefetchRows:          25,
 	}
@@ -132,7 +133,7 @@ func (connStr *ConnectionString) validate() {
 		connStr.MinPoolSize = 0
 		connStr.IncrPoolSize = -1
 		connStr.DecrPoolSize = 0
-		connStr.PoolReglator = 0
+		connStr.PoolRegulator = 0
 	}
 }
 func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
@@ -148,13 +149,13 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	if p != "" {
 		ret.Port, err = strconv.Atoi(p)
 		if err != nil {
-			return nil, errors.New("Port must be a number")
+			return nil, errors.New("port must be a number")
 		}
 	}
 	ret.Host = u.Host
 	ret.ServiceName = strings.Trim(u.Path, "/")
 	if len(ret.Host) == 0 {
-		return nil, errors.New("empty host name (server name)")
+		return nil, errors.New("empty host name")
 	}
 	if q != nil {
 		for key, val := range q {
@@ -169,6 +170,13 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				ret.InstanceName = val[0]
 			case "WALLET":
 				ret.WalletPath = val[0]
+			case "SSL":
+				if strings.ToUpper(val[0]) == "TRUE" {
+					ret.SSL = true
+				} else {
+					ret.SSL = false
+				}
+
 			case "DBA PRIVILEGE":
 				ret.DBAPrivilege = DBAPrivilegeFromString(val[0])
 			case "ENLIST":
@@ -201,7 +209,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 					return nil, errors.New("MIN POOL SIZE value must be an integer")
 				}
 			case "POOL REGULATOR":
-				ret.PoolReglator, err = strconv.Atoi(val[0])
+				ret.PoolRegulator, err = strconv.Atoi(val[0])
 				if err != nil {
 					return nil, errors.New("POOL REGULATOR value must be an integer")
 				}
@@ -239,7 +247,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			case "CONTEXT CONNECTION":
 				ret.ContextConnection = val[0] == "TRUE"
 			case "PROMOTABLE TRANSACTION":
-				if val[0] == "ROMOTABLE" {
+				if val[0] == "PROMOTABLE" {
 					ret.PromotableTransaction = Promotable
 				} else {
 					ret.PromotableTransaction = Local
@@ -280,21 +288,23 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		if len(ret.ServiceName) == 0 {
 			return nil, errors.New("you should specify server/service if you will use wallet")
 		}
-		w, err := NewWallet(path.Join(ret.WalletPath, "cwallet.sso"))
+		ret.w, err = NewWallet(path.Join(ret.WalletPath, "cwallet.sso"))
 		if err != nil {
 			return nil, err
 		}
-		cred, err := w.getCredential(serv, p, ret.ServiceName, ret.UserID)
-		if err != nil {
-			return nil, err
+		if len(ret.Password) == 0 {
+			cred, err := ret.w.getCredential(serv, p, ret.ServiceName, ret.UserID)
+			if err != nil {
+				return nil, err
+			}
+			if cred == nil {
+				return nil, errors.New(
+					fmt.Sprintf("cannot find credentials for server: %s, service: %s,  username: %s",
+						ret.Host, ret.ServiceName, ret.UserID))
+			}
+			ret.UserID = cred.username
+			ret.Password = cred.password
 		}
-		if cred == nil {
-			return nil, errors.New(
-				fmt.Sprintf("cannot find credentials for server: %s, service: %s,  username: %s",
-					ret.Host, ret.ServiceName, ret.UserID))
-		}
-		ret.UserID = cred.username
-		ret.Password = cred.password
 	}
 	if len(ret.UserID) == 0 {
 		return nil, errors.New("empty user name")
@@ -356,7 +366,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 //				return errors.New("MIN POOL SIZE value must be an integer")
 //			}
 //		case "POOL REGULATOR":
-//			conStr.PoolReglator, err = strconv.Atoi(val)
+//			conStr.PoolRegulator, err = strconv.Atoi(val)
 //			if err != nil {
 //				return errors.New("POOL REGULATOR value must be an integer")
 //			}
@@ -394,7 +404,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 //		case "CONTEXT CONNECTION":
 //			conStr.ContextConnection = val == "TRUE"
 //		case "PROMOTABLE TRANSACTION":
-//			if val == "ROMOTABLE" {
+//			if val == "PROMOTABLE" {
 //				conStr.PromotableTransaction = Promotable
 //			} else {
 //				conStr.PromotableTransaction = Local

@@ -2,7 +2,11 @@ package network
 
 import (
 	"bytes"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"log"
@@ -27,6 +31,7 @@ type sessionState struct {
 
 type Session struct {
 	conn              net.Conn
+	sslConn           *tls.Conn
 	connOption        ConnectionOption
 	Context           *SessionContext
 	sendPcks          []PacketInterface
@@ -45,6 +50,14 @@ type Session struct {
 	StrConv           converters.IStringConverter
 	UseBigClrChunks   bool
 	ClrChunkSize      int
+	SSL               struct {
+		CertificateRequest []*x509.CertificateRequest
+		PrivateKeys        []*rsa.PrivateKey
+		Certificates       []*x509.Certificate
+		roots              *x509.CertPool
+		tlsCertificates    []tls.Certificate
+	}
+	//certificates      []*x509.Certificate
 }
 
 func NewSession(connOption *ConnectionOption) *Session {
@@ -59,6 +72,15 @@ func NewSession(connOption *ConnectionOption) *Session {
 		ClrChunkSize:    0x40,
 	}
 }
+
+//func (session *Session) AddCert(certData []byte) error {
+//	cert, err := x509.ParseCertificate(certData)
+//	if err != nil {
+//		return err
+//	}
+//	session.certificates = append(session.certificates, cert)
+//	return nil
+//}
 
 func (session *Session) SaveState() {
 	session.states = append(session.states, sessionState{
@@ -88,6 +110,157 @@ func (session *Session) LoadState() {
 	}
 }
 
+func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
+	for _, temp := range certs {
+		cert, err := x509.ParseCertificate(temp)
+		if err != nil {
+			return err
+		}
+		session.SSL.Certificates = append(session.SSL.Certificates, cert)
+		for _, temp2 := range keys {
+			key, err := x509.ParsePKCS1PrivateKey(temp2)
+			if err != nil {
+				return err
+			}
+			if key.PublicKey.Equal(cert.PublicKey) {
+				certPem := pem.EncodeToMemory(&pem.Block{
+					Type:  "CERTIFICATE",
+					Bytes: temp,
+				})
+				keyPem := pem.EncodeToMemory(&pem.Block{
+					Type:  "RSA PRIVATE KEY",
+					Bytes: x509.MarshalPKCS1PrivateKey(key),
+				})
+				tlsCert, err := tls.X509KeyPair(certPem, keyPem)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("%#v\n", tlsCert)
+				session.SSL.tlsCertificates = append(session.SSL.tlsCertificates, tlsCert)
+			}
+		}
+	}
+	for _, temp := range certRequests {
+		cert, err := x509.ParseCertificateRequest(temp)
+		if err != nil {
+			return err
+		}
+		session.SSL.CertificateRequest = append(session.SSL.CertificateRequest, cert)
+	}
+	return nil
+}
+func (session *Session) negotiate() error {
+	//var err error
+	//var host string
+	//if !strings.Contains(session.connOption.Host, ":") {
+	//	host = fmt.Sprintf("%s:%d", session.connOption.Host, session.connOption.Port)
+	//} else {
+	//	host = session.connOption.Host
+	//}
+	//if session.SSL.roots == nil {
+	//	session.SSL.roots = x509.NewCertPool()
+	//	for _, cert := range session.SSL.Certificates {
+	//		for _, prvKey := range session.SSL.PrivateKeys {
+	//			if prvKey.PublicKey.Equal(cert.PublicKey) {
+	//				keyPem := pem.EncodeToMemory(&pem.Block{
+	//					Type:  "RSA PRIVATE KEY",
+	//					Bytes: x509.MarshalPKCS1PrivateKey(prvKey),
+	//				})
+	//				certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &prvKey.PublicKey, prvKey)
+	//				if err != nil {
+	//					return err
+	//				}
+	//				certPem := pem.EncodeToMemory(&pem.Block{
+	//					Type:    "CERTIFICATE",
+	//					Bytes:   certBytes,
+	//				})
+	//				fmt.Printf("%#v\n", string(certPem))
+	//				tlsCert, err := tls.X509KeyPair(certPem, keyPem)
+	//				if err != nil {
+	//					return err
+	//				}
+	//				fmt.Printf("%#v\n", cert)
+	//				session.SSL.tlsCertificates = append(session.SSL.tlsCertificates, tlsCert)
+	//				//tempCert, err := x509.ParseCertificate(certBytes)
+	//				//if err != nil {
+	//				//	return err
+	//				//}
+	//				//session.SSL.roots.AddCert(tempCert)
+	//				//"48, 130, 1, 167, 48, 130, 1, 16, 2, 17, 0, 212, 66, 239, 86, 123, 87, 141, 8, 39, 98, 85, 199, 32, 79, 16, 219, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 11, 5, 0, 48, 20, 49, 18, 48, 16, 6, 3, 85, 4, 3, 19, 9, 115, 97, 109, 121, 115, 45, 77, 66, 80, 48, 30, 23, 13, 50, 49, 48, 56, 49, 55, 49, 49, 49, 55, 53, 53, 90, 23, 13, 50, 50, 48, 56, 49, 55, 49, 49, 49, 55, 53, 53, 90, 48, 20, 49, 18, 48, 16, 6, 3, 85, 4, 3, 19, 9, 115, 97, 109, 121, 115, 45, 77, 66, 80, 48, 129, 159, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 1, 5, 0, 3, 129, 141, 0, 48, 129, 137, 2, 129, 129, 0, 130, 4, 190, 26, 202, 206, 188, 107, 124, 22, 193, 104, 141, 106, 50, 88, 73, 80, 120, 28, 218, 78, 241, 113, 165, 78, 58, 90, 42, 11, 216, 179, 7, 52, 76, 198, 106, 52, 130, 165, 46, 57, 118, 77, 198, 211, 200, 160, 199, 1, 0, 143, 44, 41, 19, 255, 22, 101, 202, 98, 127, 85, 204, 169, 199, 18, 221, 245, 192, 192, 228, 20, 26, 11, 99, 115, 72, 195, 132, 113, 228, 67, 227, 160, 250, 64, 128, 31, 170, 102, 167, 194, 56, 132, 104, 102,
+	//				//60, 24, 128, 34, 84, 177, 14, 202, 98, 144, 48, 19, 8, 16, 44, 146, 85, 142, 187, 220, 20, 76, 50, 24, 126, 234, 192, 23, 189, 225, 30, 195, 2, 3, 1, 0, 1, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 11, 5, 0, 3, 129, 129, 0, 48, 31, 16, 204, 125, 7, 134, 19, 182, 199, 199, 175, 211, 236, 55, 211, 44, 216, 105, 254, 61, 40, 122, 109, 98, 15, 119, 125, 164, 6, 86, 136, 184, 104, 1, 164, 243, 140, 172, 29, 10, 107, 52, 204, 195, 159, 60, 108, 165, 127, 98, 74, 98, 32, 164, 236, 115, 186, 197, 171, 226, 20, 14, 148, 104, 237, 100, 82, 129, 24, 216, 150, 226, 26, 32, 229, 102, 119, 132, 155, 64, 47, 101, 194, 201, 137, 229, 159, 189, 54, 142, 184, 172, 42, 217, 209, 88, 203, 254, 28, 81, 50, 163, 197, 243, 86, 152, 119, 25, 48, 146, 37, 128, 160, 156, 189, 139, 9, 152, 170, 235, 141, 129, 159, 227, 160, 65, 234"
+	//
+	//				//fmt.Printf("%#v\n", cert)
+	//			}
+	//			session.SSL.roots.AddCert(cert)
+	//
+	//		}
+	//}
+
+	//cert.DNSNames
+	//if cert.Issuer.CommonName == "10.211.55.3" {
+	//	//
+	//	roots.AddCert(cert)
+	//}
+	//}
+	if session.SSL.roots == nil {
+		session.SSL.roots = x509.NewCertPool()
+		for _, cert := range session.SSL.Certificates {
+			session.SSL.roots.AddCert(cert)
+		}
+	}
+	var host string
+	idx := strings.Index(session.connOption.Host, ":")
+	if idx < 0 {
+		host = session.connOption.Host
+	} else {
+		host = session.connOption.Host[:idx]
+	}
+	session.sslConn = tls.Client(session.conn, &tls.Config{
+		Certificates: session.SSL.tlsCertificates,
+		RootCAs:      session.SSL.roots,
+		//InsecureSkipVerify: true,
+		//ServerName: "samys-MBP",
+		ServerName: host,
+		//Renegotiation: 3,
+		//VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		//	fmt.Println(rawCerts)
+		//	fmt.Println(verifiedChains)
+		//	return nil
+		//},
+		//PreferServerCipherSuites: true,
+		//MinVersion: tls.VersionTLS10,
+		//MaxVersion: tls.VersionTLS12,
+		//Renegotiation: tls.RenegotiateFreelyAsClient,
+		//CipherSuites: []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_RSA_WITH_AES_128_CBC_SHA, tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA},
+	})
+	//_  = session.conn.Close()
+	//session.conn, err = tls.Dial("tcp", host, &tls.Config{
+	//	RootCAs: roots,
+	//	InsecureSkipVerify: true,
+	//	ServerName: "10.211.55.3",
+	//	PreferServerCipherSuites: true,
+	//	//MinVersion: tls.VersionTLS10,
+	//	//MaxVersion: tls.VersionTLS12,
+	//	Renegotiation: tls.RenegotiateFreelyAsClient,
+	//	//CipherSuites: []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_RSA_WITH_AES_128_CBC_SHA, tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA},
+	//})
+
+	//err = session.sslConn.Handshake()
+	//if err != nil {
+	//	return err
+	//}
+	//fmt.Printf("%#v\n",session.sslConn.ConnectionState())
+	session.connOption.Tracer.Print("SSL/TLS HandShake complete")
+	//if temp, ok := session.conn.(*tls.Conn); ok {
+	//	err = temp.Handshake()
+	//	if err != nil {
+	//		return nil
+	//	}
+	//
+	//}
+	return nil
+}
+
 func (session *Session) Connect() error {
 	session.Disconnect()
 	session.connOption.Tracer.Print("Connect")
@@ -98,10 +271,77 @@ func (session *Session) Connect() error {
 	} else {
 		host = session.connOption.Host
 	}
-
-	session.conn, err = net.Dial(session.connOption.Protocol, host)
+	session.conn, err = net.Dial("tcp", host)
 	if err != nil {
 		return err
+	}
+	if session.connOption.SSL {
+		session.connOption.Tracer.Print("Using SSL/TLS")
+		err = session.negotiate()
+		if err != nil {
+			return err
+		}
+
+		//roots := x509.NewCertPool()
+		//for _, cert := range session.certificates {
+		//	roots.AddCert(cert)
+		//}
+		//conf := tls.Config{
+		//	Rand:                        nil,
+		//	Time:                        nil,
+		//	Certificates:                nil,
+		//	NameToCertificate:           nil,
+		//	GetCertificate:              nil,
+		//	GetClientCertificate:        nil,
+		//	GetConfigForClient:          nil,
+		//	VerifyPeerCertificate:       nil,
+		//	VerifyConnection:            nil,
+		//	RootCAs:                     nil,
+		//	NextProtos:                  nil,
+		//	ServerName:                  "",
+		//	ClientAuth:                  0,
+		//	ClientCAs:                   nil,
+		//	InsecureSkipVerify:          false,
+		//	CipherSuites:                nil,
+		//	PreferServerCipherSuites:    false,
+		//	SessionTicketsDisabled:      false,
+		//	SessionTicketKey:            [32]byte{},
+		//	ClientSessionCache:          nil,
+		//	MinVersion:                  0,
+		//	MaxVersion:                  0,
+		//	CurvePreferences:            nil,
+		//	DynamicRecordSizingDisabled: false,
+		//	Renegotiation:               0,
+		//	KeyLogWriter:                nil,
+		//}
+		//idx := strings.Index(host, ":")
+		//var srv string
+		//if idx < 0 {
+		//	srv = host
+		//} else {
+		//	srv = host[:idx]
+		//}
+		//session.conn, err = tls.Dial("tcp", host, &tls.Config{
+		//	RootCAs: roots,
+		//	InsecureSkipVerify: true,
+		//	ServerName: "10.211.55.3",
+		//	PreferServerCipherSuites: true,
+		//	//MinVersion: tls.VersionTLS10,
+		//	//MaxVersion: tls.VersionTLS12,
+		//	Renegotiation: tls.RenegotiateFreelyAsClient,
+		//	//CipherSuites: []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_RSA_WITH_AES_128_CBC_SHA, tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA},
+		//})
+		//if err != nil {
+		//	return err
+		//}
+		//if temp, ok := session.conn.(*tls.Conn); ok {
+		//	err = temp.Handshake()
+		//	if err != nil {
+		//		return nil
+		//	}
+		//	session.connOption.Tracer.Print("SSL/TLS HandShake complete")
+		//
+		//}
 	}
 	connectPacket := newConnectPacket(*session.Context)
 	err = session.writePacket(connectPacket)
@@ -305,11 +545,13 @@ func (session *Session) writePacket(pck PacketInterface) error {
 	session.sendPcks = append(session.sendPcks, pck)
 	tmp := pck.bytes()
 	session.connOption.Tracer.LogPacket("Write packet:", tmp)
-	_, err := session.conn.Write(tmp)
-	if err != nil {
-		return err
+	var err error
+	if session.sslConn != nil {
+		_, err = session.sslConn.Write(tmp)
+	} else {
+		_, err = session.conn.Write(tmp)
 	}
-	return nil
+	return err
 }
 
 func (session *Session) HasError() bool {
@@ -366,7 +608,24 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			if pckType == RESEND {
 				for _, pck := range session.sendPcks {
 					//log.Printf("Request: %#v\n\n", pck.bytes())
-					_, err := session.conn.Write(pck.bytes())
+					//if session.connOption.SSL {
+					//	if temp, ok := session.conn.(*tls.Conn); ok {
+					//		err = temp.Handshake()
+					//		if err != nil {
+					//			return nil, err
+					//		}
+					//	}
+					//}
+					var err error
+					if session.sslConn != nil {
+						err = session.negotiate()
+						if err != nil {
+							return nil, err
+						}
+						_, err = session.sslConn.Write(pck.bytes())
+					} else {
+						_, err = session.conn.Write(pck.bytes())
+					}
 					if err != nil {
 						return nil, err
 					}
@@ -379,8 +638,13 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 
 	}
-
-	packetData, err := readPacketData(session.conn)
+	var packetData []byte
+	var err error
+	if session.sslConn != nil {
+		packetData, err = readPacketData(session.sslConn)
+	} else {
+		packetData, err = readPacketData(session.conn)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -864,7 +1128,6 @@ func (session *Session) GetBytes(length int) ([]byte, error) {
 	return session.read(length)
 }
 
-// return key, val, int and error
 func (session *Session) GetKeyVal() (key []byte, val []byte, num int, err error) {
 	key, err = session.GetDlc()
 	if err != nil {
@@ -877,7 +1140,3 @@ func (session *Session) GetKeyVal() (key []byte, val []byte, num int, err error)
 	num, err = session.GetInt(4, true, true)
 	return
 }
-
-//func (session *Session) FillInBuffer(buffer []byte) {
-//	session.inBuffer = buffer
-//}

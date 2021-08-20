@@ -524,7 +524,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 						if err != nil {
 							return err
 						}
-						//moreThanOneRowAffectedByDmlWithRetClause := false
 						if num > 1 {
 							return errors.New("more than one row affected with return clause")
 						}
@@ -536,8 +535,14 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 							if err != nil {
 								return err
 							}
-							stmt.Pars[x].Value = stmt.getParamValue(stmt.Pars[x], stmt.Pars[x].BValue)
+							err = stmt.calculateParameterValue(&stmt.Pars[x])
+							if err != nil {
+								return err
+							}
 							_, err = session.GetInt(2, true, true)
+							if err != nil {
+								return err
+							}
 						}
 					}
 				}
@@ -560,8 +565,14 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 								if err != nil {
 									return err
 								}
-								stmt.Pars[x].Value = stmt.getParamValue(stmt.Pars[x], stmt.Pars[x].BValue)
+								err = stmt.calculateParameterValue(&stmt.Pars[x])
+								if err != nil {
+									return err
+								}
 								_, err = session.GetInt(2, true, true)
+								if err != nil {
+									return err
+								}
 							} else {
 								//_, err = session.GetClr()
 							}
@@ -583,18 +594,21 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 									return err
 								}
 								if rowid == nil {
-									dataSet.currentRow[x] = nil
+									dataSet.Cols[x].Value = nil
 								} else {
-									dataSet.currentRow[x] = string(rowid.getBytes())
+									dataSet.Cols[x].Value = string(rowid.getBytes())
 								}
 								continue
 							}
-							temp, err := session.GetClr()
+							dataSet.Cols[x].BValue, err = session.GetClr()
 							//fmt.Println("buffer: ", temp)
 							if err != nil {
 								return err
 							}
-							dataSet.currentRow[x] = stmt.getParamValue(dataSet.Cols[x], temp)
+							err = stmt.calculateParameterValue(&dataSet.Cols[x])
+							if err != nil {
+								return err
+							}
 							if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
 								_, err = session.GetInt(4, true, true)
 								if err != nil {
@@ -656,7 +670,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 							//	//	throw new Exception("UnmarshalColumnData: Unimplemented type");
 							//	//}
 							//	//fmt.Println("type: ", dataSet.Cols[x].DataType)
-							//	dataSet.currentRow[x] = stmt.getParamValue(dataSet.Cols[x], temp)
+							//	dataSet.currentRow[x] = stmt.calculateParameterValue(dataSet.Cols[x], temp)
 							//	//switch dataSet.Cols[x].DataType {
 							//	//case NCHAR, CHAR, LONG:
 							//	//	if stmt.connection.strConv.GetLangID() != dataSet.Cols[x].CharsetID {
@@ -746,7 +760,10 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 						}
 					}
 					newRow := make(Row, dataSet.ColumnCount)
-					copy(newRow, dataSet.currentRow)
+					for x := 0; x < len(dataSet.Cols); x++ {
+						newRow[x] = dataSet.Cols[x].Value
+					}
+					//copy(newRow, dataSet.currentRow)
 					dataSet.Rows = append(dataSet.Rows, newRow)
 				}
 			}
@@ -928,10 +945,11 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	}
 	return nil
 }
-func (stmt *defaultStmt) getParamValue(param ParameterInfo, bValue []byte) driver.Value {
-	var ret driver.Value
+func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
+	//var ret driver.Value
 	session := stmt.connection.session
-	if bValue == nil {
+	if param.BValue == nil {
+		param.Value = nil
 		return nil
 	}
 	switch param.DataType {
@@ -939,13 +957,13 @@ func (stmt *defaultStmt) getParamValue(param ParameterInfo, bValue []byte) drive
 		if stmt.connection.strConv.GetLangID() != param.CharsetID {
 			tempCharset := stmt.connection.strConv.GetLangID()
 			stmt.connection.strConv.SetLangID(param.CharsetID)
-			ret = stmt.connection.strConv.Decode(bValue)
+			param.Value = stmt.connection.strConv.Decode(param.BValue)
 			stmt.connection.strConv.SetLangID(tempCharset)
 		} else {
-			ret = stmt.connection.strConv.Decode(bValue)
+			param.Value = stmt.connection.strConv.Decode(param.BValue)
 		}
 	case NUMBER:
-		ret = converters.DecodeNumber(bValue)
+		param.Value = converters.DecodeNumber(param.BValue)
 	case TimeStamp:
 		fallthrough
 	case TimeStampDTY:
@@ -959,11 +977,11 @@ func (stmt *defaultStmt) getParamValue(param ParameterInfo, bValue []byte) drive
 	case TimeStampTZ_DTY:
 		fallthrough
 	case DATE:
-		dateVal, err := converters.DecodeDate(bValue)
+		dateVal, err := converters.DecodeDate(param.BValue)
 		if err != nil {
 			return err
 		}
-		ret = dateVal
+		param.Value = dateVal
 	case OCIBlobLocator, OCIClobLocator:
 		data, err := session.GetClr()
 		if err != nil {
@@ -986,7 +1004,7 @@ func (stmt *defaultStmt) getParamValue(param ParameterInfo, bValue []byte) drive
 			if dataSize != int64(len(lobData)) {
 				return errors.New("error reading lob data")
 			}
-			ret = lobData
+			param.Value = lobData
 		} else {
 			tempCharset := stmt.connection.strConv.GetLangID()
 			if lob.variableWidthChar() {
@@ -1003,12 +1021,12 @@ func (stmt *defaultStmt) getParamValue(param ParameterInfo, bValue []byte) drive
 			if dataSize != int64(len([]rune(resultClobString))) {
 				return errors.New("error reading clob data")
 			}
-			ret = resultClobString
+			param.Value = resultClobString
 		}
 	default:
-		ret = bValue
+		param.Value = param.BValue
 	}
-	return ret
+	return nil
 }
 func (stmt *defaultStmt) Close() error {
 	if stmt.cursorID != 0 {

@@ -27,9 +27,9 @@ type DataSet struct {
 	MaxRowSize      int
 	Cols            []ParameterInfo
 	Rows            []Row
-	currentRow      Row
-	index           int
-	parent          StmtInterface
+	//currentRow      Row
+	index  int
+	parent StmtInterface
 }
 
 func (dataSet *DataSet) load(session *network.Session) error {
@@ -49,9 +49,9 @@ func (dataSet *DataSet) load(session *network.Session) error {
 	if columnCount > dataSet.ColumnCount {
 		dataSet.ColumnCount = columnCount
 	}
-	if len(dataSet.currentRow) != dataSet.ColumnCount {
-		dataSet.currentRow = make(Row, dataSet.ColumnCount)
-	}
+	//if len(dataSet.currentRow) != dataSet.ColumnCount {
+	//	dataSet.currentRow = make(Row, dataSet.ColumnCount)
+	//}
 	dataSet.RowCount, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err

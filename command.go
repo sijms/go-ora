@@ -9,8 +9,6 @@ import (
 
 	"github.com/sijms/go-ora/converters"
 	"github.com/sijms/go-ora/network"
-
-	//charmap "golang.org/x/text/encoding/charmap"
 	"regexp"
 	"strings"
 )
@@ -475,37 +473,35 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			}
 		case 7:
 			after7 = true
-			if stmt._hasReturnClause {
-				//if (bHasReturningParams && bindAccessors != null)
-				//{
-				//	int paramLen = bindAccessors.Length;
-				//	this.m_marshallingEngine.m_oraBufRdr.m_bHavingParameterData = true;
-				//	for (int index1 = 0; index1 < paramLen; ++index1)
-				//	{
-				//		if (bindAccessors[index1] != null)
-				//		{
-				//			int num = (int) this.m_marshallingEngine.UnmarshalUB4(false);
-				//			if (num > 1)
-				//				bMoreThanOneRowAffectedByDmlWithRetClause = true;
-				//			if (num == 0)
-				//			{
-				//				bindAccessors[index1].AddNullForData();
-				//			}
-				//			else
-				//			{
-				//				for (int index2 = 0; index2 < num; ++index2)
-				//				{
-				//					bindAccessors[index1].m_bReceivedOutValueFromServer = true;
-				//					bindAccessors[index1].UnmarshalOneRow();
-				//				}
-				//			}
-				//		}
-				//	}
-				//	this.m_marshallingEngine.m_oraBufRdr.m_currentOB = (OraBuf) null;
-				//	this.m_marshallingEngine.m_oraBufRdr.m_bHavingParameterData = false;
-				//	++noOfRowsFetched;
-				//	continue;
-				//}
+			if stmt._hasReturnClause && containOutputPars {
+				for x := 0; x < len(stmt.Pars); x++ {
+					if stmt.Pars[x].Direction == Output {
+						num, err := session.GetInt(4, true, true)
+						if err != nil {
+							return err
+						}
+						if num > 1 {
+							return errors.New("more than one row affected with return clause")
+						}
+						if num == 0 {
+							stmt.Pars[x].BValue = nil
+							stmt.Pars[x].Value = nil
+						} else {
+							stmt.Pars[x].BValue, err = session.GetClr()
+							if err != nil {
+								return err
+							}
+							err = stmt.calculateParameterValue(&stmt.Pars[x])
+							if err != nil {
+								return err
+							}
+							_, err = session.GetInt(2, true, true)
+							if err != nil {
+								return err
+							}
+						}
+					}
+				}
 			} else {
 				if containOutputPars {
 					for x := 0; x < len(stmt.Pars); x++ {
@@ -525,7 +521,14 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 								if err != nil {
 									return err
 								}
+								err = stmt.calculateParameterValue(&stmt.Pars[x])
+								if err != nil {
+									return err
+								}
 								_, err = session.GetInt(2, true, true)
+								if err != nil {
+									return err
+								}
 							} else {
 								//_, err = session.GetClr()
 							}
@@ -547,191 +550,208 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 									return err
 								}
 								if rowid == nil {
-									dataSet.currentRow[x] = nil
+									dataSet.Cols[x].Value = nil
 								} else {
-									dataSet.currentRow[x] = string(rowid.getBytes())
+									dataSet.Cols[x].Value = string(rowid.getBytes())
 								}
 								continue
 							}
-							temp, err := session.GetClr()
+							dataSet.Cols[x].BValue, err = session.GetClr()
 							//fmt.Println("buffer: ", temp)
 							if err != nil {
 								return err
 							}
-							if temp == nil {
-								dataSet.currentRow[x] = nil
-								if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
-									_, err = session.GetBytes(2)
-									if err != nil {
-										return err
-									}
-									_, err = session.GetInt(4, true, true)
-									if err != nil {
-										return err
-									}
+							err = stmt.calculateParameterValue(&dataSet.Cols[x])
+							if err != nil {
+								return err
+							}
+							if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
+								_, err = session.GetInt(4, true, true)
+								if err != nil {
+									return err
 								}
-							} else {
-								//switch (this.m_definedColumnType)
-								//{
-								//case OraType.ORA_TIMESTAMP_DTY:
-								//case OraType.ORA_TIMESTAMP:
-								//case OraType.ORA_TIMESTAMP_LTZ_DTY:
-								//case OraType.ORA_TIMESTAMP_LTZ:
-								//	this.m_marshallingEngine.UnmarshalCLR_ColData(11);
-								//	break;
-								//case OraType.ORA_TIMESTAMP_TZ_DTY:
-								//case OraType.ORA_TIMESTAMP_TZ:
-								//	this.m_marshallingEngine.UnmarshalCLR_ColData(13);
-								//	break;
-								//case OraType.ORA_INTERVAL_YM_DTY:
-								//case OraType.ORA_INTERVAL_DS_DTY:
-								//case OraType.ORA_INTERVAL_YM:
-								//case OraType.ORA_INTERVAL_DS:
-								//case OraType.ORA_IBFLOAT:
-								//case OraType.ORA_IBDOUBLE:
-								//case OraType.ORA_RAW:
-								//case OraType.ORA_CHAR:
-								//case OraType.ORA_CHARN:
-								//case OraType.ORA_VARCHAR:
-								//	this.m_marshallingEngine.UnmarshalCLR_ColData(this.m_colMetaData.m_maxLength);
-								//	break;
-								//case OraType.ORA_RESULTSET:
-								//	throw new InvalidOperationException();
-								//case OraType.ORA_NUMBER:
-								//case OraType.ORA_FLOAT:
-								//case OraType.ORA_VARNUM:
-								//	this.m_marshallingEngine.UnmarshalCLR_ColData(21);
-								//	break;
-								//case OraType.ORA_DATE:
-								//	this.m_marshallingEngine.UnmarshalCLR_ColData(7);
-								//	break;
-								//default:
-								//	throw new Exception("UnmarshalColumnData: Unimplemented type");
-								//}
-								//fmt.Println("type: ", dataSet.Cols[x].DataType)
-								switch dataSet.Cols[x].DataType {
-								case NCHAR, CHAR, LONG:
-									if stmt.connection.strConv.GetLangID() != dataSet.Cols[x].CharsetID {
-										tempCharset := stmt.connection.strConv.GetLangID()
-										stmt.connection.strConv.SetLangID(dataSet.Cols[x].CharsetID)
-										dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
-										stmt.connection.strConv.SetLangID(tempCharset)
-									} else {
-										dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
-									}
-
-								case NUMBER:
-									dataSet.currentRow[x] = converters.DecodeNumber(temp)
-									// if dataSet.Cols[x].Scale == 0 {
-									// 	dataSet.currentRow[x] = int64(converters.DecodeInt(temp))
-									// } else {
-									// 	dataSet.currentRow[x] = converters.DecodeDouble(temp)
-									// 	//base := math.Pow10(int(dataSet.Cols[x].Scale))
-									// 	//if dataSet.Cols[x].Scale < 0x80 {
-									// 	//	dataSet.currentRow[x] = math.Round(converters.DecodeDouble(temp)*base) / base
-									// 	//} else {
-									// 	//	dataSet.currentRow[x] = converters.DecodeDouble(temp)
-									// 	//}
-									// }
-								case TimeStamp:
-									fallthrough
-								case TimeStampDTY:
-									fallthrough
-								case TimeStampeLTZ:
-									fallthrough
-								case TimeStampLTZ_DTY:
-									fallthrough
-								case TimeStampTZ:
-									fallthrough
-								case TimeStampTZ_DTY:
-									fallthrough
-								case DATE:
-									dateVal, err := converters.DecodeDate(temp)
-									if err != nil {
-										return err
-									}
-									dataSet.currentRow[x] = dateVal
-								//case :
-								//	data, err := session.GetClr()
-								//	if err != nil {
-								//		return err
-								//	}
-								//	lob := &Lob{
-								//		sourceLocator: data,
-								//	}
-								//	session.SaveState()
-								//	dataSize, err := lob.getSize(session)
-								//	if err != nil {
-								//		return err
-								//	}
-								//	lobData, err := lob.getData(session)
-								//	if err != nil {
-								//		return err
-								//	}
-								//	if dataSize != int64(len(lobData)) {
-								//		return errors.New("error reading lob data")
-								//	}
-								//	session.LoadState()
-								//
-								case OCIBlobLocator, OCIClobLocator:
-									data, err := session.GetClr()
-									if err != nil {
-										return err
-									}
-									lob := &Lob{
-										sourceLocator: data,
-									}
-									session.SaveState()
-									dataSize, err := lob.getSize(stmt.connection)
-									if err != nil {
-										return err
-									}
-									lobData, err := lob.getData(stmt.connection)
-									if err != nil {
-										return err
-									}
-									session.LoadState()
-									if dataSet.Cols[x].DataType == OCIBlobLocator {
-										if dataSize != int64(len(lobData)) {
-											return errors.New("error reading lob data")
-										}
-										dataSet.currentRow[x] = lobData
-									} else {
-										tempCharset := stmt.connection.strConv.GetLangID()
-										if lob.variableWidthChar() {
-											if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
-												stmt.connection.strConv.SetLangID(2002)
-											} else {
-												stmt.connection.strConv.SetLangID(2000)
-											}
-										} else {
-											stmt.connection.strConv.SetLangID(dataSet.Cols[x].CharsetID)
-										}
-										resultClobString := stmt.connection.strConv.Decode(lobData)
-										stmt.connection.strConv.SetLangID(tempCharset)
-										if dataSize != int64(len([]rune(resultClobString))) {
-											return errors.New("error reading clob data")
-										}
-										dataSet.currentRow[x] = resultClobString
-									}
-								default:
-									dataSet.currentRow[x] = temp
-								}
-								if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
-									_, err = session.GetInt(4, true, true)
-									if err != nil {
-										return err
-									}
-									_, err = session.GetInt(4, true, true)
-									if err != nil {
-										return err
-									}
+								_, err = session.GetInt(4, true, true)
+								if err != nil {
+									return err
 								}
 							}
+							//if temp == nil {
+							//	dataSet.currentRow[x] = nil
+							//	if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
+							//		_, err = session.GetBytes(2)
+							//		if err != nil {
+							//			return err
+							//		}
+							//		_, err = session.GetInt(4, true, true)
+							//		if err != nil {
+							//			return err
+							//		}
+							//	}
+							//} else {
+							//	//switch (this.m_definedColumnType)
+							//	//{
+							//	//case OraType.ORA_TIMESTAMP_DTY:
+							//	//case OraType.ORA_TIMESTAMP:
+							//	//case OraType.ORA_TIMESTAMP_LTZ_DTY:
+							//	//case OraType.ORA_TIMESTAMP_LTZ:
+							//	//	this.m_marshallingEngine.UnmarshalCLR_ColData(11);
+							//	//	break;
+							//	//case OraType.ORA_TIMESTAMP_TZ_DTY:
+							//	//case OraType.ORA_TIMESTAMP_TZ:
+							//	//	this.m_marshallingEngine.UnmarshalCLR_ColData(13);
+							//	//	break;
+							//	//case OraType.ORA_INTERVAL_YM_DTY:
+							//	//case OraType.ORA_INTERVAL_DS_DTY:
+							//	//case OraType.ORA_INTERVAL_YM:
+							//	//case OraType.ORA_INTERVAL_DS:
+							//	//case OraType.ORA_IBFLOAT:
+							//	//case OraType.ORA_IBDOUBLE:
+							//	//case OraType.ORA_RAW:
+							//	//case OraType.ORA_CHAR:
+							//	//case OraType.ORA_CHARN:
+							//	//case OraType.ORA_VARCHAR:
+							//	//	this.m_marshallingEngine.UnmarshalCLR_ColData(this.m_colMetaData.m_maxLength);
+							//	//	break;
+							//	//case OraType.ORA_RESULTSET:
+							//	//	throw new InvalidOperationException();
+							//	//case OraType.ORA_NUMBER:
+							//	//case OraType.ORA_FLOAT:
+							//	//case OraType.ORA_VARNUM:
+							//	//	this.m_marshallingEngine.UnmarshalCLR_ColData(21);
+							//	//	break;
+							//	//case OraType.ORA_DATE:
+							//	//	this.m_marshallingEngine.UnmarshalCLR_ColData(7);
+							//	//	break;
+							//	//default:
+							//	//	throw new Exception("UnmarshalColumnData: Unimplemented type");
+							//	//}
+							//	//fmt.Println("type: ", dataSet.Cols[x].DataType)
+							//	switch dataSet.Cols[x].DataType {
+							//	case NCHAR, CHAR, LONG:
+							//		if stmt.connection.strConv.GetLangID() != dataSet.Cols[x].CharsetID {
+							//			tempCharset := stmt.connection.strConv.GetLangID()
+							//			stmt.connection.strConv.SetLangID(dataSet.Cols[x].CharsetID)
+							//			dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
+							//			stmt.connection.strConv.SetLangID(tempCharset)
+							//		} else {
+							//			dataSet.currentRow[x] = stmt.connection.strConv.Decode(temp)
+							//		}
+							//
+							//	case NUMBER:
+							//		dataSet.currentRow[x] = converters.DecodeNumber(temp)
+							//		// if dataSet.Cols[x].Scale == 0 {
+							//		// 	dataSet.currentRow[x] = int64(converters.DecodeInt(temp))
+							//		// } else {
+							//		// 	dataSet.currentRow[x] = converters.DecodeDouble(temp)
+							//		// 	//base := math.Pow10(int(dataSet.Cols[x].Scale))
+							//		// 	//if dataSet.Cols[x].Scale < 0x80 {
+							//		// 	//	dataSet.currentRow[x] = math.Round(converters.DecodeDouble(temp)*base) / base
+							//		// 	//} else {
+							//		// 	//	dataSet.currentRow[x] = converters.DecodeDouble(temp)
+							//		// 	//}
+							//		// }
+							//	case TimeStamp:
+							//		fallthrough
+							//	case TimeStampDTY:
+							//		fallthrough
+							//	case TimeStampeLTZ:
+							//		fallthrough
+							//	case TimeStampLTZ_DTY:
+							//		fallthrough
+							//	case TimeStampTZ:
+							//		fallthrough
+							//	case TimeStampTZ_DTY:
+							//		fallthrough
+							//	case DATE:
+							//		dateVal, err := converters.DecodeDate(temp)
+							//		if err != nil {
+							//			return err
+							//		}
+							//		dataSet.currentRow[x] = dateVal
+							//	//case :
+							//	//	data, err := session.GetClr()
+							//	//	if err != nil {
+							//	//		return err
+							//	//	}
+							//	//	lob := &Lob{
+							//	//		sourceLocator: data,
+							//	//	}
+							//	//	session.SaveState()
+							//	//	dataSize, err := lob.getSize(session)
+							//	//	if err != nil {
+							//	//		return err
+							//	//	}
+							//	//	lobData, err := lob.getData(session)
+							//	//	if err != nil {
+							//	//		return err
+							//	//	}
+							//	//	if dataSize != int64(len(lobData)) {
+							//	//		return errors.New("error reading lob data")
+							//	//	}
+							//	//	session.LoadState()
+							//	//
+							//	case OCIBlobLocator, OCIClobLocator:
+							//		data, err := session.GetClr()
+							//		if err != nil {
+							//			return err
+							//		}
+							//		lob := &Lob{
+							//			sourceLocator: data,
+							//		}
+							//		session.SaveState()
+							//		dataSize, err := lob.getSize(stmt.connection)
+							//		if err != nil {
+							//			return err
+							//		}
+							//		lobData, err := lob.getData(stmt.connection)
+							//		if err != nil {
+							//			return err
+							//		}
+							//		session.LoadState()
+							//		if dataSet.Cols[x].DataType == OCIBlobLocator {
+							//			if dataSize != int64(len(lobData)) {
+							//				return errors.New("error reading lob data")
+							//			}
+							//			dataSet.currentRow[x] = lobData
+							//		} else {
+							//			tempCharset := stmt.connection.strConv.GetLangID()
+							//			if lob.variableWidthChar() {
+							//				if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
+							//					stmt.connection.strConv.SetLangID(2002)
+							//				} else {
+							//					stmt.connection.strConv.SetLangID(2000)
+							//				}
+							//			} else {
+							//				stmt.connection.strConv.SetLangID(dataSet.Cols[x].CharsetID)
+							//			}
+							//			resultClobString := stmt.connection.strConv.Decode(lobData)
+							//			stmt.connection.strConv.SetLangID(tempCharset)
+							//			if dataSize != int64(len([]rune(resultClobString))) {
+							//				return errors.New("error reading clob data")
+							//			}
+							//			dataSet.currentRow[x] = resultClobString
+							//		}
+							//	default:
+							//		dataSet.currentRow[x] = temp
+							//	}
+							//	if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
+							//		_, err = session.GetInt(4, true, true)
+							//		if err != nil {
+							//			return err
+							//		}
+							//		_, err = session.GetInt(4, true, true)
+							//		if err != nil {
+							//			return err
+							//		}
+							//	}
+							//}
 						}
 					}
 					newRow := make(Row, dataSet.ColumnCount)
-					copy(newRow, dataSet.currentRow)
+					for x := 0; x < len(dataSet.Cols); x++ {
+						newRow[x] = dataSet.Cols[x].Value
+					}
+					//copy(newRow, dataSet.currentRow)
 					dataSet.Rows = append(dataSet.Rows, newRow)
 				}
 			}
@@ -880,6 +900,89 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	}
 	if stmt.connection.connOption.Tracer.IsOn() {
 		dataSet.Trace(stmt.connection.connOption.Tracer)
+	}
+	return nil
+}
+func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
+	//var ret driver.Value
+	session := stmt.connection.session
+	if param.BValue == nil {
+		param.Value = nil
+		return nil
+	}
+	switch param.DataType {
+	case NCHAR, CHAR, LONG:
+		if stmt.connection.strConv.GetLangID() != param.CharsetID {
+			tempCharset := stmt.connection.strConv.GetLangID()
+			stmt.connection.strConv.SetLangID(param.CharsetID)
+			param.Value = stmt.connection.strConv.Decode(param.BValue)
+			stmt.connection.strConv.SetLangID(tempCharset)
+		} else {
+			param.Value = stmt.connection.strConv.Decode(param.BValue)
+		}
+	case NUMBER:
+		param.Value = converters.DecodeNumber(param.BValue)
+	case TimeStamp:
+		fallthrough
+	case TimeStampDTY:
+		fallthrough
+	case TimeStampeLTZ:
+		fallthrough
+	case TimeStampLTZ_DTY:
+		fallthrough
+	case TimeStampTZ:
+		fallthrough
+	case TimeStampTZ_DTY:
+		fallthrough
+	case DATE:
+		dateVal, err := converters.DecodeDate(param.BValue)
+		if err != nil {
+			return err
+		}
+		param.Value = dateVal
+	case OCIBlobLocator, OCIClobLocator:
+		data, err := session.GetClr()
+		if err != nil {
+			return err
+		}
+		lob := &Lob{
+			sourceLocator: data,
+		}
+		session.SaveState()
+		dataSize, err := lob.getSize(stmt.connection)
+		if err != nil {
+			return err
+		}
+		lobData, err := lob.getData(stmt.connection)
+		if err != nil {
+			return err
+		}
+		session.LoadState()
+		if param.DataType == OCIBlobLocator {
+			if dataSize != int64(len(lobData)) {
+				return errors.New("error reading lob data")
+			}
+			param.Value = lobData
+		} else {
+			tempCharset := stmt.connection.strConv.GetLangID()
+			if lob.variableWidthChar() {
+				if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
+					stmt.connection.strConv.SetLangID(2002)
+				} else {
+					stmt.connection.strConv.SetLangID(2000)
+				}
+			} else {
+				stmt.connection.strConv.SetLangID(param.CharsetID)
+			}
+			resultClobString := stmt.connection.strConv.Decode(lobData)
+			stmt.connection.strConv.SetLangID(tempCharset)
+			if dataSize != int64(len([]rune(resultClobString))) {
+				return errors.New("error reading clob data")
+			}
+			param.Value = resultClobString
+		}
+	default:
+		param.Value = param.BValue
 	}
 	return nil
 }

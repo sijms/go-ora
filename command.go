@@ -386,7 +386,7 @@ func (stmt *Stmt) getExeOption() int {
 	if stmt.arrayBindCount > 1 {
 		op |= 0x80000
 	}
-	if stmt.connection.autoCommit && stmt.stmtType == DML {
+	if stmt.connection.autoCommit && (stmt.stmtType == DML || stmt.stmtType == PLSQL) {
 		op |= 0x100
 	}
 	if stmt.parse {

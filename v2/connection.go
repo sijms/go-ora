@@ -297,14 +297,6 @@ func (conn *Connection) Open() error {
 		}
 	}
 
-	//if conn.w != nil && len(conn.w.certificates) > 0{
-	//	for _, cert := range conn.w.certificates {
-	//		err := conn.session.AddCert(cert)
-	//		if err != nil {
-	//			return err
-	//		}
-	//	}
-	//}
 	session := conn.session
 	err := session.Connect()
 	if err != nil {

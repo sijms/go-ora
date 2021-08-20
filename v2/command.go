@@ -430,7 +430,7 @@ func (stmt *Stmt) getExeOption() int {
 	if stmt.arrayBindCount > 1 {
 		op |= 0x80000
 	}
-	if stmt.connection.autoCommit && stmt.stmtType == DML {
+	if stmt.connection.autoCommit && (stmt.stmtType == DML || stmt.stmtType == PLSQL) {
 		op |= 0x100
 	}
 	if stmt.parse {
@@ -517,37 +517,30 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			}
 		case 7:
 			after7 = true
-			if stmt._hasReturnClause {
-				//if (bHasReturningParams && bindAccessors != null)
-				//{
-				//	int paramLen = bindAccessors.Length;
-				//	this.m_marshallingEngine.m_oraBufRdr.m_bHavingParameterData = true;
-				//	for (int index1 = 0; index1 < paramLen; ++index1)
-				//	{
-				//		if (bindAccessors[index1] != null)
-				//		{
-				//			int num = (int) this.m_marshallingEngine.UnmarshalUB4(false);
-				//			if (num > 1)
-				//				bMoreThanOneRowAffectedByDmlWithRetClause = true;
-				//			if (num == 0)
-				//			{
-				//				bindAccessors[index1].AddNullForData();
-				//			}
-				//			else
-				//			{
-				//				for (int index2 = 0; index2 < num; ++index2)
-				//				{
-				//					bindAccessors[index1].m_bReceivedOutValueFromServer = true;
-				//					bindAccessors[index1].UnmarshalOneRow();
-				//				}
-				//			}
-				//		}
-				//	}
-				//	this.m_marshallingEngine.m_oraBufRdr.m_currentOB = (OraBuf) null;
-				//	this.m_marshallingEngine.m_oraBufRdr.m_bHavingParameterData = false;
-				//	++noOfRowsFetched;
-				//	continue;
-				//}
+			if stmt._hasReturnClause && containOutputPars {
+				for x := 0; x < len(stmt.Pars); x++ {
+					if stmt.Pars[x].Direction == Output {
+						num, err := session.GetInt(4, true, true)
+						if err != nil {
+							return err
+						}
+						//moreThanOneRowAffectedByDmlWithRetClause := false
+						if num > 1 {
+							return errors.New("more than one row affected with return clause")
+						}
+						if num == 0 {
+							stmt.Pars[x].BValue = nil
+							stmt.Pars[x].Value = nil
+						} else {
+							stmt.Pars[x].BValue, err = session.GetClr()
+							if err != nil {
+								return err
+							}
+							stmt.Pars[x].Value = stmt.getParamValue(stmt.Pars[x], stmt.Pars[x].BValue)
+							_, err = session.GetInt(2, true, true)
+						}
+					}
+				}
 			} else {
 				if containOutputPars {
 					for x := 0; x < len(stmt.Pars); x++ {

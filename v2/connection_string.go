@@ -85,6 +85,7 @@ type ConnectionString struct {
 	ContextConnection     bool
 	SelfTuning            bool
 	SSL                   bool
+	SSLVerify             bool
 	ApplicationEdition    string
 	PoolRegulator         int
 	ConnectionPoolTimeout int
@@ -152,7 +153,15 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			return nil, errors.New("port must be a number")
 		}
 	}
-	ret.Host = u.Host
+	if ret.Port == 0 {
+		ret.Port = 1521
+	}
+	idx := strings.Index(u.Host, ":")
+	if idx > 0 {
+		ret.Host = u.Host[:idx]
+	} else {
+		ret.Host = u.Host
+	}
 	ret.ServiceName = strings.Trim(u.Path, "/")
 	if len(ret.Host) == 0 {
 		return nil, errors.New("empty host name")
@@ -171,12 +180,9 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			case "WALLET":
 				ret.WalletPath = val[0]
 			case "SSL":
-				if strings.ToUpper(val[0]) == "TRUE" {
-					ret.SSL = true
-				} else {
-					ret.SSL = false
-				}
-
+				ret.SSL = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
+			case "SSL VERIFY":
+				ret.SSLVerify = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
 			case "DBA PRIVILEGE":
 				ret.DBAPrivilege = DBAPrivilegeFromString(val[0])
 			case "ENLIST":

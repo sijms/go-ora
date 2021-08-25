@@ -440,7 +440,8 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 			DriverName:  "OracleClientGo",
 			PID:         os.Getpid(),
 		},
-		SSL: conStr.SSL,
+		SSL:       conStr.SSL,
+		SSLVerify: conStr.SSLVerify,
 		//InAddrAny:             false,
 	}
 	if conStr.SSL {

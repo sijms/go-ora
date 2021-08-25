@@ -39,6 +39,7 @@ type ConnectionOption struct {
 	SNOConfig    map[string]string
 	PrefetchRows int
 	SSL          bool
+	SSLVerify    bool
 }
 
 func (op *ConnectionOption) ConnectionData() string {

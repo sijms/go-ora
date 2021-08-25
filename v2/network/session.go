@@ -187,75 +187,6 @@ func (session *Session) Connect() error {
 		session.negotiate()
 	}
 
-	//if session.connOption.SSL {
-	//
-	//
-	//	err = session.negotiate()
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	//roots := x509.NewCertPool()
-	//	//for _, cert := range session.certificates {
-	//	//	roots.AddCert(cert)
-	//	//}
-	//	//conf := tls.Config{
-	//	//	Rand:                        nil,
-	//	//	Time:                        nil,
-	//	//	Certificates:                nil,
-	//	//	NameToCertificate:           nil,
-	//	//	GetCertificate:              nil,
-	//	//	GetClientCertificate:        nil,
-	//	//	GetConfigForClient:          nil,
-	//	//	VerifyPeerCertificate:       nil,
-	//	//	VerifyConnection:            nil,
-	//	//	RootCAs:                     nil,
-	//	//	NextProtos:                  nil,
-	//	//	ServerName:                  "",
-	//	//	ClientAuth:                  0,
-	//	//	ClientCAs:                   nil,
-	//	//	InsecureSkipVerify:          false,
-	//	//	CipherSuites:                nil,
-	//	//	PreferServerCipherSuites:    false,
-	//	//	SessionTicketsDisabled:      false,
-	//	//	SessionTicketKey:            [32]byte{},
-	//	//	ClientSessionCache:          nil,
-	//	//	MinVersion:                  0,
-	//	//	MaxVersion:                  0,
-	//	//	CurvePreferences:            nil,
-	//	//	DynamicRecordSizingDisabled: false,
-	//	//	Renegotiation:               0,
-	//	//	KeyLogWriter:                nil,
-	//	//}
-	//	//idx := strings.Index(host, ":")
-	//	//var srv string
-	//	//if idx < 0 {
-	//	//	srv = host
-	//	//} else {
-	//	//	srv = host[:idx]
-	//	//}
-	//	//session.conn, err = tls.Dial("tcp", host, &tls.Config{
-	//	//	RootCAs: roots,
-	//	//	InsecureSkipVerify: true,
-	//	//	ServerName: "10.211.55.3",
-	//	//	PreferServerCipherSuites: true,
-	//	//	//MinVersion: tls.VersionTLS10,
-	//	//	//MaxVersion: tls.VersionTLS12,
-	//	//	Renegotiation: tls.RenegotiateFreelyAsClient,
-	//	//	//CipherSuites: []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_RSA_WITH_AES_128_CBC_SHA, tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA},
-	//	//})
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//	//if temp, ok := session.conn.(*tls.Conn); ok {
-	//	//	err = temp.Handshake()
-	//	//	if err != nil {
-	//	//		return nil
-	//	//	}
-	//	//	session.connOption.Tracer.Print("SSL/TLS HandShake complete")
-	//	//
-	//	//}
-	//}
 	connectPacket := newConnectPacket(*session.Context)
 	err = session.writePacket(connectPacket)
 	if err != nil {
@@ -336,6 +267,10 @@ func (session *Session) Connect() error {
 
 func (session *Session) Disconnect() {
 	session.ResetBuffer()
+	if session.sslConn != nil {
+		_ = session.sslConn.Close()
+		session.sslConn = nil
+	}
 	if session.conn != nil {
 		_ = session.conn.Close()
 		session.conn = nil

@@ -4,7 +4,8 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
 ### version 2.2.4
-add support for tcps. you can enable tcps through the following url options
+* add support for tcps. you can enable tcps through the following url options
+* this [link](https://oracle-base.com/articles/misc/configure-tcpip-with-ssl-and-tls-for-database-connections) explain how to enable tcps in your server
 ```azure
 wallet=wallet_dir // wallet should contain server and client certificates
 SSL=true          // true or enabled

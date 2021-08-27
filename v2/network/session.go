@@ -150,28 +150,13 @@ func (session *Session) negotiate() {
 		Certificates: session.SSL.tlsCertificates,
 		RootCAs:      session.SSL.roots,
 		ServerName:   session.connOption.Host,
-		MinVersion:   tls.VersionTLS10,
-		MaxVersion:   tls.VersionTLS12,
 	}
 	if !session.connOption.SSLVerify {
 		config.InsecureSkipVerify = true
 	}
 	session.sslConn = tls.Client(session.conn, config)
-	session.connOption.Tracer.Print("SSL/TLS HandShake complete")
+	//session.connOption.Tracer.Print("SSL/TLS HandShake complete")
 }
-
-//func (session *Session) sslConnect(addr string) error {
-//	var err error
-//	config := &tls.Config{
-//		Certificates: session.SSL.tlsCertificates,
-//		RootCAs:      session.SSL.roots,
-//		ServerName: session.connOption.Host,
-//		MinVersion: tls.VersionTLS10,
-//		MaxVersion: tls.VersionTLS12,
-//	}
-//	session.sslConn = tls.Client(session.conn, config)
-//	return nil
-//}
 
 func (session *Session) Connect() error {
 	session.Disconnect()

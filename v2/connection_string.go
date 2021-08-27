@@ -112,21 +112,10 @@ func NewConnectionString() *ConnectionString {
 		PoolRegulator:         100,
 		ConnectionPoolTimeout: 15,
 		PrefetchRows:          25,
+		SSL:                   false,
+		SSLVerify:             true,
 	}
 }
-
-//func NewConnectionStringFromString(connectionString string) (*ConnectionString, error) {
-//	// initialize
-//	ret := NewConnectionString()
-//	// parse
-//	err := ret.Parse(connectionString)
-//	if err != nil {
-//		return nil, err
-//	}
-//	// validate
-//	ret.validate()
-//	return ret, nil
-//}
 
 func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	u, err := url.Parse(databaseUrl)

@@ -208,14 +208,6 @@ func (session *Session) Connect() error {
 		*session.Context = acceptPacket.sessionCtx
 		session.Context.handshakeComplete = true
 		session.connOption.Tracer.Print("Handshake Complete")
-		//if (this.m_sessionCtx.m_ACFL0 & 1) != 0 &&
-		//   (this.m_sessionCtx.m_ACFL0 & 4) == 0 &&
-		//   (this.m_sessionCtx.m_ACFL1 & 8) == 0 {
-		//        this.m_sessionCtx.m_ano.StartNegotiation();
-		//   } else {
-		//        this.m_sessionCtx.m_bAnoEnabled = false;
-		//        this.m_sessionCtx.m_ano = (Ano) null;
-		//      }
 		return nil
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
@@ -233,10 +225,6 @@ func (session *Session) Connect() error {
 				return errors.New("redirect packet with wrong port")
 			}
 		}
-		//err = session.conn.Close()
-		//if err != nil {
-		//	return errors.New("cannot close existing connection")
-		//}
 		return session.Connect()
 	}
 	if refusePacket, ok := pck.(*RefusePacket); ok {

@@ -128,15 +128,6 @@ func NewConnectionString() *ConnectionString {
 //	return ret, nil
 //}
 
-func (connStr *ConnectionString) validate() {
-	if !connStr.Pooling {
-		connStr.MaxPoolSize = -1
-		connStr.MinPoolSize = 0
-		connStr.IncrPoolSize = -1
-		connStr.DecrPoolSize = 0
-		connStr.PoolRegulator = 0
-	}
-}
 func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	u, err := url.Parse(databaseUrl)
 	if err != nil {
@@ -312,17 +303,27 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			ret.Password = cred.password
 		}
 	}
-	if len(ret.UserID) == 0 {
-		return nil, errors.New("empty user name")
+	return ret, ret.validate()
+}
+
+func (connStr *ConnectionString) validate() error {
+	if !connStr.Pooling {
+		connStr.MaxPoolSize = -1
+		connStr.MinPoolSize = 0
+		connStr.IncrPoolSize = -1
+		connStr.DecrPoolSize = 0
+		connStr.PoolRegulator = 0
 	}
-	if len(ret.Password) == 0 {
-		return nil, errors.New("empty password")
+	if len(connStr.UserID) == 0 {
+		return errors.New("empty user name")
 	}
-	if len(ret.SID) == 0 && len(ret.ServiceName) == 0 {
-		return nil, errors.New("empty SID and service name")
+	if len(connStr.Password) == 0 {
+		return errors.New("empty password")
 	}
-	ret.validate()
-	return ret, nil
+	if len(connStr.SID) == 0 && len(connStr.ServiceName) == 0 {
+		return errors.New("empty SID and service name")
+	}
+	return nil
 }
 
 //func (conStr *ConnectionString) Parse(s string) error {

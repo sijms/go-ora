@@ -4,7 +4,11 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
 ### version 2.2.4
-add support for tcps
+add support for tcps. you can enable tcps through the following url options
+```azure
+SSL=true           // true or enabled
+SSL Verify=false   // to bypass certificate verification
+```
 ### version 2.1.23
 * now support auto-login oracle wallet (non-local)
 * **note**:

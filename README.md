@@ -6,8 +6,9 @@
 ### version 2.2.4
 add support for tcps. you can enable tcps through the following url options
 ```azure
-SSL=true           // true or enabled
-SSL Verify=false   // to bypass certificate verification
+wallet=wallet_dir // wallet should contain server and client certificates
+SSL=true          // true or enabled
+SSL Verify=false  // to bypass certificate verification
 ```
 ### version 2.1.23
 * now support auto-login oracle wallet (non-local)

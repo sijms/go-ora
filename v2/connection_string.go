@@ -303,9 +303,9 @@ func (connStr *ConnectionString) validate() error {
 		connStr.DecrPoolSize = 0
 		connStr.PoolRegulator = 0
 	}
-	if connStr.SSL && (connStr.w == nil || len(connStr.w.certificates) == 0) {
-		return errors.New("tcps need a valid wallet contains server and client certificates")
-	}
+	//if connStr.SSL && (connStr.w == nil || len(connStr.w.certificates) == 0) {
+	//	return errors.New("tcps need a valid wallet contains server and client certificates")
+	//}
 	if len(connStr.UserID) == 0 {
 		return errors.New("empty user name")
 	}

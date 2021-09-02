@@ -98,11 +98,13 @@ type ConnectionString struct {
 func BuildUrl(server, service, user, password string, options map[string]string) string {
 	ret := fmt.Sprintf("oracle://%s:%s@%s/%s", url.QueryEscape(user), url.QueryEscape(password),
 		url.QueryEscape(server), url.QueryEscape(service))
-	ret += "?"
-	for key, val := range options {
-		ret += fmt.Sprintf("%s=%s&", key, val)
+	if options != nil {
+		ret += "?"
+		for key, val := range options {
+			ret += fmt.Sprintf("%s=%s&", key, url.QueryEscape(val))
+		}
+		ret = strings.TrimRight(ret, "&")
 	}
-	ret = strings.TrimRight(ret, "&")
 	return ret
 }
 func NewConnectionString() *ConnectionString {

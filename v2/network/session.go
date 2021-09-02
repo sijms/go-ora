@@ -49,6 +49,7 @@ type Session struct {
 	states            []sessionState
 	StrConv           converters.IStringConverter
 	UseBigClrChunks   bool
+	UseBigScn         bool
 	ClrChunkSize      int
 	SSL               struct {
 		CertificateRequest []*x509.CertificateRequest

@@ -348,6 +348,7 @@ func (conn *Connection) Open() error {
 		return err
 	}
 	conn.session.TTCVersion = conn.dataNego.CompileTimeCaps[7]
+	conn.session.UseBigScn = conn.tcpNego.ServerCompileTimeCaps[7] >= 8
 	if conn.tcpNego.ServerCompileTimeCaps[7] < conn.session.TTCVersion {
 		conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
 	}

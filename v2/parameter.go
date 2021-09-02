@@ -62,8 +62,8 @@ const (
 	IBFloat          OracleType = 100
 	IBDouble         OracleType = 101
 	REFCURSOR        OracleType = 102
-	NOT              OracleType = 108
-	XMLType          OracleType = 108
+	OCIXMLType       OracleType = 108
+	XMLType          OracleType = 109
 	OCIRef           OracleType = 110
 	OCIClobLocator   OracleType = 112
 	OCIBlobLocator   OracleType = 113
@@ -94,6 +94,7 @@ const (
 
 type ParameterInfo struct {
 	Name                 string
+	TypeName             string
 	Direction            ParameterDirection
 	IsNull               bool
 	AllowNull            bool
@@ -248,7 +249,8 @@ func (par *ParameterInfo) load(session *network.Session) error {
 	if err != nil {
 		return err
 	}
-	if strings.ToUpper(string(bName)) == "XMLTYPE" {
+	par.TypeName = session.StrConv.Decode(bName)
+	if strings.ToUpper(par.TypeName) == "XMLTYPE" {
 		par.DataType = XMLType
 		par.IsXmlType = true
 	}

@@ -4,7 +4,7 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
 ### version 2.2.6 (pre-release - experimental): Add support for user defined type 
-to user make the following (oracle 12c)
+to use make the following (oracle 12c)
 * define custom type in the oracle
 ```azure
 create or replace TYPE TEST_TYPE1 IS OBJECT 

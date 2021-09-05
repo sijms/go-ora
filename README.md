@@ -18,7 +18,7 @@ create or replace TYPE TEST_TYPE1 IS OBJECT
 type test1 struct {
     // note use int64 not int
     // all tagged fields should be exported 
-    // tag name:type_name --> case insensitive
+    // tag name:field_name --> case insensitive
     Id int64       `oracle:"name:test_id"`
     Name string    `oracle:"name:test_name"`
 }

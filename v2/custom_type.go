@@ -131,11 +131,19 @@ END;`
 				param.ContFlag = 16
 				param.MaxCharLen = 1000
 				param.MaxLen = 1000 * converters.MaxBytePerChar(param.CharsetID)
+			case "TIMESTAMP":
+				fallthrough
 			case "DATE":
 				param.DataType = DATE
 				param.ContFlag = 0
 				param.MaxLen = 11
 				param.MaxCharLen = 11
+			case "RAW":
+				param.DataType = RAW
+				param.ContFlag = 0
+				param.MaxLen = 1000
+				param.MaxCharLen = 0
+				param.CharsetForm = 0
 			default:
 				return errors.New(fmt.Sprint("unsupported attribute type: ", attTypeName))
 			}
@@ -178,31 +186,5 @@ func (cust *customType) getObject() interface{} {
 			obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(attrib.Value))
 		}
 	}
-	//for x:=0; x < typ.NumField(); x++ {
-	//	f := typ.Field(x)
-	//	tag := f.Tag.Get("oracle")
-	//	if len(tag) == 0 {
-	//		continue
-	//	}
-	//	tag = strings.Trim(tag, "\"")
-	//	parts := strings.Split(tag, ",")
-	//	for _, part := range parts {
-	//		subs := strings.Split(part, ":")
-	//		if len(subs) == 0 {
-	//			continue
-	//		}
-	//		if strings.TrimSpace(strings.ToLower(subs[0])) == "name" {
-	//			if len(subs) == 1 {
-	//				continue
-	//			}
-	//			fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
-	//			for _, attrib := range cust.attribs {
-	//				if fieldID == attrib.Name {
-	//					obj.Elem().Field(x).Set(reflect.ValueOf(attrib.Value))
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
 	return obj.Elem().Interface()
 }

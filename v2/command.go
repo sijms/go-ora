@@ -884,7 +884,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 			return errors.New("unsupported data type: XMLTYPE")
 		}
 		if param.cusType == nil {
-			return fmt.Errorf("unregister custom type: %s. call register type first", param.TypeName)
+			return fmt.Errorf("unregister custom type: %s. call RegisterType first", param.TypeName)
 		}
 		_, err = session.GetDlc() // contian toid and some 0s
 		if err != nil {

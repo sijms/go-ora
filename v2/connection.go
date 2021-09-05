@@ -76,27 +76,28 @@ type Connection struct {
 	strConv           converters.IStringConverter
 	NLSData           NLSData
 	w                 *wallet
+	cusTyp            map[string]customType
 }
 
-type oracleDriver struct {
+type OracleDriver struct {
+	Conn *Connection
 }
 
 func init() {
-	sql.Register("oracle", &oracleDriver{})
+	sql.Register("oracle", &OracleDriver{})
 }
-func (drv *oracleDriver) Open(name string) (driver.Conn, error) {
-
+func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 	conn, err := NewConnection(name)
 	if err != nil {
 		return nil, err
 	}
-
+	drv.Conn = conn
 	return conn, conn.Open()
 }
 
-func (conn *Connection) SetStringConveter(conveter converters.IStringConverter) {
-	conn.strConv = conveter
-	conn.session.StrConv = conveter
+func (conn *Connection) SetStringConverter(converter converters.IStringConverter) {
+	conn.strConv = converter
+	conn.session.StrConv = converter
 }
 
 func (conn *Connection) GetNLS() (*NLSData, error) {
@@ -147,7 +148,9 @@ DECLARE
 	stmt.AddParam("p_nls_timestamp_tz", "", 56, Output)
 	stmt.AddParam("p_err_code", "", 2000, Output)
 	stmt.AddParam("p_err_msg", "", 2000, Output)
-	defer stmt.Close()
+	defer func(stmt *Stmt) {
+		_ = stmt.Close()
+	}(stmt)
 	//fmt.Println(stmt.Pars)
 	_, err := stmt.Exec(nil)
 	if err != nil {
@@ -464,6 +467,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 		connOption: connOption,
 		autoCommit: true,
 		w:          conStr.w,
+		cusTyp:     map[string]customType{},
 	}, nil
 }
 
@@ -476,7 +480,7 @@ func (conn *Connection) Close() (err error) {
 		conn.session = nil
 	}
 	conn.connOption.Tracer.Print("Connection Closed")
-	conn.connOption.Tracer.Close()
+	_ = conn.connOption.Tracer.Close()
 	return
 }
 

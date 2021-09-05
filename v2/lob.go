@@ -25,10 +25,7 @@ func (lob *Lob) variableWidthChar() bool {
 	return false
 }
 func (lob *Lob) littleEndianClob() bool {
-	if len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&64 > 0 {
-		return true
-	}
-	return false
+	return len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&64 > 0
 }
 func (lob *Lob) getSize(connection *Connection) (size int64, err error) {
 	session := connection.session

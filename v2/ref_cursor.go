@@ -1,9 +1,5 @@
 package go_ora
 
-import (
-	"github.com/sijms/go-ora/v2/network"
-)
-
 type RefCursor struct {
 	defaultStmt
 	len        uint8
@@ -16,7 +12,7 @@ type RefCursor struct {
 	//hasMoreRows bool
 }
 
-func (cursor *RefCursor) load(session *network.Session) error {
+func (cursor *RefCursor) load() error {
 	// initialize ref cursor object
 	cursor.text = ""
 	cursor._hasLONG = false
@@ -26,6 +22,7 @@ func (cursor *RefCursor) load(session *network.Session) error {
 	cursor.arrayBindCount = 1
 	cursor.scnForSnapshot = make([]int, 2)
 	cursor.stmtType = SELECT
+	session := cursor.connection.session
 	var err error
 	cursor.len, err = session.GetByte()
 	if err != nil {
@@ -46,18 +43,11 @@ func (cursor *RefCursor) load(session *network.Session) error {
 			return err
 		}
 		for x := 0; x < len(cursor.columns); x++ {
-			err = cursor.columns[x].load(session)
+			err = cursor.columns[x].load(cursor.connection)
 			if err != nil {
 				return err
 			}
 		}
-		//for _, col := range cursor.Cols {
-		//	err = col.load(session)
-		//	fmt.Println(col)
-		//	if err != nil {
-		//		return err
-		//	}
-		//}
 	}
 	_, err = session.GetDlc()
 	if err != nil {

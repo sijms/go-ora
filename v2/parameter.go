@@ -116,9 +116,11 @@ type ParameterInfo struct {
 	Value                driver.Value
 	getDataFromServer    bool
 	oaccollid            int
+	cusType              *customType
 }
 
-func (par *ParameterInfo) load(session *network.Session) error {
+func (par *ParameterInfo) load(conn *Connection) error {
+	session := conn.session
 	par.getDataFromServer = true
 	dataType, err := session.GetByte()
 	if err != nil {
@@ -249,8 +251,15 @@ func (par *ParameterInfo) load(session *network.Session) error {
 	if err != nil {
 		return err
 	}
-	par.TypeName = session.StrConv.Decode(bName)
-	if strings.ToUpper(par.TypeName) == "XMLTYPE" {
+	par.TypeName = strings.ToUpper(session.StrConv.Decode(bName))
+	if par.DataType == XMLType && par.TypeName != "XMLTYPE" {
+		for typName, cusTyp := range conn.cusTyp {
+			if typName == par.TypeName {
+				par.cusType = &cusTyp
+			}
+		}
+	}
+	if par.TypeName == "XMLTYPE" {
 		par.DataType = XMLType
 		par.IsXmlType = true
 	}

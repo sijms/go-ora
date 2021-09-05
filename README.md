@@ -3,6 +3,56 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+### version 2.2.6 (pre-release - experimental): Add support for user defined type 
+to user make the following (oracle 12c)
+* define custom type in the oracle
+```azure
+create or replace TYPE TEST_TYPE1 IS OBJECT 
+( 
+    TEST_ID NUMBER(6, 0),
+    TEST_NAME VARCHAR2(10)
+)
+```
+* define struct in go with tag
+```azure
+type test1 struct {
+    // note use int64 not int
+    // all tagged fields should be exported 
+    // tag name:type_name --> case insensitive
+    Id int64       `oracle:"name:test_id"`
+    Name string    `oracle:"name:test_name"`
+}
+```
+* connect to database
+```azure
+databaseURL := go_ora.BuildUrl("localhost", 1521, "service", "user", "pass", nil)
+conn, err := sql.Open("oracle", databaseURL)
+// check for err
+err = conn.Ping()
+// check for err
+defer func() {
+    err := conn.Close()
+    // check for err
+}()
+```
+* register type
+```azure
+if drv, ok := conn.Driver().(*go_ora.OracleDriver); ok {
+    err = drv.Conn.RegisterType("TEST_TYPE1", test1{})
+    // check for err
+}
+```
+* select and display data
+```azure
+rows, err := conn.Query("SELECT test_type1(10, 'test') from dual")
+// check for err
+var test test1
+for rows.Next() {
+    err = rows.Scan(&test)
+    // check for err
+    fmt.Println(test)
+}
+```
 ### version 2.2.5
 * add function go_ora.BuildUrl to escape special characters 
 ### version 2.2.4

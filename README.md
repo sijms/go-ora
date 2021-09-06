@@ -3,7 +3,10 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
-### version 2.2.6 (pre-release - experimental): Add support for user defined type 
+### version 2.2.7: Add support for user defined types
+* this feature is now tested against these oracle versions 10.2, 12.2, 19.3.
+* RegisterType function need extra parameter owner (oracle user who create the type).
+### version 2.2.6 (pre-release - experimental): Add support for user defined types
 to use make the following (oracle 12c)
 * define custom type in the oracle
 ```azure
@@ -38,7 +41,7 @@ defer func() {
 * register type
 ```azure
 if drv, ok := conn.Driver().(*go_ora.OracleDriver); ok {
-    err = drv.Conn.RegisterType("TEST_TYPE1", test1{})
+    err = drv.Conn.RegisterType("owner", "TEST_TYPE1", test1{})
     // check for err
 }
 ```

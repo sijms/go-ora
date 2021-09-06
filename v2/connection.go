@@ -80,7 +80,10 @@ type Connection struct {
 }
 
 type OracleDriver struct {
-	Conn *Connection
+	Conn    *Connection
+	Server  string
+	Service string
+	UserId  string
 }
 
 func init() {
@@ -92,6 +95,9 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 		return nil, err
 	}
 	drv.Conn = conn
+	drv.Server = conn.connOption.Host
+	drv.Service = conn.connOption.ServiceName
+	drv.UserId = conn.connOption.UserID
 	return conn, conn.Open()
 }
 

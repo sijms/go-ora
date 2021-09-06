@@ -16,7 +16,126 @@ type customType struct {
 	filedMap map[string]int
 }
 
-func (conn *Connection) RegisterType(typeName string, typeObj interface{}) error {
+func (conn *Connection) RegisterType(owner, typeName string, typeObj interface{}) error {
+	if typeObj == nil {
+		return errors.New("type object cannot be nil")
+	}
+	typ := reflect.TypeOf(typeObj)
+	switch typ.Kind() {
+	case reflect.Ptr:
+		return errors.New("unsupported type object: Ptr")
+	case reflect.Array:
+		return errors.New("unsupported type object: Array")
+	case reflect.Chan:
+		return errors.New("unsupported type object: Chan")
+	case reflect.Map:
+		return errors.New("unsupported type object: Map")
+	case reflect.Slice:
+		return errors.New("unsupported type object: Slice")
+	}
+	if typ.Kind() != reflect.Struct {
+		return errors.New("type object should be of structure type")
+	}
+	cust := customType{typ: typ, filedMap: map[string]int{}}
+	sqlText := `SELECT ATTR_NAME, ATTR_TYPE_NAME, LENGTH, ATTR_NO 
+FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
+	stmt := NewStmt(sqlText, conn)
+	defer func(stmt *Stmt) {
+		_ = stmt.Close()
+	}(stmt)
+	stmt.AddParam("1", strings.ToUpper(owner), 40, Input)
+	stmt.AddParam("2", strings.ToUpper(typeName), 40, Input)
+	values := make([]driver.Value, 4)
+	rows, err := stmt.Query(nil)
+	if err != nil {
+		return err
+	}
+	var (
+		attName     string
+		attOrder    int64
+		attTypeName string
+		length      int64
+		ok          bool
+	)
+	for {
+		err = rows.Next(values)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+		if attName, ok = values[0].(string); !ok {
+			return errors.New(fmt.Sprint("error reading attribute properties for type: ", typeName))
+		}
+		if attTypeName, ok = values[1].(string); !ok {
+			return errors.New(fmt.Sprint("error reading attribute properties for type: ", typeName))
+		}
+		if values[2] == nil {
+			length = 0
+		} else {
+			if length, ok = values[2].(int64); !ok {
+				return errors.New(fmt.Sprint("error reading attribute properties for type: ", typeName))
+			}
+		}
+		if attOrder, ok = values[3].(int64); !ok {
+			return errors.New(fmt.Sprint("error reading attribute properties for type: ", typeName))
+		}
+		for int(attOrder) > len(cust.attribs) {
+			cust.attribs = append(cust.attribs, ParameterInfo{
+				Direction:   Input,
+				Flag:        3,
+				CharsetID:   conn.tcpNego.ServerCharset,
+				CharsetForm: 1,
+			})
+		}
+		param := &cust.attribs[attOrder-1]
+		param.Name = attName
+		param.TypeName = attTypeName
+		switch strings.ToUpper(attTypeName) {
+		case "NUMBER":
+			param.DataType = NUMBER
+			param.ContFlag = 0
+			param.MaxCharLen = 0
+			param.MaxLen = 22
+			param.CharsetForm = 0
+		case "VARCHAR2":
+			param.DataType = NCHAR
+			param.CharsetForm = 1
+			param.ContFlag = 16
+			param.MaxCharLen = int(length)
+			param.MaxLen = int(length) * converters.MaxBytePerChar(param.CharsetID)
+		case "NVARCHAR2":
+			param.DataType = NCHAR
+			param.CharsetForm = 2
+			param.ContFlag = 16
+			param.MaxCharLen = int(length)
+			param.MaxLen = int(length) * converters.MaxBytePerChar(param.CharsetID)
+		case "TIMESTAMP":
+			fallthrough
+		case "DATE":
+			param.DataType = DATE
+			param.ContFlag = 0
+			param.MaxLen = 11
+			param.MaxCharLen = 11
+		case "RAW":
+			param.DataType = RAW
+			param.ContFlag = 0
+			param.MaxLen = int(length)
+			param.MaxCharLen = 0
+			param.CharsetForm = 0
+		default:
+			return errors.New(fmt.Sprint("unsupported attribute type: ", attTypeName))
+		}
+	}
+	if len(cust.attribs) == 0 {
+		return errors.New(fmt.Sprint("unknown or empty type: ", typeName))
+	}
+	cust.loadFieldMap()
+	conn.cusTyp[strings.ToUpper(typeName)] = cust
+	return nil
+}
+func (conn *Connection) RegisterType2(typeName string, typeObj interface{}) error {
 	if typeObj == nil {
 		return errors.New("type object cannot be nil")
 	}

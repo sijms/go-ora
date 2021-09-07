@@ -500,7 +500,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					stmt._hasMoreRows = false
 					stmt.connection.session.Summary = nil
 				} else {
-					return errors.New(stmt.connection.session.GetError())
+					return stmt.connection.session.GetError()
 				}
 
 			}

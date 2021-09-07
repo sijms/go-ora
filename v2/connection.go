@@ -532,7 +532,7 @@ func (conn *Connection) doAuth() error {
 				return err
 			}
 			if conn.session.HasError() {
-				return errors.New(conn.session.GetError())
+				return conn.session.GetError()
 			}
 			stop = true
 		case 8:

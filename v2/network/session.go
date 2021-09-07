@@ -358,15 +358,17 @@ func (session *Session) HasError() bool {
 	return session.Summary != nil && session.Summary.RetCode != 0
 }
 
-func (session *Session) GetError() string {
+func (session *Session) GetError() *OracleError {
+	err := &OracleError{}
 	if session.Summary != nil && session.Summary.RetCode != 0 {
+		err.ErrCode = session.Summary.RetCode
 		if session.StrConv != nil {
-			return session.StrConv.Decode(session.Summary.ErrorMessage)
+			err.ErrMsg = session.StrConv.Decode(session.Summary.ErrorMessage)
 		} else {
-			return string(session.Summary.ErrorMessage)
+			err.ErrMsg = string(session.Summary.ErrorMessage)
 		}
 	}
-	return ""
+	return err
 }
 
 func (session *Session) readPacket() (PacketInterface, error) {
@@ -563,7 +565,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				return nil, err
 			}
 			if session.HasError() {
-				return nil, errors.New(session.GetError())
+				return nil, session.GetError()
 			}
 		}
 		fallthrough

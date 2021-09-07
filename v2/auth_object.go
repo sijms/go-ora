@@ -60,7 +60,7 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 				return nil, err
 			}
 			if session.HasError() {
-				return nil, errors.New(session.GetError())
+				return nil, session.GetError()
 			}
 			loop = false
 		case 8:

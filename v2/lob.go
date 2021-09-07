@@ -158,7 +158,7 @@ func (lob *Lob) read(connection *Connection) error {
 				if session.Summary.RetCode == 1403 {
 					session.Summary = nil
 				} else {
-					return errors.New(session.GetError())
+					return session.GetError()
 				}
 			}
 			loop = false

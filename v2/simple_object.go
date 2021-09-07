@@ -85,7 +85,7 @@ func (obj *simpleObject) read() error {
 		}
 	}
 	if session.HasError() {
-		return errors.New(session.GetError())
+		return session.GetError()
 	}
 	return nil
 }

@@ -3,6 +3,8 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+### version 2.2.8: add OracleError class 
+OracleError carry error message from the server
 ### version 2.2.7: Add support for user defined types
 * this feature is now tested against these oracle versions 10.2, 12.2, 19.3.
 * RegisterType function need extra parameter owner (oracle user who create the type).

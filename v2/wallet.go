@@ -395,7 +395,7 @@ func (w *wallet) decodeASN1(buffer []byte) (encryptedData []byte, err error) {
 	return
 }
 
-func (w *wallet) getCredential(server, port, service, username string) (*walletCredential, error) {
+func (w *wallet) getCredential(server string, port int, service, username string) (*walletCredential, error) {
 	rHost, err := regexp.Compile(`\(\s*HOST\s*=\s*([A-z0-9._%+-]+)\)`)
 	if err != nil {
 		return nil, err
@@ -410,7 +410,7 @@ func (w *wallet) getCredential(server, port, service, username string) (*walletC
 	}
 	var (
 		lhost    string
-		lport    string
+		lport    int
 		lservice string
 	)
 	for _, cred := range w.credentials {
@@ -426,20 +426,20 @@ func (w *wallet) getCredential(server, port, service, username string) (*walletC
 		lhost = strings.TrimSpace(matches[1])
 		matches = rPort.FindStringSubmatch(strings.ToUpper(cred.dsn))
 		if len(matches) == 2 {
-			lport = strings.TrimSpace(matches[1])
+			lport, err = strconv.Atoi(matches[1])
+			if err != nil {
+				lport = defaultPort
+			}
 		} else {
-			lport = ""
+			lport = defaultPort
 		}
 		matches = rService.FindStringSubmatch(strings.ToUpper(cred.dsn))
 		if len(matches) != 2 {
 			continue
 		}
 		lservice = strings.TrimSpace(matches[1])
-		if lport == "" {
-			lport = "1521"
-		}
-		if port == "" {
-			port = "1521"
+		if port == 0 {
+			port = 1521
 		}
 		if lhost == strings.ToUpper(server) &&
 			lport == port &&

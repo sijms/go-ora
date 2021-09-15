@@ -71,7 +71,3 @@ func newConnectPacket(sessionCtx SessionContext) *ConnectPacket {
 		buffer: []byte(connectData),
 	}
 }
-
-//DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=al-maaly)(PORT=1521))(CONNECT_DATA=(
-//	SERVICE_NAME=newhospital)(CID=(PROGRAM=D:\projects\DotPeekExtractedProjects\TestClient\bin\Debug\TestClient.exe)
-//	(HOST=LABMANAGER)(USER=lab))))

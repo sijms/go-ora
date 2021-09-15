@@ -2,6 +2,7 @@ package network
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/sijms/go-ora/v2/trace"
 )
@@ -24,6 +25,8 @@ type ConnectionOption struct {
 	Protocol              string
 	Host                  string
 	UserID                string
+	Servers               []string
+	Ports                 []int
 	//IP string
 	SID string
 	//Addr string
@@ -40,6 +43,17 @@ type ConnectionOption struct {
 	PrefetchRows int
 	SSL          bool
 	SSLVerify    bool
+}
+
+func (op *ConnectionOption) UpdateServers() {
+	for i := 0; i < len(op.Servers); i++ {
+		if strings.ToUpper(op.Host) == strings.ToUpper(op.Servers[i]) &&
+			op.Port == op.Ports[i] {
+			return
+		}
+	}
+	op.Servers = append([]string{op.Host}, op.Servers...)
+	op.Ports = append([]int{op.Port}, op.Ports...)
 }
 
 func (op *ConnectionOption) ConnectionData() string {

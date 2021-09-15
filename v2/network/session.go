@@ -30,9 +30,9 @@ type sessionState struct {
 }
 
 type Session struct {
-	conn              net.Conn
-	sslConn           *tls.Conn
-	connOption        ConnectionOption
+	conn    net.Conn
+	sslConn *tls.Conn
+	//connOption        ConnectionOption
 	Context           *SessionContext
 	sendPcks          []PacketInterface
 	inBuffer          []byte
@@ -63,10 +63,10 @@ type Session struct {
 
 func NewSession(connOption *ConnectionOption) *Session {
 	return &Session{
-		conn:            nil,
-		inBuffer:        nil,
-		index:           0,
-		connOption:      *connOption,
+		conn:     nil,
+		inBuffer: nil,
+		index:    0,
+		//connOption:      *connOption,
 		Context:         NewSessionContext(connOption),
 		Summary:         nil,
 		UseBigClrChunks: false,
@@ -141,6 +141,7 @@ func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
 	return nil
 }
 func (session *Session) negotiate() {
+	connOption := session.Context.ConnOption
 	if session.SSL.roots == nil {
 		session.SSL.roots = x509.NewCertPool()
 		for _, cert := range session.SSL.Certificates {
@@ -150,9 +151,9 @@ func (session *Session) negotiate() {
 	config := &tls.Config{
 		Certificates: session.SSL.tlsCertificates,
 		RootCAs:      session.SSL.roots,
-		ServerName:   session.connOption.Host,
+		ServerName:   connOption.Host,
 	}
-	if !session.connOption.SSLVerify {
+	if !connOption.SSLVerify {
 		config.InsecureSkipVerify = true
 	}
 	session.sslConn = tls.Client(session.conn, config)
@@ -160,19 +161,40 @@ func (session *Session) negotiate() {
 }
 
 func (session *Session) Connect() error {
+	connOption := session.Context.ConnOption
 	session.Disconnect()
-	session.connOption.Tracer.Print("Connect")
+	connOption.Tracer.Print("Connect")
 	var err error
-	addr := fmt.Sprintf("%s:%d", session.connOption.Host, session.connOption.Port)
-	session.conn, err = net.Dial("tcp", addr)
-	if err != nil {
+	var connected = false
+	for i := 0; i < len(connOption.Servers); i++ {
+		host := connOption.Servers[i]
+		port := connOption.Ports[i]
+
+		addr := fmt.Sprintf("%s:%d", host, port)
+		session.conn, err = net.Dial("tcp", addr)
+		if err != nil {
+			connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
+			continue
+		}
+		connOption.Tracer.Printf("using: %s ..... [SUCCEED]", addr)
+		connected = true
+		connOption.Host = host
+		connOption.Port = port
+		break
+	}
+	if !connected {
 		return err
 	}
-	if session.connOption.SSL {
-		session.connOption.Tracer.Print("Using SSL/TLS")
+	//addr := fmt.Sprintf("using: %s:%d", session.connOption.Host, session.connOption.Port)
+	//session.conn, err = net.Dial("tcp", addr)
+	//if err != nil {
+	//	return err
+	//}
+	if connOption.SSL {
+		connOption.Tracer.Print("Using SSL/TLS")
 		session.negotiate()
 	}
-
+	connOption.Tracer.Print("Open :", connOption.ConnectionData())
 	connectPacket := newConnectPacket(*session.Context)
 	err = session.writePacket(connectPacket)
 	if err != nil {
@@ -193,24 +215,25 @@ func (session *Session) Connect() error {
 	if acceptPacket, ok := pck.(*AcceptPacket); ok {
 		*session.Context = acceptPacket.sessionCtx
 		session.Context.handshakeComplete = true
-		session.connOption.Tracer.Print("Handshake Complete")
+		connOption.Tracer.Print("Handshake Complete")
 		return nil
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
-		session.connOption.Tracer.Print("Redirect")
-		session.connOption.connData = redirectPacket.reconnectData
+		connOption.Tracer.Print("Redirect")
+		connOption.connData = redirectPacket.reconnectData
 		if len(redirectPacket.protocol()) != 0 {
-			session.connOption.Protocol = redirectPacket.protocol()
+			connOption.Protocol = redirectPacket.protocol()
 		}
 		if len(redirectPacket.host()) != 0 {
-			session.connOption.Host = redirectPacket.host()
+			connOption.Host = redirectPacket.host()
 		}
 		if len(redirectPacket.port()) != 0 {
-			session.connOption.Port, err = strconv.Atoi(redirectPacket.port())
+			connOption.Port, err = strconv.Atoi(redirectPacket.port())
 			if err != nil {
 				return errors.New("redirect packet with wrong port")
 			}
 		}
+		connOption.UpdateServers()
 		return session.Connect()
 	}
 	if refusePacket, ok := pck.(*RefusePacket); ok {
@@ -220,23 +243,6 @@ func (session *Session) Connect() error {
 		return errors.New(errorMessage)
 	}
 	return errors.New("connection refused by the server due to unknown reason")
-
-	//for {
-	//	err = session.writePacket(newConnectPacket(*session.Context))
-	//
-	//	rPck, err := session.readPacket()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if rPck == nil {
-	//		return errors.New("packet is null due to unknown packet type")
-	//	}
-	//
-	//	tmpPck, ok := rPck.(*Packet)
-	//	if ok && tmpPck.packetType == RESEND {
-	//		continue
-	//	}
-	//}
 }
 
 func (session *Session) Disconnect() {
@@ -343,8 +349,9 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 //}
 func (session *Session) writePacket(pck PacketInterface) error {
 	session.sendPcks = append(session.sendPcks, pck)
+	tracer := session.Context.ConnOption.Tracer
 	tmp := pck.bytes()
-	session.connOption.Tracer.LogPacket("Write packet:", tmp)
+	tracer.LogPacket("Write packet:", tmp)
 	var err error
 	if session.sslConn != nil {
 		_, err = session.sslConn.Write(tmp)
@@ -423,7 +430,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				for _, pck := range session.sendPcks {
 					//log.Printf("Request: %#v\n\n", pck.bytes())
 					var err error
-					if session.connOption.SSL {
+					if session.Context.ConnOption.SSL {
 						session.negotiate()
 						_, err = session.sslConn.Write(pck.bytes())
 					} else {
@@ -436,7 +443,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				continue
 			}
 			ret := append(head, body...)
-			session.connOption.Tracer.LogPacket("Read packet:", ret)
+			session.Context.ConnOption.Tracer.LogPacket("Read packet:", ret)
 			return ret, nil
 		}
 
@@ -477,14 +484,6 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		} else {
 			pck.redirectAddr = data
 		}
-		//fmt.Println("redirect address: ", pck.redirectAddr)
-		//fmt.Println("reconnect data: ", pck.reconnectData)
-		//session.Disconnect()
-
-		// if the length > dataoffset use data in the packet
-		// else get data from the server
-		// disconnect the current session
-		// connect through redirectConnectData
 		return pck, nil
 	case DATA:
 		return newDataPacketFromData(packetData, session.Context)
@@ -585,12 +584,7 @@ func (session *Session) GetString(length int) (string, error) {
 
 func (session *Session) PutBytes(data ...byte) {
 	session.outBuffer.Write(data)
-	//session.outBuffer = append(session.outBuffer, )
 }
-
-//func (session *Session) PutByte(num byte) {
-//		session.outBuffer = append(session.outBuffer, num)
-//}
 
 func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, compress bool) {
 	var num uint64

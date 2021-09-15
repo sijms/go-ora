@@ -44,9 +44,6 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 	ret.tcpNego = tcpNego
 	ret.usePadding = false
 	ret.customHash = ret.tcpNego.ServerCompileTimeCaps[4]&32 != 0
-	// the parameter srvCS_Multibyte will affect may thing in the logon process
-	//if (Conv.GetMaxBytesPerChar((int) this.m_serverCharacterSet) > 1)
-	//this.m_marshallingEngine.m_bSvrCSMultibyte = true;
 	loop := true
 	for loop {
 		messageCode, err := session.GetByte()
@@ -86,14 +83,20 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 					if len(ret.pbkdf2ChkSalt) == 0 {
 						ret.pbkdf2ChkSalt = string(val)
 						if len(ret.pbkdf2ChkSalt) != 32 {
-							return nil, errors.New("ORA-28041: Authentication protocol internal error")
+							return nil, &network.OracleError{
+								ErrCode: 28041,
+								ErrMsg:  "ORA-28041: Authentication protocol internal error",
+							}
 						}
 					}
 				} else if bytes.Compare(key, []byte("AUTH_PBKDF2_VGEN_COUNT")) == 0 {
 					if ret.pbkdf2VgenCount == 0 {
 						ret.pbkdf2VgenCount, err = strconv.Atoi(string(val))
 						if err != nil {
-							return nil, errors.New("ORA-28041: Authentication protocol internal error")
+							return nil, &network.OracleError{
+								ErrCode: 28041,
+								ErrMsg:  "ORA-28041: Authentication protocol internal error",
+							}
 						}
 						if ret.pbkdf2VgenCount < 4096 || ret.pbkdf2VgenCount > 100000000 {
 							ret.pbkdf2VgenCount = 4096
@@ -103,7 +106,10 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 					ret.pbkdf2SderCount, err = strconv.Atoi(string(val))
 					if ret.pbkdf2SderCount == 0 {
 						if err != nil {
-							return nil, errors.New("ORA-28041: Authentication protocol internal error")
+							return nil, &network.OracleError{
+								ErrCode: 28041,
+								ErrMsg:  "ORA-28041: Authentication protocol internal error",
+							}
 						}
 						if ret.pbkdf2SderCount < 3 || ret.pbkdf2SderCount > 100000000 {
 							ret.pbkdf2SderCount = 3
@@ -227,10 +233,6 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 		appendKeyVal("AUTH_PASSWORD", obj.EPassword, 0)
 		index++
 	}
-	// if newpassword encrypt and add {
-	//	session.PutKeyValString("AUTH_NEWPASSWORD", ENewPassword, 0)
-	//	index ++
-	//}
 	if len(obj.ESpeedyKey) > 0 {
 		appendKeyVal("AUTH_PBKDF2_SPEEDY_KEY", obj.ESpeedyKey, 0)
 		index++

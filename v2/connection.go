@@ -80,10 +80,15 @@ type Connection struct {
 }
 
 type OracleDriver struct {
-	Conn    *Connection
-	Server  string
-	Service string
-	UserId  string
+	Conn      *Connection
+	Server    string
+	Port      int
+	Instance  string
+	Service   string
+	DBName    string
+	UserId    string
+	SessionId int
+	SerialNum int
 }
 
 func init() {
@@ -95,10 +100,20 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 		return nil, err
 	}
 	drv.Conn = conn
+
+	err = conn.Open()
+	if err != nil {
+		return nil, err
+	}
+	drv.SessionId = conn.sessionID
+	drv.SerialNum = conn.serialID
+	drv.Instance = conn.connOption.InstanceName
 	drv.Server = conn.connOption.Host
+	drv.Port = conn.connOption.Port
 	drv.Service = conn.connOption.ServiceName
 	drv.UserId = conn.connOption.UserID
-	return conn, conn.Open()
+	drv.DBName = conn.connOption.DBName
+	return conn, nil
 }
 
 func (conn *Connection) SetStringConverter(converter converters.IStringConverter) {
@@ -284,8 +299,6 @@ func (conn *Connection) Ping(_ context.Context) error {
 
 func (conn *Connection) Open() error {
 	tracer := conn.connOption.Tracer
-	tracer.Print("Open :", conn.connOption.ConnectionData())
-
 	switch conn.conStr.DBAPrivilege {
 	case SYSDBA:
 		conn.LogonMode |= SysDba
@@ -296,9 +309,6 @@ func (conn *Connection) Open() error {
 	}
 
 	conn.session = network.NewSession(conn.connOption)
-	//conn.session.SSL.Certificates = conn.w.certificates
-	//conn.session.SSL.CertificateRequest = conn.w.certificateRequests
-	//conn.session.SSL.PrivateKeys = conn.w.privateKeys
 	if conn.connOption.SSL && conn.w != nil {
 		err := conn.session.LoadSSLData(conn.w.certificates, conn.w.privateKeys, conn.w.certificateRequests)
 		if err != nil {
@@ -332,9 +342,6 @@ func (conn *Connection) Open() error {
 		}
 	}
 
-	//else {
-	//
-	//}
 	tracer.Print("TCP Negotiation")
 	conn.tcpNego, err = NewTCPNego(conn.session)
 	if err != nil {
@@ -426,15 +433,17 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	}
 
 	connOption := &network.ConnectionOption{
-		Port:                  conStr.Port,
+		//Port:                  conStr.Port,
+		Servers:               conStr.Servers,
+		Ports:                 conStr.Ports,
 		TransportConnectTo:    0xFFFF,
 		SSLVersion:            "",
 		WalletDict:            "",
 		TransportDataUnitSize: 0xFFFF,
 		SessionDataUnitSize:   0xFFFF,
 		Protocol:              "tcp",
-		Host:                  conStr.Host,
-		UserID:                conStr.UserID,
+		//Host:                  conStr.Host,
+		UserID: conStr.UserID,
 		//IP:                    "",
 		SID: conStr.SID,
 		//Addr:                  "",
@@ -499,7 +508,6 @@ func (conn *Connection) doAuth() error {
 	conn.session.PutUint(int(conn.LogonMode), 4, true, true)
 	conn.session.PutBytes(1, 1, 5, 1, 1)
 	conn.session.PutString(conn.conStr.UserID)
-	//conn.session.PutBytes([]byte()...)
 	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientData.HostName, 0)
 	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientData.ProgramName, 0)
 	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientData.HostName, 0)
@@ -573,7 +581,7 @@ func (conn *Connection) doAuth() error {
 				}
 			}
 		default:
-			return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", msg))
+			return errors.New(fmt.Sprintf("message code error: received code %d", msg))
 		}
 	}
 

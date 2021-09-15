@@ -23,6 +23,7 @@ const (
 	SYSDBA  DBAPrivilege = 0x20
 	SYSOPER DBAPrivilege = 0x40
 )
+const defaultPort int = 1521
 
 func DBAPrivilegeFromString(s string) DBAPrivilege {
 	S := strings.ToUpper(s)
@@ -58,6 +59,8 @@ type ConnectionString struct {
 	DataSource            string
 	Host                  string
 	Port                  int
+	Servers               []string
+	Ports                 []int
 	SID                   string
 	ServiceName           string
 	InstanceName          string
@@ -101,7 +104,15 @@ func BuildUrl(server string, port int, service, user, password string, options m
 	if options != nil {
 		ret += "?"
 		for key, val := range options {
-			ret += fmt.Sprintf("%s=%s&", key, url.QueryEscape(val))
+			val = strings.TrimSpace(val)
+			for _, temp := range strings.Split(val, ",") {
+				temp = strings.TrimSpace(temp)
+				if strings.ToUpper(key) == "SERVER" {
+					ret += fmt.Sprintf("%s=%s&", key, temp)
+				} else {
+					ret += fmt.Sprintf("%s=%s&", key, url.QueryEscape(temp))
+				}
+			}
 		}
 		ret = strings.TrimRight(ret, "&")
 	}
@@ -109,7 +120,7 @@ func BuildUrl(server string, port int, service, user, password string, options m
 }
 func NewConnectionString() *ConnectionString {
 	return &ConnectionString{
-		Port:                  1521,
+		Port:                  defaultPort,
 		DBAPrivilege:          NONE,
 		EnList:                TRUE,
 		IncrPoolSize:          5,
@@ -126,6 +137,8 @@ func NewConnectionString() *ConnectionString {
 		PrefetchRows:          25,
 		SSL:                   false,
 		SSLVerify:             true,
+		Servers:               make([]string, 0, 3),
+		Ports:                 make([]int, 0, 3),
 	}
 }
 
@@ -140,29 +153,50 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	ret.UserID = u.User.Username()
 	ret.Password, _ = u.User.Password()
 	if p != "" {
-		ret.Port, err = strconv.Atoi(p)
+		port, err := strconv.Atoi(p)
 		if err != nil {
-			return nil, errors.New("port must be a number")
+			ret.Ports = append(ret.Ports, defaultPort)
+		} else {
+			ret.Ports = append(ret.Ports, port)
+		}
+
+	} else {
+		ret.Ports = append(ret.Ports, defaultPort)
+	}
+	if len(u.Host) > 0 {
+		idx := strings.Index(u.Host, ":")
+		if idx > 0 {
+			ret.Servers = append(ret.Servers, u.Host[:idx])
+		} else {
+			ret.Servers = append(ret.Servers, u.Host)
 		}
 	}
-	if ret.Port == 0 {
-		ret.Port = 1521
-	}
-	idx := strings.Index(u.Host, ":")
-	if idx > 0 {
-		ret.Host = u.Host[:idx]
-	} else {
-		ret.Host = u.Host
-	}
 	ret.ServiceName = strings.Trim(u.Path, "/")
-	if len(ret.Host) == 0 {
-		return nil, errors.New("empty host name")
-	}
 	if q != nil {
 		for key, val := range q {
 			switch strings.ToUpper(key) {
 			//case "DATA SOURCE":
 			//	conStr.DataSource = val
+			case "SERVER":
+				for _, srv := range val {
+					srv = strings.TrimSpace(srv)
+					idx := strings.Index(srv, ":")
+					if idx > 0 {
+						ret.Servers = append(ret.Servers, srv[:idx])
+						port, err := strconv.Atoi(srv[idx+1:])
+						if err != nil {
+							port = 0
+						}
+						if port == 0 {
+							ret.Ports = append(ret.Ports, defaultPort)
+						} else {
+							ret.Ports = append(ret.Ports, port)
+						}
+					} else {
+						ret.Servers = append(ret.Servers, srv)
+						ret.Ports = append(ret.Ports, defaultPort)
+					}
+				}
 			case "SERVICE NAME":
 				ret.ServiceName = val[0]
 			case "SID":
@@ -275,14 +309,10 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			}
 		}
 	}
+	if len(ret.Servers) == 0 {
+		return nil, errors.New("empty connection servers")
+	}
 	if len(ret.WalletPath) > 0 {
-		colonPos := strings.Index(ret.Host, ":")
-		var serv string
-		if colonPos == -1 {
-			serv = ret.Host
-		} else {
-			serv = ret.Host[:colonPos]
-		}
 		if len(ret.ServiceName) == 0 {
 			return nil, errors.New("you should specify server/service if you will use wallet")
 		}
@@ -291,7 +321,9 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			return nil, err
 		}
 		if len(ret.Password) == 0 {
-			cred, err := ret.w.getCredential(serv, p, ret.ServiceName, ret.UserID)
+			serv := ret.Servers[0]
+			port := ret.Ports[0]
+			cred, err := ret.w.getCredential(serv, port, ret.ServiceName, ret.UserID)
 			if err != nil {
 				return nil, err
 			}
@@ -329,116 +361,3 @@ func (connStr *ConnectionString) validate() error {
 	}
 	return nil
 }
-
-//func (conStr *ConnectionString) Parse(s string) error {
-//
-//	var upperInvariant = strings.ToUpper(s)
-//	var attribs = strings.Split(upperInvariant, ";")
-//	for _, attrib := range attribs {
-//		fields := strings.Split(attrib, "=")
-//		if len(fields) != 2 {
-//			return errors.New("error in connection string")
-//		}
-//		key := fields[0]
-//		val := fields[1]
-//		var err error
-//		switch key {
-//		case "DATA SOURCE":
-//			conStr.DataSource = val
-//		case "DBA PRIVILEGE":
-//			conStr.DBAPrivilege = DBAPrivilegeFromString(val)
-//		case "ENLIST":
-//			conStr.EnList = EnListFromString(val)
-//		case "CONNECT TIMEOUT":
-//			fallthrough
-//		case "CONNECTION TIMEOUT":
-//			conStr.ConnectionTimeOut, err = strconv.Atoi(val)
-//			if err != nil {
-//				return errors.New("CONNECTION TIMEOUT value must be an integer")
-//			}
-//		case "INC POOL SIZE":
-//			conStr.IncrPoolSize, err = strconv.Atoi(val)
-//			if err != nil {
-//				return errors.New("INC POOL SIZE value must be an integer")
-//			}
-//		case "DECR POOL SIZE":
-//			conStr.DecrPoolSize, err = strconv.Atoi(val)
-//			if err != nil {
-//				return errors.New("DECR POOL SIZE value must be an integer")
-//			}
-//		case "MAX POOL SIZE":
-//			conStr.MaxPoolSize, err = strconv.Atoi(val)
-//			if err != nil {
-//				return errors.New("MAX POOL SIZE value must be an integer")
-//			}
-//		case "MIN POOL SIZE":
-//			conStr.MinPoolSize, err = strconv.Atoi(val)
-//			if err != nil {
-//				return errors.New("MIN POOL SIZE value must be an integer")
-//			}
-//		case "POOL REGULATOR":
-//			conStr.PoolRegulator, err = strconv.Atoi(val)
-//			if err != nil {
-//				return errors.New("POOL REGULATOR value must be an integer")
-//			}
-//		case "STATEMENT CACHE SIZE":
-//			conStr.StmtCacheSize, err = strconv.Atoi(val)
-//			if err != nil {
-//				return errors.New("STATEMENT CACHE SIZE value must be an integer")
-//			}
-//		case "CONNECTION POOL TIMEOUT":
-//			conStr.ConnectionPoolTimeout, err = strconv.Atoi(val)
-//			if err != nil {
-//				return errors.New("CONNECTION POOL TIMEOUT value must be an integer")
-//			}
-//		case "CONNECTION LIFETIME":
-//			conStr.ConnectionLifeTime, err = strconv.Atoi(val)
-//			if err != nil {
-//				return errors.New("CONNECTION LIFETIME value must be an integer")
-//			}
-//		case "PERSIST SECURITY INFO":
-//			conStr.PasswordSecurityInfo = val == "TRUE"
-//		case "POOLING":
-//			conStr.Pooling = val == "TRUE"
-//		case "VALIDATE CONNECTION":
-//			conStr.ValidateConnection = val == "TRUE"
-//		case "STATEMENT CACHE PURGE":
-//			conStr.StmtCachePurge = val == "TRUE"
-//		case "HA EVENTS":
-//			conStr.HaEvent = val == "TRUE"
-//		case "LOAD BALANCING":
-//			conStr.LoadBalance = val == "TRUE"
-//		case "METADATA POOLING":
-//			conStr.MetadataBooling = val == "TRUE"
-//		case "SELF TUNING":
-//			conStr.SelfTuning = val == "TRUE"
-//		case "CONTEXT CONNECTION":
-//			conStr.ContextConnection = val == "TRUE"
-//		case "PROMOTABLE TRANSACTION":
-//			if val == "PROMOTABLE" {
-//				conStr.PromotableTransaction = Promotable
-//			} else {
-//				conStr.PromotableTransaction = Local
-//			}
-//		case "APPLICATION EDITION":
-//			conStr.ApplicationEdition = val
-//		case "USER ID":
-//			val = strings.Trim(val, "'")
-//			conStr.UserID = strings.Trim(val, "\"")
-//			if conStr.UserID == "\\" {
-//				// get os user and password
-//			}
-//		case "PROXY USER ID":
-//			val = strings.Trim(val, "'")
-//			conStr.ProxyUserID = strings.Trim(val, "\"")
-//		case "PASSWORD":
-//			val = strings.Trim(val, "'")
-//			conStr.Password = strings.Trim(val, "\"")
-//		case "PROXY PASSWORD":
-//			val = strings.Trim(val, "'")
-//			conStr.ProxyPassword = strings.Trim(val, "\"")
-//		}
-//
-//	}
-//	return nil
-//}

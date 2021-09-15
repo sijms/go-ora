@@ -115,23 +115,6 @@ func newAcceptPacketFromData(packetData []byte, connOption *ConnectionOption) *A
 	if pck.sessionCtx.TransportDataUnit < pck.sessionCtx.SessionDataUnit {
 		pck.sessionCtx.SessionDataUnit = pck.sessionCtx.TransportDataUnit
 	}
-	// if pck.sessionCtx.Version >= 310 {
-	// 	byteCount := binary.BigEndian.Uint16(packetData[28:])
-	// 	if byteCount > 0 {
-	// 		byteOffset := binary.BigEndian.Uint16(packetData[30:])
-	// 	}
-	// }
-	// dataLen := binary.BigEndian.Uint16(packetData[18:])
-	//if pck.length != uint16(len(packetData)) {
-	//	return nil
-	//}
-	//if pck.packetType != ACCEPT {
-	//	return nil
-	//}
-	// if pck.packet.dataOffset != 32 {
-	// 	fmt.Println("data offset: ", pck.packet.dataOffset)
-	// 	return nil
-	// }
 	if binary.BigEndian.Uint16(packetData[18:]) != uint16(len(pck.buffer)) {
 		return nil
 	}

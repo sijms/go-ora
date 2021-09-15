@@ -3,6 +3,30 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+### version 2.2.9: add support for connect to multiple servers
+define multiple server in 2 way
+* in url string options
+```azure
+// using url options
+databaseURL := "oracle://user:pass@server1/service?server=server2&server=server3"
+/* now the driver will try connection as follow
+1- server1
+2- server2
+3- server3
+*/
+```
+* using BuildUrl function
+```azure
+urlOptions := map[string] string {
+    "TRACE FILE": "trace.log",
+    "SERVER": "server2, server3",
+    "PREFETCH_ROWS": "500",
+    //"SSL": "enable",
+    //"SSL Verify": "false",
+}
+databaseURL := go_ora.BuildUrl(server1, 1521, "service", "user", "pass", urlOptions)
+```
+
 ### version 2.2.8: add OracleError class 
 OracleError carry error message from the server
 ### version 2.2.7: Add support for user defined types

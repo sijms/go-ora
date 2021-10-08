@@ -453,6 +453,7 @@ func (stmt *Stmt) getExeOption() int {
 }
 
 func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
+	//stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	stmt.connection.session.ResetBuffer()
 	stmt.connection.session.PutBytes(3, 5, 0)
 	stmt.connection.session.PutInt(stmt.cursorID, 2, true, true)
@@ -1002,6 +1003,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	}
 	return nil
 }
+
 func (stmt *defaultStmt) Close() error {
 	if stmt.cursorID != 0 {
 		session := stmt.connection.session
@@ -1164,10 +1166,12 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 	}
 	return param
 }
+
 func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) {
 	stmt.Pars = append(stmt.Pars, *stmt.NewParam(name, val, size, direction))
 
 }
+
 func (stmt *Stmt) AddRefCursorParam(name string) {
 	par := stmt.NewParam("1", nil, 0, Output)
 	par.DataType = REFCURSOR
@@ -1179,6 +1183,7 @@ func (stmt *Stmt) AddRefCursorParam(name string) {
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	stmt.connection.connOption.Tracer.Printf("Query:\n%s", stmt.text)
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
+	//stmt._noOfRowsToFetch = 25
 	stmt._hasMoreRows = true
 	for x := 0; x < len(args); x++ {
 		par := *stmt.NewParam("", args[x], 0, Input)

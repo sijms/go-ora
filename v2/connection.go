@@ -518,7 +518,7 @@ func (conn *Connection) doAuth() error {
 		return err
 	}
 
-	conn.authObject, err = NewAuthObject(conn.conStr.UserID, conn.conStr.Password, conn.tcpNego, conn.session)
+	conn.authObject, err = newAuthObject(conn.conStr.UserID, conn.conStr.Password, conn.tcpNego, conn.session)
 	if err != nil {
 		return err
 	}

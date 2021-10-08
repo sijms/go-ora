@@ -57,9 +57,9 @@ func (op *ConnectionOption) UpdateServers() {
 }
 
 func (op *ConnectionOption) ConnectionData() string {
-	if len(op.connData) > 0 {
-		return op.connData
-	}
+	//if len(op.connData) > 0 {
+	//	return op.connData
+	//}
 	FulCid := "(CID=(PROGRAM=" + op.ClientData.ProgramPath + ")(HOST=" + op.ClientData.HostName + ")(USER=" + op.ClientData.UserName + "))"
 	address := "(ADDRESS=(PROTOCOL=" + op.Protocol + ")(HOST=" + op.Host + ")(PORT=" + strconv.Itoa(op.Port) + "))"
 	result := "(CONNECT_DATA="
@@ -68,28 +68,9 @@ func (op *ConnectionOption) ConnectionData() string {
 	} else {
 		result += "(SERVICE_NAME=" + op.ServiceName + ")"
 	}
-	//if op.ServiceName != "" {
-	//
-	//} else {
-	//	if op.SID != "" {
-	//
-	//	}
-	//}
 	if op.InstanceName != "" {
 		result += "(INSTANCE_NAME=" + op.InstanceName + ")"
 	}
 	result += FulCid
 	return "(DESCRIPTION=" + address + result + "))"
 }
-
-//func NewConnectionOption(conStr *go_ora.ConnectionString) *ConnectionOption {
-//
-//}
-//func NewConnectionOption() *ConnectionOption {
-//	return &ConnectionOption{
-//		Port: 0xFFFF,
-//		TransportConnectTo: 0xFFFF,
-//		TransportDataUnitSize: 0xFFFF,
-//		SessionDataUnitSize: 0xFFFF,
-//	}
-//}

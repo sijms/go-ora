@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/sijms/go-ora/v2/advanced_nego"
 	"github.com/sijms/go-ora/v2/converters"
@@ -80,6 +81,7 @@ type Connection struct {
 }
 
 type OracleDriver struct {
+	m         sync.Mutex
 	Conn      *Connection
 	Server    string
 	Port      int
@@ -99,19 +101,22 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	drv.m.Lock()
 	drv.Conn = conn
+	drv.SessionId = conn.sessionID
+	drv.SerialNum = conn.serialID
+	drv.Instance = conn.connOption.InstanceName
+	drv.Server = conn.connOption.Host
+	drv.Port = conn.connOption.Port
+	drv.Service = conn.connOption.ServiceName
+	drv.UserId = conn.connOption.UserID
+	drv.DBName = conn.connOption.DBName
+	drv.m.Unlock()
 	err = conn.Open()
 	if err != nil {
 		return nil, err
 	}
-	//drv.SessionId = conn.sessionID
-	//drv.SerialNum = conn.serialID
-	//drv.Instance = conn.connOption.InstanceName
-	//drv.Server = conn.connOption.Host
-	//drv.Port = conn.connOption.Port
-	//drv.Service = conn.connOption.ServiceName
-	//drv.UserId = conn.connOption.UserID
-	//drv.DBName = conn.connOption.DBName
+
 	return conn, nil
 }
 

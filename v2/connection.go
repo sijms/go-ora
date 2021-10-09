@@ -100,19 +100,18 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 		return nil, err
 	}
 	drv.Conn = conn
-
 	err = conn.Open()
 	if err != nil {
 		return nil, err
 	}
-	drv.SessionId = conn.sessionID
-	drv.SerialNum = conn.serialID
-	drv.Instance = conn.connOption.InstanceName
-	drv.Server = conn.connOption.Host
-	drv.Port = conn.connOption.Port
-	drv.Service = conn.connOption.ServiceName
-	drv.UserId = conn.connOption.UserID
-	drv.DBName = conn.connOption.DBName
+	//drv.SessionId = conn.sessionID
+	//drv.SerialNum = conn.serialID
+	//drv.Instance = conn.connOption.InstanceName
+	//drv.Server = conn.connOption.Host
+	//drv.Port = conn.connOption.Port
+	//drv.Service = conn.connOption.ServiceName
+	//drv.UserId = conn.connOption.UserID
+	//drv.DBName = conn.connOption.DBName
 	return conn, nil
 }
 

@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+const (
+	maxConvertibleInt    = (1 << 63) - 1
+	maxConvertibleNegInt = (1 << 63)
+)
+
 // EncodeDate convert time.Time into oracle representation
 func EncodeDate(ti time.Time) []byte {
 	ret := make([]byte, 7)
@@ -199,7 +204,8 @@ func DecodeNumber(inputData []byte) interface{} {
 		IntExponent := exponent
 		var over uint64
 		over, IntMantissa = bits.Mul64(IntMantissa, powerOfTen[IntExponent])
-		if IntMantissa >= 9000000000000000000 {
+		if (!negative && IntMantissa > maxConvertibleInt) ||
+			(negative && IntMantissa > maxConvertibleNegInt) {
 			goto fallbackToFloat
 		}
 		if over != 0 {

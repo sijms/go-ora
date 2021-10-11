@@ -10,7 +10,6 @@ import (
 //	https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
 
 func TestDecodeDouble(t *testing.T) {
-
 	for _, tt := range TestFloatValue {
 		t.Run(tt.SelectText, func(t *testing.T) {
 			got := DecodeDouble(tt.Binary)
@@ -37,7 +36,6 @@ func TestDecodeInt(t *testing.T) {
 }
 
 func TestTypeOfDecodeNumber(t *testing.T) {
-
 	for _, tt := range TestFloatValue {
 		t.Run(tt.SelectText, func(t *testing.T) {
 			got := DecodeNumber(tt.Binary)
@@ -106,7 +104,6 @@ func TestEncodeInt(t *testing.T) {
 }
 
 func TestEncodeDouble(t *testing.T) {
-
 	for _, tt := range TestFloatValue {
 		t.Run(tt.SelectText, func(t *testing.T) {
 			got, err := EncodeDouble(tt.Float)

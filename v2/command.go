@@ -998,6 +998,14 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 			}
 			param.Value = resultClobString
 		}
+	case IBFloat:
+		param.Value = converters.ConvertBinaryFloat(param.BValue)
+	case IBDouble:
+		param.Value = converters.ConvertBinaryDouble(param.BValue)
+	case IntervalYM_DTY:
+		param.Value = converters.ConvertIntervalYM_DTY(param.BValue)
+	case IntervalDS_DTY:
+		param.Value = converters.ConvertIntervalDS_DTY(param.BValue)
 	default:
 		param.Value = param.BValue
 	}

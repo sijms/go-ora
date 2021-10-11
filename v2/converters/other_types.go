@@ -69,9 +69,9 @@ func ConvertIntervalDS_DTY(val []byte) string {
 		return fmt.Sprintf("+%02d %02d:%02d:%02d.%06d", days, hours, mins, secs, ns)
 	}
 	days = -days
-	hours := val[4] - 40
-	mins := val[5] - 20
-	secs := val[6]
+	hours := 60 - val[4]
+	mins := 60 - val[5]
+	secs := 60 - val[6]
 	uns := binary.BigEndian.Uint32(val[7:])
 	ns := -(int(uns) - 2147483648) / 1000
 	return fmt.Sprintf("-%02d %02d:%02d:%02d.%06d", days, hours, mins, secs, ns)

@@ -29,7 +29,7 @@ func TestBinaryFloat(t *testing.T) {
 	for _, c := range cases {
 		v := ConvertBinaryFloat(c.raw)
 		if v != c.expected {
-			t.Fatalf("expected %v, got %v", c.expected, v)
+			t.Errorf("expected %v, got %v", c.expected, v)
 		}
 	}
 }
@@ -59,7 +59,7 @@ func TestBinaryDouble(t *testing.T) {
 	for _, c := range cases {
 		v := ConvertBinaryFloat(c.raw)
 		if v != c.expected {
-			t.Fatalf("expected %v, got %v", c.expected, v)
+			t.Errorf("expected %v, got %v", c.expected, v)
 		}
 	}
 }
@@ -116,21 +116,21 @@ func TestIntervalYM(t *testing.T) {
 	for _, c := range cases {
 		v := ConvertIntervalYM_DTY(c.raw)
 		if v != c.expected {
-			t.Fatalf("expected %v, got %v", c.expected, v)
+			t.Errorf("expected %v, got %v", c.expected, v)
 		}
 	}
 }
 
 /*
-SQL> SELECT dump(cast(TO_DSINTERVAL('2 10:20:30.456') as INTERVAL DAY TO SECOND)) FROM dual;
-Typ=183 Len=11: 128,0,0,2,70,80,90,155,46,2,0
-SQL> SELECT cast(TO_DSINTERVAL('2 10:20:30.456') as INTERVAL DAY TO SECOND) FROM dual;
-+02 10:20:30.456000
+SQL> SELECT dump(cast(TO_DSINTERVAL('2 12:23:34.456') as INTERVAL DAY TO SECOND)) FROM dual;
+Typ=183 Len=11: 128,0,0,2,72,83,94,155,46,2,0
+SQL> SELECT cast(TO_DSINTERVAL('2 12:23:34.456') as INTERVAL DAY TO SECOND) FROM dual;
++02 12:23:34.456000
 
-SQL> SELECT dump(cast(TO_DSINTERVAL('-2 10:20:30.456') as INTERVAL DAY TO SECOND)) FROM dual;
-Typ=183 Len=11: 127,255,255,254,50,40,30,100,209,254,0
+SQL> SELECT dump(cast(TO_DSINTERVAL('-2 12:23:34.456789') as INTERVAL DAY TO SECOND)) FROM dual;
+Typ=183 Len=11: 127,255,255,254,48,37,26,100,197,243,248
 SQL> SELECT cast(TO_DSINTERVAL('-2 10:20:30.456') as INTERVAL DAY TO SECOND) FROM dual;
--02 10:20:30.456000
+-02 12:23:34.456789
 
 SQL> SELECT dump(cast(TO_DSINTERVAL('0 10:20:30.456789') as INTERVAL DAY TO SECOND)) FROM dual;
 Typ=183 Len=11: 128,0,0,0,70,80,90,155,58,12,8
@@ -142,12 +142,12 @@ Note that heading + is expected in the string representation
 func TestIntervalDS(t *testing.T) {
 	cases := []intervalCase{
 		{
-			[]byte{128, 0, 0, 2, 70, 80, 90, 155, 46, 2, 0},
-			"+02 10:20:30.456000",
+			[]byte{128, 0, 0, 2, 72, 83, 94, 155, 46, 2, 0},
+			"+02 12:23:34.456000",
 		},
 		{
-			[]byte{127, 255, 255, 254, 50, 40, 30, 100, 209, 254, 0},
-			"-02 10:20:30.456000",
+			[]byte{127, 255, 255, 254, 48, 37, 26, 100, 197, 243, 248},
+			"-02 12:23:34.456789",
 		},
 		{
 			[]byte{128, 0, 0, 0, 70, 80, 90, 155, 58, 12, 8},
@@ -158,7 +158,7 @@ func TestIntervalDS(t *testing.T) {
 	for _, c := range cases {
 		v := ConvertIntervalDS_DTY(c.raw)
 		if v != c.expected {
-			t.Fatalf("expected %v, got %v", c.expected, v)
+			t.Errorf("expected %v, got %v", c.expected, v)
 		}
 	}
 }

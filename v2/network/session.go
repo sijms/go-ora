@@ -160,6 +160,10 @@ func (session *Session) negotiate() {
 	//session.connOption.Tracer.Print("SSL/TLS HandShake complete")
 }
 
+// Connect perform network connection on address:port
+// check if the client need to use SSL
+// then send connect packet to the server and
+// receive either accept, redirect or refuse packet
 func (session *Session) Connect() error {
 	connOption := session.Context.ConnOption
 	session.Disconnect()
@@ -245,6 +249,7 @@ func (session *Session) Connect() error {
 	return errors.New("connection refused by the server due to unknown reason")
 }
 
+// Disconnect close the network and release resources
 func (session *Session) Disconnect() {
 	session.ResetBuffer()
 	if session.sslConn != nil {
@@ -257,6 +262,7 @@ func (session *Session) Disconnect() {
 	}
 }
 
+// ResetBuffer empty in and out buffer and set read index to 0
 func (session *Session) ResetBuffer() {
 	session.Summary = nil
 	session.sendPcks = nil
@@ -275,6 +281,7 @@ func (session *Session) Debug() {
 	session.index = oldIndex
 	//}
 }
+
 func (session *Session) DumpIn() {
 	log.Printf("%#v\n", session.inBuffer)
 }
@@ -283,6 +290,9 @@ func (session *Session) DumpOut() {
 	log.Printf("%#v\n", session.outBuffer)
 }
 
+// Write send data store in output buffer through network
+// if data bigger than SessionDataUnit it should be divided into
+// segment and each segment sent in data packet
 func (session *Session) Write() error {
 	outputBytes := session.outBuffer.Bytes()
 	size := session.outBuffer.Len()

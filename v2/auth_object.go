@@ -39,7 +39,8 @@ type AuthObject struct {
 	tcpNego          *TCPNego
 }
 
-func NewAuthObject(username string, password string, tcpNego *TCPNego, session *network.Session) (*AuthObject, error) {
+// create authentication object by read data from network
+func newAuthObject(username string, password string, tcpNego *TCPNego, session *network.Session) (*AuthObject, error) {
 	ret := new(AuthObject)
 	ret.tcpNego = tcpNego
 	ret.usePadding = false
@@ -186,7 +187,7 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 	}
 
 	// encrypt the client key
-	ret.EClientSessKey, err = EncryptSessionKey(padding, key, ret.ClientSessKey)
+	ret.EClientSessKey, err = encryptSessionKey(padding, key, ret.ClientSessKey)
 	if err != nil {
 		return nil, err
 	}
@@ -202,12 +203,12 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 		padding = true
 	}
 	// encrypt the password
-	ret.EPassword, err = EncryptPassword([]byte(password), newKey, true)
+	ret.EPassword, err = encryptPassword([]byte(password), newKey, true)
 	if err != nil {
 		return nil, err
 	}
 	if ret.VerifierType == 18453 {
-		ret.ESpeedyKey, err = EncryptPassword(speedyKey, newKey, padding)
+		ret.ESpeedyKey, err = encryptPassword(speedyKey, newKey, padding)
 		if err != nil {
 			return nil, err
 		}
@@ -215,6 +216,7 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 	return ret, nil
 }
 
+// write authentication data to network
 func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMode, session *network.Session) error {
 	var keys = make([]string, 0, 20)
 	var values = make([]string, 0, 20)
@@ -365,12 +367,6 @@ func getKeyFromUserNameAndPassword(username string, password string) ([]byte, er
 	return append(key2, make([]byte, 8)...), nil
 }
 
-//func PKCS5Padding(cipherText []byte, blockSize int) []byte {
-//	padding := blockSize - len(cipherText)%blockSize
-//	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-//	return append(cipherText, padtext...)
-//}
-
 func HexStringToBytes(input string) ([]byte, error) {
 	result := make([]byte, len(input)/2)
 	for x := 0; x < len(input); x += 2 {
@@ -383,6 +379,7 @@ func HexStringToBytes(input string) ([]byte, error) {
 	return result, nil
 }
 
+// decrypt session key that come from the server
 func decryptSessionKey(padding bool, encKey []byte, sessionKey string) ([]byte, error) {
 	result, err := HexStringToBytes(sessionKey)
 	if err != nil {
@@ -417,7 +414,8 @@ func decryptSessionKey(padding bool, encKey []byte, sessionKey string) ([]byte, 
 	return output[:len(output)-cutLen], nil
 }
 
-func EncryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, error) {
+// encrypt session key that generated from the client
+func encryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, error) {
 	blk, err := aes.NewCipher(encKey)
 	if err != nil {
 		return "", err
@@ -443,34 +441,18 @@ func EncryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, 
 	//numArray = cryptoServiceProvider.CreateEncryptor().TransformFinalBlock(buffer, 0, buffer.Length);
 }
 
-func EncryptPassword(password, key []byte, padding bool) (string, error) {
+// encrypt user password
+func encryptPassword(password, key []byte, padding bool) (string, error) {
 	buff1 := make([]byte, 0x10)
 	_, err := rand.Read(buff1)
-	//buff_1 = []byte{109, 250, 127, 252, 157, 165, 29, 6, 165, 174, 50, 93, 165, 202, 192, 100}
 	if err != nil {
 		return "", nil
 	}
 	buffer := append(buff1, password...)
-	return EncryptSessionKey(padding, key, buffer)
+	return encryptSessionKey(padding, key, buffer)
 }
 
-//func bytesToHexString(input []byte) []byte {
-//	byteToHex := func(x uint8) uint8 {
-//		x &= 0xF
-//		if x < 10 {
-//			return x + 48
-//		} else {
-//			return x - 10 + 65
-//		}
-//	}
-//	output := make([]byte, len(input)*2)
-//
-//	for i := 0; i < len(input); i++ {
-//		output[i*2] = byteToHex((input[i] & 0xF0) >> 4)
-//		output[i*2+1] = byteToHex(input[i] & 0xF)
-//	}
-//	return output
-//}
+// generate encryption key for the password this depends on database verifier type
 func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 	hash := md5.New()
 	key1 := obj.ServerSessKey
@@ -538,65 +520,65 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 	}
 }
 
-func (obj *AuthObject) VerifyResponse(response string) bool {
-	key, err := decryptSessionKey(true, obj.KeyHash, response)
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-	//fmt.Printf("%#v\n", key)
-	return bytes.Compare(key[16:], []byte{83, 69, 82, 86, 69, 82, 95, 84, 79, 95, 67, 76, 73, 69, 78, 84}) == 0
-	//KZSR_SVR_RESPONSE = new byte[16]{ (byte) 83, (byte) 69, (byte) 82, (byte) 86, (byte) 69, (byte) 82, (byte) 95, (byte) 84, (byte) 79,
-	//(byte) 95, (byte) 67, (byte) 76, (byte) 73, (byte) 69, (byte) 78, (byte) 84 };
+//func (obj *AuthObject) VerifyResponse(response string) bool {
+//	key, err := decryptSessionKey(true, obj.KeyHash, response)
+//	if err != nil {
+//		fmt.Println(err)
+//		return false
+//	}
+//	//fmt.Printf("%#v\n", key)
+//	return bytes.Compare(key[16:], []byte{83, 69, 82, 86, 69, 82, 95, 84, 79, 95, 67, 76, 73, 69, 78, 84}) == 0
+//	//KZSR_SVR_RESPONSE = new byte[16]{ (byte) 83, (byte) 69, (byte) 82, (byte) 86, (byte) 69, (byte) 82, (byte) 95, (byte) 84, (byte) 79,
+//	//(byte) 95, (byte) 67, (byte) 76, (byte) 73, (byte) 69, (byte) 78, (byte) 84 };
+//
+//}
 
-}
-
-func (obj *AuthObject) TestResponse(password, pbkdf2ChkSalt string, vGenCount, sDerCount int) error {
-	padding := false
-	obj.pbkdf2ChkSalt = pbkdf2ChkSalt
-	obj.pbkdf2VgenCount = vGenCount
-	obj.pbkdf2SderCount = sDerCount
-	obj.tcpNego = &TCPNego{
-		MessageCode:           0,
-		ProtocolServerVersion: 0,
-		ProtocolServerString:  "",
-		OracleVersion:         0,
-		ServerCharset:         0,
-		ServerFlags:           0,
-		CharsetElem:           0,
-		ServernCharset:        0,
-		ServerCompileTimeCaps: []byte{0, 0, 0, 0, 32},
-		ServerRuntimeCaps:     nil,
-	}
-	salt, err := HexStringToBytes(obj.Salt)
-	if err != nil {
-		return err
-	}
-	message := append(salt, []byte("AUTH_PBKDF2_SPEEDY_KEY")...)
-	speedyKey := generateSpeedyKey(message, []byte(password), obj.pbkdf2VgenCount)
-
-	buffer := append(speedyKey, salt...)
-	hash := sha512.New()
-	hash.Write(buffer)
-	key := hash.Sum(nil)[:32]
-	obj.ServerSessKey, err = decryptSessionKey(padding, key, obj.EServerSessKey)
-	if err != nil {
-		return err
-	}
-	obj.ClientSessKey, err = decryptSessionKey(padding, key, obj.EClientSessKey)
-	if err != nil {
-		return err
-	}
-	newKey, err := obj.generatePasswordEncKey()
-	if err != nil {
-		return err
-	}
-	fmt.Println(decryptSessionKey(padding, newKey, obj.EPassword))
-
-	obj.EPassword, err = EncryptPassword([]byte(password), newKey, false)
-	if err != nil {
-		return err
-	}
-	obj.ESpeedyKey, err = EncryptPassword(speedyKey, newKey, false)
-	return err
-}
+//func (obj *AuthObject) TestResponse(password, pbkdf2ChkSalt string, vGenCount, sDerCount int) error {
+//	padding := false
+//	obj.pbkdf2ChkSalt = pbkdf2ChkSalt
+//	obj.pbkdf2VgenCount = vGenCount
+//	obj.pbkdf2SderCount = sDerCount
+//	obj.tcpNego = &TCPNego{
+//		MessageCode:           0,
+//		ProtocolServerVersion: 0,
+//		ProtocolServerString:  "",
+//		OracleVersion:         0,
+//		ServerCharset:         0,
+//		ServerFlags:           0,
+//		CharsetElem:           0,
+//		ServernCharset:        0,
+//		ServerCompileTimeCaps: []byte{0, 0, 0, 0, 32},
+//		ServerRuntimeCaps:     nil,
+//	}
+//	salt, err := HexStringToBytes(obj.Salt)
+//	if err != nil {
+//		return err
+//	}
+//	message := append(salt, []byte("AUTH_PBKDF2_SPEEDY_KEY")...)
+//	speedyKey := generateSpeedyKey(message, []byte(password), obj.pbkdf2VgenCount)
+//
+//	buffer := append(speedyKey, salt...)
+//	hash := sha512.New()
+//	hash.Write(buffer)
+//	key := hash.Sum(nil)[:32]
+//	obj.ServerSessKey, err = decryptSessionKey(padding, key, obj.EServerSessKey)
+//	if err != nil {
+//		return err
+//	}
+//	obj.ClientSessKey, err = decryptSessionKey(padding, key, obj.EClientSessKey)
+//	if err != nil {
+//		return err
+//	}
+//	newKey, err := obj.generatePasswordEncKey()
+//	if err != nil {
+//		return err
+//	}
+//	fmt.Println(decryptSessionKey(padding, newKey, obj.EPassword))
+//
+//	obj.EPassword, err = encryptPassword([]byte(password), newKey, false)
+//	if err != nil {
+//		return err
+//	}
+//	obj.ESpeedyKey, err = encryptPassword(speedyKey, newKey, false)
+//	return err
+//}

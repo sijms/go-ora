@@ -80,15 +80,16 @@ type Connection struct {
 }
 
 type OracleDriver struct {
-	Conn      *Connection
-	Server    string
-	Port      int
-	Instance  string
-	Service   string
-	DBName    string
-	UserId    string
-	SessionId int
-	SerialNum int
+	//m         sync.Mutex
+	//Conn      *Connection
+	//Server    string
+	//Port      int
+	//Instance  string
+	//Service   string
+	//DBName    string
+	//UserId    string
+	//SessionId int
+	//SerialNum int
 }
 
 func init() {
@@ -99,20 +100,22 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	drv.Conn = conn
-
+	//drv.m.Lock()
+	//drv.Conn = conn
+	//drv.SessionId = conn.sessionID
+	//drv.SerialNum = conn.serialID
+	//drv.Instance = conn.connOption.InstanceName
+	//drv.Server = conn.connOption.Host
+	//drv.Port = conn.connOption.Port
+	//drv.Service = conn.connOption.ServiceName
+	//drv.UserId = conn.connOption.UserID
+	//drv.DBName = conn.connOption.DBName
+	//drv.m.Unlock()
 	err = conn.Open()
 	if err != nil {
 		return nil, err
 	}
-	drv.SessionId = conn.sessionID
-	drv.SerialNum = conn.serialID
-	drv.Instance = conn.connOption.InstanceName
-	drv.Server = conn.connOption.Host
-	drv.Port = conn.connOption.Port
-	drv.Service = conn.connOption.ServiceName
-	drv.UserId = conn.connOption.UserID
-	drv.DBName = conn.connOption.DBName
+
 	return conn, nil
 }
 
@@ -518,7 +521,7 @@ func (conn *Connection) doAuth() error {
 		return err
 	}
 
-	conn.authObject, err = NewAuthObject(conn.conStr.UserID, conn.conStr.Password, conn.tcpNego, conn.session)
+	conn.authObject, err = newAuthObject(conn.conStr.UserID, conn.conStr.Password, conn.tcpNego, conn.session)
 	if err != nil {
 		return err
 	}

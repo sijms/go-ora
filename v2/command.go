@@ -938,7 +938,12 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 			param.Value = stmt.connection.strConv.Decode(param.BValue)
 		}
 	case NUMBER:
-		param.Value = converters.DecodeNumber(param.BValue)
+		if int8(param.Scale) <= 0 {
+			// We expect an integer
+			param.Value = converters.DecodeInt(param.BValue)
+		} else {
+			param.Value = converters.DecodeDouble(param.BValue)
+		}
 	case TimeStamp:
 		fallthrough
 	case TimeStampDTY:

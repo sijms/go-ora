@@ -44,7 +44,7 @@ Typ=101 Len=8: 63,159,49,153,153,153,153,153
 func TestBinaryDouble(t *testing.T) {
 	cases := []struct {
 		raw      []byte
-		expected float32
+		expected float64
 	}{
 		{
 			[]byte{192, 96, 206, 102, 102, 102, 102, 102},
@@ -57,7 +57,7 @@ func TestBinaryDouble(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		v := ConvertBinaryFloat(c.raw)
+		v := ConvertBinaryDouble(c.raw)
 		if v != c.expected {
 			t.Errorf("expected %v, got %v", c.expected, v)
 		}

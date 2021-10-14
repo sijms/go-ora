@@ -437,11 +437,14 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			}
 
 			if pckType == RESEND {
+				if session.Context.ConnOption.SSL {
+					session.negotiate()
+				}
 				for _, pck := range session.sendPcks {
 					//log.Printf("Request: %#v\n\n", pck.bytes())
 					var err error
 					if session.Context.ConnOption.SSL {
-						session.negotiate()
+
 						_, err = session.sslConn.Write(pck.bytes())
 					} else {
 						_, err = session.conn.Write(pck.bytes())

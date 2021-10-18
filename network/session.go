@@ -606,7 +606,6 @@ func (session *Session) PutClr(data []byte) {
 	}
 	if dataLen > 0x40 {
 		session.outBuffer.WriteByte(0xFE)
-		//session.outBuffer = append(session.outBuffer, 0xFE)
 	}
 	start := 0
 	for start < dataLen {
@@ -617,13 +616,10 @@ func (session *Session) PutClr(data []byte) {
 		temp := data[start:end]
 		session.outBuffer.WriteByte(uint8(len(temp)))
 		session.outBuffer.Write(temp)
-		//session.outBuffer = append(session.outBuffer, uint8(len(temp)))
-		//session.outBuffer = append(session.outBuffer, temp...)
-		start += 64
+		start += 0x40
 	}
 	if dataLen > 0x40 {
 		session.outBuffer.WriteByte(0)
-		//session.outBuffer = append(session.outBuffer, 0)
 	}
 }
 

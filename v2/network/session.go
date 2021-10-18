@@ -276,9 +276,9 @@ func (session *Session) Debug() {
 	//if session.index > 350 && session.index < 370 {
 	fmt.Println("index: ", session.index)
 	fmt.Printf("data buffer: %#v\n", session.inBuffer[session.index:session.index+30])
-	oldIndex := session.index
-	fmt.Println(session.GetClr())
-	session.index = oldIndex
+	//oldIndex := session.index
+	//fmt.Println(session.GetClr())
+	//session.index = oldIndex
 	//}
 }
 
@@ -901,7 +901,9 @@ func (session *Session) GetClr() (output []byte, err error) {
 		if session.UseBigClrChunks {
 			size1, err = session.GetInt(4, true, true)
 		} else {
-			size1, err = session.GetInt(1, true, true)
+			var bsize1 uint8
+			bsize1, err = session.GetByte()
+			size1 = int(bsize1)
 		}
 		if err != nil || size1 == 0 {
 			break

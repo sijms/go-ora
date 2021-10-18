@@ -901,9 +901,7 @@ func (session *Session) GetClr() (output []byte, err error) {
 		if session.UseBigClrChunks {
 			size1, err = session.GetInt(4, true, true)
 		} else {
-			var bsize1 uint8
-			bsize1, err = session.GetByte()
-			size1 = int(bsize1)
+			size1, err = session.GetInt(1, false, false)
 		}
 		if err != nil || size1 == 0 {
 			break

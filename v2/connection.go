@@ -398,7 +398,7 @@ func (conn *Connection) Open() error {
 	}
 	conn.serialID = int(serialNum)
 	conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
-	conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
+	//conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
 	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]

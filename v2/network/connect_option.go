@@ -16,17 +16,18 @@ type ClientData struct {
 	PID         int
 }
 type ConnectionOption struct {
-	Port                  int
+	//Port                  int
 	TransportConnectTo    int
 	SSLVersion            string
 	WalletDict            string
 	TransportDataUnitSize uint32
 	SessionDataUnitSize   uint32
 	Protocol              string
-	Host                  string
-	UserID                string
-	Servers               []string
-	Ports                 []int
+	//Host                  string
+	UserID      string
+	Servers     []string
+	Ports       []int
+	serverIndex int
 	//IP string
 	SID string
 	//Addr string
@@ -45,23 +46,33 @@ type ConnectionOption struct {
 	SSLVerify    bool
 }
 
-func (op *ConnectionOption) UpdateServers() {
+func (op *ConnectionOption) AddServer(host string, port int) {
 	for i := 0; i < len(op.Servers); i++ {
-		if strings.ToUpper(op.Host) == strings.ToUpper(op.Servers[i]) &&
-			op.Port == op.Ports[i] {
+		if strings.ToUpper(host) == strings.ToUpper(op.Servers[i]) &&
+			port == op.Ports[i] {
 			return
 		}
 	}
-	op.Servers = append([]string{op.Host}, op.Servers...)
-	op.Ports = append([]int{op.Port}, op.Ports...)
+	op.Servers = append(op.Servers, host)
+	op.Ports = append(op.Ports, port)
 }
 
+func (op *ConnectionOption) GetActiveServer(jump bool) (string, int) {
+	if jump {
+		op.serverIndex++
+	}
+	if op.serverIndex >= len(op.Servers) {
+		return "", 0
+	}
+	return op.Servers[op.serverIndex], op.Ports[op.serverIndex]
+}
 func (op *ConnectionOption) ConnectionData() string {
 	//if len(op.connData) > 0 {
 	//	return op.connData
 	//}
+	host, port := op.GetActiveServer(false)
 	FulCid := "(CID=(PROGRAM=" + op.ClientData.ProgramPath + ")(HOST=" + op.ClientData.HostName + ")(USER=" + op.ClientData.UserName + "))"
-	address := "(ADDRESS=(PROTOCOL=" + op.Protocol + ")(HOST=" + op.Host + ")(PORT=" + strconv.Itoa(op.Port) + "))"
+	address := "(ADDRESS=(PROTOCOL=" + op.Protocol + ")(HOST=" + host + ")(PORT=" + strconv.Itoa(port) + "))"
 	result := "(CONNECT_DATA="
 	if op.SID != "" {
 		result += "(SID=" + op.SID + ")"

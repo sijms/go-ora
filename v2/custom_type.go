@@ -16,7 +16,10 @@ type customType struct {
 	filedMap map[string]int
 }
 
-func (conn *Connection) RegisterType(owner, typeName string, typeObj interface{}) error {
+func (conn *Connection) RegisterType(typeName string, typeObj interface{}) error {
+	return conn.RegisterTypeWithOwner(conn.connOption.UserID, typeName, typeObj)
+}
+func (conn *Connection) RegisterTypeWithOwner(owner, typeName string, typeObj interface{}) error {
 	if typeObj == nil {
 		return errors.New("type object cannot be nil")
 	}

@@ -2,10 +2,12 @@ package go_ora
 
 import (
 	"bytes"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/sijms/go-ora/v2/converters"
@@ -524,10 +526,10 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 							stmt.Pars[x].BValue = nil
 							stmt.Pars[x].Value = nil
 						} else {
-							stmt.Pars[x].BValue, err = session.GetClr()
-							if err != nil {
-								return err
-							}
+							//stmt.Pars[x].BValue, err = session.GetClr()
+							//if err != nil {
+							//	return err
+							//}
 							err = stmt.calculateParameterValue(&stmt.Pars[x])
 							if err != nil {
 								return err
@@ -927,18 +929,21 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		param.Value = nil
 		return nil
 	}
+
+	var tempVal driver.Value
+
 	switch param.DataType {
 	case NCHAR, CHAR, LONG:
 		if stmt.connection.strConv.GetLangID() != param.CharsetID {
 			tempCharset := stmt.connection.strConv.GetLangID()
 			stmt.connection.strConv.SetLangID(param.CharsetID)
-			param.Value = stmt.connection.strConv.Decode(param.BValue)
+			tempVal = stmt.connection.strConv.Decode(param.BValue)
 			stmt.connection.strConv.SetLangID(tempCharset)
 		} else {
-			param.Value = stmt.connection.strConv.Decode(param.BValue)
+			tempVal = stmt.connection.strConv.Decode(param.BValue)
 		}
 	case NUMBER:
-		param.Value = converters.DecodeNumber(param.BValue)
+		tempVal = converters.DecodeNumber(param.BValue)
 	case TimeStamp:
 		fallthrough
 	case TimeStampDTY:
@@ -956,7 +961,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		if err != nil {
 			return err
 		}
-		param.Value = dateVal
+		tempVal = dateVal
 	case OCIBlobLocator, OCIClobLocator:
 		data, err := session.GetClr()
 		if err != nil {
@@ -979,7 +984,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 			if dataSize != int64(len(lobData)) {
 				return errors.New("error reading lob data")
 			}
-			param.Value = lobData
+			tempVal = lobData
 		} else {
 			tempCharset := stmt.connection.strConv.GetLangID()
 			if lob.variableWidthChar() {
@@ -996,18 +1001,28 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 			if dataSize != int64(len([]rune(resultClobString))) {
 				return errors.New("error reading clob data")
 			}
-			param.Value = resultClobString
+			tempVal = resultClobString
 		}
 	case IBFloat:
-		param.Value = converters.ConvertBinaryFloat(param.BValue)
+		tempVal = converters.ConvertBinaryFloat(param.BValue)
 	case IBDouble:
-		param.Value = converters.ConvertBinaryDouble(param.BValue)
+		tempVal = converters.ConvertBinaryDouble(param.BValue)
 	case IntervalYM_DTY:
-		param.Value = converters.ConvertIntervalYM_DTY(param.BValue)
+		tempVal = converters.ConvertIntervalYM_DTY(param.BValue)
 	case IntervalDS_DTY:
-		param.Value = converters.ConvertIntervalDS_DTY(param.BValue)
+		tempVal = converters.ConvertIntervalDS_DTY(param.BValue)
 	default:
-		param.Value = param.BValue
+		tempVal = param.BValue
+	}
+	if param.Value != nil {
+		typ := reflect.TypeOf(param.Value)
+		if typ.Kind() == reflect.Ptr {
+			reflect.ValueOf(param.Value).Elem().Set(reflect.ValueOf(tempVal))
+		} else {
+			param.Value = tempVal
+		}
+	} else {
+		param.Value = tempVal
 	}
 	return nil
 }
@@ -1031,7 +1046,12 @@ func (stmt *defaultStmt) Close() error {
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	stmt.connection.connOption.Tracer.Printf("Exec:\n%s", stmt.text)
 	for x := 0; x < len(args); x++ {
-		par := *stmt.NewParam("", args[x], 0, Input)
+		var par ParameterInfo
+		if tempOut, ok := args[x].(sql.Out); ok {
+			par = *stmt.NewParam("", tempOut.Dest, 0, Output)
+		} else {
+			par = *stmt.NewParam("", args[x], 0, Input)
+		}
 		if x < len(stmt.Pars) {
 			if par.MaxLen > stmt.Pars[x].MaxLen {
 				stmt.reSendParDef = true
@@ -1087,6 +1107,108 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 		param.CharsetForm = 1
 	} else {
 		switch val := val.(type) {
+		case *int64:
+			param.Value = val
+			param.BValue = converters.EncodeInt64(*val)
+			param.DataType = NUMBER
+		case *int32:
+			param.Value = val
+			param.BValue = converters.EncodeInt(int(*val))
+			param.DataType = NUMBER
+		case *int16:
+			param.Value = val
+			param.BValue = converters.EncodeInt(int(*val))
+			param.DataType = NUMBER
+		case *int8:
+			param.Value = val
+			param.BValue = converters.EncodeInt(int(*val))
+			param.DataType = NUMBER
+		case *int:
+			param.Value = val
+			param.BValue = converters.EncodeInt(*val)
+			param.DataType = NUMBER
+		case *uint:
+			param.Value = val
+			param.BValue = converters.EncodeInt(int(*val))
+			param.DataType = NUMBER
+		case *uint8:
+			param.Value = val
+			param.BValue = converters.EncodeInt(int(*val))
+			param.DataType = NUMBER
+		case *uint16:
+			param.Value = val
+			param.BValue = converters.EncodeInt(int(*val))
+			param.DataType = NUMBER
+		case *uint32:
+			param.Value = val
+			param.BValue = converters.EncodeInt(int(*val))
+			param.DataType = NUMBER
+		case *uint64:
+			param.Value = val
+			param.BValue = converters.EncodeInt(int(*val))
+			param.DataType = NUMBER
+		case *float32:
+			param.Value = val
+			param.BValue, _ = converters.EncodeDouble(float64(*val))
+			param.DataType = NUMBER
+		case *float64:
+			param.Value = val
+			param.BValue, _ = converters.EncodeDouble(*val)
+			param.DataType = NUMBER
+		case *time.Time:
+			param.Value = val
+			param.BValue = converters.EncodeDate(*val)
+			param.DataType = DATE
+			param.ContFlag = 0
+			param.MaxLen = 11
+			param.MaxCharLen = 11
+		case *NVarChar:
+			param.Value = val
+			param.DataType = NCHAR
+			param.CharsetID = stmt.connection.tcpNego.ServernCharset
+			param.ContFlag = 16
+			param.MaxCharLen = len(*val)
+			param.CharsetForm = 2
+			if len(*val) == 0 && direction == Input {
+				param.BValue = nil
+				param.MaxLen = 1
+			} else {
+				tempCharset := stmt.connection.strConv.GetLangID()
+				stmt.connection.strConv.SetLangID(param.CharsetID)
+				param.BValue = stmt.connection.strConv.Encode(string(*val))
+				stmt.connection.strConv.SetLangID(tempCharset)
+				if size > len(*val) {
+					param.MaxCharLen = size
+				}
+				param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+			}
+		case *string:
+			param.Value = val
+			param.DataType = NCHAR
+			param.ContFlag = 16
+			param.MaxCharLen = len([]rune(*val))
+			param.CharsetForm = 1
+			if *val == "" && direction == Input {
+				param.BValue = nil
+				param.MaxLen = 1
+			} else {
+				tempCharset := stmt.connection.strConv.GetLangID()
+				stmt.connection.strConv.SetLangID(param.CharsetID)
+				param.BValue = stmt.connection.strConv.Encode(*val)
+				stmt.connection.strConv.SetLangID(tempCharset)
+				if size > len(*val) {
+					param.MaxCharLen = size
+				}
+				param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+			}
+		case *[]byte:
+			param.Value = val
+			param.BValue = *val
+			param.DataType = RAW
+			param.MaxLen = len(*val)
+			param.ContFlag = 0
+			param.MaxCharLen = 0
+			param.CharsetForm = 0
 		case int64:
 			param.BValue = converters.EncodeInt64(val)
 			param.DataType = NUMBER
@@ -1101,6 +1223,21 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.DataType = NUMBER
 		case int:
 			param.BValue = converters.EncodeInt(val)
+			param.DataType = NUMBER
+		case uint:
+			param.BValue = converters.EncodeInt(int(val))
+			param.DataType = NUMBER
+		case uint8:
+			param.BValue = converters.EncodeInt(int(val))
+			param.DataType = NUMBER
+		case uint16:
+			param.BValue = converters.EncodeInt(int(val))
+			param.DataType = NUMBER
+		case uint32:
+			param.BValue = converters.EncodeInt(int(val))
+			param.DataType = NUMBER
+		case uint64:
+			param.BValue = converters.EncodeInt64(int64(val))
 			param.DataType = NUMBER
 		case float32:
 			param.BValue, _ = converters.EncodeDouble(float64(val))

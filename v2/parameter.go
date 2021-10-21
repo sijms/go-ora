@@ -114,6 +114,7 @@ type ParameterInfo struct {
 	CharsetForm          int
 	BValue               []byte
 	Value                driver.Value
+	OutputVarPtr         interface{}
 	getDataFromServer    bool
 	oaccollid            int
 	cusType              *customType

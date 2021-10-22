@@ -17,7 +17,7 @@ databaseURL := "oracle://user:pass@server1/service?server=server2&server=server3
 */
 ```
 * using BuildUrl function
-```azure
+```golang
 urlOptions := map[string] string {
     "TRACE FILE": "trace.log",
     "SERVER": "server2, server3",
@@ -44,7 +44,7 @@ create or replace TYPE TEST_TYPE1 IS OBJECT
 )
 ```
 * define struct in go with tag
-```azure
+```golang
 type test1 struct {
     // note use int64 not int
     // all tagged fields should be exported 
@@ -54,7 +54,7 @@ type test1 struct {
 }
 ```
 * connect to database
-```azure
+```golang
 databaseURL := go_ora.BuildUrl("localhost", 1521, "service", "user", "pass", nil)
 conn, err := sql.Open("oracle", databaseURL)
 // check for err
@@ -66,14 +66,14 @@ defer func() {
 }()
 ```
 * register type
-```azure
+```golang
 if drv, ok := conn.Driver().(*go_ora.OracleDriver); ok {
     err = drv.Conn.RegisterType("owner", "TEST_TYPE1", test1{})
     // check for err
 }
 ```
 * select and display data
-```azure
+```golang
 rows, err := conn.Query("SELECT test_type1(10, 'test') from dual")
 // check for err
 var test test1
@@ -88,7 +88,7 @@ for rows.Next() {
 ### version 2.2.4
 * add support for tcps. you can enable tcps through the following url options
 * this [link](https://oracle-base.com/articles/misc/configure-tcpip-with-ssl-and-tls-for-database-connections) explain how to enable tcps in your server
-```azure
+```golang
 wallet=wallet_dir // wallet should contain server and client certificates
 SSL=true          // true or enabled
 SSL Verify=false  // to bypass certificate verification
@@ -98,7 +98,7 @@ SSL Verify=false  // to bypass certificate verification
 * **note**:
 to use wallet you need to specify directory path for wallet the directory
   should contain cwallet.sso file "the file that will be used"
-```bigquery
+```golang
 sqlQuery := "oracle://user@127.0.0.1:1522/service"
 sqlQuery += "?TRACE FILE=trace.log"
 sqlQuery += "&wallet=path_to_wallet_directory"
@@ -139,11 +139,11 @@ SQLNET.ENCRYPTION_TYPES_SERVER = AES256
 now you can pass string parameter in 2 way:
 ##### &nbsp; &nbsp; 1- varchar string:
 
-```
+```golang
 _, err := conn.Exec(inputSql, "7586")
 ```
 ##### &nbsp; &nbsp;2- nvarchar string:
-```
+```golang
 _, err := conn.Exec(inputSql, go_ora.NVarChar("7586"))
 ```
 

@@ -3,10 +3,11 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+    - See examples for more help
 ### version 2.2.9: add support for connect to multiple servers
 define multiple server in 2 way
 * in url string options
-```azure
+```golang
 // using url options
 databaseURL := "oracle://user:pass@server1/service?server=server2&server=server3"
 /* now the driver will try connection as follow
@@ -35,7 +36,7 @@ OracleError carry error message from the server
 ### version 2.2.6 (pre-release - experimental): Add support for user defined types
 to use make the following (oracle 12c)
 * define custom type in the oracle
-```azure
+```golang
 create or replace TYPE TEST_TYPE1 IS OBJECT 
 ( 
     TEST_ID NUMBER(6, 0),

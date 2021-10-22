@@ -313,6 +313,7 @@ Read packet:
 Default value is 25 increase this value to higher level will significantly
 speed up the query
 ## RefCursor
+#### note: See examples for using RefCursor with sql package
 to use RefCursor follow these steps:
 * create the connection object and open
 * create NewStmt from connection

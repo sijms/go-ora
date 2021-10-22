@@ -545,15 +545,30 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				if containOutputPars {
 					for x := 0; x < len(stmt.Pars); x++ {
 						if stmt.Pars[x].DataType == REFCURSOR {
-							cursor := RefCursor{}
-							cursor.connection = stmt.connection
-							cursor.parent = stmt
-							err = cursor.load()
-							if err != nil {
-								return err
+							typ := reflect.TypeOf(stmt.Pars[x].Value)
+							if typ.Kind() == reflect.Ptr {
+								if cursor, ok := stmt.Pars[x].Value.(*RefCursor); ok {
+									cursor.connection = stmt.connection
+									cursor.parent = stmt
+									err = cursor.load()
+									if err != nil {
+										return err
+									}
+								} else {
+									return errors.New("RefCursor parameter should contain pointer to  RefCursor struct")
+								}
+							} else {
+								return errors.New("RefCursor parameter should contain pointer to  RefCursor struct")
+								//if cursor, ok := stmt.Pars[x].Value.(RefCursor); ok {
+								//	cursor.connection = stmt.connection
+								//	cursor.parent = stmt
+								//	err = cursor.load()
+								//	if err != nil {
+								//		return err
+								//	}
+								//	stmt.Pars[x].Value = cursor
+								//}
 							}
-							stmt.Pars[x].Value = cursor
-
 						} else {
 							if stmt.Pars[x].Direction != Input {
 								//stmt.Pars[x].BValue, err = session.GetClr()
@@ -1107,6 +1122,24 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 		param.CharsetForm = 1
 	} else {
 		switch val := val.(type) {
+		case *RefCursor:
+			param.DataType = NCHAR
+			param.BValue = nil
+			param.MaxCharLen = 0
+			param.MaxLen = 1
+			param.Value = val
+			param.DataType = REFCURSOR
+			param.ContFlag = 0
+			param.CharsetForm = 0
+		case RefCursor:
+			param.DataType = NCHAR
+			param.BValue = nil
+			param.MaxCharLen = 0
+			param.MaxLen = 1
+			param.Value = val
+			param.DataType = REFCURSOR
+			param.ContFlag = 0
+			param.CharsetForm = 0
 		case *int64:
 			param.Value = val
 			param.BValue = converters.EncodeInt64(*val)
@@ -1253,7 +1286,6 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.MaxCharLen = 11
 		//case ParameterInfo:
 		//	fmt.Println("parameter info")
-
 		case NVarChar:
 			param.DataType = NCHAR
 			param.CharsetID = stmt.connection.tcpNego.ServernCharset
@@ -1322,6 +1354,7 @@ func (stmt *Stmt) AddRefCursorParam(name string) {
 	par.DataType = REFCURSOR
 	par.ContFlag = 0
 	par.CharsetForm = 0
+	par.Value = new(RefCursor)
 	stmt.Pars = append(stmt.Pars, *par)
 }
 

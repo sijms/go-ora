@@ -2,13 +2,10 @@ package main
 
 import (
 	"database/sql"
-	"database/sql/driver"
-	"errors"
 	"flag"
 	"fmt"
 	_ "github.com/sijms/go-ora/v2"
 	go_ora "github.com/sijms/go-ora/v2"
-	"io"
 	"os"
 	"time"
 )
@@ -97,6 +94,21 @@ func usage() {
 	fmt.Println()
 }
 
+func queryCursor(cursor *go_ora.RefCursor) {
+	rows, err := cursor.Query()
+	dieOnError("Can't query cursor", err)
+	var (
+		id   int64
+		name string
+		val  float64
+		date time.Time
+	)
+	for rows.Next_() {
+		err = rows.Scan(&id, &name, &val, &date)
+		dieOnError("Can't Scan row in cursor", err)
+		fmt.Println("ID: ", id, "\tName: ", name, "\tval: ", val, "\tDate: ", date)
+	}
+}
 func main() {
 	var (
 		server string
@@ -133,34 +145,6 @@ func main() {
 	defer func() {
 		_ = cursor.Close()
 	}()
-	rows, err := cursor.Query()
-	dieOnError("Can't query cursor", err)
-	var (
-		id   int64
-		name string
-		val  float64
-		date time.Time
-		ok   bool
-	)
-	var values = make([]driver.Value, 4)
-	for {
-		err = rows.Next(values)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		dieOnError("Can't Scan row in cursor", err)
-		if id, ok = values[0].(int64); !ok {
-			dieOnError("Can't get visit_id", err)
-		}
-		if name, ok = values[1].(string); !ok {
-			dieOnError("Can't get name", err)
-		}
-		if val, ok = values[2].(float64); !ok {
-			dieOnError("Can't get val", err)
-		}
-		if date, ok = values[3].(time.Time); !ok {
-			dieOnError("Can't get visit date", err)
-		}
-		fmt.Println("ID: ", id, "\tName: ", name, "\tval: ", val, "\tDate: ", date)
-	}
+
+	queryCursor(&cursor)
 }

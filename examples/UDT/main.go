@@ -1,12 +1,9 @@
 package main
 
 import (
-	"database/sql/driver"
-	"errors"
 	"flag"
 	"fmt"
 	go_ora "github.com/sijms/go-ora/v2"
-	"io"
 	"os"
 )
 
@@ -47,21 +44,15 @@ func queryUDT(conn *go_ora.Connection) {
 	rows, err := stmt.Query(nil)
 	dieOnError("Can't Query UDT", err)
 	var (
-		test   test1
-		ok     bool
-		values = make([]driver.Value, 1)
+		test test1
 	)
-	for {
-		err = rows.Next(values)
-		if errors.Is(err, io.EOF) {
-			break
+	if oraRows, ok := rows.(*go_ora.DataSet); ok {
+		for oraRows.Next_() {
+			err = oraRows.Scan(&test)
+			dieOnError("Can't scan rows", err)
 		}
-		dieOnError("Can't scan rows", err)
-		if test, ok = values[0].(test1); !ok {
-			dieOnError("Can't convert value to object", errors.New("value conversion error"))
-		}
+		fmt.Println(test)
 	}
-	fmt.Println(test)
 	fmt.Println("Finish query UDT")
 }
 func dropUDT(conn *go_ora.Connection) {

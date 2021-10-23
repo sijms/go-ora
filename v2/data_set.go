@@ -2,8 +2,12 @@ package go_ora
 
 import (
 	"database/sql/driver"
+	"errors"
+	"fmt"
 	"github.com/sijms/go-ora/v2/trace"
 	"io"
+	"reflect"
+	"time"
 
 	"github.com/sijms/go-ora/v2/network"
 )
@@ -27,9 +31,10 @@ type DataSet struct {
 	MaxRowSize      int
 	Cols            []ParameterInfo
 	Rows            []Row
-	//currentRow      Row
-	index  int
-	parent StmtInterface
+	currentRow      Row
+	lasterr         error
+	index           int
+	parent          StmtInterface
 }
 
 func (dataSet *DataSet) load(session *network.Session) error {
@@ -49,9 +54,9 @@ func (dataSet *DataSet) load(session *network.Session) error {
 	if columnCount > dataSet.ColumnCount {
 		dataSet.ColumnCount = columnCount
 	}
-	//if len(dataSet.currentRow) != dataSet.ColumnCount {
-	//	dataSet.currentRow = make(Row, dataSet.ColumnCount)
-	//}
+	if len(dataSet.currentRow) != dataSet.ColumnCount {
+		dataSet.currentRow = make(Row, dataSet.ColumnCount)
+	}
 	dataSet.RowCount, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err
@@ -94,21 +99,88 @@ func (dataSet *DataSet) Close() error {
 	return nil
 }
 
+func (dataSet *DataSet) Next_() bool {
+	err := dataSet.Next(dataSet.currentRow)
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return false
+		}
+		dataSet.lasterr = err
+		return false
+	}
+
+	return true
+}
+
+func (dataSet *DataSet) Scan(dest ...interface{}) error {
+	if dataSet.lasterr != nil {
+		return dataSet.lasterr
+	}
+	if len(dest) != len(dataSet.currentRow) {
+		return fmt.Errorf("go-ora: expected %d destination arguments in Scan, not %d",
+			len(dataSet.currentRow), len(dest))
+	}
+	for i, col := range dataSet.currentRow {
+		if dest[i] == nil {
+			return fmt.Errorf("go-ora: argument %d is nil", i)
+		}
+		destTyp := reflect.TypeOf(dest[i])
+		if destTyp.Kind() != reflect.Ptr {
+			return errors.New("go-ora: argument in scan should be passed as pointers")
+		}
+
+		switch col.(type) {
+		case string:
+			switch destTyp.Elem().Kind() {
+			case reflect.String:
+				reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
+			default:
+				return fmt.Errorf("go-ora: column %d require type string", i)
+			}
+		case int64:
+			switch destTyp.Elem().Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				reflect.ValueOf(dest[i]).Elem().SetInt(reflect.ValueOf(col).Int())
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				reflect.ValueOf(dest[i]).Elem().SetUint(uint64(reflect.ValueOf(col).Int()))
+			case reflect.Float32, reflect.Float64:
+				reflect.ValueOf(dest[i]).Elem().SetFloat(float64(reflect.ValueOf(col).Int()))
+			default:
+				return fmt.Errorf("go-ora: column %d require an integer", i)
+			}
+		case float64:
+			switch destTyp.Elem().Kind() {
+			case reflect.Float32, reflect.Float64:
+				reflect.ValueOf(dest[i]).Elem().SetFloat(reflect.ValueOf(col).Float())
+			default:
+				return fmt.Errorf("go-ora: column %d require type float", i)
+			}
+		case time.Time:
+			if destTyp.Elem() == reflect.TypeOf(time.Time{}) {
+				reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
+			} else {
+				return fmt.Errorf("go-ora: column %d require type time.Time", i)
+			}
+		case []byte:
+			if destTyp.Elem() == reflect.TypeOf([]byte{}) {
+				reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
+			} else {
+				return fmt.Errorf("go-ora: column %d require type []byte", i)
+			}
+		default:
+			if reflect.TypeOf(col) == destTyp.Elem() {
+				reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
+			} else {
+				return fmt.Errorf("go-ora: column %d require type %v", i, reflect.TypeOf(col))
+			}
+		}
+	}
+	return nil
+}
+func (dataSet *DataSet) Err() error {
+	return dataSet.lasterr
+}
 func (dataSet *DataSet) Next(dest []driver.Value) error {
-	//fmt.Println("has more row: ", dataSet.parent.hasMoreRows)
-	//fmt.Println("row length: ", len(dataSet.Rows))
-	//fmt.Println("cursor id: ", dataSet.parent.cursorID)
-	//if dataSet.parent.hasMoreRows && dataSet.index == len(dataSet.Rows) && len(dataSet.Rows) < dataSet.parent.noOfRowsToFetch {
-	//	fmt.Println("inside first fetch")
-	//	oldFetchCount := dataSet.parent.noOfRowsToFetch;
-	//	dataSet.parent.noOfRowsToFetch = oldFetchCount - len(dataSet.Rows)
-	//	err := dataSet.parent.fetch(dataSet)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	dataSet.parent.noOfRowsToFetch = oldFetchCount
-	//	fmt.Println("row count after first fetch: ", len(dataSet.Rows))
-	//}
 	hasMoreRows := dataSet.parent.hasMoreRows()
 	noOfRowsToFetch := len(dataSet.Rows) // dataSet.parent.noOfRowsToFetch()
 	hasBLOB := dataSet.parent.hasBLOB()
@@ -133,9 +205,6 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 			return io.EOF
 		}
 	}
-	//if hasMoreRows && dataSet.index != 0 && dataSet.index%noOfRowsToFetch == 0 {
-	//
-	//}
 	if hasMoreRows && (hasBLOB || hasLONG) && dataSet.index == 0 {
 		if err := dataSet.parent.fetch(dataSet); err != nil {
 			return err

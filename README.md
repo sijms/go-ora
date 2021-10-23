@@ -322,11 +322,15 @@ to use RefCursor follow these steps:
 * call cursor.Query()
 * reterive records use for loop 
 #### code:
-```buildoutcfg
-conn, err := go_ora.NewConnection(url)
+```Golang
+urlOptions := map[string] string {
+	"trace file": "trace.log" ,
+}
+databaseURL := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
+conn, err := sql.Open("oracle", databaseURL)
 // check error
 
-err = conn.Open()
+err = conn.Ping()
 // check error
 
 defer conn.Close()
@@ -334,35 +338,22 @@ defer conn.Close()
 cmdText := `BEGIN    
     proc_1(:1); 
 end;`
-stmt := go_ora.NewStmt(cmdText, conn)
-stmt.AddRefCursorParam("1")
-defer stmt.Close()
-
-_, err = stmt.Exec(nil)
+var cursor go_ora.RefCursor
+_, err = conn.Exec(cmdText, sql.Out{Dest: &cursor})
 //check errors
 
-if cursor, ok := stmt.Pars[0].Value.(go_ora.RefCursor); ok {
-    defer cursor.Close()
-    rows, err := cursor.Query()
+defer cursor.Close()
+rows, err := cursor.Query()
+// check for error
+
+var (
+    var_1 int64
+    var_2 string
+)
+for rows.Next_() {
+    err = rows.Scan(&var_1, &var_2)
     // check for error
-    
-    var (
-        var_1 int64
-        var_2 string
-    )
-    values := make([]driver.Value, 2)
-    for {
-        err = rows.Next(values)
-        // check for error and if == io.EOF break
-        
-        if var_1, ok = values[0].(int64); !ok {
-            // error
-        }
-        if var_2, ok = values[1].(string); !ok {
-            // error
-        }
-        fmt.Println(var_1, var_2)
-    }
+	fmt.Println(var_1, var_2)
 }
 ```
 

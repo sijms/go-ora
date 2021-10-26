@@ -2,15 +2,16 @@ package go_ora
 
 import (
 	"database/sql/driver"
+	"github.com/sijms/go-ora/v2/network"
 	"math"
 	"strings"
-
-	"github.com/sijms/go-ora/v2/network"
+	"time"
 )
 
 type OracleType int
 type ParameterDirection int
 type NVarChar string
+type TimeStamp time.Time
 
 //func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
 //	return driver.Value(string(*n)), nil
@@ -76,7 +77,7 @@ const (
 	IntervalYM_DTY   OracleType = 182
 	IntervalDS_DTY   OracleType = 183
 	TimeTZ           OracleType = 186
-	TimeStamp        OracleType = 187
+	TIMESTAMP        OracleType = 187
 	TimeStampTZ      OracleType = 188
 	IntervalYM       OracleType = 189
 	IntervalDS       OracleType = 190
@@ -144,7 +145,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		fallthrough
 	case IntervalDS_DTY:
 		fallthrough
-	case TimeStamp:
+	case TIMESTAMP:
 		fallthrough
 	case TimeStampTZ:
 		fallthrough

@@ -62,16 +62,21 @@ type defaultStmt struct {
 func (stmt *defaultStmt) hasMoreRows() bool {
 	return stmt._hasMoreRows
 }
+
 func (stmt *defaultStmt) noOfRowsToFetch() int {
 	return stmt._noOfRowsToFetch
 }
+
 func (stmt *defaultStmt) hasLONG() bool {
 	return stmt._hasLONG
 }
+
 func (stmt *defaultStmt) hasBLOB() bool {
 	return stmt._hasBLOB
 }
 
+// basicWrite this is the default write procedure for the all type of stmt
+// through it the stmt data will send to network stream
 func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	session := stmt.connection.session
 	session.PutBytes(3, 0x5E, 0)
@@ -218,7 +223,7 @@ type Stmt struct {
 	defaultStmt
 	//reExec           bool
 	reSendParDef bool
-	parse        bool // means parse the command in the server this occur if the stmt is not cached
+	parse        bool // means parse the command in the server this occurs if the stmt is not cached
 	execute      bool
 	define       bool
 
@@ -238,6 +243,7 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 	return rs.rowsAffected, nil
 }
 
+// NewStmt create new stmt and set its connection properties
 func NewStmt(text string, conn *Connection) *Stmt {
 	ret := &Stmt{
 		reSendParDef: false,
@@ -277,6 +283,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	return ret
 }
 
+// write it write stmt data to network stream
 func (stmt *Stmt) write(session *network.Session) error {
 	if !stmt.parse && !stmt.reSendParDef {
 		exeOf := 0
@@ -414,6 +421,8 @@ func (stmt *Stmt) write(session *network.Session) error {
 	return session.Write()
 }
 
+// getExeOption return an integer that act like a flag carry bit value set according
+// to stmt properties
 func (stmt *Stmt) getExeOption() int {
 	op := 0
 	if stmt.stmtType == PLSQL || stmt._hasReturnClause {
@@ -454,6 +463,7 @@ func (stmt *Stmt) getExeOption() int {
 	*/
 }
 
+// fetch get more rows from network stream
 func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	//stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	stmt.connection.session.ResetBuffer()
@@ -466,6 +476,10 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	}
 	return stmt.read(dataSet)
 }
+
+// read this is common read for stmt it read many information related to
+// columns, dataset information, output parameter information, rows values
+// and at the end summary object about this operation
 func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	loop := true
 	after7 := false
@@ -800,6 +814,8 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	}
 	return nil
 }
+
+// requestCustomTypeInfo an experimental function to ask for UDT information
 func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	session := stmt.connection.session
 	session.SaveState()
@@ -861,6 +877,7 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	return nil
 }
 
+// get values of rows and output parameter according to DataType and binary value (bValue)
 func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	session := stmt.connection.session
 	var err error
@@ -959,8 +976,12 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		}
 	case NUMBER:
 		tempVal = converters.DecodeNumber(param.BValue)
-	case TimeStamp:
-		fallthrough
+	case TIMESTAMP:
+		dateVal, err := converters.DecodeDate(param.BValue)
+		if err != nil {
+			return err
+		}
+		tempVal = TimeStamp(dateVal)
 	case TimeStampDTY:
 		fallthrough
 	case TimeStampeLTZ:
@@ -1042,6 +1063,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	return nil
 }
 
+// Close close stmt cursor in the server
 func (stmt *defaultStmt) Close() error {
 	if stmt.cursorID != 0 {
 		session := stmt.connection.session
@@ -1058,6 +1080,7 @@ func (stmt *defaultStmt) Close() error {
 	return nil
 }
 
+// Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	stmt.connection.connOption.Tracer.Printf("Exec:\n%s", stmt.text)
 	for x := 0; x < len(args); x++ {
@@ -1105,6 +1128,9 @@ func (stmt *Stmt) CheckNamedValue(named *driver.NamedValue) error {
 	return nil
 }
 
+// NewParam return new parameter according to input data
+//
+// note: DataType is defined from value enter in 2nd arg [val]
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) *ParameterInfo {
 	param := &ParameterInfo{
 		Name:        name,
@@ -1192,6 +1218,13 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.Value = val
 			param.BValue = converters.EncodeDate(*val)
 			param.DataType = DATE
+			param.ContFlag = 0
+			param.MaxLen = 11
+			param.MaxCharLen = 11
+		case *TimeStamp:
+			param.Value = val
+			param.BValue = converters.EncodeDate(time.Time(*val))
+			param.DataType = TIMESTAMP
 			param.ContFlag = 0
 			param.MaxLen = 11
 			param.MaxCharLen = 11
@@ -1284,8 +1317,12 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.ContFlag = 0
 			param.MaxLen = 11
 			param.MaxCharLen = 11
-		//case ParameterInfo:
-		//	fmt.Println("parameter info")
+		case TimeStamp:
+			param.BValue = converters.EncodeDate(time.Time(val))
+			param.DataType = TIMESTAMP
+			param.ContFlag = 0
+			param.MaxLen = 11
+			param.MaxCharLen = 11
 		case NVarChar:
 			param.DataType = NCHAR
 			param.CharsetID = stmt.connection.tcpNego.ServernCharset
@@ -1344,11 +1381,15 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 	return param
 }
 
+// AddParam create new parameter and append it to stmt.Pars
 func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) {
 	stmt.Pars = append(stmt.Pars, *stmt.NewParam(name, val, size, direction))
 
 }
 
+// AddRefCursorParam add new output parameter of type REFCURSOR
+//
+// note: better to use sql.Out structure see examples for more information
 func (stmt *Stmt) AddRefCursorParam(name string) {
 	par := stmt.NewParam("1", nil, 0, Output)
 	par.DataType = REFCURSOR
@@ -1358,6 +1399,23 @@ func (stmt *Stmt) AddRefCursorParam(name string) {
 	stmt.Pars = append(stmt.Pars, *par)
 }
 
+// Query_ execute a query command and return oracle dataset object
+//
+// args is an array of values that corresponding to parameters in sql
+func (stmt *Stmt) Query_(args []driver.Value) (*DataSet, error) {
+	result, err := stmt.Query(args)
+	if err != nil {
+		return nil, err
+	}
+	if dataSet, ok := result.(*DataSet); ok {
+		return dataSet, nil
+	}
+	return nil, errors.New("the returned driver.Rows is not an oracle DataSet")
+}
+
+// Query execute a query command and return dataset object in form of driver.Rows interface
+//
+// args is an array of values that corresponding to parameters in sql
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	stmt.connection.connOption.Tracer.Printf("Query:\n%s", stmt.text)
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows

@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -74,6 +73,7 @@ func NewSession(connOption *ConnectionOption) *Session {
 	}
 }
 
+// SaveState save current session state
 func (session *Session) SaveState() {
 	session.states = append(session.states, sessionState{
 		summary:   session.Summary,
@@ -84,6 +84,9 @@ func (session *Session) SaveState() {
 	})
 }
 
+// LoadState load last saved session state and remove it from the memory
+//
+// if this is the only session state availabe set session state memory to nil
 func (session *Session) LoadState() {
 	index := len(session.states) - 1
 	if index >= 0 {
@@ -102,6 +105,8 @@ func (session *Session) LoadState() {
 	}
 }
 
+// LoadSSLData load data required for SSL connection like certificate, private keys and
+// certificate requests
 func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
 	for _, temp := range certs {
 		cert, err := x509.ParseCertificate(temp)
@@ -140,6 +145,9 @@ func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
 	}
 	return nil
 }
+
+// negotiate it is a step in SSL communication in which tcp connection is
+// used to create sslConn object
 func (session *Session) negotiate() {
 	connOption := session.Context.ConnOption
 	if session.SSL.roots == nil {
@@ -301,25 +309,26 @@ func (session *Session) ResetBuffer() {
 	session.index = 0
 }
 
-func (session *Session) Debug() {
-	//if session.index > 350 && session.index < 370 {
-	fmt.Println("index: ", session.index)
-	fmt.Printf("data buffer: %#v\n", session.inBuffer[session.index:session.index+30])
-	//oldIndex := session.index
-	//fmt.Println(session.GetClr())
-	//session.index = oldIndex
-	//}
-}
+//func (session *Session) Debug() {
+//	//if session.index > 350 && session.index < 370 {
+//	fmt.Println("index: ", session.index)
+//	fmt.Printf("data buffer: %#v\n", session.inBuffer[session.index:session.index+30])
+//	//oldIndex := session.index
+//	//fmt.Println(session.GetClr())
+//	//session.index = oldIndex
+//	//}
+//}
 
-func (session *Session) DumpIn() {
-	log.Printf("%#v\n", session.inBuffer)
-}
-
-func (session *Session) DumpOut() {
-	log.Printf("%#v\n", session.outBuffer)
-}
+//func (session *Session) DumpIn() {
+//	log.Printf("%#v\n", session.inBuffer)
+//}
+//
+//func (session *Session) DumpOut() {
+//	log.Printf("%#v\n", session.outBuffer)
+//}
 
 // Write send data store in output buffer through network
+//
 // if data bigger than SessionDataUnit it should be divided into
 // segment and each segment sent in data packet
 func (session *Session) Write() error {
@@ -365,6 +374,8 @@ func (session *Session) Write() error {
 	return nil
 }
 
+// Read numBytes of data from input buffer if requested data is larger
+// than input buffer session will get the remaining from network stream
 func (session *Session) read(numBytes int) ([]byte, error) {
 	if session.index+numBytes > len(session.inBuffer) {
 		pck, err := session.readPacket()
@@ -382,10 +393,7 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 	return ret, nil
 }
 
-//func (session *Session) writePackets() error {
-//
-//	return  nil
-//}
+// Write a packet to the network stream
 func (session *Session) writePacket(pck PacketInterface) error {
 	session.sendPcks = append(session.sendPcks, pck)
 	tracer := session.Context.ConnOption.Tracer
@@ -400,10 +408,12 @@ func (session *Session) writePacket(pck PacketInterface) error {
 	return err
 }
 
+// HasError Check if the session has error or not
 func (session *Session) HasError() bool {
 	return session.Summary != nil && session.Summary.RetCode != 0
 }
 
+// GetError Return the error in form or OracleError
 func (session *Session) GetError() *OracleError {
 	err := &OracleError{}
 	if session.Summary != nil && session.Summary.RetCode != 0 {
@@ -417,6 +427,7 @@ func (session *Session) GetError() *OracleError {
 	return err
 }
 
+// read a packet from network stream
 func (session *Session) readPacket() (PacketInterface, error) {
 
 	readPacketData := func() ([]byte, error) {
@@ -615,19 +626,23 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	}
 }
 
+// PutString write a string data to output buffer
 func (session *Session) PutString(data string) {
 	session.PutClr([]byte(data))
 }
 
+// GetString read a string data from input buffer
 func (session *Session) GetString(length int) (string, error) {
 	ret, err := session.GetClr()
 	return string(ret[:length]), err
 }
 
+// PutBytes write bytes of data to output buffer
 func (session *Session) PutBytes(data ...byte) {
 	session.outBuffer.Write(data)
 }
 
+// PutUint write uint number with size entered either use bigEndian or not and use compression or not to
 func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, compress bool) {
 	var num uint64
 	switch number := number.(type) {
@@ -702,6 +717,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 	}
 }
 
+// PutInt write int number with size entered either use bigEndian or not and use compression or not to
 func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, compress bool) {
 	var num int64
 	switch number := number.(type) {
@@ -780,6 +796,7 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 	}
 }
 
+// PutClr write variable length bytearray to output buffer
 func (session *Session) PutClr(data []byte) {
 	dataLen := len(data)
 	if dataLen > 0xFC {
@@ -808,10 +825,12 @@ func (session *Session) PutClr(data []byte) {
 	}
 }
 
+// PutKeyValString write key, val (in form of string) and flag number to output buffer
 func (session *Session) PutKeyValString(key string, val string, num uint8) {
 	session.PutKeyVal([]byte(key), []byte(val), num)
 }
 
+// PutKeyVal write key, val (in form of bytearray) and flag number to output buffer
 func (session *Session) PutKeyVal(key []byte, val []byte, num uint8) {
 	if len(key) == 0 {
 		session.outBuffer.WriteByte(0)
@@ -830,12 +849,14 @@ func (session *Session) PutKeyVal(key []byte, val []byte, num uint8) {
 	session.PutInt(num, 4, true, true)
 }
 
-func (session *Session) PutData(data Data) error {
-	return data.Write(session)
-}
-func (session *Session) GetData(data Data) error {
-	return data.Read(session)
-}
+//func (session *Session) PutData(data Data) error {
+//	return data.Write(session)
+//}
+//func (session *Session) GetData(data Data) error {
+//	return data.Read(session)
+//}
+
+// GetByte read one uint8 from input buffer
 func (session *Session) GetByte() (uint8, error) {
 	rb, err := session.read(1)
 	if err != nil {
@@ -844,6 +865,9 @@ func (session *Session) GetByte() (uint8, error) {
 	return rb[0], nil
 }
 
+// GetInt64 read int64 number from input buffer.
+//
+// you should specify the size of the int and either compress or not and stored as big endian or not
 func (session *Session) GetInt64(size int, compress bool, bigEndian bool) (int64, error) {
 	var ret int64
 	negFlag := false
@@ -880,6 +904,10 @@ func (session *Session) GetInt64(size int, compress bool, bigEndian bool) (int64
 	}
 	return ret, nil
 }
+
+// GetInt read int number from input buffer.
+//
+// you should specify the size of the int and either compress or not and stored as big endian or not
 func (session *Session) GetInt(size int, compress bool, bigEndian bool) (int, error) {
 	temp, err := session.GetInt64(size, compress, bigEndian)
 	if err != nil {
@@ -887,6 +915,8 @@ func (session *Session) GetInt(size int, compress bool, bigEndian bool) (int, er
 	}
 	return int(temp), nil
 }
+
+// GetNullTermString read a null terminated string from input buffer
 func (session *Session) GetNullTermString(maxSize int) (result string, err error) {
 	oldIndex := session.index
 	temp, err := session.read(maxSize)
@@ -903,6 +933,7 @@ func (session *Session) GetNullTermString(maxSize int) (result string, err error
 	return
 }
 
+// GetClr reed variable length bytearray from input buffer
 func (session *Session) GetClr() (output []byte, err error) {
 	var size uint8
 	var rb []byte
@@ -945,6 +976,7 @@ func (session *Session) GetClr() (output []byte, err error) {
 	return
 }
 
+// GetDlc read variable length bytearray from input buffer
 func (session *Session) GetDlc() (output []byte, err error) {
 	var length int
 	length, err = session.GetInt(4, true, true)
@@ -960,10 +992,12 @@ func (session *Session) GetDlc() (output []byte, err error) {
 	return
 }
 
+// GetBytes read specified number of bytes from input buffer
 func (session *Session) GetBytes(length int) ([]byte, error) {
 	return session.read(length)
 }
 
+// GetKeyVal read key, value (in form of bytearray), a number flag from input buffer
 func (session *Session) GetKeyVal() (key []byte, val []byte, num int, err error) {
 	key, err = session.GetDlc()
 	if err != nil {

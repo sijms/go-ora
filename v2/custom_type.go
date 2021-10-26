@@ -16,9 +16,16 @@ type customType struct {
 	filedMap map[string]int
 }
 
+// RegisterType register user defined type with owner equal to user id
 func (conn *Connection) RegisterType(typeName string, typeObj interface{}) error {
 	return conn.RegisterTypeWithOwner(conn.connOption.UserID, typeName, typeObj)
 }
+
+// RegisterTypeWithOwner take typename, owner and go type object and make an information
+// structure that used to create a new type during query and store values in it
+//
+// DataType of UDT field that can be manipulated by this function are: NUMBER,
+// VARCHAR2, NVARCHAR2, TIMESTAMP, DATE AND RAW
 func (conn *Connection) RegisterTypeWithOwner(owner, typeName string, typeObj interface{}) error {
 	if typeObj == nil {
 		return errors.New("type object cannot be nil")
@@ -138,6 +145,12 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 	conn.cusTyp[strings.ToUpper(typeName)] = cust
 	return nil
 }
+
+// RegisterType2 same as RegisterType but get user defined type data
+// with pl/sql package function: dbms_pickler.get_type_shape
+//
+// DataType of UDT field that can be manipulated by this function are: NUMBER,
+// VARCHAR2, NVARCHAR2, TIMESTAMP, DATE AND RAW
 func (conn *Connection) RegisterType2(typeName string, typeObj interface{}) error {
 	if typeObj == nil {
 		return errors.New("type object cannot be nil")
@@ -275,6 +288,9 @@ END;`
 	conn.cusTyp[strings.ToUpper(typeName)] = cust
 	return nil
 }
+
+// loadFieldMap read struct tag that supplied with golang type object passed in RegisterType
+// function
 func (cust *customType) loadFieldMap() {
 	typ := cust.typ
 	for x := 0; x < typ.NumField(); x++ {
@@ -300,6 +316,10 @@ func (cust *customType) loadFieldMap() {
 		}
 	}
 }
+
+// getObject return an object of Golang type supplied in RegisterType function
+// the object is filled with data from attrib []ParameterInfo
+// which is filled inside Stmt during data reading
 func (cust *customType) getObject() interface{} {
 	typ := cust.typ
 	obj := reflect.New(typ)

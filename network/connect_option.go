@@ -39,6 +39,8 @@ type ConnectionOption struct {
 	PrefetchRows int
 }
 
+// ConnectionData build connection data string from connection parameters stored in
+// connection option object
 func (op *ConnectionOption) ConnectionData() string {
 	if len(op.connData) > 0 {
 		return op.connData
@@ -64,15 +66,3 @@ func (op *ConnectionOption) ConnectionData() string {
 	result += FulCid
 	return "(DESCRIPTION=" + address + result + "))"
 }
-
-//func NewConnectionOption(conStr *go_ora.ConnectionString) *ConnectionOption {
-//
-//}
-//func NewConnectionOption() *ConnectionOption {
-//	return &ConnectionOption{
-//		Port: 0xFFFF,
-//		TransportConnectTo: 0xFFFF,
-//		TransportDataUnitSize: 0xFFFF,
-//		SessionDataUnitSize: 0xFFFF,
-//	}
-//}

@@ -5,6 +5,9 @@ type BindError struct {
 	rowOffset int
 	errorMsg  []byte
 }
+
+// SummaryObject this object carry summary about last operation from the server
+// including error
 type SummaryObject struct {
 	EndOfCallStatus      int // uint32
 	EndToEndECIDSequence int // uint16
@@ -34,6 +37,7 @@ type SummaryObject struct {
 	bindErrors           []BindError
 }
 
+// NewSummary create new summary object by read data from the session
 func NewSummary(session *Session) (*SummaryObject, error) {
 	result := new(SummaryObject)
 	var err error
@@ -210,13 +214,6 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			return nil, err
 		}
 	}
-
-	//if result.sqlType == 3 && result.RetCode == 1403 {
-	//	_, _ = session.GetClr()
-	//} else if result.RetCode != 0 {
-	//
-	//}
-	//fmt.Println(result)
 	return result, nil
 }
 
@@ -226,6 +223,7 @@ type WarningObject struct {
 	errorMessage string
 }
 
+// NewWarningObject create new warning object by read data from session
 func NewWarningObject(session *Session) (*WarningObject, error) {
 	result := new(WarningObject)
 	var err error

@@ -37,6 +37,7 @@ type DataSet struct {
 	parent          StmtInterface
 }
 
+// load Loading dataset information from network session
 func (dataSet *DataSet) load(session *network.Session) error {
 	_, err := session.GetByte()
 	if err != nil {
@@ -74,6 +75,8 @@ func (dataSet *DataSet) load(session *network.Session) error {
 	return nil
 }
 
+// setBitVector bit vector is an array of bit that define which column need to be read
+// from network session
 func (dataSet *DataSet) setBitVector(bitVector []byte) {
 	index := dataSet.ColumnCount / 8
 	if dataSet.ColumnCount%8 > 0 {
@@ -235,6 +238,7 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 //	return nil
 //}
 
+// Columns return a string array that represent columns names
 func (dataSet *DataSet) Columns() []string {
 	if len(dataSet.Cols) == 0 {
 		return nil

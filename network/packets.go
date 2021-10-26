@@ -45,14 +45,15 @@ type Packet struct {
 //	NSPSID_SZ = 0x10
 //)
 
-func newPacket(packetData []byte) *Packet {
-	return &Packet{
-		length:     binary.BigEndian.Uint16(packetData),
-		packetType: PacketType(packetData[4]),
-		flag:       packetData[5],
-	}
-}
+//func newPacket(packetData []byte) *Packet {
+//	return &Packet{
+//		length:     binary.BigEndian.Uint16(packetData),
+//		packetType: PacketType(packetData[4]),
+//		flag:       packetData[5],
+//	}
+//}
 
+// bytes return bytearray representation of packet
 func (pck *Packet) bytes() []byte {
 	output := make([]byte, 8)
 	if pck.dataOffset > 8 {
@@ -63,6 +64,8 @@ func (pck *Packet) bytes() []byte {
 	output[5] = pck.flag
 	return output
 }
+
+// GetPacketType return packet type
 func (pck *Packet) getPacketType() PacketType {
 	return pck.packetType
 }

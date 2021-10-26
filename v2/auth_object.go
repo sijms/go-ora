@@ -39,7 +39,7 @@ type AuthObject struct {
 	tcpNego          *TCPNego
 }
 
-// create authentication object by read data from network
+// create authentication object through reading data from network
 func newAuthObject(username string, password string, tcpNego *TCPNego, session *network.Session) (*AuthObject, error) {
 	ret := new(AuthObject)
 	ret.tcpNego = tcpNego
@@ -367,6 +367,8 @@ func getKeyFromUserNameAndPassword(username string, password string) ([]byte, er
 	return append(key2, make([]byte, 8)...), nil
 }
 
+// HexStringToBytes convert hex-string to bytearray
+// for example "03FF" will be converted to []byte{0x03, 0xFF}
 func HexStringToBytes(input string) ([]byte, error) {
 	result := make([]byte, len(input)/2)
 	for x := 0; x < len(input); x += 2 {

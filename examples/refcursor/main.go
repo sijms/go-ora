@@ -103,6 +103,7 @@ func queryCursor(cursor *go_ora.RefCursor) {
 		val  float64
 		date time.Time
 	)
+
 	for rows.Next_() {
 		err = rows.Scan(&id, &name, &val, &date)
 		dieOnError("Can't Scan row in cursor", err)

@@ -3,18 +3,15 @@ package network
 import "encoding/binary"
 
 type RefusePacket struct {
-	packet Packet
-	//dataOffset uint16
-	//Len uint16
-	//packetType PacketType
-	//Flag uint8
+	Packet
 	SystemReason uint8
 	UserReason   uint8
 	message      string
 }
 
+// bytes return bytearray representation of refuse packet
 func (pck *RefusePacket) bytes() []byte {
-	output := pck.packet.bytes()
+	output := pck.Packet.bytes()
 	output[8] = pck.SystemReason
 	output[9] = pck.UserReason
 	data := []byte(pck.message)
@@ -23,9 +20,12 @@ func (pck *RefusePacket) bytes() []byte {
 	return output
 }
 
-func (pck *RefusePacket) getPacketType() PacketType {
-	return pck.packet.packetType
-}
+//func (pck *RefusePacket) getPacketType() PacketType {
+//	return pck.packet.packetType
+//}
+
+// newRefusePacketFromData create new refuse packet from bytearray that
+// has been read from network stream
 func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	if len(packetData) < 12 {
 		return nil
@@ -36,7 +36,7 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 		message = string(packetData[12 : 12+dataLen])
 	}
 	return &RefusePacket{
-		packet: Packet{
+		Packet: Packet{
 			dataOffset: 12,
 			length:     binary.BigEndian.Uint16(packetData),
 			packetType: PacketType(packetData[4]),

@@ -17,6 +17,8 @@ type DBVersion struct {
 	isDb11gR10OrHigher bool
 }
 
+// GetDBVersion write a request to get database version the read
+// database version from network session
 func GetDBVersion(session *network.Session) (*DBVersion, error) {
 	session.ResetBuffer()
 	session.PutBytes(3, 0x3B, 0, 1)

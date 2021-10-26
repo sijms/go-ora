@@ -355,7 +355,7 @@ func (conn *Connection) Open() error {
 	}
 
 	tracer.Print("TCP Negotiation")
-	conn.tcpNego, err = NewTCPNego(conn.session)
+	conn.tcpNego, err = newTCPNego(conn.session)
 	if err != nil {
 		return err
 	}

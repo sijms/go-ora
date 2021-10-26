@@ -102,6 +102,7 @@ func (dataSet *DataSet) Close() error {
 	return nil
 }
 
+// Next_ act like Next in sql package return false if no other rows in dataset
 func (dataSet *DataSet) Next_() bool {
 	err := dataSet.Next(dataSet.currentRow)
 	if err != nil {
@@ -115,6 +116,7 @@ func (dataSet *DataSet) Next_() bool {
 	return true
 }
 
+// Scan act like scan in sql package return row values to dest variable pointers
 func (dataSet *DataSet) Scan(dest ...interface{}) error {
 	if dataSet.lasterr != nil {
 		return dataSet.lasterr
@@ -180,9 +182,13 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 	}
 	return nil
 }
+
+// Err return last error
 func (dataSet *DataSet) Err() error {
 	return dataSet.lasterr
 }
+
+// Next implement method need for sql.Rows interface
 func (dataSet *DataSet) Next(dest []driver.Value) error {
 	hasMoreRows := dataSet.parent.hasMoreRows()
 	noOfRowsToFetch := len(dataSet.Rows) // dataSet.parent.noOfRowsToFetch()
@@ -262,10 +268,12 @@ func (dataSet DataSet) Trace(t trace.Tracer) {
 	}
 }
 
+// ColumnTypeDatabaseTypeName return Col DataType name
 func (dataSet DataSet) ColumnTypeDatabaseTypeName(index int) string {
 	return dataSet.Cols[index].DataType.String()
 }
 
+// ColumnTypeLength return length of column type
 func (dataSet DataSet) ColumnTypeLength(index int) (length int64, ok bool) {
 	switch dataSet.Cols[index].DataType {
 	case NCHAR, CHAR:
@@ -277,6 +285,7 @@ func (dataSet DataSet) ColumnTypeLength(index int) (length int64, ok bool) {
 
 }
 
+// ColumnTypeNullable return if column allow null or not
 func (dataSet DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {
 	return dataSet.Cols[index].AllowNull, true
 }

@@ -56,7 +56,7 @@ func _() {
 	_ = x[TimeStampeLTZ-232]
 }
 
-const _OracleType_name = "NCHARNUMBERSB1FLOATNullStrVarNumLONGVARCHARROWIDDATEVarRawBFloatBDoubleRAWLongRawUINTLongVarCharLongVarRawCHARCHARZIBFloatIBDoubleRefCursorOCIXMLTypeOCIRefOCIClobLocatorOCIBlobLocatorOCIFileLocatorResultSetOCIStringOCIDateTimeStampDTYTimeStampTZ_DTYIntervalYM_DTYIntervalDS_DTYTimeTZTimeStampTimeStampTZIntervalYMIntervalDSUROWIDTimeStampLTZ_DTYTimeStampeLTZ"
+const _OracleType_name = "NCHARNUMBERSB1FLOATNullStrVarNumLONGVARCHARROWIDDATEVarRawBFloatBDoubleRAWLongRawUINTLongVarCharLongVarRawCHARCHARZIBFloatIBDoubleREFCURSOROCIXMLTypeXMLTypeOCIRefOCIClobLocatorOCIBlobLocatorOCIFileLocatorResultSetOCIStringOCIDateTimeStampDTYTimeStampTZ_DTYIntervalYM_DTYIntervalDS_DTYTimeTZTIMESTAMPTimeStampTZIntervalYMIntervalDSUROWIDTimeStampLTZ_DTYTimeStampeLTZ"
 
 var _OracleType_map = map[OracleType]string{
 	1:   _OracleType_name[0:5],
@@ -82,26 +82,27 @@ var _OracleType_map = map[OracleType]string{
 	100: _OracleType_name[115:122],
 	101: _OracleType_name[122:130],
 	102: _OracleType_name[130:139],
-	108: _OracleType_name[139:148],
-	110: _OracleType_name[148:154],
-	112: _OracleType_name[154:168],
-	113: _OracleType_name[168:183],
-	114: _OracleType_name[183:196],
-	116: _OracleType_name[196:205],
-	155: _OracleType_name[205:214],
-	156: _OracleType_name[214:221],
-	180: _OracleType_name[221:233],
-	181: _OracleType_name[233:248],
-	182: _OracleType_name[248:264],
-	183: _OracleType_name[264:276],
-	186: _OracleType_name[276:282],
-	187: _OracleType_name[282:291],
-	188: _OracleType_name[291:302],
-	189: _OracleType_name[302:312],
-	190: _OracleType_name[312:322],
-	208: _OracleType_name[322:328],
-	231: _OracleType_name[328:344],
-	232: _OracleType_name[344:357],
+	108: _OracleType_name[139:149],
+	109: _OracleType_name[149:156],
+	110: _OracleType_name[156:162],
+	112: _OracleType_name[162:176],
+	113: _OracleType_name[176:190],
+	114: _OracleType_name[190:204],
+	116: _OracleType_name[204:213],
+	155: _OracleType_name[213:222],
+	156: _OracleType_name[222:229],
+	180: _OracleType_name[229:241],
+	181: _OracleType_name[241:256],
+	182: _OracleType_name[256:270],
+	183: _OracleType_name[270:284],
+	186: _OracleType_name[284:290],
+	187: _OracleType_name[290:299],
+	188: _OracleType_name[299:310],
+	189: _OracleType_name[310:320],
+	190: _OracleType_name[320:330],
+	208: _OracleType_name[330:336],
+	231: _OracleType_name[336:352],
+	232: _OracleType_name[352:365],
 }
 
 func (i OracleType) String() string {

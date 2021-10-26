@@ -38,12 +38,15 @@ type walletCredential struct {
 	password string
 }
 
+// NewWallet create new wallet object from file path
 func NewWallet(filePath string) (*wallet, error) {
 	ret := new(wallet)
 	ret.file = filePath
 	err := ret.read()
 	return ret, err
 }
+
+// read will read the file data decrypting file chunk to get wallet information
 func (w *wallet) read() error {
 	fileData, err := os.ReadFile(w.file)
 	if err != nil {
@@ -179,6 +182,7 @@ func (w *wallet) decrypt(encryptedData []byte) error {
 	return errors.New("unsupported algorithm type")
 }
 
+// readCredentials read dsn, usernames and passwords into walletCredentials array
 func (w *wallet) readCredentials(input []byte) error {
 	w.certificates = nil
 	w.credentials = nil
@@ -395,6 +399,7 @@ func (w *wallet) decodeASN1(buffer []byte) (encryptedData []byte, err error) {
 	return
 }
 
+// getCredential read one credential dsn, username, password from encrypted data
 func (w *wallet) getCredential(server string, port int, service, username string) (*walletCredential, error) {
 	rHost, err := regexp.Compile(`\(\s*HOST\s*=\s*([A-z0-9._%+-]+)\)`)
 	if err != nil {

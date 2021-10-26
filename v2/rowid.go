@@ -11,6 +11,7 @@ type rowid struct {
 	slotNumber  int64
 }
 
+// newRowID read rowId from network session
 func newRowID(session *network.Session) (*rowid, error) {
 	temp, err := session.GetByte()
 	if err != nil {
@@ -68,6 +69,7 @@ func convertRowIDToByte(number int64, size int) []byte {
 	}
 	return output
 }
+
 func (id *rowid) getBytes() []byte {
 	output := make([]byte, 0, 18)
 	output = append(output, convertRowIDToByte(id.rba, 6)...)

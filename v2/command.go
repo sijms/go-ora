@@ -36,7 +36,7 @@ type StmtInterface interface {
 	//write() error
 	//getExeOption() int
 	read(dataSet *DataSet) error
-	//Close() error
+	Close() error
 	//Exec(args []driver.Value) (driver.Result, error)
 	//Query(args []driver.Value) (driver.Rows, error)
 }
@@ -283,7 +283,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	return ret
 }
 
-// write it write stmt data to network stream
+// write stmt data to network stream
 func (stmt *Stmt) write(session *network.Session) error {
 	if !stmt.parse && !stmt.reSendParDef {
 		exeOf := 0
@@ -320,79 +320,6 @@ func (stmt *Stmt) write(session *network.Session) error {
 		stmt.define = false
 		stmt.reSendParDef = false
 	}
-	//if !stmt.reExec {
-	//exeOp := stmt.getExeOption()
-	//session.PutBytes(3, 0x5E, 0)
-	//session.PutUint(exeOp, 4, true, true)
-	//session.PutUint(stmt.cursorID, 2, true, true)
-	//if stmt.cursorID == 0 {
-	//	session.PutBytes(1)
-	//	//session.PutUint(1, 1, false, false)
-	//} else {
-	//	session.PutBytes(0)
-	//	//session.PutUint(0, 1, false, false)
-	//}
-	//session.PutUint(len(stmt.text), 4, true, true)
-	//session.PutBytes(1)
-	//session.PutUint(1, 1, false, false)
-	//session.PutUint(13, 2, true, true)
-	//session.PutBytes(0, 0)
-	//if exeOp&0x40 == 0 && exeOp&0x20 != 0 && exeOp&0x1 != 0 && stmt.stmtType == SELECT {
-	//	session.PutBytes(0)
-	//	//session.PutUint(0, 1, false, false)
-	//	session.PutUint(stmt.noOfRowsToFetch, 4, true, true)
-	//} else {
-	//	session.PutUint(0, 4, true, true)
-	//	session.PutUint(0, 4, true, true)
-	//}
-	// longFetchSize == 0 marshal 1 else marshal longFetchSize
-	//session.PutUint(1, 4, true, true)
-	//if len(stmt.Pars) > 0 {
-	//	session.PutBytes(1)
-	//	//session.PutUint(1, 1, false, false)
-	//	session.PutUint(len(stmt.Pars), 2, true, true)
-	//} else {
-	//	session.PutBytes(0, 0)
-	//	//session.PutUint(0, 1, false, false)
-	//	//session.PutUint(0, 1, false, false)
-	//}
-	//session.PutBytes(0, 0, 0, 0, 0)
-	//if stmt.define {
-	//	session.PutBytes(1)
-	//	//session.PutUint(1, 1, false, false)
-	//	session.PutUint(stmt.noOfDefCols, 2, true, true)
-	//} else {
-	//	session.PutBytes(0, 0)
-	//	//session.PutUint(0, 1, false, false)
-	//	//session.PutUint(0, 1, false, false)
-	//}
-	//if session.TTCVersion >= 4 {
-	//	session.PutBytes(0, 0, 1)
-	//	//session.PutUint(0, 1, false, false) // dbChangeRegisterationId
-	//	//session.PutUint(0, 1, false, false)
-	//	//session.PutUint(1, 1, false, false)
-	//}
-	//if session.TTCVersion >= 5 {
-	//	session.PutBytes(0, 0, 0, 0, 0)
-	//	//session.PutUint(0, 1, false, false)
-	//	//session.PutUint(0, 1, false, false)
-	//	//session.PutUint(0, 1, false, false)
-	//	//session.PutUint(0, 1, false, false)
-	//	//session.PutUint(0, 1, false, false)
-	//}
-
-	//session.PutBytes([]byte(stmt.text)...)
-	//for x := 0; x < len(stmt.al8i4); x++ {
-	//	session.PutUint(stmt.al8i4[x], 2, true, true)
-	//}
-	//for _, par := range stmt.Pars {
-	//	_ = par.write(session)
-	//}
-	//stmt.reExec = true
-	//stmt.parse = false
-	//} else {
-	//
-	//}
 
 	if len(stmt.Pars) > 0 {
 		session.PutBytes(7)

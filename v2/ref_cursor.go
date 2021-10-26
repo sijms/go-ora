@@ -5,11 +5,6 @@ type RefCursor struct {
 	len        uint8
 	MaxRowSize int
 	parent     *defaultStmt
-	//ID         int
-	//scnForSnapshot []int
-	//connection *Connection
-	//noOfRowsToFetch int
-	//hasMoreRows bool
 }
 
 func (cursor *RefCursor) load() error {
@@ -112,6 +107,7 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	}
 	return dataSet, nil
 }
+
 func (cursor *RefCursor) write() error {
 	err := cursor.basicWrite(cursor.getExeOptions(), false, false)
 	if err != nil {
@@ -119,19 +115,3 @@ func (cursor *RefCursor) write() error {
 	}
 	return cursor.connection.session.Write()
 }
-
-func (cursor *RefCursor) Close() error {
-	return nil
-}
-
-//func (cursor *RefCursor) Exec(args []driver.Value) (driver.Result, error) {
-//	return nil, nil
-//}
-//
-//func (cursor *RefCursor) NumInput() int {
-//	return -1;
-//}
-//func (cursor *RefCursor) readQ() (*DataSet, error) {
-//	dataSet := new(DataSet)
-//	return dataSet, nil
-//}

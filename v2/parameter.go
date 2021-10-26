@@ -121,6 +121,7 @@ type ParameterInfo struct {
 	cusType              *customType
 }
 
+// load get parameter information form network session
 func (par *ParameterInfo) load(conn *Connection) error {
 	session := conn.session
 	par.getDataFromServer = true
@@ -275,12 +276,10 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	_, err = session.GetInt(4, true, true)
 	return nil
 }
+
+// write parameter information to network session
 func (par *ParameterInfo) write(session *network.Session) error {
 	session.PutBytes(uint8(par.DataType), par.Flag, par.Precision, par.Scale)
-	//session.PutUint(int(par.DataType), 1, false, false)
-	//session.PutUint(par.Flag, 1, false, false)
-	//session.PutUint(par.Precision, 1, false, false)
-	//session.PutUint(par.Scale, 1, false, false)
 	session.PutUint(par.MaxLen, 4, true, true)
 	session.PutInt(par.MaxNoOfArrayElements, 4, true, true)
 	if session.TTCVersion >= 10 {
@@ -305,84 +304,3 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	}
 	return nil
 }
-
-//func NewIntegerParameter(name string, val int, direction ParameterDirection) *ParameterInfo {
-//	ret := ParameterInfo{
-//		Name:        name,
-//		Direction:   direction,
-//		flag:        3,
-//		ContFlag:    0,
-//		DataType:    NUMBER,
-//		MaxCharLen:  22,
-//		MaxLen:      22,
-//		CharsetID:   871,
-//		CharsetForm: 1,
-//		BValue:       converters.EncodeInt(val),
-//	}
-//	return &ret
-//}
-//func NewStringParameter(name string, val string, size int, direction ParameterDirection) *ParameterInfo {
-//	ret := ParameterInfo{
-//		Name:        name,
-//		Direction:   direction,
-//		flag:        3,
-//		ContFlag:    16,
-//		DataType:    NCHAR,
-//		MaxCharLen:  size,
-//		MaxLen:      size,
-//		CharsetID:   871,
-//		CharsetForm: 1,
-//		BValue:       []byte(val),
-//	}
-//	return &ret
-//}
-
-//func NewParamInfo(name string, parType ParameterType, size int, direction ParameterDirection) *ParameterInfo {
-//	ret := new(ParameterInfo)
-//	ret.Name = name
-//	ret.Direction = direction
-//	ret.flag = 3
-//	//ret.DataType = dataType
-//	switch parType {
-//	case String:
-//		ret.ContFlag = 16
-//	default:
-//		ret.ContFlag = 0
-//	}
-//	switch parType {
-//	case Number:
-//		ret.DataType = NUMBER
-//		ret.MaxLen = 22
-//	case String:
-//		ret.CharsetForm = 1
-//		ret.DataType = NCHAR
-//		ret.MaxCharLen = size
-//		ret.MaxLen = size
-//	}
-//	//ret.MaxCharLen = 0 // number of character to write
-//	//ret.MaxLen = ret.MaxCharLen * 1 // number of character * byte per character
-//	ret.CharsetID = 871
-//	return ret
-//	// if duplicateBind ret.flag = 128 else ret.flag = 3
-//	// if collection type is assocative array ret.Flat |= 64
-//
-//	//num3 := 0
-//	//switch dataType {
-//	//case LONG:
-//	//	fallthrough
-//	//case LongRaw:
-//	//	fallthrough
-//	//case CHAR:
-//	//	fallthrough
-//	//case RAW:
-//	//	fallthrough
-//	//case NCHAR:
-//	//	num3 = 1
-//	//default:
-//	//	num3 = 0
-//	//}
-//	//if num3 != 0 {
-//	//
-//	//}
-//	//return ret
-//}

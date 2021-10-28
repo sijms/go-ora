@@ -10,14 +10,7 @@ import (
 	"time"
 )
 
-func dieOnError(msg string, err error) {
-	if err != nil {
-		fmt.Println(msg, err)
-		os.Exit(1)
-	}
-}
-
-func createTable(conn *sql.DB) {
+func createTable(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `CREATE TABLE GOORA_TEMP_VISIT(
 	VISIT_ID	number(10)	NOT NULL,
@@ -27,16 +20,21 @@ func createTable(conn *sql.DB) {
 	PRIMARY KEY(VISIT_ID)
 	)`
 	_, err := conn.Exec(sqlText)
-	dieOnError("Cannot create temporary table", err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("Finish create table GOORA_TEMP_VISIT :", time.Now().Sub(t))
+	return nil
 }
 
-func insertData(conn *sql.DB) {
+func insertData(conn *sql.DB) error {
 	t := time.Now()
 	index := 1
 	stmt, err := conn.Prepare(`INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, NAME, VAL, VISIT_DATE) 
 VALUES(:1, :2, :3, :4)`)
-	dieOnError("Cannot prepare stmt for insert", err)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		_ = stmt.Close()
 	}()
@@ -44,21 +42,26 @@ VALUES(:1, :2, :3, :4)`)
 	val := 1.1
 	for index = 1; index <= 100; index++ {
 		_, err = stmt.Exec(index, nameText, val, time.Now())
-		errorText := fmt.Sprintf("Error during insert at index: %d", index)
-		dieOnError(errorText, err)
+		if err != nil {
+			return err
+		}
 		val += 1.1
 	}
 	fmt.Println("100 Rows inserted: ", time.Now().Sub(t))
+	return nil
 }
 
-func dropTable(conn *sql.DB) {
+func dropTable(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec("drop table GOORA_TEMP_VISIT purge")
-	dieOnError("Can't drop table", err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("Finish drop table: ", time.Now().Sub(t))
+	return nil
 }
 
-func createRefCursorProc(conn *sql.DB) {
+func createRefCursorProc(conn *sql.DB) error {
 	sqlText := `CREATE OR REPLACE PROCEDURE GOORA_TEMP_GET_VISIT
 (
 	LVISIT_ID IN NUMBER,
@@ -69,15 +72,21 @@ BEGIN
 END GOORA_TEMP_GET_VISIT;`
 	t := time.Now()
 	_, err := conn.Exec(sqlText)
-	dieOnError("Can't create refcursor procedure", err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("Finish create refcursor procedure: ", time.Now().Sub(t))
+	return nil
 }
 
-func dropRefCursorProc(conn *sql.DB) {
+func dropRefCursorProc(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec("DROP PROCEDURE GOORA_TEMP_GET_VISIT")
-	dieOnError("Can't drop refcursor procedure", err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("Finish drop refcursor procedure: ", time.Now().Sub(t))
+	return nil
 }
 
 func usage() {
@@ -94,9 +103,12 @@ func usage() {
 	fmt.Println()
 }
 
-func queryCursor(cursor *go_ora.RefCursor) {
+func queryCursor(cursor *go_ora.RefCursor) error {
+	t := time.Now()
 	rows, err := cursor.Query()
-	dieOnError("Can't query cursor", err)
+	if err != nil {
+		return err
+	}
 	var (
 		id   int64
 		name string
@@ -106,10 +118,15 @@ func queryCursor(cursor *go_ora.RefCursor) {
 
 	for rows.Next_() {
 		err = rows.Scan(&id, &name, &val, &date)
-		dieOnError("Can't Scan row in cursor", err)
+		if err != nil {
+			return err
+		}
 		fmt.Println("ID: ", id, "\tName: ", name, "\tval: ", val, "\tDate: ", date)
 	}
+	fmt.Println("Finish query RefCursor: ", time.Now().Sub(t))
+	return nil
 }
+
 func main() {
 	var (
 		server string
@@ -126,26 +143,66 @@ func main() {
 	}
 	fmt.Println("Connection string: ", connStr)
 	conn, err := sql.Open("oracle", server)
-	dieOnError("Can't open the driver:", err)
+	if err != nil {
+		fmt.Println("Can't open the driver", err)
+		return
+	}
 
 	defer func() {
-		_ = conn.Close()
+		err = conn.Close()
+		if err != nil {
+			fmt.Println("Can't close connection", err)
+		}
 	}()
 
 	err = conn.Ping()
-	dieOnError("Can't ping connection", err)
+	if err != nil {
+		fmt.Println("Can't ping connection", err)
+		return
+	}
 
-	createTable(conn)
-	defer dropTable(conn)
-	insertData(conn)
-	createRefCursorProc(conn)
-	defer dropRefCursorProc(conn)
+	err = createTable(conn)
+	if err != nil {
+		fmt.Println("Can't create table", err)
+	}
+	defer func() {
+		err = dropTable(conn)
+		if err != nil {
+			fmt.Println("Can't drop table", err)
+		}
+	}()
+	err = insertData(conn)
+	if err != nil {
+		fmt.Println("Can't insert data", err)
+		return
+	}
+	err = createRefCursorProc(conn)
+	if err != nil {
+		fmt.Println("Can't create RefCursor", err)
+		return
+	}
+	defer func() {
+		err = dropRefCursorProc(conn)
+		if err != nil {
+			fmt.Println("Can't drop RefCursor", err)
+		}
+	}()
 	var cursor go_ora.RefCursor
 	_, err = conn.Exec(`BEGIN GOORA_TEMP_GET_VISIT(:1, :2); END;`, 1, sql.Out{Dest: &cursor})
-	dieOnError("Can't call refcursor procedure", err)
+	if err != nil {
+		fmt.Println("Can't call refcursor procedure", err)
+		return
+	}
+
 	defer func() {
-		_ = cursor.Close()
+		err = cursor.Close()
+		if err != nil {
+			fmt.Println("Can't close RefCursor", err)
+		}
 	}()
 
-	queryCursor(&cursor)
+	err = queryCursor(&cursor)
+	if err != nil {
+		fmt.Println("Can't query RefCursor", err)
+	}
 }

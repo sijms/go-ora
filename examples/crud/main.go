@@ -10,14 +10,8 @@ import (
 	"time"
 )
 
-func dieOnError(msg string, err error) {
-	if err != nil {
-		fmt.Println(msg, err)
-		os.Exit(1)
-	}
-}
-func createTable(conn *sql.DB) {
-	fmt.Println("Creating temporary table GOORA_TEMP_VISIT")
+func createTable(conn *sql.DB) error {
+	t := time.Now()
 	sqlText := `CREATE TABLE GOORA_TEMP_VISIT(
 	VISIT_ID	number(10)	NOT NULL,
 	NAME		VARCHAR(200),
@@ -26,15 +20,21 @@ func createTable(conn *sql.DB) {
 	PRIMARY KEY(VISIT_ID)
 	)`
 	_, err := conn.Exec(sqlText)
-	dieOnError("Cannot create temporary table", err)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Finish create table GOORA_TEMP_VISIT :", time.Now().Sub(t))
+	return nil
 }
 
-func insertData(conn *sql.DB) {
-	fmt.Println("Inserting values in the table")
+func insertData(conn *sql.DB) error {
+	t := time.Now()
 	index := 1
 	stmt, err := conn.Prepare(`INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, NAME, VAL, VISIT_DATE) 
 VALUES(:1, :2, :3, :4)`)
-	dieOnError("Cannot prepare stmt for insert", err)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		_ = stmt.Close()
 	}()
@@ -42,17 +42,21 @@ VALUES(:1, :2, :3, :4)`)
 	val := 1.1
 	for index = 1; index <= 100; index++ {
 		_, err = stmt.Exec(index, nameText, val, time.Now())
-		errorText := fmt.Sprintf("Error during insert at index: %d", index)
-		dieOnError(errorText, err)
+		if err != nil {
+			return err
+		}
 		val += 1.1
 	}
-	fmt.Println("100 Rows inserted")
+	fmt.Println("100 Rows inserted: ", time.Now().Sub(t))
+	return nil
 }
 
-func queryData(conn *sql.DB) {
-	fmt.Println("Query rows")
+func queryData(conn *sql.DB) error {
+	t := time.Now()
 	rows, err := conn.Query("SELECT VISIT_ID, NAME, VAL, VISIT_DATE FROM GOORA_TEMP_VISIT")
-	dieOnError("Cannot query after insert", err)
+	if err != nil {
+		return err
+	}
 	var (
 		id   int64
 		name string
@@ -61,41 +65,55 @@ func queryData(conn *sql.DB) {
 	)
 	for rows.Next() {
 		err = rows.Scan(&id, &name, &val, &date)
-		dieOnError("Cannot scan rows", err)
+		if err != nil {
+			return err
+		}
 		fmt.Println("ID: ", id, "\tName: ", name, "\tval: ", val, "\tDate: ", date)
 	}
-	dieOnError("Query: ", rows.Err())
-	fmt.Println("Finish query")
+	fmt.Println("Finish query rows: ", time.Now().Sub(t))
+	return nil
 }
 
-func updateData(conn *sql.DB) {
-	fmt.Println("Updating values")
+func updateData(conn *sql.DB) error {
+	t := time.Now()
 	updStmt, err := conn.Prepare(`UPDATE GOORA_TEMP_VISIT SET NAME = :1 WHERE VISIT_ID = :2`)
-	dieOnError("Can't prepare stmt for update", err)
+	if err != nil {
+		return err
+	}
 	nameText := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	defer func() {
 		_ = updStmt.Close()
 	}()
 	for index := 1; index <= 100; index++ {
 		_, err = updStmt.Exec(nameText[:101-index], index)
-		dieOnError("Can't update", err)
+		if err != nil {
+			return err
+		}
 	}
-	fmt.Println("Finish update")
+	fmt.Println("Finish update: ", time.Now().Sub(t))
+	return nil
 }
 
-func deleteData(conn *sql.DB) {
-	fmt.Println("Deleting data")
+func deleteData(conn *sql.DB) error {
+	t := time.Now()
 	_, err := conn.Exec("delete from GOORA_TEMP_VISIT")
-	dieOnError("Can't delete", err)
-	fmt.Println("Finish delete")
+	if err != nil {
+		return err
+	}
+	fmt.Println("Finish delete: ", time.Now().Sub(t))
+	return nil
 }
 
-func dropTable(conn *sql.DB) {
-	fmt.Println("Dropping table")
+func dropTable(conn *sql.DB) error {
+	t := time.Now()
 	_, err := conn.Exec("drop table GOORA_TEMP_VISIT purge")
-	dieOnError("Can't drop table", err)
-	fmt.Println("Finish drop table")
+	if err != nil {
+		return err
+	}
+	fmt.Println("Finish drop table: ", time.Now().Sub(t))
+	return nil
 }
+
 func usage() {
 	fmt.Println()
 	fmt.Println("crud")
@@ -126,23 +144,60 @@ func main() {
 	}
 	fmt.Println("Connection string: ", connStr)
 	conn, err := sql.Open("oracle", server)
-	dieOnError("Can't open the driver:", err)
+	if err != nil {
+		fmt.Println("Can't open the driver", err)
+		return
+	}
 
 	defer func() {
-		_ = conn.Close()
+		err = conn.Close()
+		if err != nil {
+			fmt.Println("Can't close connection", err)
+		}
 	}()
 
 	err = conn.Ping()
-	dieOnError("Can't ping connection", err)
+	if err != nil {
+		fmt.Println("Can't ping connection", err)
+		return
+	}
 
-	createTable(conn)
+	err = createTable(conn)
+	if err != nil {
+		fmt.Println("Can't create table", err)
+		return
+	}
+	defer func() {
+		err = dropTable(conn)
+		if err != nil {
+			fmt.Println("Can't drop table", err)
+		}
+	}()
 
-	defer dropTable(conn)
-
-	insertData(conn)
-	queryData(conn)
-	updateData(conn)
-	queryData(conn)
-	deleteData(conn)
+	err = insertData(conn)
+	if err != nil {
+		fmt.Println("Can't insert data", err)
+		return
+	}
+	err = queryData(conn)
+	if err != nil {
+		fmt.Println("Can't query data", err)
+		return
+	}
+	err = updateData(conn)
+	if err != nil {
+		fmt.Println("Can't update data", err)
+		return
+	}
+	err = queryData(conn)
+	if err != nil {
+		fmt.Println("Can't query data", err)
+		return
+	}
+	err = deleteData(conn)
+	if err != nil {
+		fmt.Println("Can't delete data", err)
+		return
+	}
 
 }

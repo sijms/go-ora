@@ -57,6 +57,7 @@ type defaultStmt struct {
 	columns            []ParameterInfo
 	scnForSnapshot     []int
 	arrayBindCount     int
+	containOutputPars  bool
 }
 
 func (stmt *defaultStmt) hasMoreRows() bool {
@@ -283,6 +284,29 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	return ret
 }
 
+func (stmt *Stmt) writePars(session *network.Session) {
+	if len(stmt.Pars) > 0 {
+		session.PutBytes(7)
+		for _, par := range stmt.Pars {
+			if !stmt.parse && par.Direction == Output {
+				continue
+			}
+			if par.DataType != RAW {
+				if par.DataType == REFCURSOR {
+					session.PutBytes(1, 0)
+				} else {
+					session.PutClr(par.BValue)
+				}
+			}
+		}
+		for _, par := range stmt.Pars {
+			if par.DataType == RAW {
+				session.PutClr(par.BValue)
+			}
+		}
+	}
+}
+
 // write stmt data to network stream
 func (stmt *Stmt) write(session *network.Session) error {
 	if !stmt.parse && !stmt.reSendParDef {
@@ -310,40 +334,17 @@ func (stmt *Stmt) write(session *network.Session) error {
 		session.PutUint(count, 2, true, true)
 		session.PutUint(exeOf, 2, true, true)
 		session.PutUint(execFlag, 2, true, true)
+		stmt.writePars(session)
 	} else {
 		//stmt.reExec = true
 		err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
 		if err != nil {
 			return err
 		}
+		stmt.writePars(session)
 		stmt.parse = false
 		stmt.define = false
 		stmt.reSendParDef = false
-	}
-
-	if len(stmt.Pars) > 0 {
-		session.PutBytes(7)
-		for _, par := range stmt.Pars {
-			if par.DataType != RAW {
-				if par.DataType == REFCURSOR {
-					session.PutBytes(1, 0)
-				} else {
-					session.PutClr(par.BValue)
-				}
-			}
-		}
-		for _, par := range stmt.Pars {
-			if par.DataType == RAW {
-				session.PutClr(par.BValue)
-			}
-		}
-		//for x := 0; x < stmt.arrayBindCount; x++ {
-		//
-		//}
-		//session.PutUint(7, 1, false, false)
-		//for _, par := range stmt.Pars {
-		//	session.PutClr(par.BValue)
-		//}
 	}
 	return session.Write()
 }
@@ -410,7 +411,6 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	loop := true
 	after7 := false
-	containOutputPars := false
 	dataSet.parent = stmt
 	session := stmt.connection.session
 	for loop {
@@ -453,7 +453,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			}
 		case 7:
 			after7 = true
-			if stmt._hasReturnClause && containOutputPars {
+			if stmt._hasReturnClause && stmt.containOutputPars {
 				for x := 0; x < len(stmt.Pars); x++ {
 					if stmt.Pars[x].Direction == Output {
 						num, err := session.GetInt(4, true, true)
@@ -483,7 +483,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					}
 				}
 			} else {
-				if containOutputPars {
+				if stmt.containOutputPars {
 					for x := 0; x < len(stmt.Pars); x++ {
 						if stmt.Pars[x].DataType == REFCURSOR {
 							typ := reflect.TypeOf(stmt.Pars[x].Value)
@@ -650,10 +650,10 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					stmt.Pars[x].Direction = Input
 				case 16:
 					stmt.Pars[x].Direction = Output
-					containOutputPars = true
+					stmt.containOutputPars = true
 				case 48:
 					stmt.Pars[x].Direction = InOut
-					containOutputPars = true
+					stmt.containOutputPars = true
 				}
 				if err != nil {
 					return err

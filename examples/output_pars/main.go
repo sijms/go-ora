@@ -10,15 +10,8 @@ import (
 	"time"
 )
 
-func dieOnError(msg string, err error) {
-	if err != nil {
-		fmt.Println(msg, err)
-		os.Exit(1)
-	}
-}
-
-func createTable(conn *sql.DB) {
-	fmt.Println("Creating temporary table GOORA_TEMP_VISIT")
+func createTable(conn *sql.DB) error {
+	t := time.Now()
 	sqlText := `CREATE TABLE GOORA_TEMP_VISIT(
 	VISIT_ID	number(10)	NOT NULL,
 	NAME		VARCHAR(200),
@@ -27,15 +20,21 @@ func createTable(conn *sql.DB) {
 	PRIMARY KEY(VISIT_ID)
 	)`
 	_, err := conn.Exec(sqlText)
-	dieOnError("Cannot create temporary table", err)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Finish create table GOORA_TEMP_VISIT :", time.Now().Sub(t))
+	return nil
 }
 
-func insertData(conn *sql.DB) {
-	fmt.Println("Inserting values in the table")
+func insertData(conn *sql.DB) error {
+	t := time.Now()
 	index := 1
 	stmt, err := conn.Prepare(`INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, NAME, VAL, VISIT_DATE) 
 VALUES(:1, :2, :3, :4)`)
-	dieOnError("Cannot prepare stmt for insert", err)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		_ = stmt.Close()
 	}()
@@ -43,20 +42,49 @@ VALUES(:1, :2, :3, :4)`)
 	val := 1.1
 	for index = 1; index <= 100; index++ {
 		_, err = stmt.Exec(index, nameText, val, time.Now())
-		errorText := fmt.Sprintf("Error during insert at index: %d", index)
-		dieOnError(errorText, err)
+		if err != nil {
+			return err
+		}
 		val += 1.1
 	}
-	fmt.Println("100 Rows inserted")
+	fmt.Println("100 Rows inserted: ", time.Now().Sub(t))
+	return nil
 }
 
-func dropTable(conn *sql.DB) {
-	fmt.Println("Dropping table")
+func dropTable(conn *sql.DB) error {
+	t := time.Now()
 	_, err := conn.Exec("drop table GOORA_TEMP_VISIT purge")
-	dieOnError("Can't drop table", err)
-	fmt.Println("Finish drop table")
+	if err != nil {
+		return err
+	}
+	fmt.Println("Finish drop table: ", time.Now().Sub(t))
+	return nil
 }
 
+func queryOutputPars(conn *sql.DB) error {
+	t := time.Now()
+	sqlText := `BEGIN
+SELECT VISIT_ID, NAME, VAL, VISIT_DATE INTO :1, :2, :3, :4 FROM GOORA_TEMP_VISIT WHERE VISIT_ID = 1;
+END;`
+	var (
+		id   int64
+		name string
+		val  float64
+		date time.Time
+	)
+	name = strings.Repeat(" ", 200)
+	_, err := conn.Exec(sqlText, sql.Out{Dest: &id}, sql.Out{Dest: &name},
+		sql.Out{Dest: &val}, sql.Out{Dest: &date})
+	if err != nil {
+		return err
+	}
+	fmt.Println("ID: ", id)
+	fmt.Println("Name: ", name)
+	fmt.Println("Val: ", val)
+	fmt.Println("Date: ", date)
+	fmt.Println("Finish query output pars: ", time.Now().Sub(t))
+	return nil
+}
 func usage() {
 	fmt.Println()
 	fmt.Println("output_par")
@@ -87,34 +115,43 @@ func main() {
 	}
 	fmt.Println("Connection string: ", connStr)
 	conn, err := sql.Open("oracle", server)
-	dieOnError("Can't open the driver:", err)
+	if err != nil {
+		fmt.Println("Can't open connection", err)
+		return
+	}
 	defer func() {
-		_ = conn.Close()
+		err = conn.Close()
+		if err != nil {
+			fmt.Println("Can't close connection", err)
+		}
 	}()
 
 	err = conn.Ping()
-	dieOnError("Can't ping connection", err)
+	if err != nil {
+		fmt.Println("Can't ping connection", err)
+		return
+	}
 
-	createTable(conn)
+	err = createTable(conn)
+	if err != nil {
+		fmt.Println("Can't create table", err)
+		return
+	}
+	defer func() {
+		err = dropTable(conn)
+		if err != nil {
+			fmt.Println("Can't drop table", err)
+		}
+	}()
+	err = insertData(conn)
+	if err != nil {
+		fmt.Println("Can't insert data", err)
+		return
+	}
+	err = queryOutputPars(conn)
+	if err != nil {
+		fmt.Println("Can't get output parameters", err)
+		return
+	}
 
-	insertData(conn)
-	defer dropTable(conn)
-
-	sqlText := `BEGIN
-SELECT VISIT_ID, NAME, VAL, VISIT_DATE INTO :1, :2, :3, :4 FROM GOORA_TEMP_VISIT WHERE VISIT_ID = 1;
-END;`
-	var (
-		id   int64
-		name string
-		val  float64
-		date time.Time
-	)
-	name = strings.Repeat(" ", 200)
-	_, err = conn.Exec(sqlText, sql.Out{Dest: &id}, sql.Out{Dest: &name},
-		sql.Out{Dest: &val}, sql.Out{Dest: &date})
-	dieOnError("Can't get output parameters", err)
-	fmt.Println("ID: ", id)
-	fmt.Println("Name: ", name)
-	fmt.Println("Val: ", val)
-	fmt.Println("Date: ", date)
 }

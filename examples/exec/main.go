@@ -7,12 +7,12 @@ import (
 	"os"
 )
 
-func dieOnError(msg string, err error) {
-	if err != nil {
-		fmt.Println(msg, err)
-		os.Exit(1)
-	}
-}
+//func dieOnError(msg string, err error) {
+//	if err != nil {
+//		fmt.Println(msg, err)
+//		os.Exit(1)
+//	}
+//}
 
 func usage() {
 	fmt.Println()
@@ -52,18 +52,37 @@ func main() {
 	}
 
 	DB, err := go_ora.NewConnection(connStr)
-	dieOnError("Can't open the driver:", err)
+	if err != nil {
+		fmt.Println("Can't create new connection", err)
+		return
+	}
 	err = DB.Open()
-	dieOnError("Can't open the connection:", err)
+	if err != nil {
+		fmt.Println("Can't open the connection:", err)
+		return
+	}
 
-	defer DB.Close()
+	defer func() {
+		err = DB.Close()
+		if err != nil {
+			fmt.Println("Can't close connection", err)
+		}
+	}()
 
 	stmt := go_ora.NewStmt(sqlText, DB)
 
-	defer stmt.Close()
+	defer func() {
+		err = stmt.Close()
+		if err != nil {
+			fmt.Println("Can't close stmt", err)
+		}
+	}()
 
 	result, err := stmt.Exec(nil)
-	dieOnError("Can't execute sql", err)
+	if err != nil {
+		fmt.Println("Can't execute sql", err)
+		return
+	}
 	rowsAffected, _ := result.RowsAffected()
 	fmt.Println("Rows affected: ", rowsAffected)
 }

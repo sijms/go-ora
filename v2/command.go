@@ -902,7 +902,12 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 			tempVal = stmt.connection.strConv.Decode(param.BValue)
 		}
 	case NUMBER:
-		tempVal = converters.DecodeNumber(param.BValue)
+		if int8(param.Scale) <= 0 {
+			// We expect an integer
+			tempVal = converters.DecodeInt(param.BValue)
+		} else {
+			tempVal = converters.DecodeDouble(param.BValue)
+		}
 	case TIMESTAMP:
 		dateVal, err := converters.DecodeDate(param.BValue)
 		if err != nil {

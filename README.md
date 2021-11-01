@@ -3,10 +3,11 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+    - See examples for more help
 ### version 2.2.9: add support for connect to multiple servers
 define multiple server in 2 way
 * in url string options
-```azure
+```golang
 // using url options
 databaseURL := "oracle://user:pass@server1/service?server=server2&server=server3"
 /* now the driver will try connection as follow
@@ -16,7 +17,7 @@ databaseURL := "oracle://user:pass@server1/service?server=server2&server=server3
 */
 ```
 * using BuildUrl function
-```azure
+```golang
 urlOptions := map[string] string {
     "TRACE FILE": "trace.log",
     "SERVER": "server2, server3",
@@ -35,7 +36,7 @@ OracleError carry error message from the server
 ### version 2.2.6 (pre-release - experimental): Add support for user defined types
 to use make the following (oracle 12c)
 * define custom type in the oracle
-```azure
+```golang
 create or replace TYPE TEST_TYPE1 IS OBJECT 
 ( 
     TEST_ID NUMBER(6, 0),
@@ -43,7 +44,7 @@ create or replace TYPE TEST_TYPE1 IS OBJECT
 )
 ```
 * define struct in go with tag
-```azure
+```golang
 type test1 struct {
     // note use int64 not int
     // all tagged fields should be exported 
@@ -53,7 +54,7 @@ type test1 struct {
 }
 ```
 * connect to database
-```azure
+```golang
 databaseURL := go_ora.BuildUrl("localhost", 1521, "service", "user", "pass", nil)
 conn, err := sql.Open("oracle", databaseURL)
 // check for err
@@ -65,14 +66,14 @@ defer func() {
 }()
 ```
 * register type
-```azure
+```golang
 if drv, ok := conn.Driver().(*go_ora.OracleDriver); ok {
     err = drv.Conn.RegisterType("owner", "TEST_TYPE1", test1{})
     // check for err
 }
 ```
 * select and display data
-```azure
+```golang
 rows, err := conn.Query("SELECT test_type1(10, 'test') from dual")
 // check for err
 var test test1
@@ -87,7 +88,7 @@ for rows.Next() {
 ### version 2.2.4
 * add support for tcps. you can enable tcps through the following url options
 * this [link](https://oracle-base.com/articles/misc/configure-tcpip-with-ssl-and-tls-for-database-connections) explain how to enable tcps in your server
-```azure
+```golang
 wallet=wallet_dir // wallet should contain server and client certificates
 SSL=true          // true or enabled
 SSL Verify=false  // to bypass certificate verification
@@ -97,7 +98,7 @@ SSL Verify=false  // to bypass certificate verification
 * **note**:
 to use wallet you need to specify directory path for wallet the directory
   should contain cwallet.sso file "the file that will be used"
-```bigquery
+```golang
 sqlQuery := "oracle://user@127.0.0.1:1522/service"
 sqlQuery += "?TRACE FILE=trace.log"
 sqlQuery += "&wallet=path_to_wallet_directory"
@@ -138,11 +139,11 @@ SQLNET.ENCRYPTION_TYPES_SERVER = AES256
 now you can pass string parameter in 2 way:
 ##### &nbsp; &nbsp; 1- varchar string:
 
-```
+```golang
 _, err := conn.Exec(inputSql, "7586")
 ```
 ##### &nbsp; &nbsp;2- nvarchar string:
-```
+```golang
 _, err := conn.Exec(inputSql, go_ora.NVarChar("7586"))
 ```
 
@@ -312,6 +313,7 @@ Read packet:
 Default value is 25 increase this value to higher level will significantly
 speed up the query
 ## RefCursor
+#### note: See examples for using RefCursor with sql package
 to use RefCursor follow these steps:
 * create the connection object and open
 * create NewStmt from connection
@@ -320,11 +322,15 @@ to use RefCursor follow these steps:
 * call cursor.Query()
 * reterive records use for loop 
 #### code:
-```buildoutcfg
-conn, err := go_ora.NewConnection(url)
+```Golang
+urlOptions := map[string] string {
+	"trace file": "trace.log" ,
+}
+databaseURL := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
+conn, err := sql.Open("oracle", databaseURL)
 // check error
 
-err = conn.Open()
+err = conn.Ping()
 // check error
 
 defer conn.Close()
@@ -332,35 +338,22 @@ defer conn.Close()
 cmdText := `BEGIN    
     proc_1(:1); 
 end;`
-stmt := go_ora.NewStmt(cmdText, conn)
-stmt.AddRefCursorParam("1")
-defer stmt.Close()
-
-_, err = stmt.Exec(nil)
+var cursor go_ora.RefCursor
+_, err = conn.Exec(cmdText, sql.Out{Dest: &cursor})
 //check errors
 
-if cursor, ok := stmt.Pars[0].Value.(go_ora.RefCursor); ok {
-    defer cursor.Close()
-    rows, err := cursor.Query()
+defer cursor.Close()
+rows, err := cursor.Query()
+// check for error
+
+var (
+    var_1 int64
+    var_2 string
+)
+for rows.Next_() {
+    err = rows.Scan(&var_1, &var_2)
     // check for error
-    
-    var (
-        var_1 int64
-        var_2 string
-    )
-    values := make([]driver.Value, 2)
-    for {
-        err = rows.Next(values)
-        // check for error and if == io.EOF break
-        
-        if var_1, ok = values[0].(int64); !ok {
-            // error
-        }
-        if var_2, ok = values[1].(string); !ok {
-            // error
-        }
-        fmt.Println(var_1, var_2)
-    }
+	fmt.Println(var_1, var_2)
 }
 ```
 

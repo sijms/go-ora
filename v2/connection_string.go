@@ -98,6 +98,9 @@ type ConnectionString struct {
 	w                     *wallet
 }
 
+// BuildUrl create databaseURL from server, port, service, user, password, urlOptions
+// this function help build a will formed databaseURL and accept any character as it
+// convert special charters to corresponding values in URL
 func BuildUrl(server string, port int, service, user, password string, options map[string]string) string {
 	ret := fmt.Sprintf("oracle://%s:%s@%s:%d/%s", url.QueryEscape(user), url.QueryEscape(password),
 		url.QueryEscape(server), port, url.QueryEscape(service))
@@ -118,8 +121,16 @@ func BuildUrl(server string, port int, service, user, password string, options m
 	}
 	return ret
 }
-func NewConnectionString() *ConnectionString {
-	return &ConnectionString{
+
+// newConnectionStringFromUrl create new connection string from databaseURL data and options
+func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
+	u, err := url.Parse(databaseUrl)
+	if err != nil {
+		return nil, err
+	}
+	q := u.Query()
+	p := u.Port()
+	ret := &ConnectionString{
 		Port:                  defaultPort,
 		DBAPrivilege:          NONE,
 		EnList:                TRUE,
@@ -140,16 +151,6 @@ func NewConnectionString() *ConnectionString {
 		Servers:               make([]string, 0, 3),
 		Ports:                 make([]int, 0, 3),
 	}
-}
-
-func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
-	u, err := url.Parse(databaseUrl)
-	if err != nil {
-		return nil, err
-	}
-	q := u.Query()
-	p := u.Port()
-	ret := NewConnectionString()
 	ret.UserID = u.User.Username()
 	ret.Password, _ = u.User.Password()
 	if p != "" {
@@ -339,6 +340,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	return ret, ret.validate()
 }
 
+// validate check is data in connection string is correct and fulfilled
 func (connStr *ConnectionString) validate() error {
 	if !connStr.Pooling {
 		connStr.MaxPoolSize = -1

@@ -95,6 +95,8 @@ type OracleDriver struct {
 func init() {
 	sql.Register("oracle", &OracleDriver{})
 }
+
+// Open return a new open connection
 func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 	conn, err := NewConnection(name)
 	if err != nil {
@@ -119,11 +121,15 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 	return conn, nil
 }
 
+// SetStringConverter this function is used to set a custom string converter interface
+// that will used to encode and decode strings and bytearrays
 func (conn *Connection) SetStringConverter(converter converters.IStringConverter) {
 	conn.strConv = converter
 	conn.session.StrConv = converter
 }
 
+// GetNLS return NLS properties of the connection.
+// this function is left from v1. but v2 is using another method
 func (conn *Connection) GetNLS() (*NLSData, error) {
 
 	// we read from nls_session_parameters ONCE
@@ -232,11 +238,13 @@ DECLARE
 	return &conn.NLSData, nil
 }
 
+// Prepare take a query string and create a stmt object
 func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
 	conn.connOption.Tracer.Print("Prepare\n", query)
 	return NewStmt(query, conn), nil
 }
 
+// Ping test if connection is online
 func (conn *Connection) Ping(_ context.Context) error {
 	conn.connOption.Tracer.Print("Ping")
 	conn.session.ResetBuffer()
@@ -300,6 +308,7 @@ func (conn *Connection) Ping(_ context.Context) error {
 //	return nil
 //}
 
+// Open open the connection = bring it online
 func (conn *Connection) Open() error {
 	tracer := conn.connOption.Tracer
 	switch conn.conStr.DBAPrivilege {
@@ -346,7 +355,7 @@ func (conn *Connection) Open() error {
 	}
 
 	tracer.Print("TCP Negotiation")
-	conn.tcpNego, err = NewTCPNego(conn.session)
+	conn.tcpNego, err = newTCPNego(conn.session)
 	if err != nil {
 		return err
 	}
@@ -398,7 +407,7 @@ func (conn *Connection) Open() error {
 	}
 	conn.serialID = int(serialNum)
 	conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
-	conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
+	//conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
 	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
@@ -411,12 +420,14 @@ func (conn *Connection) Open() error {
 	return nil
 }
 
+// Begin called to begin a transaction
 func (conn *Connection) Begin() (driver.Tx, error) {
 	conn.connOption.Tracer.Print("Begin transaction")
 	conn.autoCommit = false
 	return &Transaction{conn: conn}, nil
 }
 
+// NewConnection create a new connection from databaseURL string
 func NewConnection(databaseUrl string) (*Connection, error) {
 	//this.m_id = this.GetHashCode().ToString();
 	conStr, err := newConnectionStringFromUrl(databaseUrl)
@@ -489,6 +500,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	}, nil
 }
 
+// Close the connection by disconnect network session
 func (conn *Connection) Close() (err error) {
 	conn.connOption.Tracer.Print("Close")
 	//var err error = nil
@@ -502,6 +514,7 @@ func (conn *Connection) Close() (err error) {
 	return
 }
 
+// doAuth a login step that occur during open connection
 func (conn *Connection) doAuth() error {
 	conn.connOption.Tracer.Print("doAuth")
 	conn.session.ResetBuffer()
@@ -593,6 +606,7 @@ func (conn *Connection) doAuth() error {
 	return nil
 }
 
+// loadNLSData get nls data for v2
 func (conn *Connection) loadNLSData() error {
 	_, err := conn.session.GetInt(2, true, true)
 	if err != nil {
@@ -733,6 +747,7 @@ func (conn *Connection) getServerNetworkInformation(code uint8) error {
 	return nil
 }
 
+// SaveNLSValue a helper function that convert between nls key and code
 func (nls *NLSData) SaveNLSValue(key, value string, code int) {
 	key = strings.ToUpper(key)
 	if len(key) > 0 {

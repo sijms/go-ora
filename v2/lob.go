@@ -18,15 +18,20 @@ type Lob struct {
 	data          bytes.Buffer
 }
 
+// variableWidthChar if lob has variable width char or not
 func (lob *Lob) variableWidthChar() bool {
 	if len(lob.sourceLocator) > 6 && lob.sourceLocator[6]&128 == 128 {
 		return true
 	}
 	return false
 }
+
+// littleEndianClob if CLOB is littleEndian or not
 func (lob *Lob) littleEndianClob() bool {
 	return len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&64 > 0
 }
+
+// getSize return lob size
 func (lob *Lob) getSize(connection *Connection) (size int64, err error) {
 	session := connection.session
 	connection.connOption.Tracer.Print("Read Lob Size")
@@ -42,6 +47,8 @@ func (lob *Lob) getSize(connection *Connection) (size int64, err error) {
 	connection.connOption.Tracer.Print("Lob Size: ", size)
 	return
 }
+
+// getData return lob data
 func (lob *Lob) getData(connection *Connection) (data []byte, err error) {
 	connection.connOption.Tracer.Print("Read Lob Data")
 	session := connection.session
@@ -57,6 +64,8 @@ func (lob *Lob) getData(connection *Connection) (data []byte, err error) {
 	data = lob.data.Bytes()
 	return
 }
+
+// write lob command to network session
 func (lob *Lob) write(session *network.Session, operationID int) error {
 	session.ResetBuffer()
 	session.PutBytes(3, 0x60, 0)
@@ -140,6 +149,7 @@ func (lob *Lob) write(session *network.Session, operationID int) error {
 	return session.Write()
 }
 
+// read lob response from network session
 func (lob *Lob) read(connection *Connection) error {
 	loop := true
 	session := connection.session
@@ -231,6 +241,8 @@ func (lob *Lob) read(connection *Connection) error {
 	}
 	return nil
 }
+
+// read lob data chunks from network session
 func (lob *Lob) readData(session *network.Session) error {
 	num1 := 0 // data readed in the call of this function
 	var chunkSize int = 0

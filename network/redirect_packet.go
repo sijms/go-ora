@@ -6,13 +6,14 @@ import (
 )
 
 type RedirectPacket struct {
-	packet        Packet
+	Packet
 	redirectAddr  string
 	reconnectData string
 }
 
+// bytes return bytearray representation of redirect packet
 func (pck *RedirectPacket) bytes() []byte {
-	output := pck.packet.bytes()
+	output := pck.Packet.bytes()
 	data := append([]byte(pck.redirectAddr), 0)
 	data = append(data, []byte(pck.reconnectData)...)
 	binary.BigEndian.PutUint16(output[8:], uint16(len(data)))
@@ -20,16 +21,14 @@ func (pck *RedirectPacket) bytes() []byte {
 	return output
 }
 
-func (pck *RedirectPacket) getPacketType() PacketType {
-	return pck.packet.packetType
-}
-
+// newRedirectPacketFromData create new redirect packet from bytearray that has
+// been read from network stream
 func newRedirectPacketFromData(packetData []byte) *RedirectPacket {
 	if len(packetData) < 10 {
 		return nil
 	}
 	pck := RedirectPacket{
-		packet: Packet{
+		Packet: Packet{
 			dataOffset: 10,
 			length:     binary.BigEndian.Uint16(packetData),
 			packetType: PacketType(packetData[4]),
@@ -50,6 +49,9 @@ func newRedirectPacketFromData(packetData []byte) *RedirectPacket {
 	//}
 	return &pck
 }
+
+// findValue search in the redirectArra which contain data in form key=value
+// for appropriate value that related to entered key
 func (pck *RedirectPacket) findValue(key string) string {
 	redirectAddr := strings.ToUpper(pck.redirectAddr)
 	start := strings.Index(redirectAddr, key)
@@ -69,13 +71,18 @@ func (pck *RedirectPacket) findValue(key string) string {
 		return ""
 	}
 }
+
+// protocol return value of protocol key
 func (pck *RedirectPacket) protocol() string {
 	return strings.ToLower(pck.findValue("PROTOCOL"))
 }
 
+// host return value of host key
 func (pck *RedirectPacket) host() string {
 	return pck.findValue("HOST")
 }
+
+// port return value of port key
 func (pck *RedirectPacket) port() string {
 	return pck.findValue("PORT")
 }

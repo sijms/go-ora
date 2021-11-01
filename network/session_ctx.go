@@ -44,6 +44,7 @@ type SessionContext struct {
 	GotReset            bool
 }
 
+// NewSessionContext create session context from connection option
 func NewSessionContext(connOption ConnectionOption) *SessionContext {
 	return &SessionContext{
 		SessionDataUnit:   connOption.SessionDataUnitSize,

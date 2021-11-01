@@ -3,7 +3,7 @@ package network
 import "encoding/binary"
 
 type MarkerPacket struct {
-	packet Packet
+	Packet
 	//length     uint16
 	//packetType PacketType
 	//flag       uint8
@@ -11,17 +11,20 @@ type MarkerPacket struct {
 	markerType uint8
 }
 
+// bytes return bytearray representation of marker packet
 func (pck *MarkerPacket) bytes() []byte {
 	return []byte{0, 0xB, 0, 0, 0xC, 0, 0, 0, pck.markerType, 0, pck.markerData}
 }
 
-func (pck *MarkerPacket) getPacketType() PacketType {
-	return pck.packet.packetType
-}
+// GetPacketType return packet type
+//func (pck *MarkerPacket) getPacketType() PacketType {
+//	return pck.packet.packetType
+//}
 
+// newMarkerPacket create new marker packet from marker data
 func newMarkerPacket(markerData uint8) *MarkerPacket {
 	return &MarkerPacket{
-		packet: Packet{
+		Packet: Packet{
 			dataOffset: 0,
 			length:     0xB,
 			packetType: MARKER,
@@ -31,12 +34,15 @@ func newMarkerPacket(markerData uint8) *MarkerPacket {
 		markerData: markerData,
 	}
 }
+
+// newMarkerPacketFromData create marker packet from bytearray data that has been
+// read from network stream
 func newMarkerPacketFromData(packetData []byte) *MarkerPacket {
 	if len(packetData) != 0xB {
 		return nil
 	}
 	pck := MarkerPacket{
-		packet: Packet{
+		Packet: Packet{
 			dataOffset: 0,
 			length:     binary.BigEndian.Uint16(packetData),
 			packetType: PacketType(packetData[4]),
@@ -45,7 +51,7 @@ func newMarkerPacketFromData(packetData []byte) *MarkerPacket {
 		markerType: packetData[8],
 		markerData: packetData[10],
 	}
-	if pck.packet.packetType != MARKER {
+	if pck.packetType != MARKER {
 		return nil
 	}
 	return &pck

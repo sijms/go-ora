@@ -122,7 +122,7 @@ func usage() {
 	flag.PrintDefaults()
 	fmt.Println()
 	fmt.Println("Example:")
-	fmt.Println(`  store_proc -server "oracle://user:pass@server/service_name"`)
+	fmt.Println(`  insert_return -server "oracle://user:pass@server/service_name"`)
 	fmt.Println()
 }
 func main() {

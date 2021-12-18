@@ -38,7 +38,7 @@ type StmtInterface interface {
 	read(dataSet *DataSet) error
 	Close() error
 	//Exec(args []driver.Value) (driver.Result, error)
-	//Query(args []driver.Value) (driver.Rows, error)
+	//Query(args []driver.Value) (driver.rows, error)
 }
 type defaultStmt struct {
 	connection         *Connection
@@ -569,12 +569,12 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 							}
 						}
 					}
-					newRow := make(Row, dataSet.ColumnCount)
+					newRow := make(Row, dataSet.columnCount)
 					for x := 0; x < len(dataSet.Cols); x++ {
 						newRow[x] = dataSet.Cols[x].Value
 					}
 					//copy(newRow, dataSet.currentRow)
-					dataSet.Rows = append(dataSet.Rows, newRow)
+					dataSet.rows = append(dataSet.rows, newRow)
 				}
 			}
 		case 8:
@@ -656,8 +656,8 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			if err != nil {
 				return err
 			}
-			//dataSet.BindDirections = make([]byte, dataSet.ColumnCount)
-			for x := 0; x < dataSet.ColumnCount; x++ {
+			//dataSet.BindDirections = make([]byte, dataSet.columnCount)
+			for x := 0; x < dataSet.columnCount; x++ {
 				direction, err := session.GetByte()
 				switch direction {
 				case 32:
@@ -682,19 +682,19 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			if err != nil {
 				return err
 			}
-			dataSet.MaxRowSize, err = session.GetInt(4, true, true)
+			dataSet.maxRowSize, err = session.GetInt(4, true, true)
 			if err != nil {
 				return err
 			}
-			dataSet.ColumnCount, err = session.GetInt(4, true, true)
+			dataSet.columnCount, err = session.GetInt(4, true, true)
 			if err != nil {
 				return err
 			}
-			if dataSet.ColumnCount > 0 {
+			if dataSet.columnCount > 0 {
 				_, err = session.GetByte() // session.GetInt(1, false, false)
 			}
-			dataSet.Cols = make([]ParameterInfo, dataSet.ColumnCount)
-			for x := 0; x < dataSet.ColumnCount; x++ {
+			dataSet.Cols = make([]ParameterInfo, dataSet.columnCount)
+			for x := 0; x < dataSet.columnCount; x++ {
 				err = dataSet.Cols[x].load(stmt.connection)
 				if err != nil {
 					return err
@@ -706,7 +706,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					stmt._hasBLOB = true
 				}
 			}
-			stmt.columns = make([]ParameterInfo, dataSet.ColumnCount)
+			stmt.columns = make([]ParameterInfo, dataSet.columnCount)
 			copy(stmt.columns, dataSet.Cols)
 			_, err = session.GetDlc()
 			if session.TTCVersion >= 3 {
@@ -725,8 +725,8 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			if err != nil {
 				return err
 			}
-			bitVectorLen := dataSet.ColumnCount / 8
-			if dataSet.ColumnCount%8 > 0 {
+			bitVectorLen := dataSet.columnCount / 8
+			if dataSet.columnCount%8 > 0 {
 				bitVectorLen++
 			}
 			bitVector := make([]byte, bitVectorLen)
@@ -1356,7 +1356,7 @@ func (stmt *Stmt) Query_(args []driver.Value) (*DataSet, error) {
 	if dataSet, ok := result.(*DataSet); ok {
 		return dataSet, nil
 	}
-	return nil, errors.New("the returned driver.Rows is not an oracle DataSet")
+	return nil, errors.New("the returned driver.rows is not an oracle DataSet")
 }
 
 // Query execute a query command and return dataset object in form of driver.Rows interface

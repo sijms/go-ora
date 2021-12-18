@@ -25,12 +25,12 @@ var _ = driver.RowsColumnTypeNullable((*DataSet)(nil))
 type Row []driver.Value
 
 type DataSet struct {
-	ColumnCount     int
-	RowCount        int
-	UACBufferLength int
-	MaxRowSize      int
+	columnCount     int
+	rowCount        int
+	uACBufferLength int
+	maxRowSize      int
 	Cols            []ParameterInfo
-	Rows            []Row
+	rows            []Row
 	currentRow      Row
 	lasterr         error
 	index           int
@@ -52,17 +52,17 @@ func (dataSet *DataSet) load(session *network.Session) error {
 		return err
 	}
 	columnCount += num * 0x100
-	if columnCount > dataSet.ColumnCount {
-		dataSet.ColumnCount = columnCount
+	if columnCount > dataSet.columnCount {
+		dataSet.columnCount = columnCount
 	}
-	if len(dataSet.currentRow) != dataSet.ColumnCount {
-		dataSet.currentRow = make(Row, dataSet.ColumnCount)
+	if len(dataSet.currentRow) != dataSet.columnCount {
+		dataSet.currentRow = make(Row, dataSet.columnCount)
 	}
-	dataSet.RowCount, err = session.GetInt(4, true, true)
+	dataSet.rowCount, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err
 	}
-	dataSet.UACBufferLength, err = session.GetInt(2, true, true)
+	dataSet.uACBufferLength, err = session.GetInt(2, true, true)
 	if err != nil {
 		return err
 	}
@@ -78,14 +78,14 @@ func (dataSet *DataSet) load(session *network.Session) error {
 // setBitVector bit vector is an array of bit that define which column need to be read
 // from network session
 func (dataSet *DataSet) setBitVector(bitVector []byte) {
-	index := dataSet.ColumnCount / 8
-	if dataSet.ColumnCount%8 > 0 {
+	index := dataSet.columnCount / 8
+	if dataSet.columnCount%8 > 0 {
 		index++
 	}
 	if len(bitVector) > 0 {
 		for x := 0; x < len(bitVector); x++ {
 			for i := 0; i < 8; i++ {
-				if (x*8)+i < dataSet.ColumnCount {
+				if (x*8)+i < dataSet.columnCount {
 					dataSet.Cols[(x*8)+i].getDataFromServer = bitVector[x]&(1<<i) > 0
 				}
 			}
@@ -191,20 +191,20 @@ func (dataSet *DataSet) Err() error {
 // Next implement method need for sql.Rows interface
 func (dataSet *DataSet) Next(dest []driver.Value) error {
 	hasMoreRows := dataSet.parent.hasMoreRows()
-	noOfRowsToFetch := len(dataSet.Rows) // dataSet.parent.noOfRowsToFetch()
+	noOfRowsToFetch := len(dataSet.rows) // dataSet.parent.noOfRowsToFetch()
 	hasBLOB := dataSet.parent.hasBLOB()
 	hasLONG := dataSet.parent.hasLONG()
 	if !hasMoreRows && noOfRowsToFetch == 0 {
 		return io.EOF
 	}
-	if dataSet.index > 0 && dataSet.index%len(dataSet.Rows) == 0 {
+	if dataSet.index > 0 && dataSet.index%len(dataSet.rows) == 0 {
 		if hasMoreRows {
-			dataSet.Rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
+			dataSet.rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
 			err := dataSet.parent.fetch(dataSet)
 			if err != nil {
 				return err
 			}
-			noOfRowsToFetch = len(dataSet.Rows)
+			noOfRowsToFetch = len(dataSet.rows)
 			hasMoreRows = dataSet.parent.hasMoreRows()
 			dataSet.index = 0
 			if !hasMoreRows && noOfRowsToFetch == 0 {
@@ -215,13 +215,14 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 		}
 	}
 	if hasMoreRows && (hasBLOB || hasLONG) && dataSet.index == 0 {
+		//dataSet.rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
 		if err := dataSet.parent.fetch(dataSet); err != nil {
 			return err
 		}
 	}
-	if dataSet.index%noOfRowsToFetch < len(dataSet.Rows) {
-		for x := 0; x < len(dataSet.Rows[dataSet.index%noOfRowsToFetch]); x++ {
-			dest[x] = dataSet.Rows[dataSet.index%noOfRowsToFetch][x]
+	if dataSet.index%noOfRowsToFetch < len(dataSet.rows) {
+		for x := 0; x < len(dataSet.rows[dataSet.index%noOfRowsToFetch]); x++ {
+			dest[x] = dataSet.rows[dataSet.index%noOfRowsToFetch][x]
 		}
 		dataSet.index++
 		return nil
@@ -257,7 +258,7 @@ func (dataSet *DataSet) Columns() []string {
 }
 
 func (dataSet DataSet) Trace(t trace.Tracer) {
-	for r, row := range dataSet.Rows {
+	for r, row := range dataSet.rows {
 		if r > 25 {
 			break
 		}

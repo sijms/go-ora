@@ -33,7 +33,7 @@ type StmtInterface interface {
 	read(dataSet *DataSet) error
 	//Close() error
 	//Exec(args []driver.Value) (driver.Result, error)
-	//Query(args []driver.Value) (driver.Rows, error)
+	//Query(args []driver.Value) (driver.rows, error)
 }
 type defaultStmt struct {
 	connection         *Connection
@@ -812,7 +812,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			if err != nil {
 				return err
 			}
-			//dataSet.BindDirections = make([]byte, dataSet.ColumnCount)
+			//dataSet.BindDirections = make([]byte, dataSet.columnCount)
 			for x := 0; x < dataSet.ColumnCount; x++ {
 				direction, err := session.GetByte()
 				switch direction {

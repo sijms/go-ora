@@ -49,8 +49,8 @@ func (dataSet *DataSet) load(session *network.Session) error {
 	if columnCount > dataSet.ColumnCount {
 		dataSet.ColumnCount = columnCount
 	}
-	//if len(dataSet.currentRow) != dataSet.ColumnCount {
-	//	dataSet.currentRow = make(Row, dataSet.ColumnCount)
+	//if len(dataSet.currentRow) != dataSet.columnCount {
+	//	dataSet.currentRow = make(Row, dataSet.columnCount)
 	//}
 	dataSet.RowCount, err = session.GetInt(4, true, true)
 	if err != nil {
@@ -96,18 +96,18 @@ func (dataSet *DataSet) Close() error {
 
 func (dataSet *DataSet) Next(dest []driver.Value) error {
 	//fmt.Println("has more row: ", dataSet.parent.hasMoreRows)
-	//fmt.Println("row length: ", len(dataSet.Rows))
+	//fmt.Println("row length: ", len(dataSet.rows))
 	//fmt.Println("cursor id: ", dataSet.parent.cursorID)
-	//if dataSet.parent.hasMoreRows && dataSet.index == len(dataSet.Rows) && len(dataSet.Rows) < dataSet.parent.noOfRowsToFetch {
+	//if dataSet.parent.hasMoreRows && dataSet.index == len(dataSet.rows) && len(dataSet.rows) < dataSet.parent.noOfRowsToFetch {
 	//	fmt.Println("inside first fetch")
 	//	oldFetchCount := dataSet.parent.noOfRowsToFetch;
-	//	dataSet.parent.noOfRowsToFetch = oldFetchCount - len(dataSet.Rows)
+	//	dataSet.parent.noOfRowsToFetch = oldFetchCount - len(dataSet.rows)
 	//	err := dataSet.parent.fetch(dataSet)
 	//	if err != nil {
 	//		return err
 	//	}
 	//	dataSet.parent.noOfRowsToFetch = oldFetchCount
-	//	fmt.Println("row count after first fetch: ", len(dataSet.Rows))
+	//	fmt.Println("row count after first fetch: ", len(dataSet.rows))
 	//}
 	hasMoreRows := dataSet.parent.hasMoreRows()
 	noOfRowsToFetch := len(dataSet.Rows) // dataSet.parent.noOfRowsToFetch()

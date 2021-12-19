@@ -1,0 +1,173 @@
+package main
+
+import (
+	"database/sql/driver"
+	"flag"
+	"fmt"
+	go_ora "github.com/sijms/go-ora/v2"
+	"os"
+	"time"
+)
+
+type visit struct {
+	//Id   int64  `db:"name:visit_id"`
+	Name string  `db:"name:name"`
+	Val  float64 `db:"name:val"`
+	//Date time.Time	`db:"name:visit_date"`
+}
+
+func createTable(conn *go_ora.Connection) error {
+	t := time.Now()
+	sqlText := `CREATE TABLE GOORA_TEMP_VISIT(
+	VISIT_ID	number(10)	NOT NULL,
+	NAME		VARCHAR(200),
+	VAL			number(10,2),
+	VISIT_DATE	date,
+	PRIMARY KEY(VISIT_ID)
+	)`
+	stmt := go_ora.NewStmt(sqlText, conn)
+	_, err := stmt.Exec(nil)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Finish create table GOORA_TEMP_VISIT :", time.Now().Sub(t))
+	return nil
+}
+
+func insertData(conn *go_ora.Connection) error {
+	t := time.Now()
+	index := 1
+	stmt, err := conn.Prepare(`INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, NAME, VAL, VISIT_DATE) 
+VALUES(:1, :2, :3, :4)`)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = stmt.Close()
+	}()
+	nameText := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	val := 1.1
+	for index = 1; index <= 100; index++ {
+		_, err = stmt.Exec([]driver.Value{index, nameText, val, time.Now()})
+		if err != nil {
+			return err
+		}
+		val += 1.1
+	}
+	fmt.Println("100 rows inserted: ", time.Now().Sub(t))
+	return nil
+}
+
+func queryData(conn *go_ora.Connection) error {
+	t := time.Now()
+	stmt := go_ora.NewStmt("SELECT VISIT_ID, NAME, VAL, VISIT_DATE FROM GOORA_TEMP_VISIT", conn)
+	rows, err := stmt.Query_(nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = stmt.Close()
+		if err != nil {
+			fmt.Println("Can't close connection: ", err)
+		}
+	}()
+	//var (
+	//	id int64
+	//	name string
+	//	val float32
+	//	date time.Time
+	//)
+	var vi visit
+	var Id int64
+	var Date time.Time
+	for rows.Next_() {
+		err = rows.Scan(&Id, &vi, &Date)
+		if err != nil {
+			return err
+		}
+		fmt.Println("ID: ", Id, "\tName: ", vi.Name, "\tval: ", vi.Val, "\tDate: ", Date)
+	}
+	fmt.Println("Finish query rows: ", time.Now().Sub(t))
+	return nil
+}
+
+func dropTable(conn *go_ora.Connection) error {
+	t := time.Now()
+	stmt := go_ora.NewStmt("drop table GOORA_TEMP_VISIT purge", conn)
+	_, err := stmt.Exec(nil)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Finish drop table: ", time.Now().Sub(t))
+	return nil
+}
+
+func usage() {
+	fmt.Println()
+	fmt.Println("query_to_struct")
+	fmt.Println("  a complete code of create table insert, query to struct then drop table.")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println(`  query_to_struct -server server_url`)
+	flag.PrintDefaults()
+	fmt.Println()
+	fmt.Println("Example:")
+	fmt.Println(`  query_to_struct -server "oracle://user:pass@server/service_name"`)
+	fmt.Println()
+}
+
+func main() {
+	var (
+		server string
+	)
+
+	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
+	flag.Parse()
+
+	connStr := os.ExpandEnv(server)
+	if connStr == "" {
+		fmt.Println("Missing -server option")
+		usage()
+		os.Exit(1)
+	}
+	fmt.Println("Connection string: ", connStr)
+	conn, err := go_ora.NewConnection(connStr)
+	if err != nil {
+		fmt.Println("Can't create connection: ", err)
+		return
+	}
+	err = conn.Open()
+	if err != nil {
+		fmt.Println("Can't open connection: ", err)
+		return
+	}
+	defer func() {
+		err = conn.Close()
+		if err != nil {
+			fmt.Println("Can't close connection: ", err)
+		}
+	}()
+	err = createTable(conn)
+	if err != nil {
+		fmt.Println("Can't create table: ", err)
+		return
+	}
+	defer func() {
+		err = dropTable(conn)
+		if err != nil {
+			fmt.Println("Can't drop table: ", err)
+		}
+	}()
+
+	err = insertData(conn)
+	if err != nil {
+		fmt.Println("Can't insert data: ", err)
+		return
+	}
+
+	err = queryData(conn)
+	if err != nil {
+		fmt.Println("Can't query data: ", err)
+		return
+	}
+}

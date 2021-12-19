@@ -139,7 +139,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 			return errors.New("go-ora: argument in scan should be passed as pointers")
 		}
 
-		if destTyp.Elem().Kind() == reflect.Struct {
+		if destTyp.Elem().Kind() == reflect.Struct && destTyp.Elem() != reflect.TypeOf(time.Time{}) {
 			for x := 0; x < destTyp.Elem().NumField(); x++ {
 				col := dataSet.currentRow[srcIndex]
 				f := destTyp.Elem().Field(x)

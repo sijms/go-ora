@@ -175,11 +175,9 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 						return err
 					}
 					if !result {
-						return errors.New("only allow basic type inside struct object")
+						return errors.New("only basic types are allowed inside struct object")
 					}
-					//reflect.ValueOf(dest[destIndex]).Elem().Field(x).Set(reflect.ValueOf(col))
 					processedFields++
-					//srcIndex++
 				}
 			}
 		}
@@ -188,73 +186,6 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 		}
 		srcIndex = srcIndex + processedFields - 1
 
-		//switch destTyp.Elem().Kind() {
-		//case reflect.String:
-		//	reflect.ValueOf(dest[destIndex]).Elem().SetString(getString(col))
-		//case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		//	temp, err := getInt(col)
-		//	if err != nil {
-		//		return fmt.Errorf("go-ora: column %d require an integer", srcIndex)
-		//	}
-		//	reflect.ValueOf(dest[destIndex]).Elem().SetInt(temp)
-		//case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		//	temp, err := getInt(col)
-		//	if err != nil {
-		//		return fmt.Errorf("go-ora: column %d require an integer", srcIndex)
-		//	}
-		//	reflect.ValueOf(dest[destIndex]).Elem().SetUint(uint64(temp))
-		//case reflect.Float32, reflect.Float64:
-		//	temp, err := getFloat(col)
-		//	if err != nil {
-		//		return fmt.Errorf("go-ora: column %d require type float", srcIndex)
-		//	}
-		//	reflect.ValueOf(dest[destIndex]).Elem().SetFloat(temp)
-		//default:
-		//	if destTyp.Elem() == reflect.TypeOf(time.Time{}) {
-		//		if _, ok := col.(time.Time); ok {
-		//			reflect.ValueOf(dest[destIndex]).Elem().Set(reflect.ValueOf(col))
-		//		} else {
-		//			return fmt.Errorf("go-ora: column %d require type time.Time", srcIndex)
-		//		}
-		//	} else if destTyp.Elem() == reflect.TypeOf([]byte{}) {
-		//		if _, ok := col.([]byte); ok {
-		//			reflect.ValueOf(dest[destIndex]).Elem().Set(reflect.ValueOf(col))
-		//		} else {
-		//			return fmt.Errorf("go-ora: column %d require type []byte", srcIndex)
-		//		}
-		//	} else if destTyp.Elem().Kind() == reflect.Struct {
-		//		for x := 0; x < destTyp.Elem().NumField(); x++ {
-		//			col := dataSet.currentRow[srcIndex]
-		//			f := destTyp.Elem().Field(x)
-		//			tag := f.Tag.Get("db")
-		//			if len(tag) == 0 {
-		//				continue
-		//			}
-		//			tag = strings.Trim(tag, "\"")
-		//			parts := strings.Split(tag, ",")
-		//			for _, part := range parts {
-		//				subs := strings.Split(part, ":")
-		//				if len(subs) != 2 {
-		//					continue
-		//				}
-		//				if strings.TrimSpace(strings.ToLower(subs[0])) == "name" {
-		//					fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
-		//					colInfo := dataSet.Cols[srcIndex]
-		//					if strings.ToUpper(colInfo.Name) != fieldID {
-		//						return fmt.Errorf(
-		//							"go-ora: column %d name %s is mismatching with tag name %s of structure field",
-		//							srcIndex, colInfo.Name, fieldID)
-		//					}
-		//					reflect.ValueOf(dest[destIndex]).Elem().Field(x).Set(reflect.ValueOf(col))
-		//					srcIndex++
-		//				}
-		//			}
-		//		}
-		//		srcIndex--
-		//	} else {
-		//		return fmt.Errorf("go-ora: column %d require type %v", srcIndex, reflect.TypeOf(col))
-		//	}
-		//}
 	}
 	return nil
 }

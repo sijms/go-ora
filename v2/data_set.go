@@ -7,6 +7,7 @@ import (
 	"github.com/sijms/go-ora/v2/trace"
 	"io"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/sijms/go-ora/v2/network"
@@ -121,65 +122,158 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 	if dataSet.lasterr != nil {
 		return dataSet.lasterr
 	}
-	if len(dest) != len(dataSet.currentRow) {
-		return fmt.Errorf("go-ora: expected %d destination arguments in Scan, not %d",
-			len(dataSet.currentRow), len(dest))
-	}
-	for i, col := range dataSet.currentRow {
-		if dest[i] == nil {
-			return fmt.Errorf("go-ora: argument %d is nil", i)
+	//if len(dest) != len(dataSet.currentRow) {
+	//	return fmt.Errorf("go-ora: expected %d destination arguments in Scan, not %d",
+	//		len(dataSet.currentRow), len(dest))
+	//}
+	destIndex := 0
+	for srcIndex := 0; srcIndex < len(dataSet.currentRow); srcIndex++ {
+		if destIndex >= len(dest) {
+			return errors.New("go-or: mismatching between Scan function input count and column count")
 		}
-		destTyp := reflect.TypeOf(dest[i])
+		if dest[destIndex] == nil {
+			return fmt.Errorf("go-ora: argument %d is nil", destIndex)
+		}
+		destTyp := reflect.TypeOf(dest[destIndex])
 		if destTyp.Kind() != reflect.Ptr {
 			return errors.New("go-ora: argument in scan should be passed as pointers")
 		}
 
-		switch col.(type) {
-		case string:
-			switch destTyp.Elem().Kind() {
-			case reflect.String:
-				reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
+		if destTyp.Elem().Kind() == reflect.Struct {
+			for x := 0; x < destTyp.Elem().NumField(); x++ {
+				col := dataSet.currentRow[srcIndex]
+				f := destTyp.Elem().Field(x)
+				tag := f.Tag.Get("db")
+				if len(tag) == 0 {
+					continue
+				}
+				tag = strings.Trim(tag, "\"")
+				parts := strings.Split(tag, ",")
+				for _, part := range parts {
+					subs := strings.Split(part, ":")
+					if len(subs) != 2 {
+						continue
+					}
+					if strings.TrimSpace(strings.ToLower(subs[0])) == "name" {
+						fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
+						colInfo := dataSet.Cols[srcIndex]
+						if strings.ToUpper(colInfo.Name) != fieldID {
+							return fmt.Errorf(
+								"go-ora: column %d name %s is mismatching with tag name %s of structure field",
+								srcIndex, colInfo.Name, fieldID)
+						}
+						reflect.ValueOf(dest[destIndex]).Elem().Field(x).Set(reflect.ValueOf(col))
+						srcIndex++
+					}
+				}
+			}
+			srcIndex--
+			//continue
+		} else {
+			col := dataSet.currentRow[srcIndex]
+			switch col.(type) {
+			case string:
+				switch destTyp.Elem().Kind() {
+				case reflect.String:
+					reflect.ValueOf(dest[destIndex]).Elem().Set(reflect.ValueOf(col))
+				default:
+					return fmt.Errorf("go-ora: column %d require type string", srcIndex)
+				}
+			case int64:
+				switch destTyp.Elem().Kind() {
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					reflect.ValueOf(dest[destIndex]).Elem().SetInt(reflect.ValueOf(col).Int())
+				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+					reflect.ValueOf(dest[destIndex]).Elem().SetUint(uint64(reflect.ValueOf(col).Int()))
+				case reflect.Float32, reflect.Float64:
+					reflect.ValueOf(dest[destIndex]).Elem().SetFloat(float64(reflect.ValueOf(col).Int()))
+				default:
+					return fmt.Errorf("go-ora: column %d require an integer", srcIndex)
+				}
+			case float64:
+				switch destTyp.Elem().Kind() {
+				case reflect.Float32, reflect.Float64:
+					reflect.ValueOf(dest[destIndex]).Elem().SetFloat(reflect.ValueOf(col).Float())
+				default:
+					return fmt.Errorf("go-ora: column %d require type float", srcIndex)
+				}
+			case time.Time:
+				if destTyp.Elem() == reflect.TypeOf(time.Time{}) {
+					reflect.ValueOf(dest[destIndex]).Elem().Set(reflect.ValueOf(col))
+				} else {
+					return fmt.Errorf("go-ora: column %d require type time.Time", srcIndex)
+				}
+			case []byte:
+				if destTyp.Elem() == reflect.TypeOf([]byte{}) {
+					reflect.ValueOf(dest[destIndex]).Elem().Set(reflect.ValueOf(col))
+				} else {
+					return fmt.Errorf("go-ora: column %d require type []byte", srcIndex)
+				}
 			default:
-				return fmt.Errorf("go-ora: column %d require type string", i)
-			}
-		case int64:
-			switch destTyp.Elem().Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				reflect.ValueOf(dest[i]).Elem().SetInt(reflect.ValueOf(col).Int())
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				reflect.ValueOf(dest[i]).Elem().SetUint(uint64(reflect.ValueOf(col).Int()))
-			case reflect.Float32, reflect.Float64:
-				reflect.ValueOf(dest[i]).Elem().SetFloat(float64(reflect.ValueOf(col).Int()))
-			default:
-				return fmt.Errorf("go-ora: column %d require an integer", i)
-			}
-		case float64:
-			switch destTyp.Elem().Kind() {
-			case reflect.Float32, reflect.Float64:
-				reflect.ValueOf(dest[i]).Elem().SetFloat(reflect.ValueOf(col).Float())
-			default:
-				return fmt.Errorf("go-ora: column %d require type float", i)
-			}
-		case time.Time:
-			if destTyp.Elem() == reflect.TypeOf(time.Time{}) {
-				reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
-			} else {
-				return fmt.Errorf("go-ora: column %d require type time.Time", i)
-			}
-		case []byte:
-			if destTyp.Elem() == reflect.TypeOf([]byte{}) {
-				reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
-			} else {
-				return fmt.Errorf("go-ora: column %d require type []byte", i)
-			}
-		default:
-			if reflect.TypeOf(col) == destTyp.Elem() {
-				reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
-			} else {
-				return fmt.Errorf("go-ora: column %d require type %v", i, reflect.TypeOf(col))
+				if reflect.TypeOf(col) == destTyp.Elem() {
+					reflect.ValueOf(dest[destIndex]).Elem().Set(reflect.ValueOf(col))
+				} else {
+					return fmt.Errorf("go-ora: column %d require type %v", srcIndex, reflect.TypeOf(col))
+				}
 			}
 		}
+		destIndex++
 	}
+	//for i, col := range dataSet.currentRow {
+	//	if dest[i] == nil {
+	//		return fmt.Errorf("go-ora: argument %d is nil", i)
+	//	}
+	//	destTyp := reflect.TypeOf(dest[i])
+	//	if destTyp.Kind() != reflect.Ptr {
+	//		return errors.New("go-ora: argument in scan should be passed as pointers")
+	//	}
+	//
+	//	switch col.(type) {
+	//	case string:
+	//		switch destTyp.Elem().Kind() {
+	//		case reflect.String:
+	//			reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
+	//		default:
+	//			return fmt.Errorf("go-ora: column %d require type string", i)
+	//		}
+	//	case int64:
+	//		switch destTyp.Elem().Kind() {
+	//		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+	//			reflect.ValueOf(dest[i]).Elem().SetInt(reflect.ValueOf(col).Int())
+	//		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	//			reflect.ValueOf(dest[i]).Elem().SetUint(uint64(reflect.ValueOf(col).Int()))
+	//		case reflect.Float32, reflect.Float64:
+	//			reflect.ValueOf(dest[i]).Elem().SetFloat(float64(reflect.ValueOf(col).Int()))
+	//		default:
+	//			return fmt.Errorf("go-ora: column %d require an integer", i)
+	//		}
+	//	case float64:
+	//		switch destTyp.Elem().Kind() {
+	//		case reflect.Float32, reflect.Float64:
+	//			reflect.ValueOf(dest[i]).Elem().SetFloat(reflect.ValueOf(col).Float())
+	//		default:
+	//			return fmt.Errorf("go-ora: column %d require type float", i)
+	//		}
+	//	case time.Time:
+	//		if destTyp.Elem() == reflect.TypeOf(time.Time{}) {
+	//			reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
+	//		} else {
+	//			return fmt.Errorf("go-ora: column %d require type time.Time", i)
+	//		}
+	//	case []byte:
+	//		if destTyp.Elem() == reflect.TypeOf([]byte{}) {
+	//			reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
+	//		} else {
+	//			return fmt.Errorf("go-ora: column %d require type []byte", i)
+	//		}
+	//	default:
+	//		if reflect.TypeOf(col) == destTyp.Elem() {
+	//			reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(col))
+	//		} else {
+	//			return fmt.Errorf("go-ora: column %d require type %v", i, reflect.TypeOf(col))
+	//		}
+	//	}
+	//}
 	return nil
 }
 

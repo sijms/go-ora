@@ -147,7 +147,8 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 		processedFields := 0
 		for x := 0; x < destTyp.Elem().NumField(); x++ {
 			if srcIndex+processedFields >= len(dataSet.currentRow) {
-				return errors.New("go-ora: mismatching between Scan function input count and column count")
+				continue
+				//return errors.New("go-ora: mismatching between Scan function input count and column count")
 			}
 			//col := dataSet.currentRow[srcIndex + processedFields]
 			f := destTyp.Elem().Field(x)
@@ -166,9 +167,10 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 					fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
 					colInfo := dataSet.Cols[srcIndex+processedFields]
 					if strings.ToUpper(colInfo.Name) != fieldID {
-						return fmt.Errorf(
-							"go-ora: column %d name %s is mismatching with tag name %s of structure field",
-							srcIndex+processedFields, colInfo.Name, fieldID)
+						continue
+						//return fmt.Errorf(
+						//	"go-ora: column %d name %s is mismatching with tag name %s of structure field",
+						//	srcIndex+processedFields, colInfo.Name, fieldID)
 					}
 					result, err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), srcIndex+processedFields)
 					if err != nil {

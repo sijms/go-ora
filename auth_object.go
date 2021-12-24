@@ -8,6 +8,7 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/sijms/go-ora/network"
@@ -83,7 +84,7 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 		if ret.tcpNego.ServerCompileTimeCaps[4]&2 == 0 {
 			padding = true
 		}
-		result, err := HexStringToBytes(ret.Salt)
+		result, err := hex.DecodeString(ret.Salt)
 		if err != nil {
 			return nil, err
 		}
@@ -292,19 +293,8 @@ func PKCS5Padding(cipherText []byte, blockSize int) []byte {
 	return append(cipherText, padtext...)
 }
 
-func HexStringToBytes(input string) ([]byte, error) {
-	result := make([]byte, len(input)/2)
-	for x := 0; x < len(input); x += 2 {
-		num, err := strconv.ParseUint(input[x:x+2], 16, 8)
-		if err != nil {
-			return nil, err
-		}
-		result[x/2] = uint8(num)
-	}
-	return result, nil
-}
 func decryptSessionKey(padding bool, encKey []byte, sessionKey string) ([]byte, error) {
-	result, err := HexStringToBytes(sessionKey)
+	result, err := hex.DecodeString(sessionKey)
 	if err != nil {
 		return nil, err
 	}

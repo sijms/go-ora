@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha512"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/sijms/go-ora/v2/network"
@@ -140,7 +141,7 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, session *
 		if ret.tcpNego.ServerCompileTimeCaps[4]&2 == 0 {
 			padding = true
 		}
-		result, err := HexStringToBytes(ret.Salt)
+		result, err := hex.DecodeString(ret.Salt)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +154,7 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, session *
 		key = hash.Sum(nil)           // 20 byte key
 		key = append(key, 0, 0, 0, 0) // 24 byte key
 	} else if ret.VerifierType == 18453 {
-		salt, err := HexStringToBytes(ret.Salt)
+		salt, err := hex.DecodeString(ret.Salt)
 		if err != nil {
 			return nil, err
 		}
@@ -367,23 +368,9 @@ func getKeyFromUserNameAndPassword(username string, password string) ([]byte, er
 	return append(key2, make([]byte, 8)...), nil
 }
 
-// HexStringToBytes convert hex-string to bytearray
-// for example "03FF" will be converted to []byte{0x03, 0xFF}
-func HexStringToBytes(input string) ([]byte, error) {
-	result := make([]byte, len(input)/2)
-	for x := 0; x < len(input); x += 2 {
-		num, err := strconv.ParseUint(input[x:x+2], 16, 8)
-		if err != nil {
-			return nil, err
-		}
-		result[x/2] = uint8(num)
-	}
-	return result, nil
-}
-
 // decrypt session key that come from the server
 func decryptSessionKey(padding bool, encKey []byte, sessionKey string) ([]byte, error) {
-	result, err := HexStringToBytes(sessionKey)
+	result, err := hex.DecodeString(sessionKey)
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +468,7 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 		default:
 			return nil, errors.New("unsupported verifier type")
 		}
-		df2key, err := HexStringToBytes(obj.pbkdf2ChkSalt)
+		df2key, err := hex.DecodeString(obj.pbkdf2ChkSalt)
 		if err != nil {
 			return nil, err
 		}
@@ -552,7 +539,7 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 //		ServerCompileTimeCaps: []byte{0, 0, 0, 0, 32},
 //		ServerRuntimeCaps:     nil,
 //	}
-//	salt, err := HexStringToBytes(obj.Salt)
+//	salt, err := hex.DecodeString(obj.Salt)
 //	if err != nil {
 //		return err
 //	}

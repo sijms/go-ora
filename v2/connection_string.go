@@ -153,6 +153,9 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	}
 	ret.UserID = u.User.Username()
 	ret.Password, _ = u.User.Password()
+	if strings.ToUpper(ret.UserID) == "SYS" {
+		ret.DBAPrivilege = SYSDBA
+	}
 	if p != "" {
 		port, err := strconv.Atoi(p)
 		if err != nil {

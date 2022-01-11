@@ -373,13 +373,16 @@ func (dataSet DataSet) ColumnTypeDatabaseTypeName(index int) string {
 
 // ColumnTypeLength return length of column type
 func (dataSet DataSet) ColumnTypeLength(index int) (length int64, ok bool) {
-	switch dataSet.Cols[index].DataType {
-	case NCHAR, CHAR:
-		return int64(dataSet.Cols[index].MaxCharLen), true
-	case NUMBER:
-		return int64(dataSet.Cols[index].Precision), true
-	}
-	return int64(0), false
+	length = int64(len(dataSet.Cols[index].BValue))
+	ok = true
+	return
+	//switch dataSet.Cols[index].DataType {
+	//case NCHAR, CHAR:
+	//	return int64(dataSet.Cols[index].MaxCharLen), true
+	//case NUMBER:
+	//	return int64(dataSet.Cols[index].Precision), true
+	//}
+	//return int64(0), false
 
 }
 

@@ -289,8 +289,8 @@ func (dataSet *DataSet) Err() error {
 func (dataSet *DataSet) Next(dest []driver.Value) error {
 	hasMoreRows := dataSet.parent.hasMoreRows()
 	noOfRowsToFetch := len(dataSet.rows) // dataSet.parent.noOfRowsToFetch()
-	hasBLOB := dataSet.parent.hasBLOB()
-	hasLONG := dataSet.parent.hasLONG()
+	//hasBLOB := dataSet.parent.hasBLOB()
+	//hasLONG := dataSet.parent.hasLONG()
 	if !hasMoreRows && noOfRowsToFetch == 0 {
 		return io.EOF
 	}
@@ -311,12 +311,12 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 			return io.EOF
 		}
 	}
-	if hasMoreRows && (hasBLOB || hasLONG) && dataSet.index == 0 {
-		//dataSet.rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
-		if err := dataSet.parent.fetch(dataSet); err != nil {
-			return err
-		}
-	}
+	//if hasMoreRows && (hasBLOB || hasLONG) && dataSet.index == 0 {
+	//	//dataSet.rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
+	//	if err := dataSet.parent.fetch(dataSet); err != nil {
+	//		return err
+	//	}
+	//}
 	if dataSet.index%noOfRowsToFetch < len(dataSet.rows) {
 		for x := 0; x < len(dataSet.rows[dataSet.index%noOfRowsToFetch]); x++ {
 			dest[x] = dataSet.rows[dataSet.index%noOfRowsToFetch][x]

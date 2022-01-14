@@ -64,6 +64,21 @@ func (lob *Lob) getData(connection *Connection) (data []byte, err error) {
 	data = lob.data.Bytes()
 	return
 }
+func (lob *Lob) isTemporary() bool {
+	if len(lob.sourceLocator) > 7 {
+		if lob.sourceLocator[7]&1 == 1 || lob.sourceLocator[4]&64 == 64 {
+			return true
+		}
+	}
+	return false
+}
+
+//func (lob *Lob) open() error {
+//	if lob.isTemporary() {
+//		return nil
+//	}
+//	return nil
+//}
 
 // write lob command to network session
 func (lob *Lob) write(session *network.Session, operationID int) error {

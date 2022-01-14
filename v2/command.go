@@ -408,6 +408,25 @@ func (stmt *Stmt) getExeOption() int {
 // fetch get more rows from network stream
 func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	//stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
+	// note if _noOfRowsToFetch is default i will try to calculate the best value for
+	// according to the query
+	if stmt._noOfRowsToFetch == 25 {
+		//m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
+		maxRowSize := 0
+		for _, col := range dataSet.Cols {
+			if col.DataType == OCIClobLocator || col.DataType == OCIBlobLocator {
+				maxRowSize += 86
+			} else if col.DataType == LONG || col.DataType == LongRaw {
+				maxRowSize += 2
+			} else if col.DataType == OCIFileLocator {
+				maxRowSize += 86
+			} else {
+				maxRowSize += col.MaxLen
+			}
+		}
+		stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
+		stmt.connection.connOption.Tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
+	}
 	stmt.connection.session.ResetBuffer()
 	stmt.connection.session.PutBytes(3, 5, 0)
 	stmt.connection.session.PutInt(stmt.cursorID, 2, true, true)
@@ -546,7 +565,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					}
 				} else {
 					// see if it is re-execute
-					//fmt.Println(dataSet.Cols)
 					if len(dataSet.Cols) == 0 && len(stmt.columns) > 0 {
 						dataSet.Cols = make([]ParameterInfo, len(stmt.columns))
 						copy(dataSet.Cols, stmt.columns)
@@ -753,6 +771,61 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	if stmt.connection.connOption.Tracer.IsOn() {
 		dataSet.Trace(stmt.connection.connOption.Tracer)
 	}
+	if stmt._hasBLOB {
+		for colIndex, col := range dataSet.Cols {
+			if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
+				for _, row := range dataSet.rows {
+					if row[colIndex] == nil {
+						continue
+					}
+					lob := &Lob{
+						sourceLocator: nil,
+					}
+
+					if lobLocator, ok := row[colIndex].([]byte); ok {
+						lob.sourceLocator = lobLocator
+					} else {
+						return errors.New("error reading lob")
+					}
+					//lob := &Lob{
+					//	sourceLocator: row[colIndex],
+					//}
+					//session.SaveState()
+					dataSize, err := lob.getSize(stmt.connection)
+					if err != nil {
+						return err
+					}
+					lobData, err := lob.getData(stmt.connection)
+					if err != nil {
+						return err
+					}
+					if col.DataType == OCIBlobLocator {
+						if dataSize != int64(len(lobData)) {
+							return errors.New("error reading lob data: data size mismatching")
+						}
+						row[colIndex] = lobData
+					} else {
+						tempCharset := stmt.connection.strConv.GetLangID()
+						if lob.variableWidthChar() {
+							if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
+								stmt.connection.strConv.SetLangID(2002)
+							} else {
+								stmt.connection.strConv.SetLangID(2000)
+							}
+						} else {
+							stmt.connection.strConv.SetLangID(col.CharsetID)
+						}
+						resultClobString := stmt.connection.strConv.Decode(lobData)
+						stmt.connection.strConv.SetLangID(tempCharset)
+						if dataSize != int64(len([]rune(resultClobString))) {
+							return errors.New("error reading clob data")
+						}
+						row[colIndex] = resultClobString
+					}
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -947,45 +1020,9 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		}
 		tempVal = dateVal
 	case OCIBlobLocator, OCIClobLocator:
-		data, err := session.GetClr()
+		tempVal, err = session.GetClr()
 		if err != nil {
 			return err
-		}
-		lob := &Lob{
-			sourceLocator: data,
-		}
-		session.SaveState()
-		dataSize, err := lob.getSize(stmt.connection)
-		if err != nil {
-			return err
-		}
-		lobData, err := lob.getData(stmt.connection)
-		if err != nil {
-			return err
-		}
-		session.LoadState()
-		if param.DataType == OCIBlobLocator {
-			if dataSize != int64(len(lobData)) {
-				return errors.New("error reading lob data")
-			}
-			tempVal = lobData
-		} else {
-			tempCharset := stmt.connection.strConv.GetLangID()
-			if lob.variableWidthChar() {
-				if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
-					stmt.connection.strConv.SetLangID(2002)
-				} else {
-					stmt.connection.strConv.SetLangID(2000)
-				}
-			} else {
-				stmt.connection.strConv.SetLangID(param.CharsetID)
-			}
-			resultClobString := stmt.connection.strConv.Decode(lobData)
-			stmt.connection.strConv.SetLangID(tempCharset)
-			if dataSize != int64(len([]rune(resultClobString))) {
-				return errors.New("error reading clob data")
-			}
-			tempVal = resultClobString
 		}
 	case IBFloat:
 		tempVal = converters.ConvertBinaryFloat(param.BValue)

@@ -4,6 +4,11 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.2.19: improve lob reading with high prefetch rows value
+* Now Prefetch rows value is **_automatically calculated (when left with its default value = 25)_** according to column
+size 
+* Reading lob is retarded until all record has been read this fix error happen
+when you try to read lob with large PREFETCH_ROWS value
 ### version 2.2.9: add support for connect to multiple servers
 define multiple server in 2 way
 * in url string options

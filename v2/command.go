@@ -1231,8 +1231,12 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 				if size > len(*val) {
 					param.MaxCharLen = size
 				}
-				//param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-				param.MaxLen = len(param.BValue)
+				if direction == Input {
+					param.MaxLen = len(param.BValue)
+				} else {
+					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+				}
+
 			}
 		case *string:
 			param.Value = val
@@ -1251,8 +1255,11 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 				if size > len(*val) {
 					param.MaxCharLen = size
 				}
-				//param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-				param.MaxLen = len(param.BValue)
+				if direction == Input {
+					param.MaxLen = len(param.BValue)
+				} else {
+					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+				}
 			}
 		case *[]byte:
 			param.Value = val
@@ -1327,8 +1334,11 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 				if size > len(val) {
 					param.MaxCharLen = size
 				}
-				//param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-				param.MaxLen = len(param.BValue)
+				if direction == Input {
+					param.MaxLen = len(param.BValue)
+				} else {
+					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+				}
 			}
 		case string:
 			param.DataType = NCHAR
@@ -1346,8 +1356,11 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 				if size > len(val) {
 					param.MaxCharLen = size
 				}
-				//param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-				param.MaxLen = len(param.BValue)
+				if direction == Input {
+					param.MaxLen = len(param.BValue)
+				} else {
+					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+				}
 			}
 		case []byte:
 			param.BValue = val

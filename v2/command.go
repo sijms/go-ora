@@ -819,7 +819,7 @@ func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Valu
 func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 	if stmt._hasBLOB {
 		if stmt.containOutputPars {
-			for _, par := range stmt.Pars {
+			for parIndex, par := range stmt.Pars {
 				if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
 					switch val := par.Value.(type) {
 					case *Clob:
@@ -850,6 +850,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
 							}
 						}
+						stmt.Pars[parIndex].Value = val
 					case *Blob:
 						if val.locator == nil {
 							val.Data = nil
@@ -878,6 +879,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
 							}
 						}
+						stmt.Pars[parIndex].Value = val
 					}
 					//if par.Value == nil {
 					//	continue
@@ -1437,28 +1439,55 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.ContFlag = 0
 			param.MaxLen = 11
 			param.MaxCharLen = 11
-		case *Clob:
-			param.Value = val
-			param.DataType = OCIClobLocator
+		case Clob:
 			param.ContFlag = 16
 			param.MaxCharLen = len([]rune(val.String))
 			param.CharsetForm = 1
-			if val.String == "" && direction == Input {
-				param.BValue = nil
-				param.MaxLen = 1
-			} else {
-				tempCharset := stmt.connection.strConv.GetLangID()
-				stmt.connection.strConv.SetLangID(param.CharsetID)
-				param.BValue = stmt.connection.strConv.Encode(val.String)
-				stmt.connection.strConv.SetLangID(tempCharset)
-				if size > len(val.String) {
-					param.MaxCharLen = size
-				}
-				if direction == Input {
-					param.MaxLen = len(param.BValue)
+			if size > param.MaxCharLen {
+				param.MaxCharLen = size
+			}
+			if direction == Input {
+				param.Value = val.String
+				param.DataType = NCHAR
+				if val.String == "" {
+					param.BValue = nil
+					param.MaxLen = 1
 				} else {
-					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+					tempCharset := stmt.connection.strConv.GetLangID()
+					stmt.connection.strConv.SetLangID(param.CharsetID)
+					param.BValue = stmt.connection.strConv.Encode(val.String)
+					stmt.connection.strConv.SetLangID(tempCharset)
 				}
+				param.MaxLen = len(param.BValue)
+			} else {
+				param.Value = val
+				param.DataType = OCIClobLocator
+				param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+			}
+		case *Clob:
+			param.ContFlag = 16
+			param.MaxCharLen = len([]rune(val.String))
+			param.CharsetForm = 1
+			if size > param.MaxCharLen {
+				param.MaxCharLen = size
+			}
+			if direction == Input {
+				param.Value = val.String
+				param.DataType = NCHAR
+				if val.String == "" {
+					param.BValue = nil
+					param.MaxLen = 1
+				} else {
+					tempCharset := stmt.connection.strConv.GetLangID()
+					stmt.connection.strConv.SetLangID(param.CharsetID)
+					param.BValue = stmt.connection.strConv.Encode(val.String)
+					stmt.connection.strConv.SetLangID(tempCharset)
+				}
+				param.MaxLen = len(param.BValue)
+			} else {
+				param.Value = val
+				param.DataType = OCIClobLocator
+				param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
 			}
 		case *NVarChar:
 			param.Value = val
@@ -1508,14 +1537,38 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
 				}
 			}
-		case *Blob:
-			param.Value = val
-			param.BValue = val.Data
-			param.DataType = OCIBlobLocator
+		case Blob:
 			param.ContFlag = 0
 			param.MaxCharLen = 0
 			param.CharsetForm = 0
-			param.MaxLen = len(param.BValue)
+			param.MaxLen = len(val.Data)
+			if size > param.MaxLen {
+				param.MaxLen = size
+			}
+			if direction == Input {
+				param.Value = val.Data
+				param.BValue = val.Data
+				param.DataType = RAW
+			} else {
+				param.Value = val
+				param.DataType = OCIBlobLocator
+			}
+		case *Blob:
+			param.ContFlag = 0
+			param.MaxCharLen = 0
+			param.CharsetForm = 0
+			param.MaxLen = len(val.Data)
+			if size > param.MaxLen {
+				param.MaxLen = size
+			}
+			if direction == Input {
+				param.Value = val.Data
+				param.BValue = val.Data
+				param.DataType = RAW
+			} else {
+				param.Value = val
+				param.DataType = OCIBlobLocator
+			}
 		case *[]byte:
 			param.Value = val
 			param.BValue = *val

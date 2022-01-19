@@ -42,18 +42,75 @@ func dropTable(conn *sql.DB) error {
 	fmt.Println("Finish drop table: ", time.Now().Sub(t))
 	return nil
 }
+func readWithOutputParameters2() error {
+	t := time.Now()
+	conn, err := go_ora.NewConnection(server)
+	if err != nil {
+		return err
+	}
+	err = conn.Open()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = conn.Close()
+		if err != nil {
+			fmt.Println("Can't close 2nd connection: ", err)
+		}
+	}()
+	sqlText := `BEGIN
+SELECT VISIT_DATA, VISIT_DATA2, VISIT_DATA3, VISIT_DATA4 INTO :1, :2, :3, :4 FROM GOORA_TEMP_VISIT WHERE VISIT_ID = 1;
+END;`
+	stmt := go_ora.NewStmt(sqlText, conn)
+	defer func() {
+		err = stmt.Close()
+		if err != nil {
+			fmt.Println("Can't close stmt: ", err)
+		}
+	}()
+	var (
+		data  go_ora.Clob
+		data2 go_ora.Clob
+		data3 go_ora.Blob
+		data4 go_ora.Blob
+	)
+	// passing by value ==> you cannot use the original variable
+	// use stmt.Pars[index]
+	stmt.AddParam("1", data, 10000, go_ora.Output)
+	// pass a pointer ==> you can use the original variable
+	stmt.AddParam("2", &data2, 10, go_ora.Output)
+	// Blob as Clob above
+	stmt.AddParam("3", data3, 10000, go_ora.Output)
+	stmt.AddParam("4", &data4, 10, go_ora.Output)
+	_, err = stmt.Exec(nil)
+	if err != nil {
+		return err
+	}
+	if tempVal, ok := stmt.Pars[0].Value.(go_ora.Clob); ok {
+		printLargeString("Data1: ", tempVal.String)
+	}
+	printLargeString("Data2: ", data2.String)
+	if tempVal, ok := stmt.Pars[2].Value.(go_ora.Blob); ok {
+		printLargeString("Data3: ", string(tempVal.Data))
+	}
+	printLargeString("Data4: ", string(data4.Data))
+	//fmt.Println("Data2: ", data2.String)
+	//printLargeString("Data3: ", string(data3.Data))
+	//fmt.Println("Data4: ", string(data4.Data))
+	fmt.Println("Finish query output pars: ", time.Now().Sub(t))
+	return nil
+
+}
 func readWithOutputParameters(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `BEGIN
 SELECT VISIT_DATA, VISIT_DATA2, VISIT_DATA3, VISIT_DATA4 INTO :1, :2, :3, :4 FROM GOORA_TEMP_VISIT WHERE VISIT_ID = 1;
 END;`
 	var (
-		//data string
 		data  go_ora.Clob
 		data2 go_ora.Clob
 		data3 go_ora.Blob
 		data4 go_ora.Blob
-		//data2 string
 	)
 	// give space for data
 	data.String = strings.Repeat(" ", 9444)
@@ -65,10 +122,10 @@ END;`
 	if err != nil {
 		return err
 	}
-	fmt.Println("Data1: ", data.String)
+	printLargeString("Data1: ", data.String)
 	fmt.Println("Data2: ", data2.String)
-	fmt.Println("Data3: ", data3.Data)
-	fmt.Println("Data4: ", data4.Data)
+	printLargeString("Data3: ", string(data3.Data))
+	fmt.Println("Data4: ", string(data4.Data))
 	fmt.Println("Finish query output pars: ", time.Now().Sub(t))
 	return nil
 }
@@ -88,15 +145,24 @@ func readWithSql(conn *sql.DB) error {
 			return err
 		}
 		fmt.Println("ID: ", visitID)
-		fmt.Println("Data1: ", data1)
+		printLargeString("Data1: ", data1)
+		//fmt.Println("Data1: ", data1[:10], "...", data1[len(data1)-10:])
 		fmt.Println("Data2: ", data2)
-		fmt.Println("Data3: ", data3)
-		fmt.Println("Data4: ", data4)
-		//fmt.Println("ID: ", visitID, "\t Data1: ", data1, "\t Data2: ", data2)
-		//fmt.Println("ID: ", visitID, "\t Data2: ", data2)
+		printLargeString("Data3: ", string(data3))
+		//fmt.Println("Data3: ", string(data3)[:5], "...", string(data3)[len(data3)-5:])
+		fmt.Println("Data4: ", string(data4))
 	}
 	fmt.Println("1 row readed: ", time.Now().Sub(t))
 	return nil
+}
+func printLargeString(prefix, data string) {
+	if len(data) <= 25 {
+		fmt.Println(prefix, data)
+		return
+	}
+	temp := strings.ReplaceAll(data, "\r", "")
+	temp = strings.ReplaceAll(temp, "\n", "\\n")
+	fmt.Println(prefix, temp[:25], "...........", temp[len(temp)-25:])
 }
 func insertData2() error {
 	t := time.Now()
@@ -118,7 +184,7 @@ func insertData2() error {
 	if err != nil {
 		return err
 	}
-	val2 := "string2"
+	val2 := go_ora.Clob{String: "string2"}
 	stmt := go_ora.NewStmt(`INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, VISIT_DATA, VISIT_DATA2) VALUES(2, :1, :2)`, conn)
 	defer func() {
 		err = stmt.Close()
@@ -126,8 +192,8 @@ func insertData2() error {
 			fmt.Println("Can't close stmt: ", err)
 		}
 	}()
-	stmt.AddParam(":1", string(val), len(string(val)), go_ora.Input)
-	stmt.AddParam(":2", val2, len(val2), go_ora.Input)
+	stmt.AddParam(":1", string(val), -1, go_ora.Input)
+	stmt.AddParam(":2", val2, -1, go_ora.Input)
 	_, err = stmt.Exec(nil)
 	if err != nil {
 		return err
@@ -144,7 +210,7 @@ func insertData(conn *sql.DB) error {
 
 	_, err = conn.Exec(`INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, VISIT_DATA, VISIT_DATA2, VISIT_DATA3, VISIT_DATA4)
  VALUES(1, :1, :2, :3, :4)`,
-		string(val), "string2", val, []byte("string2"))
+		string(val), go_ora.Clob{String: "string2"}, val, go_ora.Blob{Data: []byte("string2")})
 	if err != nil {
 		return err
 	}
@@ -222,6 +288,11 @@ func main() {
 		return
 	}
 	err = readWithOutputParameters(conn)
+	if err != nil {
+		fmt.Println("Can't read data: ", err)
+		return
+	}
+	err = readWithOutputParameters2()
 	if err != nil {
 		fmt.Println("Can't read data: ", err)
 		return

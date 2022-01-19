@@ -4,7 +4,7 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
-### version 2.2.21: Lob for output parameters
+### version 2.2.22: Lob for output parameters
 * Add new types for output parameter which is `go_ora.Clob` and `go_ora.Blob`
 used for receiving Clob and Blob from output parameters **_see clob example for 
 more details_**

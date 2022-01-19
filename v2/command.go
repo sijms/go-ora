@@ -771,56 +771,261 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	if stmt.connection.connOption.Tracer.IsOn() {
 		dataSet.Trace(stmt.connection.connOption.Tracer)
 	}
+	return stmt.readLobs(dataSet)
+	//return nil
+}
+func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Value, error) {
+	if locator == nil {
+		return nil, nil
+	}
+	lob := &Lob{
+		sourceLocator: locator,
+	}
+	dataSize, err := lob.getSize(stmt.connection)
+	if err != nil {
+		return nil, err
+	}
+	lobData, err := lob.getData(stmt.connection)
+	if err != nil {
+		return nil, err
+	}
+	if col.DataType == OCIBlobLocator {
+		//if !lob.isValid() {
+		//
+		//}
+		if dataSize != int64(len(lobData)) {
+			return nil, errors.New("error reading lob data: data size mismatching")
+		}
+		return lobData, nil
+	} else {
+		tempCharset := stmt.connection.strConv.GetLangID()
+		if lob.variableWidthChar() {
+			if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
+				stmt.connection.strConv.SetLangID(2002)
+			} else {
+				stmt.connection.strConv.SetLangID(2000)
+			}
+		} else {
+			stmt.connection.strConv.SetLangID(col.CharsetID)
+		}
+		resultClobString := stmt.connection.strConv.Decode(lobData)
+		stmt.connection.strConv.SetLangID(tempCharset)
+		if dataSize != int64(len([]rune(resultClobString))) {
+			return nil, errors.New("error reading clob data")
+		}
+		return resultClobString, nil
+	}
+}
+func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 	if stmt._hasBLOB {
-		for colIndex, col := range dataSet.Cols {
-			if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
-				for _, row := range dataSet.rows {
-					if row[colIndex] == nil {
-						continue
-					}
-					lob := &Lob{
-						sourceLocator: nil,
-					}
-
-					if lobLocator, ok := row[colIndex].([]byte); ok {
-						lob.sourceLocator = lobLocator
-					} else {
-						return errors.New("error reading lob")
-					}
-					//lob := &Lob{
-					//	sourceLocator: row[colIndex],
-					//}
-					//session.SaveState()
-					dataSize, err := lob.getSize(stmt.connection)
-					if err != nil {
-						return err
-					}
-					lobData, err := lob.getData(stmt.connection)
-					if err != nil {
-						return err
-					}
-					if col.DataType == OCIBlobLocator {
-						if dataSize != int64(len(lobData)) {
-							return errors.New("error reading lob data: data size mismatching")
-						}
-						row[colIndex] = lobData
-					} else {
-						tempCharset := stmt.connection.strConv.GetLangID()
-						if lob.variableWidthChar() {
-							if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
-								stmt.connection.strConv.SetLangID(2002)
-							} else {
-								stmt.connection.strConv.SetLangID(2000)
-							}
+		if stmt.containOutputPars {
+			for _, par := range stmt.Pars {
+				if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
+					switch val := par.Value.(type) {
+					case *Clob:
+						if val.locator == nil {
+							val.String = ""
 						} else {
-							stmt.connection.strConv.SetLangID(col.CharsetID)
+							tempVal, err := stmt.readLob(par, val.locator)
+							if err != nil {
+								return err
+							}
+							if stringVal, ok := tempVal.(string); ok {
+								val.String = stringVal
+							} else {
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+							}
 						}
-						resultClobString := stmt.connection.strConv.Decode(lobData)
-						stmt.connection.strConv.SetLangID(tempCharset)
-						if dataSize != int64(len([]rune(resultClobString))) {
-							return errors.New("error reading clob data")
+					case Clob:
+						if val.locator == nil {
+							val.String = ""
+						} else {
+							tempVal, err := stmt.readLob(par, val.locator)
+							if err != nil {
+								return err
+							}
+							if stringVal, ok := tempVal.(string); ok {
+								val.String = stringVal
+							} else {
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+							}
 						}
-						row[colIndex] = resultClobString
+					case *Blob:
+						if val.locator == nil {
+							val.Data = nil
+						} else {
+							tempVal, err := stmt.readLob(par, val.locator)
+							if err != nil {
+								return err
+							}
+							if byteVal, ok := tempVal.([]byte); ok {
+								val.Data = byteVal
+							} else {
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+							}
+						}
+					case Blob:
+						if val.locator == nil {
+							val.Data = nil
+						} else {
+							tempVal, err := stmt.readLob(par, val.locator)
+							if err != nil {
+								return err
+							}
+							if byteVal, ok := tempVal.([]byte); ok {
+								val.Data = byteVal
+							} else {
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+							}
+						}
+					}
+					//if par.Value == nil {
+					//	continue
+					//}
+					//if lobLocator, ok := par.Value.([]byte); ok {
+					//	val, err := stmt.readLob(par, lobLocator)
+					//	if err != nil {
+					//		return err
+					//	}
+					//	typ := reflect.TypeOf(par.Value)
+					//	if typ.Kind() == reflect.Ptr {
+					//		reflect.ValueOf(par.Value).Elem().Set(reflect.ValueOf(val))
+					//	} else {
+					//		par.Value = val
+					//	}
+					//} else {
+					//	return errors.New("error reading lob: lob locator is not present")
+					//}
+				}
+			}
+		} else {
+			for colIndex, col := range dataSet.Cols {
+				if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
+					for _, row := range dataSet.rows {
+						//if row[colIndex] == nil {
+						//	continue
+						//}
+						switch val := row[colIndex].(type) {
+						case *Clob:
+							if val.locator == nil {
+								row[colIndex] = nil
+							} else {
+								tempVal, err := stmt.readLob(col, val.locator)
+								if err != nil {
+									return err
+								}
+								if stringVal, ok := tempVal.(string); ok {
+									row[colIndex] = stringVal
+								} else {
+									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								}
+							}
+						case Clob:
+							if val.locator == nil {
+								row[colIndex] = nil
+							} else {
+								tempVal, err := stmt.readLob(col, val.locator)
+								if err != nil {
+									return err
+								}
+								if stringVal, ok := tempVal.(string); ok {
+									row[colIndex] = stringVal
+								} else {
+									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								}
+							}
+						case *Blob:
+							if val.locator == nil {
+								row[colIndex] = nil
+							} else {
+								tempVal, err := stmt.readLob(col, val.locator)
+								if err != nil {
+									return err
+								}
+								if byteVal, ok := tempVal.([]byte); ok {
+									row[colIndex] = byteVal
+								} else {
+									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								}
+							}
+						case Blob:
+							if val.locator == nil {
+								row[colIndex] = nil
+							} else {
+								tempVal, err := stmt.readLob(col, val.locator)
+								if err != nil {
+									return err
+								}
+								if byteVal, ok := tempVal.([]byte); ok {
+									row[colIndex] = byteVal
+								} else {
+									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								}
+							}
+						}
+						//if lobLocator, ok := row[colIndex].([]byte); ok {
+						//	var err error
+						//	row[colIndex], err = stmt.readLob(col, lobLocator)
+						//	if err != nil {
+						//		return err
+						//	}
+						//} else {
+						//	return errors.New("error reading lob: lob locator is not present")
+						//}
+						//lob := &Lob{
+						//	sourceLocator: nil,
+						//}
+						//
+						//if lobLocator, ok := row[colIndex].([]byte); ok {
+						//	lob.sourceLocator = lobLocator
+						//} else {
+						//	return errors.New("error reading lob: lob locator is not present")
+						//}
+						//lob := &Lob{
+						//	sourceLocator: row[colIndex],
+						//}
+						//session.SaveState()
+						//dataSize, err := lob.getSize(stmt.connection)
+						//if err != nil {
+						//	return err
+						//}
+						//lobData, err := lob.getData(stmt.connection)
+						//if err != nil {
+						//	return err
+						//}
+						//if col.DataType == OCIBlobLocator {
+						//	if dataSize != int64(len(lobData)) {
+						//		return errors.New("error reading lob data: data size mismatching")
+						//	}
+						//	row[colIndex] = lobData
+						//} else {
+						//	tempCharset := stmt.connection.strConv.GetLangID()
+						//	if lob.variableWidthChar() {
+						//		if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
+						//			stmt.connection.strConv.SetLangID(2002)
+						//		} else {
+						//			stmt.connection.strConv.SetLangID(2000)
+						//		}
+						//	} else {
+						//		stmt.connection.strConv.SetLangID(col.CharsetID)
+						//	}
+						//	resultClobString := stmt.connection.strConv.Decode(lobData)
+						//	stmt.connection.strConv.SetLangID(tempCharset)
+						//	if dataSize != int64(len([]rune(resultClobString))) {
+						//		return errors.New("error reading clob data")
+						//	}
+						//	row[colIndex] = resultClobString
+						//	//if row[colIndex] != nil {
+						//	//	typ := reflect.TypeOf(row[colIndex])
+						//	//	if typ.Kind() == reflect.Ptr {
+						//	//		reflect.ValueOf(row[colIndex]).Elem().Set(reflect.ValueOf(resultClobString))
+						//	//	} else {
+						//	//		row[colIndex] = resultClobString
+						//	//	}
+						//	//} else {
+						//	//	row[colIndex] = resultClobString
+						//	//}
+						//}
 					}
 				}
 			}
@@ -971,69 +1176,88 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	if err != nil {
 		return err
 	}
-	if param.BValue == nil {
-		param.Value = nil
-		return nil
-	}
+	// not correct as param.Value sometimes contain a pointer to data
+	// thus you need to set nil to the value of the pointer.
+	//if param.BValue == nil {
+	//	param.Value = nil
+	//	return nil
+	//}
 
 	var tempVal driver.Value
-
-	switch param.DataType {
-	case NCHAR, CHAR, LONG:
-		if stmt.connection.strConv.GetLangID() != param.CharsetID {
-			tempCharset := stmt.connection.strConv.GetLangID()
-			stmt.connection.strConv.SetLangID(param.CharsetID)
-			tempVal = stmt.connection.strConv.Decode(param.BValue)
-			stmt.connection.strConv.SetLangID(tempCharset)
-		} else {
-			tempVal = stmt.connection.strConv.Decode(param.BValue)
+	if param.BValue == nil {
+		switch param.DataType {
+		case OCIClobLocator:
+			tempVal = Clob{locator: nil}
+		case OCIBlobLocator:
+			tempVal = Blob{locator: nil}
+		default:
+			tempVal = nil
 		}
-	case NUMBER:
-		if int8(param.Scale) < 0 {
+	} else {
+		switch param.DataType {
+		case NCHAR, CHAR, LONG:
+			if stmt.connection.strConv.GetLangID() != param.CharsetID {
+				tempCharset := stmt.connection.strConv.GetLangID()
+				stmt.connection.strConv.SetLangID(param.CharsetID)
+				tempVal = stmt.connection.strConv.Decode(param.BValue)
+				stmt.connection.strConv.SetLangID(tempCharset)
+			} else {
+				tempVal = stmt.connection.strConv.Decode(param.BValue)
+			}
+		case NUMBER:
 			tempVal = converters.DecodeNumber(param.BValue)
-		} else if param.Scale == 0 {
-			tempVal = converters.DecodeInt(param.BValue)
-		} else {
-			tempVal = converters.DecodeDouble(param.BValue)
+			//if int8(param.Scale) < 0 {
+			//	tempVal = converters.DecodeNumber(param.BValue)
+			//} else if param.Scale == 0 {
+			//	tempVal = converters.DecodeInt(param.BValue)
+			//} else {
+			//	tempVal = converters.DecodeDouble(param.BValue)
+			//}
+			//tempVal = converters.DecodeNumber(param.BValue)
+		case TIMESTAMP:
+			dateVal, err := converters.DecodeDate(param.BValue)
+			if err != nil {
+				return err
+			}
+			tempVal = TimeStamp(dateVal)
+		case TimeStampDTY:
+			fallthrough
+		case TimeStampeLTZ:
+			fallthrough
+		case TimeStampLTZ_DTY:
+			fallthrough
+		case TimeStampTZ:
+			fallthrough
+		case TimeStampTZ_DTY:
+			fallthrough
+		case DATE:
+			dateVal, err := converters.DecodeDate(param.BValue)
+			if err != nil {
+				return err
+			}
+			tempVal = dateVal
+		case OCIBlobLocator, OCIClobLocator:
+			locator, err := session.GetClr()
+			stmt._hasBLOB = true
+			if err != nil {
+				return err
+			}
+			if param.DataType == OCIClobLocator {
+				tempVal = Clob{locator: locator}
+			} else {
+				tempVal = Blob{locator: locator}
+			}
+		case IBFloat:
+			tempVal = converters.ConvertBinaryFloat(param.BValue)
+		case IBDouble:
+			tempVal = converters.ConvertBinaryDouble(param.BValue)
+		case IntervalYM_DTY:
+			tempVal = converters.ConvertIntervalYM_DTY(param.BValue)
+		case IntervalDS_DTY:
+			tempVal = converters.ConvertIntervalDS_DTY(param.BValue)
+		default:
+			tempVal = param.BValue
 		}
-		//tempVal = converters.DecodeNumber(param.BValue)
-	case TIMESTAMP:
-		dateVal, err := converters.DecodeDate(param.BValue)
-		if err != nil {
-			return err
-		}
-		tempVal = TimeStamp(dateVal)
-	case TimeStampDTY:
-		fallthrough
-	case TimeStampeLTZ:
-		fallthrough
-	case TimeStampLTZ_DTY:
-		fallthrough
-	case TimeStampTZ:
-		fallthrough
-	case TimeStampTZ_DTY:
-		fallthrough
-	case DATE:
-		dateVal, err := converters.DecodeDate(param.BValue)
-		if err != nil {
-			return err
-		}
-		tempVal = dateVal
-	case OCIBlobLocator, OCIClobLocator:
-		tempVal, err = session.GetClr()
-		if err != nil {
-			return err
-		}
-	case IBFloat:
-		tempVal = converters.ConvertBinaryFloat(param.BValue)
-	case IBDouble:
-		tempVal = converters.ConvertBinaryDouble(param.BValue)
-	case IntervalYM_DTY:
-		tempVal = converters.ConvertIntervalYM_DTY(param.BValue)
-	case IntervalDS_DTY:
-		tempVal = converters.ConvertIntervalDS_DTY(param.BValue)
-	default:
-		tempVal = param.BValue
 	}
 	if param.Value != nil {
 		typ := reflect.TypeOf(param.Value)
@@ -1127,7 +1351,7 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 	if val == nil {
 		param.DataType = NCHAR
 		param.BValue = nil
-		param.ContFlag = 16
+		param.ContFlag = 0
 		param.MaxCharLen = 0
 		param.MaxLen = 1
 		param.CharsetForm = 1
@@ -1213,6 +1437,29 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 			param.ContFlag = 0
 			param.MaxLen = 11
 			param.MaxCharLen = 11
+		case *Clob:
+			param.Value = val
+			param.DataType = OCIClobLocator
+			param.ContFlag = 16
+			param.MaxCharLen = len([]rune(val.String))
+			param.CharsetForm = 1
+			if val.String == "" && direction == Input {
+				param.BValue = nil
+				param.MaxLen = 1
+			} else {
+				tempCharset := stmt.connection.strConv.GetLangID()
+				stmt.connection.strConv.SetLangID(param.CharsetID)
+				param.BValue = stmt.connection.strConv.Encode(val.String)
+				stmt.connection.strConv.SetLangID(tempCharset)
+				if size > len(val.String) {
+					param.MaxCharLen = size
+				}
+				if direction == Input {
+					param.MaxLen = len(param.BValue)
+				} else {
+					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+				}
+			}
 		case *NVarChar:
 			param.Value = val
 			param.DataType = NCHAR
@@ -1261,6 +1508,14 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
 				}
 			}
+		case *Blob:
+			param.Value = val
+			param.BValue = val.Data
+			param.DataType = OCIBlobLocator
+			param.ContFlag = 0
+			param.MaxCharLen = 0
+			param.CharsetForm = 0
+			param.MaxLen = len(param.BValue)
 		case *[]byte:
 			param.Value = val
 			param.BValue = *val

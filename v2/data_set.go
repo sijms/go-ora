@@ -196,38 +196,43 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 // for non-supported type
 // error means error occur during operation
 func (dataSet DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, error) {
-	col := dataSet.currentRow[colIndex]
+	field := dataSet.currentRow[colIndex]
+	col := dataSet.Cols[colIndex]
+	if col.cusType != nil && col.cusType.typ == obj.Type() {
+		obj.Set(reflect.ValueOf(field))
+		return true, nil
+	}
 	switch obj.Type().Kind() {
 	case reflect.String:
-		obj.SetString(getString(col))
+		obj.SetString(getString(field))
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		temp, err := getInt(col)
+		temp, err := getInt(field)
 		if err != nil {
 			return false, fmt.Errorf("go-ora: column %d require an integer", colIndex)
 		}
 		obj.SetInt(temp)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		temp, err := getInt(col)
+		temp, err := getInt(field)
 		if err != nil {
 			return false, fmt.Errorf("go-ora: column %d require an integer", colIndex)
 		}
 		obj.SetUint(uint64(temp))
 	case reflect.Float32, reflect.Float64:
-		temp, err := getFloat(col)
+		temp, err := getFloat(field)
 		if err != nil {
 			return false, fmt.Errorf("go-ora: column %d require type float", colIndex)
 		}
 		obj.SetFloat(temp)
 	default:
 		if obj.Type() == reflect.TypeOf(time.Time{}) {
-			if _, ok := col.(time.Time); ok {
-				obj.Set(reflect.ValueOf(col))
+			if _, ok := field.(time.Time); ok {
+				obj.Set(reflect.ValueOf(field))
 			} else {
 				return false, fmt.Errorf("go-ora: column %d require type time.Time", colIndex)
 			}
 		} else if obj.Type() == reflect.TypeOf([]byte{}) {
-			if _, ok := col.([]byte); ok {
-				obj.Set(reflect.ValueOf(col))
+			if _, ok := field.([]byte); ok {
+				obj.Set(reflect.ValueOf(field))
 			} else {
 				return false, fmt.Errorf("go-ora: column %d require type []byte", colIndex)
 			}

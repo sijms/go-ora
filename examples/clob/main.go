@@ -8,6 +8,7 @@ import (
 	go_ora "github.com/sijms/go-ora/v2"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -21,6 +22,8 @@ func createTable(conn *sql.DB) error {
 	VISIT_ID	number(10)	NOT NULL,
 	VISIT_DATA  CLOB,
 	VISIT_DATA2 CLOB,
+	VISIT_DATA3 BLOB,
+	VISIT_DATA4 BLOB,
 	PRIMARY KEY(VISIT_ID)
 	)`
 	_, err := conn.Exec(sqlText)
@@ -39,20 +42,57 @@ func dropTable(conn *sql.DB) error {
 	fmt.Println("Finish drop table: ", time.Now().Sub(t))
 	return nil
 }
-func readData(conn *sql.DB) error {
+func readWithOutputParameters(conn *sql.DB) error {
 	t := time.Now()
-	row := conn.QueryRow("SELECT VISIT_ID, VISIT_DATA, VISIT_DATA2 FROM GOORA_TEMP_VISIT")
+	sqlText := `BEGIN
+SELECT VISIT_DATA, VISIT_DATA2, VISIT_DATA3, VISIT_DATA4 INTO :1, :2, :3, :4 FROM GOORA_TEMP_VISIT WHERE VISIT_ID = 1;
+END;`
+	var (
+		//data string
+		data  go_ora.Clob
+		data2 go_ora.Clob
+		data3 go_ora.Blob
+		data4 go_ora.Blob
+		//data2 string
+	)
+	// give space for data
+	data.String = strings.Repeat(" ", 9444)
+	data2.String = strings.Repeat(" ", 10)
+	data3.Data = make([]byte, 9444)
+	data4.Data = make([]byte, 10)
+	_, err := conn.Exec(sqlText, sql.Out{Dest: &data}, sql.Out{Dest: &data2},
+		sql.Out{Dest: &data3}, sql.Out{Dest: &data4})
+	if err != nil {
+		return err
+	}
+	fmt.Println("Data1: ", data.String)
+	fmt.Println("Data2: ", data2.String)
+	fmt.Println("Data3: ", data3.Data)
+	fmt.Println("Data4: ", data4.Data)
+	fmt.Println("Finish query output pars: ", time.Now().Sub(t))
+	return nil
+}
+func readWithSql(conn *sql.DB) error {
+	t := time.Now()
+	row := conn.QueryRow("SELECT VISIT_ID, VISIT_DATA, VISIT_DATA2, VISIT_DATA3, VISIT_DATA4 FROM GOORA_TEMP_VISIT")
 	if row != nil {
 		var (
 			visitID int64
 			data1   string
 			data2   string
+			data3   []byte
+			data4   []byte
 		)
-		err := row.Scan(&visitID, &data1, &data2)
+		err := row.Scan(&visitID, &data1, &data2, &data3, &data4)
 		if err != nil {
 			return err
 		}
-		fmt.Println("ID: ", visitID, "\t Data1: ", data1, "\t Data2: ", data2)
+		fmt.Println("ID: ", visitID)
+		fmt.Println("Data1: ", data1)
+		fmt.Println("Data2: ", data2)
+		fmt.Println("Data3: ", data3)
+		fmt.Println("Data4: ", data4)
+		//fmt.Println("ID: ", visitID, "\t Data1: ", data1, "\t Data2: ", data2)
 		//fmt.Println("ID: ", visitID, "\t Data2: ", data2)
 	}
 	fmt.Println("1 row readed: ", time.Now().Sub(t))
@@ -86,7 +126,7 @@ func insertData2() error {
 			fmt.Println("Can't close stmt: ", err)
 		}
 	}()
-	stmt.AddParam(":1", string(val), len(val), go_ora.Input)
+	stmt.AddParam(":1", string(val), len(string(val)), go_ora.Input)
 	stmt.AddParam(":2", val2, len(val2), go_ora.Input)
 	_, err = stmt.Exec(nil)
 	if err != nil {
@@ -102,8 +142,9 @@ func insertData(conn *sql.DB) error {
 		return err
 	}
 
-	_, err = conn.Exec(`INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, VISIT_DATA, VISIT_DATA2) VALUES(1, :1, :2)`,
-		string(val), "string2")
+	_, err = conn.Exec(`INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, VISIT_DATA, VISIT_DATA2, VISIT_DATA3, VISIT_DATA4)
+ VALUES(1, :1, :2, :3, :4)`,
+		string(val), "string2", val, []byte("string2"))
 	if err != nil {
 		return err
 	}
@@ -157,6 +198,7 @@ func main() {
 	err = createTable(conn)
 	if err != nil {
 		fmt.Println("Can't create table", err)
+		return
 	}
 	defer func() {
 		err = dropTable(conn)
@@ -174,8 +216,14 @@ func main() {
 		fmt.Println("Can't make second insert: ", err)
 		return
 	}
-	err = readData(conn)
+	err = readWithSql(conn)
 	if err != nil {
 		fmt.Println("Can't read data: ", err)
+		return
+	}
+	err = readWithOutputParameters(conn)
+	if err != nil {
+		fmt.Println("Can't read data: ", err)
+		return
 	}
 }

@@ -7,6 +7,16 @@ import (
 	"github.com/sijms/go-ora/v2/network"
 )
 
+type Clob struct {
+	locator []byte
+	String  string
+}
+
+type Blob struct {
+	locator []byte
+	Data    []byte
+}
+
 type Lob struct {
 	sourceLocator []byte
 	destLocator   []byte

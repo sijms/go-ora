@@ -12,7 +12,7 @@ import (
 type visit struct {
 	//Id   int64  `db:"name:visit_id"`
 	Name string  `db:"name:name"`
-	Val  float64 `db:"name:val"`
+	Val  float32 `db:"name:val"`
 	//Date time.Time	`db:"name:visit_date"`
 }
 
@@ -78,7 +78,7 @@ func queryData(conn *go_ora.Connection) error {
 	//	date time.Time
 	//)
 	var vi visit
-	var Id int64
+	var Id int
 	var Date time.Time
 	for rows.Next_() {
 		err = rows.Scan(&Id, &vi, &Date)
@@ -91,6 +91,66 @@ func queryData(conn *go_ora.Connection) error {
 	return nil
 }
 
+type db_TS struct {
+	S1C1 string `db:"name:s1c1"`
+	S1C2 string `db:"name:s1c2"`
+	S2C1 string `db:"name:s2c1"`
+	S2C2 string `db:"name:s2c2"`
+}
+
+func queryTest2(conn *go_ora.Connection) error {
+	var DBID int = 0
+	stmt := go_ora.NewStmt("select 1 as DBID from dual", conn) // It's an integer, an Oracle number to be more precise.
+	defer func() {
+		err := stmt.Close()
+		if err != nil {
+			fmt.Println("Can't close stmt: ", err)
+		}
+	}()
+
+	rows, err := stmt.Query_(nil)
+	if err != nil {
+		return err
+	}
+	rows.Next_()
+	err = rows.Scan(&DBID)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%#v\n", DBID)
+	return nil
+}
+func queryTest(conn *go_ora.Connection) error {
+	queries := []string{
+		"select 's1c1' as s1c1, 's1c2' as s1c2 from dual",
+		"select 's2c1' as s2c1, 's2c2' as s2c2 from dual",
+	}
+	for _, query := range queries {
+		stmt := go_ora.NewStmt(query, conn)
+		defer func() {
+			err := stmt.Close()
+			if err != nil {
+				fmt.Println("Can't close stmt: ", err)
+			}
+		}()
+
+		rows, err := stmt.Query_(nil)
+		if err != nil {
+			return err
+		}
+		rowsCount := 0
+		var db db_TS
+		for rows.Next_() {
+			err = rows.Scan(&db)
+			if err != nil {
+				return err
+			}
+			rowsCount += 1
+		}
+		fmt.Println("Rows count: ", rowsCount)
+	}
+	return nil
+}
 func dropTable(conn *go_ora.Connection) error {
 	t := time.Now()
 	stmt := go_ora.NewStmt("drop table GOORA_TEMP_VISIT purge", conn)
@@ -168,6 +228,17 @@ func main() {
 	err = queryData(conn)
 	if err != nil {
 		fmt.Println("Can't query data: ", err)
+		return
+	}
+
+	err = queryTest(conn)
+	if err != nil {
+		fmt.Println("Can't query data: ", err)
+		return
+	}
+	err = queryTest2(conn)
+	if err != nil {
+		fmt.Println("Can't query 2: ", err)
 		return
 	}
 }

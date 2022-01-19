@@ -115,7 +115,7 @@ VALUES(:1, :2, :3) RETURNING VISIT_ID INTO :4`)
 func usage() {
 	fmt.Println()
 	fmt.Println("insert_return")
-	fmt.Println("  a complete code of insert row with returning new id in output paramter.")
+	fmt.Println("  a complete code of insert row with returning new id in output parameter.")
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println(`  insert_return -server server_url`)
@@ -166,19 +166,19 @@ func main() {
 	defer func() {
 		err = dropSeq(conn)
 		if err != nil {
-			fmt.Println("Can't drop sequence", err)
+			fmt.Println("Can't drop sequence: ", err)
 		}
 	}()
 
 	err = createTable(conn)
 	if err != nil {
-		fmt.Println("Can't create table", err)
+		fmt.Println("Can't create table: ", err)
 		return
 	}
 	defer func() {
 		err = dropTable(conn)
 		if err != nil {
-			fmt.Println("Can't drop table", err)
+			fmt.Println("Can't drop table: ", err)
 		}
 	}()
 

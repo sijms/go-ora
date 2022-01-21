@@ -11,7 +11,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"regexp"
 	"strconv"
 	"strings"
@@ -48,7 +48,7 @@ func NewWallet(filePath string) (*wallet, error) {
 
 // read will read the file data decrypting file chunk to get wallet information
 func (w *wallet) read() error {
-	fileData, err := os.ReadFile(w.file)
+	fileData, err := ioutil.ReadFile(w.file)
 	if err != nil {
 		return err
 	}

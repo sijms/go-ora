@@ -294,6 +294,9 @@ func (dataSet *DataSet) Err() error {
 func (dataSet *DataSet) Next(dest []driver.Value) error {
 	hasMoreRows := dataSet.parent.hasMoreRows()
 	noOfRowsToFetch := len(dataSet.rows) // dataSet.parent.noOfRowsToFetch()
+	if noOfRowsToFetch == 0 {
+		return io.EOF
+	}
 	//hasBLOB := dataSet.parent.hasBLOB()
 	//hasLONG := dataSet.parent.hasLONG()
 	if !hasMoreRows && noOfRowsToFetch == 0 {

@@ -310,19 +310,23 @@ func (stmt *Stmt) writePars(session *network.Session) error {
 					session.PutBytes(1, 0)
 				} else {
 					if par.cusType != nil {
-						var sizeBuffer bytes.Buffer
+						//var sizeBuffer bytes.Buffer
 						size := len(par.BValue) + 7
-						session.WriteUint(&sizeBuffer, size, 4, true, true)
+						//session.WriteUint(&sizeBuffer, size, 4, true, true)
 						session.PutBytes(0, 0, 0, 0)
-						sizeBytes := sizeBuffer.Bytes()
-						session.PutBytes(sizeBytes...)
-						if len(sizeBytes) > 1 {
-							session.PutBytes(sizeBytes[0])
-							session.PutBytes(sizeBytes...)
-						}
-						session.PutBytes(0x84, 0x1, 0xfe)
-						session.PutUint(size, 4, true, false)
-						session.PutBytes(par.BValue...)
+						//sizeBytes := sizeBuffer.Bytes()
+						session.PutUint(size, 4, true, true)
+						//session.PutBytes(sizeBytes...)
+						session.PutBytes(1, 1)
+						tempBuffer := bytes.Buffer{}
+						tempBuffer.Write([]byte{0x84, 0x1, 0xfe})
+						session.WriteUint(&tempBuffer, size, 4, true, false)
+						tempBuffer.Write(par.BValue)
+						session.PutClr(tempBuffer.Bytes())
+
+						//session.PutBytes(0x84, 0x1, 0xfe)
+						//session.PutUint(size, 4, true, false)
+						//session.PutBytes(par.BValue...)
 					} else {
 						session.PutClr(par.BValue)
 					}
@@ -1056,8 +1060,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 // requestCustomTypeInfo an experimental function to ask for UDT information
 func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	session := stmt.connection.session
-	session.SaveState()
-	session.ResetBuffer()
+	session.SaveState(nil)
 	session.PutBytes(0x3, 0x5c, 0)
 	session.PutInt(3, 4, true, true)
 	//session.PutInt(0x5C0003, 4, true, true)
@@ -1167,26 +1170,35 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		if err != nil {
 			return err
 		}
-		_, err = session.GetClr()
+		_, err = session.GetByte()
 		if err != nil {
 			return err
 		}
+		tempBytes, err := session.GetClr()
+		if err != nil {
+			return err
+		}
+		newState := network.SessionState{InBuffer: tempBytes}
+		session.SaveState(&newState)
 		//fmt.Println(bty)
 		_, err = session.GetByte()
 		if err != nil {
 			return err
 		}
+		//ctl, err := session.ReadInt(&buffer, 4, true, true)
 		//fmt.Println(num2)
 		ctl, err := session.GetInt(4, true, true)
 		if err != nil {
 			return err
 		}
 		if ctl == 0xFE {
+			//_, err = session.ReadInt(&buffer, 4, false, true)
 			_, err = session.GetInt(4, false, true)
 			if err != nil {
 				return err
 			}
 		}
+		//return errors.New("interrupt")
 		//fmt.Println(num3)
 		for x := 0; x < len(param.cusType.attribs); x++ {
 			err = stmt.calculateParameterValue(&param.cusType.attribs[x])
@@ -1194,6 +1206,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 				return err
 			}
 		}
+		_ = session.LoadState()
 		param.Value = param.cusType.getObject()
 		return nil
 	}

@@ -21,11 +21,11 @@ type Data interface {
 	Write(session *Session) error
 	Read(session *Session) error
 }
-type sessionState struct {
+type SessionState struct {
 	summary   *SummaryObject
 	sendPcks  []PacketInterface
-	inBuffer  []byte
-	outBuffer []byte
+	InBuffer  []byte
+	OutBuffer bytes.Buffer
 	index     int
 }
 
@@ -46,7 +46,7 @@ type Session struct {
 	HasEOSCapability  bool
 	HasFSAPCapability bool
 	Summary           *SummaryObject
-	states            []sessionState
+	states            []SessionState
 	StrConv           converters.IStringConverter
 	UseBigClrChunks   bool
 	UseBigScn         bool
@@ -75,28 +75,43 @@ func NewSession(connOption *ConnectionOption) *Session {
 }
 
 // SaveState save current session state
-func (session *Session) SaveState() {
-	session.states = append(session.states, sessionState{
+func (session *Session) SaveState(newState *SessionState) {
+	session.states = append(session.states, SessionState{
 		summary:   session.Summary,
 		sendPcks:  session.sendPcks,
-		inBuffer:  session.inBuffer,
-		outBuffer: session.outBuffer.Bytes(),
+		InBuffer:  session.inBuffer,
+		OutBuffer: session.outBuffer,
 		index:     session.index,
 	})
+	if newState == nil {
+		session.Summary = nil
+		session.sendPcks = nil
+		session.inBuffer = nil
+		session.outBuffer = bytes.Buffer{}
+		session.index = 0
+	} else {
+		session.Summary = newState.summary
+		session.sendPcks = newState.sendPcks
+		session.inBuffer = newState.InBuffer
+		session.outBuffer = newState.OutBuffer
+		session.index = newState.index
+	}
 }
 
 // LoadState load last saved session state and remove it from the memory
 //
 // if this is the only session state availabe set session state memory to nil
-func (session *Session) LoadState() {
+func (session *Session) LoadState() (oldState *SessionState) {
 	index := len(session.states) - 1
+	if index >= 0 {
+		oldState = &session.states[index]
+	}
 	if index >= 0 {
 		currentState := session.states[index]
 		session.Summary = currentState.summary
 		session.sendPcks = currentState.sendPcks
-		session.inBuffer = currentState.inBuffer
-		session.outBuffer.Reset()
-		session.outBuffer.Write(currentState.outBuffer) //  = currentState.outBuffer
+		session.inBuffer = currentState.InBuffer
+		session.outBuffer = currentState.OutBuffer
 		session.index = currentState.index
 		if index == 0 {
 			session.states = nil
@@ -104,6 +119,17 @@ func (session *Session) LoadState() {
 			session.states = session.states[:index]
 		}
 	}
+	return
+}
+
+// ResetBuffer empty in and out buffer and set read index to 0
+func (session *Session) ResetBuffer() {
+	session.Summary = nil
+	session.sendPcks = nil
+	session.inBuffer = nil
+	//session.OutBuffer = nil
+	session.outBuffer.Reset()
+	session.index = 0
 }
 
 // LoadSSLData load data required for SSL connection like certificate, private keys and
@@ -300,20 +326,10 @@ func (session *Session) Disconnect() {
 	}
 }
 
-// ResetBuffer empty in and out buffer and set read index to 0
-func (session *Session) ResetBuffer() {
-	session.Summary = nil
-	session.sendPcks = nil
-	session.inBuffer = nil
-	//session.outBuffer = nil
-	session.outBuffer.Reset()
-	session.index = 0
-}
-
 //func (session *Session) Debug() {
 //	//if session.index > 350 && session.index < 370 {
 //	fmt.Println("index: ", session.index)
-//	fmt.Printf("data buffer: %#v\n", session.inBuffer[session.index:session.index+30])
+//	fmt.Printf("data buffer: %#v\n", session.InBuffer[session.index:session.index+30])
 //	//oldIndex := session.index
 //	//fmt.Println(session.GetClr())
 //	//session.index = oldIndex
@@ -321,11 +337,11 @@ func (session *Session) ResetBuffer() {
 //}
 
 //func (session *Session) DumpIn() {
-//	log.Printf("%#v\n", session.inBuffer)
+//	log.Printf("%#v\n", session.InBuffer)
 //}
 //
 //func (session *Session) DumpOut() {
-//	log.Printf("%#v\n", session.outBuffer)
+//	log.Printf("%#v\n", session.OutBuffer)
 //}
 
 // Write send data store in output buffer through network
@@ -672,7 +688,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 	}
 	if size == 1 {
 		session.outBuffer.WriteByte(uint8(num))
-		//session.outBuffer = append(session.outBuffer, uint8(num))
+		//session.OutBuffer = append(session.OutBuffer, uint8(num))
 		return
 	}
 	if compress {
@@ -685,12 +701,12 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			//session.outBuffer = append(session.outBuffer, 0)
+			//session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			session.outBuffer.WriteByte(size)
 			session.outBuffer.Write(temp)
-			//session.outBuffer = append(session.outBuffer, size)
-			//session.outBuffer = append(session.outBuffer, temp...)
+			//session.OutBuffer = append(session.OutBuffer, size)
+			//session.OutBuffer = append(session.OutBuffer, temp...)
 		}
 	} else {
 		temp := make([]byte, size)
@@ -714,7 +730,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 			}
 		}
 		session.outBuffer.Write(temp)
-		//session.outBuffer = append(session.outBuffer, temp...)
+		//session.OutBuffer = append(session.OutBuffer, temp...)
 	}
 }
 
@@ -755,7 +771,7 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			//session.outBuffer = append(session.outBuffer, 0)
+			//session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			if num < 0 {
 				num = num * -1
@@ -789,7 +805,7 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 				}
 			}
 			session.outBuffer.Write(temp)
-			//session.outBuffer = append(session.outBuffer, temp...)
+			//session.OutBuffer = append(session.OutBuffer, temp...)
 		}
 	}
 }
@@ -832,14 +848,14 @@ func (session *Session) PutKeyValString(key string, val string, num uint8) {
 func (session *Session) PutKeyVal(key []byte, val []byte, num uint8) {
 	if len(key) == 0 {
 		session.outBuffer.WriteByte(0)
-		//session.outBuffer = append(session.outBuffer, 0)
+		//session.OutBuffer = append(session.OutBuffer, 0)
 	} else {
 		session.PutUint(len(key), 4, true, true)
 		session.PutClr(key)
 	}
 	if len(val) == 0 {
 		session.outBuffer.WriteByte(0)
-		//session.outBuffer = append(session.outBuffer, 0)
+		//session.OutBuffer = append(session.OutBuffer, 0)
 	} else {
 		session.PutUint(len(val), 4, true, true)
 		session.PutClr(val)
@@ -1026,7 +1042,7 @@ func (session *Session) WriteUint(buffer *bytes.Buffer, number interface{}, size
 	}
 	if size == 1 {
 		buffer.WriteByte(uint8(num))
-		//session.outBuffer = append(session.outBuffer, uint8(num))
+		//session.OutBuffer = append(session.OutBuffer, uint8(num))
 		return
 	}
 	if compress {
@@ -1039,7 +1055,7 @@ func (session *Session) WriteUint(buffer *bytes.Buffer, number interface{}, size
 		}
 		if size == 0 {
 			buffer.WriteByte(0)
-			//session.outBuffer = append(session.outBuffer, 0)
+			//session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			buffer.WriteByte(size)
 			buffer.Write(temp)
@@ -1089,7 +1105,7 @@ func (session *Session) WriteInt(buffer *bytes.Buffer, number interface{}, size 
 		}
 		if size == 0 {
 			buffer.WriteByte(0)
-			//session.outBuffer = append(session.outBuffer, 0)
+			//session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			if num < 0 {
 				num = num * -1
@@ -1169,10 +1185,109 @@ func (session *Session) WriteKeyVal(buffer *bytes.Buffer, key []byte, val []byte
 	}
 	if len(val) == 0 {
 		buffer.WriteByte(0)
-		//session.outBuffer = append(session.outBuffer, 0)
+		//session.OutBuffer = append(session.OutBuffer, 0)
 	} else {
 		session.WriteUint(buffer, len(val), 4, true, true)
 		session.WriteClr(buffer, val)
 	}
 	session.WriteInt(buffer, num, 4, true, true)
 }
+
+//func (session *Session) ReadInt64(buffer *bytes.Buffer, size int, compress, bigEndian bool) (int64, error) {
+//	var ret int64
+//	negFlag := false
+//	if compress {
+//		rb, err := buffer.ReadByte()
+//		if err != nil {
+//			return 0, err
+//		}
+//		size = int(rb)
+//		if size&0x80 > 0 {
+//			negFlag = true
+//			size = size & 0x7F
+//		}
+//		bigEndian = true
+//	}
+//	if size == 0 {
+//		return 0, nil
+//	}
+//	tempBytes, err := session.ReadBytes(buffer, size)
+//	if err != nil {
+//		return 0, err
+//	}
+//	temp := make([]byte, 8)
+//	if bigEndian {
+//		copy(temp[8-size:], tempBytes)
+//		ret = int64(binary.BigEndian.Uint64(temp))
+//	} else {
+//		copy(temp[:size], tempBytes)
+//		ret = int64(binary.LittleEndian.Uint64(temp))
+//	}
+//	if negFlag {
+//		ret = ret * -1
+//	}
+//	return ret, nil
+//}
+//
+//func (session *Session) ReadInt(buffer *bytes.Buffer, size int, compress, bigEndian bool) (int, error) {
+//	temp, err := session.ReadInt64(buffer, size, compress, bigEndian)
+//	return int(temp), err
+//}
+//
+//func (session *Session) ReadBytes(buffer *bytes.Buffer, size int) ([]byte, error) {
+//	temp := make([]byte, size)
+//	_, err := buffer.Read(temp)
+//	return temp, err
+//}
+//
+//func (session *Session)ReadClr(buffer *bytes.Buffer) (output []byte, err error){
+//	var size uint8
+//	var rb []byte
+//	size, err = buffer.ReadByte()
+//	if err != nil {
+//		return
+//	}
+//	if size == 0 || size == 0xFF {
+//		output = nil
+//		err = nil
+//		return
+//	}
+//	if size != 0xFE {
+//		output, err = session.ReadBytes(buffer, int(size))//  session.read(int(size))
+//		return
+//	}
+//	var tempBuffer bytes.Buffer
+//	for {
+//		var size1 int
+//		if session.UseBigClrChunks {
+//			size1, err = session.ReadInt(buffer, 4, true, true)
+//		} else {
+//			size1, err = session.ReadInt(buffer, 1, false, false)
+//		}
+//		if err != nil || size1 == 0 {
+//			break
+//		}
+//		rb, err = session.ReadBytes(buffer, size1)
+//		if err != nil {
+//			return
+//		}
+//		tempBuffer.Write(rb)
+//	}
+//	output = tempBuffer.Bytes()
+//	return
+//}
+//
+//func (session *Session)ReadDlc(buffer *bytes.Buffer) (output []byte, err error) {
+//	var length int
+//	length, err = session.ReadInt(buffer, 4, true, true)
+//	if err != nil {
+//		return
+//	}
+//	if length > 0 {
+//		output, err = session.ReadClr(buffer)
+//		if len(output) > length {
+//			output = output[:length]
+//		}
+//	}
+//	return
+//}

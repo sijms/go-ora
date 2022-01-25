@@ -10,9 +10,12 @@ import (
 )
 
 type test1 struct {
-	Id   int64     `oracle:"name:test_id"`
-	Name string    `oracle:"name:test_name"`
-	Date time.Time `oracle:"name:test_date"`
+	Id    int64     `oracle:"name:test_id"`
+	Name  string    `oracle:"name:test_name"`
+	Data1 string    `oracle:"name:test_data1"`
+	Data2 string    `oracle:"name:test_data2"`
+	Data3 string    `oracle:"name:test_data3"`
+	Date  time.Time `oracle:"name:test_date"`
 }
 
 func createTable(conn *go_ora.Connection) error {
@@ -42,6 +45,9 @@ func insertData(conn *go_ora.Connection) error {
 		var test test1
 		test.Id = int64(index)
 		test.Name = nameText[:index]
+		test.Data1 = nameText
+		test.Data2 = nameText
+		test.Data3 = nameText
 		test.Date = time.Now()
 		_, err := stmt.Exec([]driver.Value{index, test})
 		if err != nil {
@@ -75,7 +81,11 @@ func queryData(conn *go_ora.Connection) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("ID: ", visitID, "\tTest: ", test)
+		fmt.Println("ID: ", visitID)
+		fmt.Println("Name: ", test.Name)
+		fmt.Println("Data1: ", test.Data1)
+		fmt.Println("Data2: ", test.Data2)
+		fmt.Println("Data3: ", test.Data3)
 		count++
 	}
 	if rows.Err() != nil {
@@ -101,6 +111,9 @@ func createUDT(conn *go_ora.Connection) error {
 (
     TEST_ID NUMBER(10, 0),
     TEST_NAME VARCHAR2(200),
+	TEST_DATA1 VARCHAR2(200),
+	TEST_DATA2 VARCHAR2(200),
+	TEST_DATA3 VARCHAR2(200),
 	TEST_DATE DATE
 )`
 	stmt := go_ora.NewStmt(sqlText, conn)
@@ -214,63 +227,5 @@ func main() {
 		fmt.Println("Can't query data: ", err)
 		return
 	}
-	//err = inputPars(conn, 3, test1{
-	//	Id:   4,
-	//	Name: "this is a very big test4",
-	//})
-	//if err != nil {
-	//	fmt.Println(err)
-	//	return
-	//}
-	//err = queryCustTypeTable(conn)
-	//if err != nil {
-	//	fmt.Println("Can't query: ", err)
-	//	return
-	//}
-
-	//err = queryUDT(conn)
-	//if err != nil {
-	//	fmt.Println("Can't query UDT", err)
-	//	return
-	//}
-	//conn, err := sql.Open("oracle", server)
-	//if err != nil {
-	//	fmt.Println("Can't open connection", err)
-	//	return
-	//}
-	//defer func() {
-	//	err = conn.Close()
-	//	if err != nil {
-	//		fmt.Println("Can't close connection", err)
-	//	}
-	//}()
-	//
-	//err = conn.Ping()
-	//if err != nil {
-	//	fmt.Println("Can't ping connection", err)
-	//	return
-	//}
-	//
-	//err = createTable(conn)
-	//if err != nil {
-	//	fmt.Println("Can't create table", err)
-	//	return
-	//}
-	//defer func() {
-	//	err = dropTable(conn)
-	//	if err != nil {
-	//		fmt.Println("Can't drop table", err)
-	//	}
-	//}()
-	//err = insertData(conn)
-	//if err != nil {
-	//	fmt.Println("Can't insert data", err)
-	//	return
-	//}
-	//err = queryOutputPars(conn)
-	//if err != nil {
-	//	fmt.Println("Can't get output parameters", err)
-	//	return
-	//}
 
 }

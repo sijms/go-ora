@@ -113,12 +113,12 @@ END;`
 		data4 go_ora.Blob
 	)
 	// give space for data
-	data.String = strings.Repeat(" ", 9444)
-	data2.String = strings.Repeat(" ", 10)
-	data3.Data = make([]byte, 9444)
-	data4.Data = make([]byte, 10)
-	_, err := conn.Exec(sqlText, sql.Out{Dest: &data}, sql.Out{Dest: &data2},
-		sql.Out{Dest: &data3}, sql.Out{Dest: &data4})
+	//data.String = strings.Repeat(" ", 9444)
+	//data2.String = strings.Repeat(" ", 10)
+	//data3.Data = make([]byte, 9444)
+	//data4.Data = make([]byte, 10)
+	_, err := conn.Exec(sqlText, go_ora.Out{Dest: &data, Size: 9444}, go_ora.Out{Dest: &data2, Size: 10},
+		go_ora.Out{Dest: &data3, Size: 9444}, go_ora.Out{Dest: &data4, Size: 10})
 	if err != nil {
 		return err
 	}

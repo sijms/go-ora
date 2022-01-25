@@ -833,3 +833,11 @@ func (nls *NLSData) SaveNLSValue(key, value string, code int) {
 		nls.NCharConvImp = value
 	}
 }
+
+func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, error) {
+	stmt := NewStmt(text, conn)
+	defer func() {
+		_ = stmt.Close()
+	}()
+	return stmt.Exec(args)
+}

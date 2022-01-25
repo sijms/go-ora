@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -762,13 +763,10 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 			}
 			session.outBuffer.WriteByte(size)
 			session.outBuffer.Write(temp)
-			//session.outBuffer = append(session.outBuffer, size)
-			//session.outBuffer = append(session.outBuffer, temp...)
 		}
 	} else {
 		if size == 1 {
 			session.outBuffer.WriteByte(uint8(num))
-			//session.outBuffer = append(session.outBuffer, uint8(num))
 		} else {
 			temp := make([]byte, size)
 			if bigEndian {
@@ -1009,4 +1007,172 @@ func (session *Session) GetKeyVal() (key []byte, val []byte, num int, err error)
 	}
 	num, err = session.GetInt(4, true, true)
 	return
+}
+
+func (session *Session) WriteBytes(buffer *bytes.Buffer, data ...byte) {
+	buffer.Write(data)
+}
+
+func (session *Session) WriteUint(buffer *bytes.Buffer, number interface{}, size uint8, bigEndian, compress bool) {
+	val := reflect.ValueOf(number)
+	var num uint64
+	switch val.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		num = uint64(val.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		num = val.Uint()
+	default:
+		panic("you need to pass an integer to this function")
+	}
+	if size == 1 {
+		buffer.WriteByte(uint8(num))
+		//session.outBuffer = append(session.outBuffer, uint8(num))
+		return
+	}
+	if compress {
+		// if the size is one byte no compression occur only one byte written
+		temp := make([]byte, 8)
+		binary.BigEndian.PutUint64(temp, num)
+		temp = bytes.TrimLeft(temp, "\x00")
+		if size > uint8(len(temp)) {
+			size = uint8(len(temp))
+		}
+		if size == 0 {
+			buffer.WriteByte(0)
+			//session.outBuffer = append(session.outBuffer, 0)
+		} else {
+			buffer.WriteByte(size)
+			buffer.Write(temp)
+		}
+	} else {
+		temp := make([]byte, size)
+		if bigEndian {
+			switch size {
+			case 2:
+				binary.BigEndian.PutUint16(temp, uint16(num))
+			case 4:
+				binary.BigEndian.PutUint32(temp, uint32(num))
+			case 8:
+				binary.BigEndian.PutUint64(temp, num)
+			}
+		} else {
+			switch size {
+			case 2:
+				binary.LittleEndian.PutUint16(temp, uint16(num))
+			case 4:
+				binary.LittleEndian.PutUint32(temp, uint32(num))
+			case 8:
+				binary.LittleEndian.PutUint64(temp, num)
+			}
+		}
+		buffer.Write(temp)
+	}
+}
+
+func (session *Session) WriteInt(buffer *bytes.Buffer, number interface{}, size uint8, bigEndian, compress bool) {
+	val := reflect.ValueOf(number)
+	var num int64
+	switch val.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		num = val.Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		num = int64(val.Uint())
+	default:
+		panic("you need to pass an integer to this function")
+	}
+	if compress {
+		temp := make([]byte, 8)
+		binary.BigEndian.PutUint64(temp, uint64(num))
+		temp = bytes.TrimLeft(temp, "\x00")
+		if size > uint8(len(temp)) {
+			size = uint8(len(temp))
+		}
+		if size == 0 {
+			buffer.WriteByte(0)
+			//session.outBuffer = append(session.outBuffer, 0)
+		} else {
+			if num < 0 {
+				num = num * -1
+				size = size & 0x80
+			}
+			buffer.WriteByte(size)
+			buffer.Write(temp)
+		}
+	} else {
+		if size == 1 {
+			buffer.WriteByte(uint8(num))
+		} else {
+			temp := make([]byte, size)
+			if bigEndian {
+				switch size {
+				case 2:
+					binary.BigEndian.PutUint16(temp, uint16(num))
+				case 4:
+					binary.BigEndian.PutUint32(temp, uint32(num))
+				case 8:
+					binary.BigEndian.PutUint64(temp, uint64(num))
+				}
+			} else {
+				switch size {
+				case 2:
+					binary.LittleEndian.PutUint16(temp, uint16(num))
+				case 4:
+					binary.LittleEndian.PutUint32(temp, uint32(num))
+				case 8:
+					binary.LittleEndian.PutUint64(temp, uint64(num))
+				}
+			}
+			buffer.Write(temp)
+		}
+	}
+}
+
+func (session *Session) WriteClr(buffer *bytes.Buffer, data []byte) {
+	dataLen := len(data)
+	if dataLen > 0xFC {
+		buffer.WriteByte(0xFE)
+		start := 0
+		for start < dataLen {
+			end := start + session.ClrChunkSize
+			if end > dataLen {
+				end = dataLen
+			}
+			temp := data[start:end]
+			if session.UseBigClrChunks {
+				session.WriteInt(buffer, len(temp), 4, true, true)
+			} else {
+				buffer.WriteByte(uint8(len(temp)))
+			}
+			buffer.Write(temp)
+			start += session.ClrChunkSize
+		}
+		buffer.WriteByte(0)
+	} else if dataLen == 0 {
+		buffer.WriteByte(0)
+	} else {
+		buffer.WriteByte(uint8(len(data)))
+		buffer.Write(data)
+	}
+}
+
+// WriteKeyValString write key, val (in form of string) and flag number to output buffer
+func (session *Session) WriteKeyValString(buffer *bytes.Buffer, key string, val string, num uint8) {
+	session.WriteKeyVal(buffer, []byte(key), []byte(val), num)
+}
+
+func (session *Session) WriteKeyVal(buffer *bytes.Buffer, key []byte, val []byte, num uint8) {
+	if len(key) == 0 {
+		buffer.WriteByte(0)
+	} else {
+		session.WriteUint(buffer, len(key), 4, true, true)
+		session.WriteClr(buffer, key)
+	}
+	if len(val) == 0 {
+		buffer.WriteByte(0)
+		//session.outBuffer = append(session.outBuffer, 0)
+	} else {
+		session.WriteUint(buffer, len(val), 4, true, true)
+		session.WriteClr(buffer, val)
+	}
+	session.WriteInt(buffer, num, 4, true, true)
 }

@@ -54,7 +54,7 @@ VALUES(:1, :2, :3, :4)`)
 		}
 		val += 1.1
 	}
-	fmt.Println("100 Rows inserted: ", time.Now().Sub(t))
+	fmt.Println("100 rows inserted: ", time.Now().Sub(t))
 	return nil
 }
 

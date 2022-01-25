@@ -298,7 +298,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	return ret
 }
 
-func (stmt *Stmt) writePars(session *network.Session) {
+func (stmt *Stmt) writePars(session *network.Session) error {
 	if len(stmt.Pars) > 0 {
 		session.PutBytes(7)
 		for _, par := range stmt.Pars {
@@ -309,7 +309,23 @@ func (stmt *Stmt) writePars(session *network.Session) {
 				if par.DataType == REFCURSOR {
 					session.PutBytes(1, 0)
 				} else {
-					session.PutClr(par.BValue)
+					if par.cusType != nil {
+						var sizeBuffer bytes.Buffer
+						size := len(par.BValue) + 7
+						session.WriteUint(&sizeBuffer, size, 4, true, true)
+						session.PutBytes(0, 0, 0, 0)
+						sizeBytes := sizeBuffer.Bytes()
+						session.PutBytes(sizeBytes...)
+						if len(sizeBytes) > 1 {
+							session.PutBytes(sizeBytes[0])
+							session.PutBytes(sizeBytes...)
+						}
+						session.PutBytes(0x84, 0x1, 0xfe)
+						session.PutUint(size, 4, true, false)
+						session.PutBytes(par.BValue...)
+					} else {
+						session.PutClr(par.BValue)
+					}
 				}
 			}
 		}
@@ -319,6 +335,7 @@ func (stmt *Stmt) writePars(session *network.Session) {
 			}
 		}
 	}
+	return nil
 }
 
 // write stmt data to network stream
@@ -1160,9 +1177,15 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 			return err
 		}
 		//fmt.Println(num2)
-		_, err = session.GetInt(4, true, true)
+		ctl, err := session.GetInt(4, true, true)
 		if err != nil {
 			return err
+		}
+		if ctl == 0xFE {
+			_, err = session.GetInt(4, false, true)
+			if err != nil {
+				return err
+			}
 		}
 		//fmt.Println(num3)
 		for x := 0; x < len(param.cusType.attribs); x++ {
@@ -1294,20 +1317,43 @@ func (stmt *defaultStmt) Close() error {
 // Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	stmt.connection.connOption.Tracer.Printf("Exec:\n%s", stmt.text)
+	var err error
 	for x := 0; x < len(args); x++ {
-		var par ParameterInfo
-		if tempOut, ok := args[x].(sql.Out); ok {
-			par = *stmt.NewParam("", tempOut.Dest, 0, Output)
-		} else {
-			par = *stmt.NewParam("", args[x], 0, Input)
+		var par *ParameterInfo
+		switch tempOut := args[x].(type) {
+		case sql.Out:
+			par, err = stmt.NewParam("", tempOut.Dest, 0, Output)
+			if err != nil {
+				return nil, err
+			}
+		case *sql.Out:
+			par, err = stmt.NewParam("", tempOut.Dest, 0, Output)
+			if err != nil {
+				return nil, err
+			}
+		case Out:
+			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, Output)
+			if err != nil {
+				return nil, err
+			}
+		case *Out:
+			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, Output)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			par, err = stmt.NewParam("", args[x], 0, Input)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if x < len(stmt.Pars) {
 			if par.MaxLen > stmt.Pars[x].MaxLen {
 				stmt.reSendParDef = true
 			}
-			stmt.Pars[x] = par
+			stmt.Pars[x] = *par
 		} else {
-			stmt.Pars = append(stmt.Pars, par)
+			stmt.Pars = append(stmt.Pars, *par)
 		}
 		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
 	}
@@ -1319,7 +1365,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	//	stmt.AddParam("", args[x], 0, Input)
 	//}
 	session.ResetBuffer()
-	err := stmt.write(session)
+	err = stmt.write(session)
 	if err != nil {
 		return nil, err
 	}
@@ -1342,370 +1388,476 @@ func (stmt *Stmt) CheckNamedValue(named *driver.NamedValue) error {
 // NewParam return new parameter according to input data
 //
 // note: DataType is defined from value enter in 2nd arg [val]
-func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) *ParameterInfo {
+func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) (*ParameterInfo, error) {
+	//parType := reflect.TypeOf(val)
+	//if parType.Kind() == reflect.Struct {
+	//	param := ParameterInfo{
+	//		Name:      name,
+	//		Flag:      3,
+	//		Version:   1,
+	//		Direction: direction,
+	//		DataType:  XMLType,
+	//		TypeName:  "TEST_TYPE1",
+	//		MaxLen:    2000,
+	//		Value:     val,
+	//	}
+	//	for typName, cusTyp := range stmt.connection.cusTyp {
+	//		if typName == param.TypeName {
+	//			param.cusType = &cusTyp
+	//			param.ToID = cusTyp.toid
+	//		}
+	//	}
+	//	if param.cusType == nil {
+	//		return nil, errors.New("struct parameters type only allowed with user defined type (UDT)")
+	//	}
+	//	return param, nil
+	//} else if parType.Kind() == reflect.Ptr {
+	//
+	//}
 	param := &ParameterInfo{
 		Name:        name,
+		Value:       val,
 		Direction:   direction,
 		Flag:        3,
 		CharsetID:   stmt.connection.tcpNego.ServerCharset,
 		CharsetForm: 1,
 	}
 	if val == nil {
-		param.DataType = NCHAR
-		param.BValue = nil
-		param.ContFlag = 0
-		param.MaxCharLen = 0
-		param.MaxLen = 1
-		param.CharsetForm = 1
+		param.setForNull()
+		return param, nil
+	}
+	typ := reflect.TypeOf(val)
+	var value reflect.Value
+	if typ.Kind() == reflect.Ptr {
+		value = reflect.ValueOf(val).Elem()
 	} else {
-		switch val := val.(type) {
-		case *RefCursor:
-			param.DataType = NCHAR
-			param.BValue = nil
-			param.MaxCharLen = 0
-			param.MaxLen = 1
-			param.Value = val
-			param.DataType = REFCURSOR
-			param.ContFlag = 0
-			param.CharsetForm = 0
-		case RefCursor:
-			param.DataType = NCHAR
-			param.BValue = nil
-			param.MaxCharLen = 0
-			param.MaxLen = 1
-			param.Value = val
-			param.DataType = REFCURSOR
-			param.ContFlag = 0
-			param.CharsetForm = 0
-		case *int64:
-			param.Value = val
-			param.BValue = converters.EncodeInt64(*val)
-			param.DataType = NUMBER
-		case *int32:
-			param.Value = val
-			param.BValue = converters.EncodeInt(int(*val))
-			param.DataType = NUMBER
-		case *int16:
-			param.Value = val
-			param.BValue = converters.EncodeInt(int(*val))
-			param.DataType = NUMBER
-		case *int8:
-			param.Value = val
-			param.BValue = converters.EncodeInt(int(*val))
-			param.DataType = NUMBER
-		case *int:
-			param.Value = val
-			param.BValue = converters.EncodeInt(*val)
-			param.DataType = NUMBER
-		case *uint:
-			param.Value = val
-			param.BValue = converters.EncodeInt(int(*val))
-			param.DataType = NUMBER
-		case *uint8:
-			param.Value = val
-			param.BValue = converters.EncodeInt(int(*val))
-			param.DataType = NUMBER
-		case *uint16:
-			param.Value = val
-			param.BValue = converters.EncodeInt(int(*val))
-			param.DataType = NUMBER
-		case *uint32:
-			param.Value = val
-			param.BValue = converters.EncodeInt(int(*val))
-			param.DataType = NUMBER
-		case *uint64:
-			param.Value = val
-			param.BValue = converters.EncodeInt(int(*val))
-			param.DataType = NUMBER
-		case *float32:
-			param.Value = val
-			param.BValue, _ = converters.EncodeDouble(float64(*val))
-			param.DataType = NUMBER
-		case *float64:
-			param.Value = val
-			param.BValue, _ = converters.EncodeDouble(*val)
-			param.DataType = NUMBER
-		case *time.Time:
-			param.Value = val
-			param.BValue = converters.EncodeDate(*val)
-			param.DataType = DATE
-			param.ContFlag = 0
-			param.MaxLen = 11
-			param.MaxCharLen = 11
-		case *TimeStamp:
-			param.Value = val
-			param.BValue = converters.EncodeDate(time.Time(*val))
-			param.DataType = TIMESTAMP
-			param.ContFlag = 0
-			param.MaxLen = 11
-			param.MaxCharLen = 11
-		case Clob:
-			param.ContFlag = 16
-			param.MaxCharLen = len([]rune(val.String))
-			param.CharsetForm = 1
-			if size > param.MaxCharLen {
-				param.MaxCharLen = size
-			}
-			if direction == Input {
-				param.Value = val.String
-				param.DataType = NCHAR
-				if val.String == "" {
-					param.BValue = nil
-					param.MaxLen = 1
-				} else {
-					tempCharset := stmt.connection.strConv.GetLangID()
-					stmt.connection.strConv.SetLangID(param.CharsetID)
-					param.BValue = stmt.connection.strConv.Encode(val.String)
-					stmt.connection.strConv.SetLangID(tempCharset)
-				}
-				param.MaxLen = len(param.BValue)
-			} else {
-				param.Value = val
-				param.DataType = OCIClobLocator
-				param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-			}
-		case *Clob:
-			param.ContFlag = 16
-			param.MaxCharLen = len([]rune(val.String))
-			param.CharsetForm = 1
-			if size > param.MaxCharLen {
-				param.MaxCharLen = size
-			}
-			if direction == Input {
-				param.Value = val.String
-				param.DataType = NCHAR
-				if val.String == "" {
-					param.BValue = nil
-					param.MaxLen = 1
-				} else {
-					tempCharset := stmt.connection.strConv.GetLangID()
-					stmt.connection.strConv.SetLangID(param.CharsetID)
-					param.BValue = stmt.connection.strConv.Encode(val.String)
-					stmt.connection.strConv.SetLangID(tempCharset)
-				}
-				param.MaxLen = len(param.BValue)
-			} else {
-				param.Value = val
-				param.DataType = OCIClobLocator
-				param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-			}
-		case *NVarChar:
-			param.Value = val
-			param.DataType = NCHAR
-			param.CharsetID = stmt.connection.tcpNego.ServernCharset
-			param.ContFlag = 16
-			param.MaxCharLen = len(*val)
-			param.CharsetForm = 2
-			if len(*val) == 0 && direction == Input {
-				param.BValue = nil
-				param.MaxLen = 1
-			} else {
-				tempCharset := stmt.connection.strConv.GetLangID()
-				stmt.connection.strConv.SetLangID(param.CharsetID)
-				param.BValue = stmt.connection.strConv.Encode(string(*val))
-				stmt.connection.strConv.SetLangID(tempCharset)
-				if size > len(*val) {
-					param.MaxCharLen = size
-				}
-				if direction == Input {
-					param.MaxLen = len(param.BValue)
-				} else {
-					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-				}
-
-			}
-		case *string:
-			param.Value = val
-			param.DataType = NCHAR
-			param.ContFlag = 16
-			param.MaxCharLen = len([]rune(*val))
-			param.CharsetForm = 1
-			if *val == "" && direction == Input {
-				param.BValue = nil
-				param.MaxLen = 1
-			} else {
-				tempCharset := stmt.connection.strConv.GetLangID()
-				stmt.connection.strConv.SetLangID(param.CharsetID)
-				param.BValue = stmt.connection.strConv.Encode(*val)
-				stmt.connection.strConv.SetLangID(tempCharset)
-				if size > len(*val) {
-					param.MaxCharLen = size
-				}
-				if direction == Input {
-					param.MaxLen = len(param.BValue)
-				} else {
-					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-				}
-			}
-		case Blob:
-			param.ContFlag = 0
-			param.MaxCharLen = 0
-			param.CharsetForm = 0
-			param.MaxLen = len(val.Data)
-			if size > param.MaxLen {
-				param.MaxLen = size
-			}
-			if direction == Input {
-				param.Value = val.Data
-				param.BValue = val.Data
-				param.DataType = RAW
-			} else {
-				param.Value = val
-				param.DataType = OCIBlobLocator
-			}
-		case *Blob:
-			param.ContFlag = 0
-			param.MaxCharLen = 0
-			param.CharsetForm = 0
-			param.MaxLen = len(val.Data)
-			if size > param.MaxLen {
-				param.MaxLen = size
-			}
-			if direction == Input {
-				param.Value = val.Data
-				param.BValue = val.Data
-				param.DataType = RAW
-			} else {
-				param.Value = val
-				param.DataType = OCIBlobLocator
-			}
-		case *[]byte:
-			param.Value = val
-			param.BValue = *val
-			param.DataType = RAW
-			param.MaxLen = len(*val)
-			param.ContFlag = 0
-			param.MaxCharLen = 0
-			param.CharsetForm = 0
-		case int64:
-			param.BValue = converters.EncodeInt64(val)
-			param.DataType = NUMBER
-		case int32:
-			param.BValue = converters.EncodeInt(int(val))
-			param.DataType = NUMBER
-		case int16:
-			param.BValue = converters.EncodeInt(int(val))
-			param.DataType = NUMBER
-		case int8:
-			param.BValue = converters.EncodeInt(int(val))
-			param.DataType = NUMBER
-		case int:
-			param.BValue = converters.EncodeInt(val)
-			param.DataType = NUMBER
-		case uint:
-			param.BValue = converters.EncodeInt(int(val))
-			param.DataType = NUMBER
-		case uint8:
-			param.BValue = converters.EncodeInt(int(val))
-			param.DataType = NUMBER
-		case uint16:
-			param.BValue = converters.EncodeInt(int(val))
-			param.DataType = NUMBER
-		case uint32:
-			param.BValue = converters.EncodeInt(int(val))
-			param.DataType = NUMBER
-		case uint64:
-			param.BValue = converters.EncodeInt64(int64(val))
-			param.DataType = NUMBER
-		case float32:
-			param.BValue, _ = converters.EncodeDouble(float64(val))
-			param.DataType = NUMBER
-		case float64:
-			param.BValue, _ = converters.EncodeDouble(val)
-			param.DataType = NUMBER
-		case time.Time:
-			param.BValue = converters.EncodeDate(val)
-			param.DataType = DATE
-			param.ContFlag = 0
-			param.MaxLen = 11
-			param.MaxCharLen = 11
-		case TimeStamp:
-			param.BValue = converters.EncodeDate(time.Time(val))
-			param.DataType = TIMESTAMP
-			param.ContFlag = 0
-			param.MaxLen = 11
-			param.MaxCharLen = 11
-		case NVarChar:
-			param.DataType = NCHAR
-			param.CharsetID = stmt.connection.tcpNego.ServernCharset
-			param.ContFlag = 16
-			param.MaxCharLen = len(val)
-			param.CharsetForm = 2
-			if len(val) == 0 && direction == Input {
-				param.BValue = nil
-				param.MaxLen = 1
-			} else {
-				tempCharset := stmt.connection.strConv.GetLangID()
-				stmt.connection.strConv.SetLangID(param.CharsetID)
-				param.BValue = stmt.connection.strConv.Encode(string(val))
-				stmt.connection.strConv.SetLangID(tempCharset)
-				if size > len(val) {
-					param.MaxCharLen = size
-				}
-				if direction == Input {
-					param.MaxLen = len(param.BValue)
-				} else {
-					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-				}
-			}
-		case string:
-			param.DataType = NCHAR
-			param.ContFlag = 16
-			param.MaxCharLen = len([]rune(val))
-			param.CharsetForm = 1
-			if val == "" && direction == Input {
-				param.BValue = nil
-				param.MaxLen = 1
-			} else {
-				tempCharset := stmt.connection.strConv.GetLangID()
-				stmt.connection.strConv.SetLangID(param.CharsetID)
-				param.BValue = stmt.connection.strConv.Encode(val)
-				stmt.connection.strConv.SetLangID(tempCharset)
-				if size > len(val) {
-					param.MaxCharLen = size
-				}
-				if direction == Input {
-					param.MaxLen = len(param.BValue)
-				} else {
-					param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-				}
-			}
-		case []byte:
-			param.BValue = val
-			param.DataType = RAW
-			param.MaxLen = len(val)
-			param.ContFlag = 0
-			param.MaxCharLen = 0
-			param.CharsetForm = 0
+		value = reflect.ValueOf(val)
+	}
+	switch val := value.Interface().(type) {
+	case time.Time:
+		param.setForTime(val)
+	case TimeStamp:
+		param.setForTime(time.Time(val))
+		param.DataType = TIMESTAMP
+	case NVarChar:
+		param.CharsetForm = 2
+		param.CharsetID = stmt.connection.tcpNego.ServernCharset
+		param.setForString(string(val), stmt.connection.strConv, size)
+	case Clob:
+		param.setForString(val.String, stmt.connection.strConv, size)
+		if param.Direction == Output {
+			param.DataType = OCIClobLocator
 		}
-		if param.DataType == NUMBER {
-			param.ContFlag = 0
-			param.MaxCharLen = 0
-			param.MaxLen = 22
-			param.CharsetForm = 0
+	case Blob:
+		param.setForRaw(val.Data, size)
+		if param.Direction == Output {
+			param.DataType = OCIBlobLocator
 		}
-		if direction == Output {
-			param.BValue = nil
+	case []byte:
+		param.setForRaw(val, size)
+	case RefCursor:
+		param.setForRefCursor()
+	default:
+		switch value.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			param.setForInt(value.Int())
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			param.setForInt(int64(value.Uint()))
+		case reflect.Float32, reflect.Float64:
+			err := param.setForFloat(value.Float())
+			if err != nil {
+				return nil, err
+			}
+		case reflect.String:
+			param.setForString(value.String(), stmt.connection.strConv, size)
+		case reflect.Struct:
+			param.setForUDT()
+			for _, cusTyp := range stmt.connection.cusTyp {
+				if value.Type() == cusTyp.typ {
+					param.cusType = &cusTyp
+					param.ToID = cusTyp.toid
+				}
+			}
+			if param.cusType == nil {
+				return nil, errors.New("struct parameters only allowed with user defined type (UDT)")
+			}
+			var objectBuffer bytes.Buffer
+			for _, attrib := range param.cusType.attribs {
+				if fieldIndex, ok := param.cusType.filedMap[attrib.Name]; ok {
+					tempPar, err := stmt.NewParam("", value.Field(fieldIndex).Interface(), 0, direction)
+					if err != nil {
+						return nil, err
+					}
+					stmt.connection.session.WriteClr(&objectBuffer, tempPar.BValue)
+				}
+			}
+			param.BValue = objectBuffer.Bytes()
+			// bypassing set BValue to nil if direction = output
+			return param, nil
+		default:
+			return nil, errors.New("unsupported parameter type")
 		}
 	}
-	return param
+
+	//switch val := val.(type) {
+	//case *RefCursor:
+	//	param.DataType = NCHAR
+	//	param.BValue = nil
+	//	param.MaxCharLen = 0
+	//	param.MaxLen = 1
+	//	param.Value = val
+	//	param.DataType = REFCURSOR
+	//	param.ContFlag = 0
+	//	param.CharsetForm = 0
+	//case RefCursor:
+	//	param.DataType = NCHAR
+	//	param.BValue = nil
+	//	param.MaxCharLen = 0
+	//	param.MaxLen = 1
+	//	param.Value = val
+	//	param.DataType = REFCURSOR
+	//	param.ContFlag = 0
+	//	param.CharsetForm = 0
+	//case *int64:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt64(*val)
+	//	param.DataType = NUMBER
+	//case *int32:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt(int(*val))
+	//	param.DataType = NUMBER
+	//case *int16:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt(int(*val))
+	//	param.DataType = NUMBER
+	//case *int8:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt(int(*val))
+	//	param.DataType = NUMBER
+	//case *int:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt(*val)
+	//	param.DataType = NUMBER
+	//case *uint:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt(int(*val))
+	//	param.DataType = NUMBER
+	//case *uint8:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt(int(*val))
+	//	param.DataType = NUMBER
+	//case *uint16:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt(int(*val))
+	//	param.DataType = NUMBER
+	//case *uint32:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt(int(*val))
+	//	param.DataType = NUMBER
+	//case *uint64:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeInt(int(*val))
+	//	param.DataType = NUMBER
+	//case *float32:
+	//	param.Value = val
+	//	param.BValue, _ = converters.EncodeDouble(float64(*val))
+	//	param.DataType = NUMBER
+	//case *float64:
+	//	param.Value = val
+	//	param.BValue, _ = converters.EncodeDouble(*val)
+	//	param.DataType = NUMBER
+	//case *time.Time:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeDate(*val)
+	//	param.DataType = DATE
+	//	param.ContFlag = 0
+	//	param.MaxLen = 11
+	//	param.MaxCharLen = 11
+	//case *TimeStamp:
+	//	param.Value = val
+	//	param.BValue = converters.EncodeDate(time.Time(*val))
+	//	param.DataType = TIMESTAMP
+	//	param.ContFlag = 0
+	//	param.MaxLen = 11
+	//	param.MaxCharLen = 11
+	//case Clob:
+	//	param.ContFlag = 16
+	//	param.MaxCharLen = len([]rune(val.String))
+	//	param.CharsetForm = 1
+	//	if size > param.MaxCharLen {
+	//		param.MaxCharLen = size
+	//	}
+	//	if direction == Input {
+	//		param.Value = val.String
+	//		param.DataType = NCHAR
+	//		if val.String == "" {
+	//			param.BValue = nil
+	//			param.MaxLen = 1
+	//		} else {
+	//			tempCharset := stmt.connection.strConv.GetLangID()
+	//			stmt.connection.strConv.SetLangID(param.CharsetID)
+	//			param.BValue = stmt.connection.strConv.Encode(val.String)
+	//			stmt.connection.strConv.SetLangID(tempCharset)
+	//		}
+	//		param.MaxLen = len(param.BValue)
+	//	} else {
+	//		param.Value = val
+	//		param.DataType = OCIClobLocator
+	//		param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+	//	}
+	//case *Clob:
+	//	param.ContFlag = 16
+	//	param.MaxCharLen = len([]rune(val.String))
+	//	param.CharsetForm = 1
+	//	if size > param.MaxCharLen {
+	//		param.MaxCharLen = size
+	//	}
+	//	if direction == Input {
+	//		param.Value = val.String
+	//		param.DataType = NCHAR
+	//		if val.String == "" {
+	//			param.BValue = nil
+	//			param.MaxLen = 1
+	//		} else {
+	//			tempCharset := stmt.connection.strConv.GetLangID()
+	//			stmt.connection.strConv.SetLangID(param.CharsetID)
+	//			param.BValue = stmt.connection.strConv.Encode(val.String)
+	//			stmt.connection.strConv.SetLangID(tempCharset)
+	//		}
+	//		param.MaxLen = len(param.BValue)
+	//	} else {
+	//		param.Value = val
+	//		param.DataType = OCIClobLocator
+	//		param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+	//	}
+	//case *NVarChar:
+	//	param.Value = val
+	//	param.DataType = NCHAR
+	//	param.CharsetID = stmt.connection.tcpNego.ServernCharset
+	//	param.ContFlag = 16
+	//	param.MaxCharLen = len(*val)
+	//	param.CharsetForm = 2
+	//	if len(*val) == 0 && direction == Input {
+	//		param.BValue = nil
+	//		param.MaxLen = 1
+	//	} else {
+	//		tempCharset := stmt.connection.strConv.GetLangID()
+	//		stmt.connection.strConv.SetLangID(param.CharsetID)
+	//		param.BValue = stmt.connection.strConv.Encode(string(*val))
+	//		stmt.connection.strConv.SetLangID(tempCharset)
+	//		if size > len(*val) {
+	//			param.MaxCharLen = size
+	//		}
+	//		if direction == Input {
+	//			param.MaxLen = len(param.BValue)
+	//		} else {
+	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+	//		}
+	//
+	//	}
+	//case *string:
+	//	param.Value = val
+	//	param.DataType = NCHAR
+	//	param.ContFlag = 16
+	//	param.MaxCharLen = len([]rune(*val))
+	//	param.CharsetForm = 1
+	//	if *val == "" && direction == Input {
+	//		param.BValue = nil
+	//		param.MaxLen = 1
+	//	} else {
+	//		tempCharset := stmt.connection.strConv.GetLangID()
+	//		stmt.connection.strConv.SetLangID(param.CharsetID)
+	//		param.BValue = stmt.connection.strConv.Encode(*val)
+	//		stmt.connection.strConv.SetLangID(tempCharset)
+	//		if size > len(*val) {
+	//			param.MaxCharLen = size
+	//		}
+	//		if direction == Input {
+	//			param.MaxLen = len(param.BValue)
+	//		} else {
+	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+	//		}
+	//	}
+	//case Blob:
+	//	param.ContFlag = 0
+	//	param.MaxCharLen = 0
+	//	param.CharsetForm = 0
+	//	param.MaxLen = len(val.Data)
+	//	if size > param.MaxLen {
+	//		param.MaxLen = size
+	//	}
+	//	if direction == Input {
+	//		param.Value = val.Data
+	//		param.BValue = val.Data
+	//		param.DataType = RAW
+	//	} else {
+	//		param.Value = val
+	//		param.DataType = OCIBlobLocator
+	//	}
+	//case *Blob:
+	//	param.ContFlag = 0
+	//	param.MaxCharLen = 0
+	//	param.CharsetForm = 0
+	//	param.MaxLen = len(val.Data)
+	//	if size > param.MaxLen {
+	//		param.MaxLen = size
+	//	}
+	//	if direction == Input {
+	//		param.Value = val.Data
+	//		param.BValue = val.Data
+	//		param.DataType = RAW
+	//	} else {
+	//		param.Value = val
+	//		param.DataType = OCIBlobLocator
+	//	}
+	//case *[]byte:
+	//	param.Value = val
+	//	param.BValue = *val
+	//	param.DataType = RAW
+	//	param.MaxLen = len(*val)
+	//	param.ContFlag = 0
+	//	param.MaxCharLen = 0
+	//	param.CharsetForm = 0
+	//case int64:
+	//	param.BValue = converters.EncodeInt64(val)
+	//	param.DataType = NUMBER
+	//case int32:
+	//	param.BValue = converters.EncodeInt(int(val))
+	//	param.DataType = NUMBER
+	//case int16:
+	//	param.BValue = converters.EncodeInt(int(val))
+	//	param.DataType = NUMBER
+	//case int8:
+	//	param.BValue = converters.EncodeInt(int(val))
+	//	param.DataType = NUMBER
+	//case int:
+	//	param.BValue = converters.EncodeInt(val)
+	//	param.DataType = NUMBER
+	//case uint:
+	//	param.BValue = converters.EncodeInt(int(val))
+	//	param.DataType = NUMBER
+	//case uint8:
+	//	param.BValue = converters.EncodeInt(int(val))
+	//	param.DataType = NUMBER
+	//case uint16:
+	//	param.BValue = converters.EncodeInt(int(val))
+	//	param.DataType = NUMBER
+	//case uint32:
+	//	param.BValue = converters.EncodeInt(int(val))
+	//	param.DataType = NUMBER
+	//case uint64:
+	//	param.BValue = converters.EncodeInt64(int64(val))
+	//	param.DataType = NUMBER
+	//case float32:
+	//	param.BValue, _ = converters.EncodeDouble(float64(val))
+	//	param.DataType = NUMBER
+	//case float64:
+	//	param.BValue, _ = converters.EncodeDouble(val)
+	//	param.DataType = NUMBER
+	//case time.Time:
+	//	param.BValue = converters.EncodeDate(val)
+	//	param.DataType = DATE
+	//	param.ContFlag = 0
+	//	param.MaxLen = 11
+	//	param.MaxCharLen = 11
+	//case TimeStamp:
+	//	param.BValue = converters.EncodeDate(time.Time(val))
+	//	param.DataType = TIMESTAMP
+	//	param.ContFlag = 0
+	//	param.MaxLen = 11
+	//	param.MaxCharLen = 11
+	//case NVarChar:
+	//	param.DataType = NCHAR
+	//	param.CharsetID = stmt.connection.tcpNego.ServernCharset
+	//	param.ContFlag = 16
+	//	param.MaxCharLen = len(val)
+	//	param.CharsetForm = 2
+	//	if len(val) == 0 && direction == Input {
+	//		param.BValue = nil
+	//		param.MaxLen = 1
+	//	} else {
+	//		tempCharset := stmt.connection.strConv.GetLangID()
+	//		stmt.connection.strConv.SetLangID(param.CharsetID)
+	//		param.BValue = stmt.connection.strConv.Encode(string(val))
+	//		stmt.connection.strConv.SetLangID(tempCharset)
+	//		if size > len(val) {
+	//			param.MaxCharLen = size
+	//		}
+	//		if direction == Input {
+	//			param.MaxLen = len(param.BValue)
+	//		} else {
+	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+	//		}
+	//	}
+	//case string:
+	//	param.DataType = NCHAR
+	//	param.ContFlag = 16
+	//	param.MaxCharLen = len([]rune(val))
+	//	param.CharsetForm = 1
+	//	if val == "" && direction == Input {
+	//		param.BValue = nil
+	//		param.MaxLen = 1
+	//	} else {
+	//		tempCharset := stmt.connection.strConv.GetLangID()
+	//		stmt.connection.strConv.SetLangID(param.CharsetID)
+	//		param.BValue = stmt.connection.strConv.Encode(val)
+	//		stmt.connection.strConv.SetLangID(tempCharset)
+	//		if size > len(val) {
+	//			param.MaxCharLen = size
+	//		}
+	//		if direction == Input {
+	//			param.MaxLen = len(param.BValue)
+	//		} else {
+	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+	//		}
+	//	}
+	//case []byte:
+	//	param.BValue = val
+	//	param.DataType = RAW
+	//	param.MaxLen = len(val)
+	//	param.ContFlag = 0
+	//	param.MaxCharLen = 0
+	//	param.CharsetForm = 0
+	//}
+	//if param.DataType == NUMBER {
+	//	param.ContFlag = 0
+	//	param.MaxCharLen = 0
+	//	param.MaxLen = 22
+	//	param.CharsetForm = 0
+	//}
+	if direction == Output {
+		param.BValue = nil
+	}
+	return param, nil
+}
+
+func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
+	if pos >= 0 && pos < len(stmt.Pars) {
+		if par.MaxLen > stmt.Pars[pos].MaxLen {
+			stmt.reSendParDef = true
+		}
+		stmt.Pars[pos] = par
+	} else {
+		stmt.Pars = append(stmt.Pars, par)
+	}
 }
 
 // AddParam create new parameter and append it to stmt.Pars
-func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) {
-	stmt.Pars = append(stmt.Pars, *stmt.NewParam(name, val, size, direction))
-
+func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) error {
+	par, err := stmt.NewParam(name, val, size, direction)
+	if err != nil {
+		return err
+	}
+	stmt.setParam(-1, *par)
+	return nil
+	//stmt.Pars = append(stmt.Pars, )
 }
 
 // AddRefCursorParam add new output parameter of type REFCURSOR
 //
 // note: better to use sql.Out structure see examples for more information
 func (stmt *Stmt) AddRefCursorParam(name string) {
-	par := stmt.NewParam("1", nil, 0, Output)
-	par.DataType = REFCURSOR
-	par.ContFlag = 0
-	par.CharsetForm = 0
-	par.Value = new(RefCursor)
+	par, _ := stmt.NewParam("1", new(RefCursor), 0, Output)
 	stmt.Pars = append(stmt.Pars, *par)
 }
 
@@ -1732,15 +1884,19 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	//stmt._noOfRowsToFetch = 25
 	stmt._hasMoreRows = true
 	for x := 0; x < len(args); x++ {
-		par := *stmt.NewParam("", args[x], 0, Input)
-		if x < len(stmt.Pars) {
-			if par.MaxLen > stmt.Pars[x].MaxLen {
-				stmt.reSendParDef = true
-			}
-			stmt.Pars[x] = par
-		} else {
-			stmt.Pars = append(stmt.Pars, par)
+		par, err := stmt.NewParam("", args[x], 0, Input)
+		if err != nil {
+			return nil, err
 		}
+		stmt.setParam(x, *par)
+		//if x < len(stmt.Pars) {
+		//	if par.MaxLen > stmt.Pars[x].MaxLen {
+		//		stmt.reSendParDef = true
+		//	}
+		//	stmt.Pars[x] = *par
+		//} else {
+		//	stmt.Pars = append(stmt.Pars, par)
+		//}
 	}
 	//stmt.Pars = nil
 	//for x := 0; x < len(args); x++ {

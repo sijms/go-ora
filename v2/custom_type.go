@@ -8,11 +8,15 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"time"
 )
 
 type customType struct {
+	owner    string
+	name     string
 	attribs  []ParameterInfo
 	typ      reflect.Type
+	toid     []byte // type oid
 	filedMap map[string]int
 }
 
@@ -46,7 +50,16 @@ func (conn *Connection) RegisterTypeWithOwner(owner, typeName string, typeObj in
 	if typ.Kind() != reflect.Struct {
 		return errors.New("type object should be of structure type")
 	}
-	cust := customType{typ: typ, filedMap: map[string]int{}}
+	cust := customType{
+		owner:    owner,
+		name:     typeName,
+		typ:      typ,
+		filedMap: map[string]int{},
+	}
+	err := cust.getTOID(conn)
+	if err != nil {
+		return err
+	}
 	sqlText := `SELECT ATTR_NAME, ATTR_TYPE_NAME, LENGTH, ATTR_NO 
 FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 	stmt := NewStmt(sqlText, conn)
@@ -85,11 +98,11 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 			length = 0
 		} else {
 			if length, ok = values[2].(int64); !ok {
-				return errors.New(fmt.Sprint("error reading attribute properties for type: ", typeName))
+				return fmt.Errorf("error reading attribute properties for type: %s", typeName)
 			}
 		}
 		if attOrder, ok = values[3].(int64); !ok {
-			return errors.New(fmt.Sprint("error reading attribute properties for type: ", typeName))
+			return fmt.Errorf("error reading attribute properties for type: %s", typeName)
 		}
 		for int(attOrder) > len(cust.attribs) {
 			cust.attribs = append(cust.attribs, ParameterInfo{
@@ -135,11 +148,11 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 			param.MaxCharLen = 0
 			param.CharsetForm = 0
 		default:
-			return errors.New(fmt.Sprint("unsupported attribute type: ", attTypeName))
+			return fmt.Errorf("unsupported attribute type: %s", attTypeName)
 		}
 	}
 	if len(cust.attribs) == 0 {
-		return errors.New(fmt.Sprint("unknown or empty type: ", typeName))
+		return fmt.Errorf("unknown or empty type: %s", typeName)
 	}
 	cust.loadFieldMap()
 	conn.cusTyp[strings.ToUpper(typeName)] = cust
@@ -289,6 +302,30 @@ END;`
 	return nil
 }
 
+func (cust *customType) getTOID(conn *Connection) error {
+	sqlText := `SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
+	stmt := NewStmt(sqlText, conn)
+	defer func(stmt *Stmt) {
+		_ = stmt.Close()
+	}(stmt)
+	stmt.AddParam("1", strings.ToUpper(cust.owner), 0, Input)
+	stmt.AddParam("2", strings.ToUpper(cust.name), 0, Input)
+	rows, err := stmt.Query_(nil)
+	if err != nil {
+		return err
+	}
+	if rows.Next_() {
+		err = rows.Scan(&cust.toid)
+		if err != nil {
+			return err
+		}
+	}
+	if len(cust.toid) == 0 {
+		return fmt.Errorf("unknown type: %s", cust.name)
+	}
+	return rows.Err()
+}
+
 // loadFieldMap read struct tag that supplied with golang type object passed in RegisterType
 // function
 func (cust *customType) loadFieldMap() {
@@ -325,8 +362,36 @@ func (cust *customType) getObject() interface{} {
 	obj := reflect.New(typ)
 	for _, attrib := range cust.attribs {
 		if fieldIndex, ok := cust.filedMap[attrib.Name]; ok {
-			obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(attrib.Value))
+			if attrib.Value != nil {
+				obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(attrib.Value))
+			}
 		}
 	}
 	return obj.Elem().Interface()
+}
+
+func (cust *customType) getFieldRepr(index int, input_value interface{}) ([]byte, error) {
+	attrib := cust.attribs[index]
+	//typ := reflect.TypeOf(val)
+	val := reflect.ValueOf(input_value)
+	typ := val.Type()
+	switch attrib.DataType {
+	case NUMBER:
+		switch typ.Kind() {
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			fallthrough
+		case reflect.Int, reflect.Int32, reflect.Int16, reflect.Int64, reflect.Int8:
+			return converters.EncodeInt64(reflect.ValueOf(val).Int()), nil
+		case reflect.Float32, reflect.Float64:
+			return converters.EncodeDouble(reflect.ValueOf(val).Float())
+		default:
+			return nil, fmt.Errorf("field %d require NUMBER data type", index)
+		}
+	case DATE:
+		if typ == reflect.TypeOf(time.Time{}) {
+			//return converters.EncodeDate(val.Interface())
+		}
+
+	}
+	return nil, nil
 }

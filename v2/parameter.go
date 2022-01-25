@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"database/sql/driver"
+	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
 	"math"
 	"strings"
@@ -27,6 +28,11 @@ const (
 	InOut  ParameterDirection = 3
 	RetVal ParameterDirection = 9
 )
+
+type Out struct {
+	Dest driver.Value
+	Size int
+}
 
 //internal enum BindDirection
 //{
@@ -303,4 +309,96 @@ func (par *ParameterInfo) write(session *network.Session) error {
 		session.PutInt(par.oaccollid, 4, true, true)
 	}
 	return nil
+}
+
+func (par *ParameterInfo) setForInt(value int64) {
+	par.setForNumber()
+	par.BValue = converters.EncodeInt64(value)
+}
+func (par *ParameterInfo) setForFloat(value float64) error {
+	par.setForNumber()
+	var err error
+	par.BValue, err = converters.EncodeDouble(value)
+	return err
+}
+func (par *ParameterInfo) setForNumber() {
+	par.DataType = NUMBER
+	par.ContFlag = 0
+	par.MaxCharLen = 0
+	par.MaxLen = 22
+	par.CharsetForm = 0
+	par.CharsetID = 0
+}
+func (par *ParameterInfo) setForString(value string, converter converters.IStringConverter, size int) {
+	par.DataType = NCHAR
+	par.ContFlag = 16
+	par.MaxCharLen = len([]rune(value))
+	if len(value) == 0 {
+		par.BValue = nil
+	} else {
+		tempCharset := converter.GetLangID()
+		converter.SetLangID(par.CharsetID)
+		par.BValue = converter.Encode(value)
+		converter.SetLangID(tempCharset)
+	}
+	if size > len(value) {
+		par.MaxCharLen = size
+	}
+	if par.Direction == Input {
+		if par.BValue == nil {
+			par.MaxLen = 1
+		} else {
+			par.MaxLen = len(par.BValue)
+		}
+	} else {
+		par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(par.CharsetID)
+	}
+}
+
+func (par *ParameterInfo) setForTime(value time.Time) {
+	par.DataType = DATE
+	par.ContFlag = 0
+	par.MaxLen = 11
+	par.BValue = converters.EncodeDate(value)
+	par.CharsetID = 0
+	par.CharsetForm = 0
+	//par.MaxCharLen = 11
+}
+func (par *ParameterInfo) setForRaw(value []byte, size int) {
+	par.BValue = value
+	par.DataType = RAW
+	par.MaxLen = len(value)
+	if size > par.MaxLen {
+		par.MaxLen = size
+	}
+	par.ContFlag = 0
+	par.MaxCharLen = 0
+	par.CharsetForm = 0
+	par.CharsetID = 0
+}
+
+func (par *ParameterInfo) setForRefCursor() {
+	par.BValue = nil
+	par.MaxCharLen = 0
+	par.MaxLen = 1
+	par.DataType = REFCURSOR
+	par.ContFlag = 0
+	par.CharsetForm = 0
+}
+
+func (par *ParameterInfo) setForUDT() {
+	par.Version = 1
+	par.DataType = XMLType
+	par.CharsetID = 0
+	par.CharsetForm = 0
+	par.MaxLen = 2000
+}
+
+func (par *ParameterInfo) setForNull() {
+	par.DataType = NCHAR
+	par.BValue = nil
+	par.ContFlag = 0
+	par.MaxCharLen = 0
+	par.MaxLen = 1
+	par.CharsetForm = 1
 }

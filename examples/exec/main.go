@@ -84,5 +84,5 @@ func main() {
 		return
 	}
 	rowsAffected, _ := result.RowsAffected()
-	fmt.Println("Rows affected: ", rowsAffected)
+	fmt.Println("rows affected: ", rowsAffected)
 }

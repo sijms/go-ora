@@ -310,23 +310,15 @@ func (stmt *Stmt) writePars(session *network.Session) error {
 					session.PutBytes(1, 0)
 				} else {
 					if par.cusType != nil {
-						//var sizeBuffer bytes.Buffer
 						size := len(par.BValue) + 7
-						//session.WriteUint(&sizeBuffer, size, 4, true, true)
 						session.PutBytes(0, 0, 0, 0)
-						//sizeBytes := sizeBuffer.Bytes()
 						session.PutUint(size, 4, true, true)
-						//session.PutBytes(sizeBytes...)
 						session.PutBytes(1, 1)
 						tempBuffer := bytes.Buffer{}
 						tempBuffer.Write([]byte{0x84, 0x1, 0xfe})
 						session.WriteUint(&tempBuffer, size, 4, true, false)
 						tempBuffer.Write(par.BValue)
 						session.PutClr(tempBuffer.Bytes())
-
-						//session.PutBytes(0x84, 0x1, 0xfe)
-						//session.PutUint(size, 4, true, false)
-						//session.PutBytes(par.BValue...)
 					} else {
 						session.PutClr(par.BValue)
 					}
@@ -566,10 +558,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 							}
 						} else {
 							if stmt.Pars[x].Direction != Input {
-								//stmt.Pars[x].BValue, err = session.GetClr()
-								//if err != nil {
-								//	return err
-								//}
 								err = stmt.calculateParameterValue(&stmt.Pars[x])
 								if err != nil {
 									return err
@@ -1207,7 +1195,12 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 			}
 		}
 		_ = session.LoadState()
-		param.Value = param.cusType.getObject()
+		paramValue := reflect.ValueOf(param.Value)
+		if paramValue.Kind() == reflect.Ptr {
+			paramValue.Elem().Set(reflect.ValueOf(param.cusType.getObject()))
+		} else {
+			param.Value = param.cusType.getObject()
+		}
 		return nil
 	}
 	param.BValue, err = session.GetClr()

@@ -58,6 +58,39 @@ func insertData(conn *go_ora.Connection) error {
 	return nil
 }
 
+func outputPar(conn *go_ora.Connection) error {
+	t := time.Now()
+	sqlText := `BEGIN 
+SELECT VISIT_ID, TEST_TYPE INTO :1, :2 FROM GOORA_TEMP_VISIT WHERE VISIT_ID = 1;
+END;`
+	stmt := go_ora.NewStmt(sqlText, conn)
+	defer func() {
+		err := stmt.Close()
+		if err != nil {
+			fmt.Println("Can't close stmt: ", err)
+		}
+	}()
+	var (
+		visitId int64
+		test    test1
+	)
+	err := stmt.AddParam("1", &visitId, 0, go_ora.Output)
+	if err != nil {
+		return err
+	}
+	err = stmt.AddParam("2", &test, 0, go_ora.Output)
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(nil)
+	if err != nil {
+		return err
+	}
+	fmt.Println("ID: ", visitId)
+	fmt.Println("Test: ", test)
+	fmt.Println("Finish query output par: ", time.Now().Sub(t))
+	return nil
+}
 func queryData(conn *go_ora.Connection) error {
 	t := time.Now()
 	stmt := go_ora.NewStmt("SELECT VISIT_ID, TEST_TYPE FROM GOORA_TEMP_VISIT", conn)
@@ -225,6 +258,11 @@ func main() {
 	err = queryData(conn)
 	if err != nil {
 		fmt.Println("Can't query data: ", err)
+		return
+	}
+	err = outputPar(conn)
+	if err != nil {
+		fmt.Println("Can't query output par: ", err)
 		return
 	}
 

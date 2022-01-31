@@ -7,11 +7,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"reflect"
-	"time"
-
-	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
+	"reflect"
 
 	//charmap "golang.org/x/text/encoding/charmap"
 	"regexp"
@@ -1109,28 +1106,8 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 // get values of rows and output parameter according to DataType and binary value (bValue)
 func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	session := stmt.connection.session
-	var err error
-	if param.DataType == ROWID {
-		rowid, err := newRowID(session)
-		if err != nil {
-			return err
-		}
-		if rowid == nil {
-			param.Value = nil
-		} else {
-			param.Value = string(rowid.getBytes())
-		}
-		return nil
-	}
-	if (param.DataType == NCHAR || param.DataType == CHAR) && param.MaxCharLen == 0 {
-		param.BValue = nil
-		param.Value = nil
-		return nil
-	}
-	if param.DataType == RAW && param.MaxLen == 0 {
-		param.BValue = nil
-		param.Value = nil
-		return nil
+	if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator {
+		stmt._hasBLOB = true
 	}
 	if param.DataType == XMLType {
 		if param.TypeName == "XMLTYPE" {
@@ -1139,21 +1116,18 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		if param.cusType == nil {
 			return fmt.Errorf("unregister custom type: %s. call RegisterType first", param.TypeName)
 		}
-		_, err = session.GetDlc() // contian toid and some 0s
+		_, err := session.GetDlc() // contian toid and some 0s
 		if err != nil {
 			return err
 		}
-		//fmt.Println(bty)
 		_, err = session.GetBytes(3) // 3 0s
 		if err != nil {
 			return err
 		}
-		//fmt.Println(bty)
 		_, err = session.GetInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		//fmt.Println("Num1: ", num1)
 		_, err = session.GetByte()
 		if err != nil {
 			return err
@@ -1168,26 +1142,20 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		}
 		newState := network.SessionState{InBuffer: tempBytes}
 		session.SaveState(&newState)
-		//fmt.Println(bty)
 		_, err = session.GetByte()
 		if err != nil {
 			return err
 		}
-		//ctl, err := session.ReadInt(&buffer, 4, true, true)
-		//fmt.Println(num2)
 		ctl, err := session.GetInt(4, true, true)
 		if err != nil {
 			return err
 		}
 		if ctl == 0xFE {
-			//_, err = session.ReadInt(&buffer, 4, false, true)
 			_, err = session.GetInt(4, false, true)
 			if err != nil {
 				return err
 			}
 		}
-		//return errors.New("interrupt")
-		//fmt.Println(num3)
 		for x := 0; x < len(param.cusType.attribs); x++ {
 			err = stmt.calculateParameterValue(&param.cusType.attribs[x])
 			if err != nil {
@@ -1203,104 +1171,135 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		}
 		return nil
 	}
+
+	//var tempVal driver.Value
+	//if param.DataType == ROWID {
+	//	rowid, err := newRowID(session)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	if rowid == nil {
+	//		param.Value = nil
+	//	} else {
+	//		param.Value = string(rowid.getBytes())
+	//	}
+	//	return nil
+	//}
+	if (param.DataType == NCHAR || param.DataType == CHAR) && param.MaxCharLen == 0 {
+		param.BValue = nil
+		//return param.setValue(nil)
+		//param.Value = nil
+		//return nil
+	}
+	if param.DataType == RAW && param.MaxLen == 0 {
+		param.BValue = nil
+		//return param.setValue(nil)
+		//param.Value = nil
+		//return nil
+	}
+	var err error
 	param.BValue, err = session.GetClr()
 	if err != nil {
 		return err
 	}
-	// not correct as param.Value sometimes contain a pointer to data
-	// thus you need to set nil to the value of the pointer.
+	return param.decodeValue(stmt.connection)
 	//if param.BValue == nil {
-	//	param.Value = nil
-	//	return nil
+	//	switch param.DataType {
+	//	case OCIClobLocator:
+	//		tempVal = Clob{locator: nil}
+	//	case OCIBlobLocator:
+	//		tempVal = Blob{locator: nil}
+	//	default:
+	//		tempVal = nil
+	//	}
+	//} else {
+	//	switch param.DataType {
+	//	case ROWID:
+	//		rowid, err := newRowID(session)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		if rowid == nil {
+	//			tempVal = nil
+	//		} else {
+	//			tempVal = string(rowid.getBytes())
+	//		}
+	//	case NCHAR, CHAR, LONG:
+	//		if stmt.connection.strConv.GetLangID() != param.CharsetID {
+	//			tempCharset := stmt.connection.strConv.GetLangID()
+	//			stmt.connection.strConv.SetLangID(param.CharsetID)
+	//			tempVal = stmt.connection.strConv.Decode(param.BValue)
+	//			stmt.connection.strConv.SetLangID(tempCharset)
+	//		} else {
+	//			tempVal = stmt.connection.strConv.Decode(param.BValue)
+	//		}
+	//	case NUMBER:
+	//		tempVal = converters.DecodeNumber(param.BValue)
+	//		//if int8(param.Scale) < 0 {
+	//		//	tempVal = converters.DecodeNumber(param.BValue)
+	//		//} else if param.Scale == 0 {
+	//		//	tempVal = converters.DecodeInt(param.BValue)
+	//		//} else {
+	//		//	tempVal = converters.DecodeDouble(param.BValue)
+	//		//}
+	//		//tempVal = converters.DecodeNumber(param.BValue)
+	//	case TIMESTAMP:
+	//		dateVal, err := converters.DecodeDate(param.BValue)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		tempVal = TimeStamp(dateVal)
+	//	case TimeStampDTY:
+	//		fallthrough
+	//	case TimeStampeLTZ:
+	//		fallthrough
+	//	case TimeStampLTZ_DTY:
+	//		fallthrough
+	//	case TimeStampTZ:
+	//		fallthrough
+	//	case TimeStampTZ_DTY:
+	//		fallthrough
+	//	case DATE:
+	//		dateVal, err := converters.DecodeDate(param.BValue)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		tempVal = dateVal
+	//	case OCIBlobLocator, OCIClobLocator:
+	//		locator, err := session.GetClr()
+	//		stmt._hasBLOB = true
+	//		if err != nil {
+	//			return err
+	//		}
+	//		if param.DataType == OCIClobLocator {
+	//			tempVal = Clob{locator: locator}
+	//		} else {
+	//			tempVal = Blob{locator: locator}
+	//		}
+	//	case IBFloat:
+	//		tempVal = converters.ConvertBinaryFloat(param.BValue)
+	//	case IBDouble:
+	//		tempVal = converters.ConvertBinaryDouble(param.BValue)
+	//	case IntervalYM_DTY:
+	//		tempVal = converters.ConvertIntervalYM_DTY(param.BValue)
+	//	case IntervalDS_DTY:
+	//		tempVal = converters.ConvertIntervalDS_DTY(param.BValue)
+	//	default:
+	//		tempVal = param.BValue
+	//	}
 	//}
-
-	var tempVal driver.Value
-	if param.BValue == nil {
-		switch param.DataType {
-		case OCIClobLocator:
-			tempVal = Clob{locator: nil}
-		case OCIBlobLocator:
-			tempVal = Blob{locator: nil}
-		default:
-			tempVal = nil
-		}
-	} else {
-		switch param.DataType {
-		case NCHAR, CHAR, LONG:
-			if stmt.connection.strConv.GetLangID() != param.CharsetID {
-				tempCharset := stmt.connection.strConv.GetLangID()
-				stmt.connection.strConv.SetLangID(param.CharsetID)
-				tempVal = stmt.connection.strConv.Decode(param.BValue)
-				stmt.connection.strConv.SetLangID(tempCharset)
-			} else {
-				tempVal = stmt.connection.strConv.Decode(param.BValue)
-			}
-		case NUMBER:
-			tempVal = converters.DecodeNumber(param.BValue)
-			//if int8(param.Scale) < 0 {
-			//	tempVal = converters.DecodeNumber(param.BValue)
-			//} else if param.Scale == 0 {
-			//	tempVal = converters.DecodeInt(param.BValue)
-			//} else {
-			//	tempVal = converters.DecodeDouble(param.BValue)
-			//}
-			//tempVal = converters.DecodeNumber(param.BValue)
-		case TIMESTAMP:
-			dateVal, err := converters.DecodeDate(param.BValue)
-			if err != nil {
-				return err
-			}
-			tempVal = TimeStamp(dateVal)
-		case TimeStampDTY:
-			fallthrough
-		case TimeStampeLTZ:
-			fallthrough
-		case TimeStampLTZ_DTY:
-			fallthrough
-		case TimeStampTZ:
-			fallthrough
-		case TimeStampTZ_DTY:
-			fallthrough
-		case DATE:
-			dateVal, err := converters.DecodeDate(param.BValue)
-			if err != nil {
-				return err
-			}
-			tempVal = dateVal
-		case OCIBlobLocator, OCIClobLocator:
-			locator, err := session.GetClr()
-			stmt._hasBLOB = true
-			if err != nil {
-				return err
-			}
-			if param.DataType == OCIClobLocator {
-				tempVal = Clob{locator: locator}
-			} else {
-				tempVal = Blob{locator: locator}
-			}
-		case IBFloat:
-			tempVal = converters.ConvertBinaryFloat(param.BValue)
-		case IBDouble:
-			tempVal = converters.ConvertBinaryDouble(param.BValue)
-		case IntervalYM_DTY:
-			tempVal = converters.ConvertIntervalYM_DTY(param.BValue)
-		case IntervalDS_DTY:
-			tempVal = converters.ConvertIntervalDS_DTY(param.BValue)
-		default:
-			tempVal = param.BValue
-		}
-	}
-	if param.Value != nil {
-		typ := reflect.TypeOf(param.Value)
-		if typ.Kind() == reflect.Ptr {
-			reflect.ValueOf(param.Value).Elem().Set(reflect.ValueOf(tempVal))
-		} else {
-			param.Value = tempVal
-		}
-	} else {
-		param.Value = tempVal
-	}
-	return nil
+	//return param.setValue(tempVal)
+	//if param.Value != nil {
+	//	typ := reflect.TypeOf(param.Value)
+	//	if typ.Kind() == reflect.Ptr {
+	//		reflect.ValueOf(param.Value).Elem().Set(reflect.ValueOf(tempVal))
+	//	} else {
+	//		param.Value = tempVal
+	//	}
+	//} else {
+	//	param.Value = tempVal
+	//}
+	//return nil
 }
 
 // Close close stmt cursor in the server
@@ -1391,451 +1390,528 @@ func (stmt *Stmt) CheckNamedValue(named *driver.NamedValue) error {
 	return nil
 }
 
-// NewParam return new parameter according to input data
-//
-// note: DataType is defined from value enter in 2nd arg [val]
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) (*ParameterInfo, error) {
-	//parType := reflect.TypeOf(val)
-	//if parType.Kind() == reflect.Struct {
-	//	param := ParameterInfo{
-	//		Name:      name,
-	//		Flag:      3,
-	//		Version:   1,
-	//		Direction: direction,
-	//		DataType:  XMLType,
-	//		TypeName:  "TEST_TYPE1",
-	//		MaxLen:    2000,
-	//		Value:     val,
-	//	}
-	//	for typName, cusTyp := range stmt.connection.cusTyp {
-	//		if typName == param.TypeName {
-	//			param.cusType = &cusTyp
-	//			param.ToID = cusTyp.toid
-	//		}
-	//	}
-	//	if param.cusType == nil {
-	//		return nil, errors.New("struct parameters type only allowed with user defined type (UDT)")
-	//	}
-	//	return param, nil
-	//} else if parType.Kind() == reflect.Ptr {
-	//
-	//}
 	param := &ParameterInfo{
 		Name:        name,
-		Value:       val,
 		Direction:   direction,
 		Flag:        3,
 		CharsetID:   stmt.connection.tcpNego.ServerCharset,
 		CharsetForm: 1,
 	}
-	if val == nil {
-		param.setForNull()
-		return param, nil
+	err := param.encodeValue(val, size, stmt.connection)
+	if err != nil {
+		return nil, err
 	}
-	typ := reflect.TypeOf(val)
-	var value reflect.Value
-	if typ.Kind() == reflect.Ptr {
-		value = reflect.ValueOf(val).Elem()
-	} else {
-		value = reflect.ValueOf(val)
-	}
-	switch val := value.Interface().(type) {
-	case time.Time:
-		param.setForTime(val)
-	case TimeStamp:
-		param.setForTime(time.Time(val))
-		param.DataType = TIMESTAMP
-	case NVarChar:
-		param.CharsetForm = 2
-		param.CharsetID = stmt.connection.tcpNego.ServernCharset
-		param.setForString(string(val), stmt.connection.strConv, size)
-	case Clob:
-		param.setForString(val.String, stmt.connection.strConv, size)
-		if param.Direction == Output {
-			param.DataType = OCIClobLocator
-		}
-	case Blob:
-		param.setForRaw(val.Data, size)
-		if param.Direction == Output {
-			param.DataType = OCIBlobLocator
-		}
-	case []byte:
-		param.setForRaw(val, size)
-	case RefCursor:
-		param.setForRefCursor()
-	default:
-		switch value.Kind() {
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			param.setForInt(value.Int())
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			param.setForInt(int64(value.Uint()))
-		case reflect.Float32, reflect.Float64:
-			err := param.setForFloat(value.Float())
-			if err != nil {
-				return nil, err
-			}
-		case reflect.String:
-			param.setForString(value.String(), stmt.connection.strConv, size)
-		case reflect.Struct:
-			param.setForUDT()
-			for _, cusTyp := range stmt.connection.cusTyp {
-				if value.Type() == cusTyp.typ {
-					param.cusType = &cusTyp
-					param.ToID = cusTyp.toid
-				}
-			}
-			if param.cusType == nil {
-				return nil, errors.New("struct parameters only allowed with user defined type (UDT)")
-			}
-			var objectBuffer bytes.Buffer
-			for _, attrib := range param.cusType.attribs {
-				if fieldIndex, ok := param.cusType.filedMap[attrib.Name]; ok {
-					tempPar, err := stmt.NewParam("", value.Field(fieldIndex).Interface(), 0, direction)
-					if err != nil {
-						return nil, err
-					}
-					stmt.connection.session.WriteClr(&objectBuffer, tempPar.BValue)
-				}
-			}
-			param.BValue = objectBuffer.Bytes()
-			// bypassing set BValue to nil if direction = output
-			return param, nil
-		default:
-			return nil, errors.New("unsupported parameter type")
-		}
-	}
-
-	//switch val := val.(type) {
-	//case *RefCursor:
-	//	param.DataType = NCHAR
-	//	param.BValue = nil
-	//	param.MaxCharLen = 0
-	//	param.MaxLen = 1
-	//	param.Value = val
-	//	param.DataType = REFCURSOR
-	//	param.ContFlag = 0
-	//	param.CharsetForm = 0
-	//case RefCursor:
-	//	param.DataType = NCHAR
-	//	param.BValue = nil
-	//	param.MaxCharLen = 0
-	//	param.MaxLen = 1
-	//	param.Value = val
-	//	param.DataType = REFCURSOR
-	//	param.ContFlag = 0
-	//	param.CharsetForm = 0
-	//case *int64:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt64(*val)
-	//	param.DataType = NUMBER
-	//case *int32:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt(int(*val))
-	//	param.DataType = NUMBER
-	//case *int16:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt(int(*val))
-	//	param.DataType = NUMBER
-	//case *int8:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt(int(*val))
-	//	param.DataType = NUMBER
-	//case *int:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt(*val)
-	//	param.DataType = NUMBER
-	//case *uint:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt(int(*val))
-	//	param.DataType = NUMBER
-	//case *uint8:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt(int(*val))
-	//	param.DataType = NUMBER
-	//case *uint16:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt(int(*val))
-	//	param.DataType = NUMBER
-	//case *uint32:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt(int(*val))
-	//	param.DataType = NUMBER
-	//case *uint64:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeInt(int(*val))
-	//	param.DataType = NUMBER
-	//case *float32:
-	//	param.Value = val
-	//	param.BValue, _ = converters.EncodeDouble(float64(*val))
-	//	param.DataType = NUMBER
-	//case *float64:
-	//	param.Value = val
-	//	param.BValue, _ = converters.EncodeDouble(*val)
-	//	param.DataType = NUMBER
-	//case *time.Time:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeDate(*val)
-	//	param.DataType = DATE
-	//	param.ContFlag = 0
-	//	param.MaxLen = 11
-	//	param.MaxCharLen = 11
-	//case *TimeStamp:
-	//	param.Value = val
-	//	param.BValue = converters.EncodeDate(time.Time(*val))
-	//	param.DataType = TIMESTAMP
-	//	param.ContFlag = 0
-	//	param.MaxLen = 11
-	//	param.MaxCharLen = 11
-	//case Clob:
-	//	param.ContFlag = 16
-	//	param.MaxCharLen = len([]rune(val.String))
-	//	param.CharsetForm = 1
-	//	if size > param.MaxCharLen {
-	//		param.MaxCharLen = size
-	//	}
-	//	if direction == Input {
-	//		param.Value = val.String
-	//		param.DataType = NCHAR
-	//		if val.String == "" {
-	//			param.BValue = nil
-	//			param.MaxLen = 1
-	//		} else {
-	//			tempCharset := stmt.connection.strConv.GetLangID()
-	//			stmt.connection.strConv.SetLangID(param.CharsetID)
-	//			param.BValue = stmt.connection.strConv.Encode(val.String)
-	//			stmt.connection.strConv.SetLangID(tempCharset)
-	//		}
-	//		param.MaxLen = len(param.BValue)
-	//	} else {
-	//		param.Value = val
-	//		param.DataType = OCIClobLocator
-	//		param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-	//	}
-	//case *Clob:
-	//	param.ContFlag = 16
-	//	param.MaxCharLen = len([]rune(val.String))
-	//	param.CharsetForm = 1
-	//	if size > param.MaxCharLen {
-	//		param.MaxCharLen = size
-	//	}
-	//	if direction == Input {
-	//		param.Value = val.String
-	//		param.DataType = NCHAR
-	//		if val.String == "" {
-	//			param.BValue = nil
-	//			param.MaxLen = 1
-	//		} else {
-	//			tempCharset := stmt.connection.strConv.GetLangID()
-	//			stmt.connection.strConv.SetLangID(param.CharsetID)
-	//			param.BValue = stmt.connection.strConv.Encode(val.String)
-	//			stmt.connection.strConv.SetLangID(tempCharset)
-	//		}
-	//		param.MaxLen = len(param.BValue)
-	//	} else {
-	//		param.Value = val
-	//		param.DataType = OCIClobLocator
-	//		param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-	//	}
-	//case *NVarChar:
-	//	param.Value = val
-	//	param.DataType = NCHAR
-	//	param.CharsetID = stmt.connection.tcpNego.ServernCharset
-	//	param.ContFlag = 16
-	//	param.MaxCharLen = len(*val)
-	//	param.CharsetForm = 2
-	//	if len(*val) == 0 && direction == Input {
-	//		param.BValue = nil
-	//		param.MaxLen = 1
-	//	} else {
-	//		tempCharset := stmt.connection.strConv.GetLangID()
-	//		stmt.connection.strConv.SetLangID(param.CharsetID)
-	//		param.BValue = stmt.connection.strConv.Encode(string(*val))
-	//		stmt.connection.strConv.SetLangID(tempCharset)
-	//		if size > len(*val) {
-	//			param.MaxCharLen = size
-	//		}
-	//		if direction == Input {
-	//			param.MaxLen = len(param.BValue)
-	//		} else {
-	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-	//		}
-	//
-	//	}
-	//case *string:
-	//	param.Value = val
-	//	param.DataType = NCHAR
-	//	param.ContFlag = 16
-	//	param.MaxCharLen = len([]rune(*val))
-	//	param.CharsetForm = 1
-	//	if *val == "" && direction == Input {
-	//		param.BValue = nil
-	//		param.MaxLen = 1
-	//	} else {
-	//		tempCharset := stmt.connection.strConv.GetLangID()
-	//		stmt.connection.strConv.SetLangID(param.CharsetID)
-	//		param.BValue = stmt.connection.strConv.Encode(*val)
-	//		stmt.connection.strConv.SetLangID(tempCharset)
-	//		if size > len(*val) {
-	//			param.MaxCharLen = size
-	//		}
-	//		if direction == Input {
-	//			param.MaxLen = len(param.BValue)
-	//		} else {
-	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-	//		}
-	//	}
-	//case Blob:
-	//	param.ContFlag = 0
-	//	param.MaxCharLen = 0
-	//	param.CharsetForm = 0
-	//	param.MaxLen = len(val.Data)
-	//	if size > param.MaxLen {
-	//		param.MaxLen = size
-	//	}
-	//	if direction == Input {
-	//		param.Value = val.Data
-	//		param.BValue = val.Data
-	//		param.DataType = RAW
-	//	} else {
-	//		param.Value = val
-	//		param.DataType = OCIBlobLocator
-	//	}
-	//case *Blob:
-	//	param.ContFlag = 0
-	//	param.MaxCharLen = 0
-	//	param.CharsetForm = 0
-	//	param.MaxLen = len(val.Data)
-	//	if size > param.MaxLen {
-	//		param.MaxLen = size
-	//	}
-	//	if direction == Input {
-	//		param.Value = val.Data
-	//		param.BValue = val.Data
-	//		param.DataType = RAW
-	//	} else {
-	//		param.Value = val
-	//		param.DataType = OCIBlobLocator
-	//	}
-	//case *[]byte:
-	//	param.Value = val
-	//	param.BValue = *val
-	//	param.DataType = RAW
-	//	param.MaxLen = len(*val)
-	//	param.ContFlag = 0
-	//	param.MaxCharLen = 0
-	//	param.CharsetForm = 0
-	//case int64:
-	//	param.BValue = converters.EncodeInt64(val)
-	//	param.DataType = NUMBER
-	//case int32:
-	//	param.BValue = converters.EncodeInt(int(val))
-	//	param.DataType = NUMBER
-	//case int16:
-	//	param.BValue = converters.EncodeInt(int(val))
-	//	param.DataType = NUMBER
-	//case int8:
-	//	param.BValue = converters.EncodeInt(int(val))
-	//	param.DataType = NUMBER
-	//case int:
-	//	param.BValue = converters.EncodeInt(val)
-	//	param.DataType = NUMBER
-	//case uint:
-	//	param.BValue = converters.EncodeInt(int(val))
-	//	param.DataType = NUMBER
-	//case uint8:
-	//	param.BValue = converters.EncodeInt(int(val))
-	//	param.DataType = NUMBER
-	//case uint16:
-	//	param.BValue = converters.EncodeInt(int(val))
-	//	param.DataType = NUMBER
-	//case uint32:
-	//	param.BValue = converters.EncodeInt(int(val))
-	//	param.DataType = NUMBER
-	//case uint64:
-	//	param.BValue = converters.EncodeInt64(int64(val))
-	//	param.DataType = NUMBER
-	//case float32:
-	//	param.BValue, _ = converters.EncodeDouble(float64(val))
-	//	param.DataType = NUMBER
-	//case float64:
-	//	param.BValue, _ = converters.EncodeDouble(val)
-	//	param.DataType = NUMBER
-	//case time.Time:
-	//	param.BValue = converters.EncodeDate(val)
-	//	param.DataType = DATE
-	//	param.ContFlag = 0
-	//	param.MaxLen = 11
-	//	param.MaxCharLen = 11
-	//case TimeStamp:
-	//	param.BValue = converters.EncodeDate(time.Time(val))
-	//	param.DataType = TIMESTAMP
-	//	param.ContFlag = 0
-	//	param.MaxLen = 11
-	//	param.MaxCharLen = 11
-	//case NVarChar:
-	//	param.DataType = NCHAR
-	//	param.CharsetID = stmt.connection.tcpNego.ServernCharset
-	//	param.ContFlag = 16
-	//	param.MaxCharLen = len(val)
-	//	param.CharsetForm = 2
-	//	if len(val) == 0 && direction == Input {
-	//		param.BValue = nil
-	//		param.MaxLen = 1
-	//	} else {
-	//		tempCharset := stmt.connection.strConv.GetLangID()
-	//		stmt.connection.strConv.SetLangID(param.CharsetID)
-	//		param.BValue = stmt.connection.strConv.Encode(string(val))
-	//		stmt.connection.strConv.SetLangID(tempCharset)
-	//		if size > len(val) {
-	//			param.MaxCharLen = size
-	//		}
-	//		if direction == Input {
-	//			param.MaxLen = len(param.BValue)
-	//		} else {
-	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-	//		}
-	//	}
-	//case string:
-	//	param.DataType = NCHAR
-	//	param.ContFlag = 16
-	//	param.MaxCharLen = len([]rune(val))
-	//	param.CharsetForm = 1
-	//	if val == "" && direction == Input {
-	//		param.BValue = nil
-	//		param.MaxLen = 1
-	//	} else {
-	//		tempCharset := stmt.connection.strConv.GetLangID()
-	//		stmt.connection.strConv.SetLangID(param.CharsetID)
-	//		param.BValue = stmt.connection.strConv.Encode(val)
-	//		stmt.connection.strConv.SetLangID(tempCharset)
-	//		if size > len(val) {
-	//			param.MaxCharLen = size
-	//		}
-	//		if direction == Input {
-	//			param.MaxLen = len(param.BValue)
-	//		} else {
-	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
-	//		}
-	//	}
-	//case []byte:
-	//	param.BValue = val
-	//	param.DataType = RAW
-	//	param.MaxLen = len(val)
-	//	param.ContFlag = 0
-	//	param.MaxCharLen = 0
-	//	param.CharsetForm = 0
-	//}
-	//if param.DataType == NUMBER {
-	//	param.ContFlag = 0
-	//	param.MaxCharLen = 0
-	//	param.MaxLen = 22
-	//	param.CharsetForm = 0
-	//}
-	if direction == Output {
+	if param.Direction == Output {
 		param.BValue = nil
 	}
-	return param, nil
+	return param, err
 }
+
+// NewParam return new parameter according to input data
+//
+// note: DataType is defined from value enter in 2nd arg [val]
+//func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) (*ParameterInfo, error) {
+//	//parType := reflect.TypeOf(val)
+//	//if parType.Kind() == reflect.Struct {
+//	//	param := ParameterInfo{
+//	//		Name:      name,
+//	//		Flag:      3,
+//	//		Version:   1,
+//	//		Direction: direction,
+//	//		DataType:  XMLType,
+//	//		TypeName:  "TEST_TYPE1",
+//	//		MaxLen:    2000,
+//	//		Value:     val,
+//	//	}
+//	//	for typName, cusTyp := range stmt.connection.cusTyp {
+//	//		if typName == param.TypeName {
+//	//			param.cusType = &cusTyp
+//	//			param.ToID = cusTyp.toid
+//	//		}
+//	//	}
+//	//	if param.cusType == nil {
+//	//		return nil, errors.New("struct parameters type only allowed with user defined type (UDT)")
+//	//	}
+//	//	return param, nil
+//	//} else if parType.Kind() == reflect.Ptr {
+//	//
+//	//}
+//	param := &ParameterInfo{
+//		Name:        name,
+//		Value:       val,
+//		Direction:   direction,
+//		Flag:        3,
+//		CharsetID:   stmt.connection.tcpNego.ServerCharset,
+//		CharsetForm: 1,
+//	}
+//	if val == nil {
+//		param.setForNull()
+//		return param, nil
+//	}
+//	typ := reflect.TypeOf(val)
+//	var value reflect.Value
+//	if typ.Kind() == reflect.Ptr {
+//		value = reflect.ValueOf(val).Elem()
+//	} else {
+//		value = reflect.ValueOf(val)
+//	}
+//	if !value.IsValid() {
+//		param.setForNull()
+//		return param, nil
+//	}
+//	switch val := value.Interface().(type) {
+//	case sql.NullString:
+//		if val.Valid {
+//			param.setForString(val.String, stmt.connection.strConv, size)
+//		} else {
+//			param.setForNull()
+//		}
+//	case sql.NullByte:
+//		if val.Valid {
+//			param.setForInt(int64(val.Byte))
+//		} else {
+//			param.setForNull()
+//		}
+//	case sql.NullInt16:
+//		if val.Valid {
+//			param.setForInt(int64(val.Int16))
+//		} else {
+//			param.setForNull()
+//		}
+//	case sql.NullInt32:
+//		if val.Valid {
+//			param.setForInt(int64(val.Int32))
+//		} else {
+//			param.setForNull()
+//		}
+//	case sql.NullInt64:
+//		if val.Valid {
+//			param.setForInt(val.Int64)
+//		} else {
+//			param.setForNull()
+//		}
+//	case sql.NullFloat64:
+//		if val.Valid {
+//			err := param.setForFloat(val.Float64)
+//			if err != nil {
+//				return nil, err
+//			}
+//		} else {
+//			param.setForNull()
+//		}
+//	case sql.NullTime:
+//		if val.Valid {
+//			param.setForTime(val.Time)
+//		} else {
+//			param.setForNull()
+//		}
+//	case sql.NullBool:
+//		if val.Valid {
+//			var tempVal int64 = 0
+//			if val.Bool {
+//				tempVal = 1
+//			}
+//			param.setForInt(tempVal)
+//		} else {
+//			param.setForNull()
+//		}
+//	case time.Time:
+//		param.setForTime(val)
+//	case TimeStamp:
+//		param.setForTime(time.Time(val))
+//		param.DataType = TIMESTAMP
+//	case NVarChar:
+//		param.CharsetForm = 2
+//		param.CharsetID = stmt.connection.tcpNego.ServernCharset
+//		param.setForString(string(val), stmt.connection.strConv, size)
+//	case Clob:
+//		param.setForString(val.String, stmt.connection.strConv, size)
+//		if param.Direction == Output {
+//			param.DataType = OCIClobLocator
+//		}
+//	case Blob:
+//		param.setForRaw(val.Data, size)
+//		if param.Direction == Output {
+//			param.DataType = OCIBlobLocator
+//		}
+//	case []byte:
+//		param.setForRaw(val, size)
+//	case RefCursor:
+//		param.setForRefCursor()
+//	default:
+//		switch value.Kind() {
+//		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+//			param.setForInt(value.Int())
+//		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+//			param.setForInt(int64(value.Uint()))
+//		case reflect.Float32, reflect.Float64:
+//			err := param.setForFloat(value.Float())
+//			if err != nil {
+//				return nil, err
+//			}
+//		case reflect.String:
+//			param.setForString(value.String(), stmt.connection.strConv, size)
+//		case reflect.Struct:
+//			param.setForUDT()
+//			for _, cusTyp := range stmt.connection.cusTyp {
+//				if value.Type() == cusTyp.typ {
+//					param.cusType = &cusTyp
+//					param.ToID = cusTyp.toid
+//				}
+//			}
+//			if param.cusType == nil {
+//				return nil, errors.New("struct parameters only allowed with user defined type (UDT)")
+//			}
+//			var objectBuffer bytes.Buffer
+//			for _, attrib := range param.cusType.attribs {
+//				if fieldIndex, ok := param.cusType.filedMap[attrib.Name]; ok {
+//					tempPar, err := stmt.NewParam("", value.Field(fieldIndex).Interface(), 0, direction)
+//					if err != nil {
+//						return nil, err
+//					}
+//					stmt.connection.session.WriteClr(&objectBuffer, tempPar.BValue)
+//				}
+//			}
+//			param.BValue = objectBuffer.Bytes()
+//			// bypassing set BValue to nil if direction = output
+//			return param, nil
+//		default:
+//			return nil, errors.New("unsupported parameter type")
+//		}
+//	}
+//
+//	//switch val := val.(type) {
+//	//case *RefCursor:
+//	//	param.DataType = NCHAR
+//	//	param.BValue = nil
+//	//	param.MaxCharLen = 0
+//	//	param.MaxLen = 1
+//	//	param.Value = val
+//	//	param.DataType = REFCURSOR
+//	//	param.ContFlag = 0
+//	//	param.CharsetForm = 0
+//	//case RefCursor:
+//	//	param.DataType = NCHAR
+//	//	param.BValue = nil
+//	//	param.MaxCharLen = 0
+//	//	param.MaxLen = 1
+//	//	param.Value = val
+//	//	param.DataType = REFCURSOR
+//	//	param.ContFlag = 0
+//	//	param.CharsetForm = 0
+//	//case *int64:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt64(*val)
+//	//	param.DataType = NUMBER
+//	//case *int32:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt(int(*val))
+//	//	param.DataType = NUMBER
+//	//case *int16:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt(int(*val))
+//	//	param.DataType = NUMBER
+//	//case *int8:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt(int(*val))
+//	//	param.DataType = NUMBER
+//	//case *int:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt(*val)
+//	//	param.DataType = NUMBER
+//	//case *uint:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt(int(*val))
+//	//	param.DataType = NUMBER
+//	//case *uint8:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt(int(*val))
+//	//	param.DataType = NUMBER
+//	//case *uint16:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt(int(*val))
+//	//	param.DataType = NUMBER
+//	//case *uint32:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt(int(*val))
+//	//	param.DataType = NUMBER
+//	//case *uint64:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeInt(int(*val))
+//	//	param.DataType = NUMBER
+//	//case *float32:
+//	//	param.Value = val
+//	//	param.BValue, _ = converters.EncodeDouble(float64(*val))
+//	//	param.DataType = NUMBER
+//	//case *float64:
+//	//	param.Value = val
+//	//	param.BValue, _ = converters.EncodeDouble(*val)
+//	//	param.DataType = NUMBER
+//	//case *time.Time:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeDate(*val)
+//	//	param.DataType = DATE
+//	//	param.ContFlag = 0
+//	//	param.MaxLen = 11
+//	//	param.MaxCharLen = 11
+//	//case *TimeStamp:
+//	//	param.Value = val
+//	//	param.BValue = converters.EncodeDate(time.Time(*val))
+//	//	param.DataType = TIMESTAMP
+//	//	param.ContFlag = 0
+//	//	param.MaxLen = 11
+//	//	param.MaxCharLen = 11
+//	//case Clob:
+//	//	param.ContFlag = 16
+//	//	param.MaxCharLen = len([]rune(val.String))
+//	//	param.CharsetForm = 1
+//	//	if size > param.MaxCharLen {
+//	//		param.MaxCharLen = size
+//	//	}
+//	//	if direction == Input {
+//	//		param.Value = val.String
+//	//		param.DataType = NCHAR
+//	//		if val.String == "" {
+//	//			param.BValue = nil
+//	//			param.MaxLen = 1
+//	//		} else {
+//	//			tempCharset := stmt.connection.strConv.GetLangID()
+//	//			stmt.connection.strConv.SetLangID(param.CharsetID)
+//	//			param.BValue = stmt.connection.strConv.Encode(val.String)
+//	//			stmt.connection.strConv.SetLangID(tempCharset)
+//	//		}
+//	//		param.MaxLen = len(param.BValue)
+//	//	} else {
+//	//		param.Value = val
+//	//		param.DataType = OCIClobLocator
+//	//		param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+//	//	}
+//	//case *Clob:
+//	//	param.ContFlag = 16
+//	//	param.MaxCharLen = len([]rune(val.String))
+//	//	param.CharsetForm = 1
+//	//	if size > param.MaxCharLen {
+//	//		param.MaxCharLen = size
+//	//	}
+//	//	if direction == Input {
+//	//		param.Value = val.String
+//	//		param.DataType = NCHAR
+//	//		if val.String == "" {
+//	//			param.BValue = nil
+//	//			param.MaxLen = 1
+//	//		} else {
+//	//			tempCharset := stmt.connection.strConv.GetLangID()
+//	//			stmt.connection.strConv.SetLangID(param.CharsetID)
+//	//			param.BValue = stmt.connection.strConv.Encode(val.String)
+//	//			stmt.connection.strConv.SetLangID(tempCharset)
+//	//		}
+//	//		param.MaxLen = len(param.BValue)
+//	//	} else {
+//	//		param.Value = val
+//	//		param.DataType = OCIClobLocator
+//	//		param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+//	//	}
+//	//case *NVarChar:
+//	//	param.Value = val
+//	//	param.DataType = NCHAR
+//	//	param.CharsetID = stmt.connection.tcpNego.ServernCharset
+//	//	param.ContFlag = 16
+//	//	param.MaxCharLen = len(*val)
+//	//	param.CharsetForm = 2
+//	//	if len(*val) == 0 && direction == Input {
+//	//		param.BValue = nil
+//	//		param.MaxLen = 1
+//	//	} else {
+//	//		tempCharset := stmt.connection.strConv.GetLangID()
+//	//		stmt.connection.strConv.SetLangID(param.CharsetID)
+//	//		param.BValue = stmt.connection.strConv.Encode(string(*val))
+//	//		stmt.connection.strConv.SetLangID(tempCharset)
+//	//		if size > len(*val) {
+//	//			param.MaxCharLen = size
+//	//		}
+//	//		if direction == Input {
+//	//			param.MaxLen = len(param.BValue)
+//	//		} else {
+//	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+//	//		}
+//	//
+//	//	}
+//	//case *string:
+//	//	param.Value = val
+//	//	param.DataType = NCHAR
+//	//	param.ContFlag = 16
+//	//	param.MaxCharLen = len([]rune(*val))
+//	//	param.CharsetForm = 1
+//	//	if *val == "" && direction == Input {
+//	//		param.BValue = nil
+//	//		param.MaxLen = 1
+//	//	} else {
+//	//		tempCharset := stmt.connection.strConv.GetLangID()
+//	//		stmt.connection.strConv.SetLangID(param.CharsetID)
+//	//		param.BValue = stmt.connection.strConv.Encode(*val)
+//	//		stmt.connection.strConv.SetLangID(tempCharset)
+//	//		if size > len(*val) {
+//	//			param.MaxCharLen = size
+//	//		}
+//	//		if direction == Input {
+//	//			param.MaxLen = len(param.BValue)
+//	//		} else {
+//	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+//	//		}
+//	//	}
+//	//case Blob:
+//	//	param.ContFlag = 0
+//	//	param.MaxCharLen = 0
+//	//	param.CharsetForm = 0
+//	//	param.MaxLen = len(val.Data)
+//	//	if size > param.MaxLen {
+//	//		param.MaxLen = size
+//	//	}
+//	//	if direction == Input {
+//	//		param.Value = val.Data
+//	//		param.BValue = val.Data
+//	//		param.DataType = RAW
+//	//	} else {
+//	//		param.Value = val
+//	//		param.DataType = OCIBlobLocator
+//	//	}
+//	//case *Blob:
+//	//	param.ContFlag = 0
+//	//	param.MaxCharLen = 0
+//	//	param.CharsetForm = 0
+//	//	param.MaxLen = len(val.Data)
+//	//	if size > param.MaxLen {
+//	//		param.MaxLen = size
+//	//	}
+//	//	if direction == Input {
+//	//		param.Value = val.Data
+//	//		param.BValue = val.Data
+//	//		param.DataType = RAW
+//	//	} else {
+//	//		param.Value = val
+//	//		param.DataType = OCIBlobLocator
+//	//	}
+//	//case *[]byte:
+//	//	param.Value = val
+//	//	param.BValue = *val
+//	//	param.DataType = RAW
+//	//	param.MaxLen = len(*val)
+//	//	param.ContFlag = 0
+//	//	param.MaxCharLen = 0
+//	//	param.CharsetForm = 0
+//	//case int64:
+//	//	param.BValue = converters.EncodeInt64(val)
+//	//	param.DataType = NUMBER
+//	//case int32:
+//	//	param.BValue = converters.EncodeInt(int(val))
+//	//	param.DataType = NUMBER
+//	//case int16:
+//	//	param.BValue = converters.EncodeInt(int(val))
+//	//	param.DataType = NUMBER
+//	//case int8:
+//	//	param.BValue = converters.EncodeInt(int(val))
+//	//	param.DataType = NUMBER
+//	//case int:
+//	//	param.BValue = converters.EncodeInt(val)
+//	//	param.DataType = NUMBER
+//	//case uint:
+//	//	param.BValue = converters.EncodeInt(int(val))
+//	//	param.DataType = NUMBER
+//	//case uint8:
+//	//	param.BValue = converters.EncodeInt(int(val))
+//	//	param.DataType = NUMBER
+//	//case uint16:
+//	//	param.BValue = converters.EncodeInt(int(val))
+//	//	param.DataType = NUMBER
+//	//case uint32:
+//	//	param.BValue = converters.EncodeInt(int(val))
+//	//	param.DataType = NUMBER
+//	//case uint64:
+//	//	param.BValue = converters.EncodeInt64(int64(val))
+//	//	param.DataType = NUMBER
+//	//case float32:
+//	//	param.BValue, _ = converters.EncodeDouble(float64(val))
+//	//	param.DataType = NUMBER
+//	//case float64:
+//	//	param.BValue, _ = converters.EncodeDouble(val)
+//	//	param.DataType = NUMBER
+//	//case time.Time:
+//	//	param.BValue = converters.EncodeDate(val)
+//	//	param.DataType = DATE
+//	//	param.ContFlag = 0
+//	//	param.MaxLen = 11
+//	//	param.MaxCharLen = 11
+//	//case TimeStamp:
+//	//	param.BValue = converters.EncodeDate(time.Time(val))
+//	//	param.DataType = TIMESTAMP
+//	//	param.ContFlag = 0
+//	//	param.MaxLen = 11
+//	//	param.MaxCharLen = 11
+//	//case NVarChar:
+//	//	param.DataType = NCHAR
+//	//	param.CharsetID = stmt.connection.tcpNego.ServernCharset
+//	//	param.ContFlag = 16
+//	//	param.MaxCharLen = len(val)
+//	//	param.CharsetForm = 2
+//	//	if len(val) == 0 && direction == Input {
+//	//		param.BValue = nil
+//	//		param.MaxLen = 1
+//	//	} else {
+//	//		tempCharset := stmt.connection.strConv.GetLangID()
+//	//		stmt.connection.strConv.SetLangID(param.CharsetID)
+//	//		param.BValue = stmt.connection.strConv.Encode(string(val))
+//	//		stmt.connection.strConv.SetLangID(tempCharset)
+//	//		if size > len(val) {
+//	//			param.MaxCharLen = size
+//	//		}
+//	//		if direction == Input {
+//	//			param.MaxLen = len(param.BValue)
+//	//		} else {
+//	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+//	//		}
+//	//	}
+//	//case string:
+//	//	param.DataType = NCHAR
+//	//	param.ContFlag = 16
+//	//	param.MaxCharLen = len([]rune(val))
+//	//	param.CharsetForm = 1
+//	//	if val == "" && direction == Input {
+//	//		param.BValue = nil
+//	//		param.MaxLen = 1
+//	//	} else {
+//	//		tempCharset := stmt.connection.strConv.GetLangID()
+//	//		stmt.connection.strConv.SetLangID(param.CharsetID)
+//	//		param.BValue = stmt.connection.strConv.Encode(val)
+//	//		stmt.connection.strConv.SetLangID(tempCharset)
+//	//		if size > len(val) {
+//	//			param.MaxCharLen = size
+//	//		}
+//	//		if direction == Input {
+//	//			param.MaxLen = len(param.BValue)
+//	//		} else {
+//	//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(param.CharsetID)
+//	//		}
+//	//	}
+//	//case []byte:
+//	//	param.BValue = val
+//	//	param.DataType = RAW
+//	//	param.MaxLen = len(val)
+//	//	param.ContFlag = 0
+//	//	param.MaxCharLen = 0
+//	//	param.CharsetForm = 0
+//	//}
+//	//if param.DataType == NUMBER {
+//	//	param.ContFlag = 0
+//	//	param.MaxCharLen = 0
+//	//	param.MaxLen = 22
+//	//	param.CharsetForm = 0
+//	//}
+//	if direction == Output {
+//		param.BValue = nil
+//	}
+//	return param, nil
+//}
 
 func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 	if pos >= 0 && pos < len(stmt.Pars) {

@@ -103,7 +103,7 @@ type ConnectionString struct {
 // convert special charters to corresponding values in URL
 func BuildUrl(server string, port int, service, user, password string, options map[string]string) string {
 	ret := fmt.Sprintf("oracle://%s:%s@%s:%d/%s", url.QueryEscape(user), url.QueryEscape(password),
-		url.QueryEscape(server), port, url.QueryEscape(service))
+		server, port, url.QueryEscape(service))
 	if options != nil {
 		ret += "?"
 		for key, val := range options {

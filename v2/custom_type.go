@@ -8,7 +8,6 @@ import (
 	"io"
 	"reflect"
 	"strings"
-	"time"
 )
 
 type customType struct {
@@ -66,8 +65,14 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 	defer func(stmt *Stmt) {
 		_ = stmt.Close()
 	}(stmt)
-	stmt.AddParam("1", strings.ToUpper(owner), 40, Input)
-	stmt.AddParam("2", strings.ToUpper(typeName), 40, Input)
+	err = stmt.AddParam("1", strings.ToUpper(owner), 40, Input)
+	if err != nil {
+		return err
+	}
+	err = stmt.AddParam("2", strings.ToUpper(typeName), 40, Input)
+	if err != nil {
+		return err
+	}
 	values := make([]driver.Value, 4)
 	rows, err := stmt.Query(nil)
 	if err != nil {
@@ -117,11 +122,7 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 		param.TypeName = attTypeName
 		switch strings.ToUpper(attTypeName) {
 		case "NUMBER":
-			param.DataType = NUMBER
-			param.ContFlag = 0
-			param.MaxCharLen = 0
-			param.MaxLen = 22
-			param.CharsetForm = 0
+			param.setForNumber()
 		case "VARCHAR2":
 			param.DataType = NCHAR
 			param.CharsetForm = 1
@@ -140,7 +141,7 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 			param.DataType = DATE
 			param.ContFlag = 0
 			param.MaxLen = 11
-			param.MaxCharLen = 11
+			//param.MaxCharLen = 11
 		case "RAW":
 			param.DataType = RAW
 			param.ContFlag = 0
@@ -363,35 +364,75 @@ func (cust *customType) getObject() interface{} {
 	for _, attrib := range cust.attribs {
 		if fieldIndex, ok := cust.filedMap[attrib.Name]; ok {
 			if attrib.Value != nil {
-				obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(attrib.Value))
+				//tempField := obj.Elem().Field(fieldIndex)
+
+				//err := setValue(&tempField, attrib.Value)
+				//if err != nil {
+				//	panic(err)
+				//}
+				//var tempPar = ParameterInfo{
+				//	Name:                 "",
+				//	TypeName:             "",
+				//	Direction:            attrib.Direction,
+				//	IsNull:               false,
+				//	AllowNull:            false,
+				//	ColAlias:             "",
+				//	DataType:             0,
+				//	IsXmlType:            false,
+				//	Flag:                 attrib.Flag,
+				//	Precision:            attrib.Precision,
+				//	Scale:                attrib.Scale,
+				//	MaxLen:               attrib.MaxLen,
+				//	MaxCharLen:           attrib.MaxCharLen,
+				//	MaxNoOfArrayElements: attrib.MaxNoOfArrayElements,
+				//	ContFlag:             attrib.ContFlag,
+				//	ToID:                 nil,
+				//	Version:              attrib.Version,
+				//	CharsetID:            attrib.CharsetID,
+				//	CharsetForm:          attrib.CharsetForm,
+				//	BValue:               attrib.BValue,
+				//	Value:                obj.Elem().Field(fieldIndex).Interface(),
+				//	OutputVarPtr:         nil,
+				//	getDataFromServer:    false,
+				//	oaccollid:            0,
+				//	cusType:              nil,
+				//}
+				tempVal := &ParameterValue{obj.Elem().Field(fieldIndex).Interface()}
+				err := tempVal.setValue(attrib.Value)
+				//err := attrib.setValueTo(obj.Elem().Field(fieldIndex))
+				if err != nil {
+					return err
+				}
+
+				obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(tempVal.Value))
 			}
 		}
 	}
 	return obj.Elem().Interface()
 }
 
-func (cust *customType) getFieldRepr(index int, input_value interface{}) ([]byte, error) {
-	attrib := cust.attribs[index]
-	//typ := reflect.TypeOf(val)
-	val := reflect.ValueOf(input_value)
-	typ := val.Type()
-	switch attrib.DataType {
-	case NUMBER:
-		switch typ.Kind() {
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			fallthrough
-		case reflect.Int, reflect.Int32, reflect.Int16, reflect.Int64, reflect.Int8:
-			return converters.EncodeInt64(reflect.ValueOf(val).Int()), nil
-		case reflect.Float32, reflect.Float64:
-			return converters.EncodeDouble(reflect.ValueOf(val).Float())
-		default:
-			return nil, fmt.Errorf("field %d require NUMBER data type", index)
-		}
-	case DATE:
-		if typ == reflect.TypeOf(time.Time{}) {
-			//return converters.EncodeDate(val.Interface())
-		}
-
-	}
-	return nil, nil
-}
+//func (cust *customType) getFieldRepr(index int, input_value interface{}) ([]byte, error) {
+//	attrib := cust.attribs[index]
+//	//typ := reflect.TypeOf(val)
+//	val := reflect.ValueOf(input_value)
+//	typ := val.Type()
+//	switch attrib.DataType {
+//	case NUMBER:
+//		switch typ.Kind() {
+//		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+//			fallthrough
+//		case reflect.Int, reflect.Int32, reflect.Int16, reflect.Int64, reflect.Int8:
+//			return converters.EncodeInt64(reflect.ValueOf(val).Int()), nil
+//		case reflect.Float32, reflect.Float64:
+//			return converters.EncodeDouble(reflect.ValueOf(val).Float())
+//		default:
+//			return nil, fmt.Errorf("field %d require NUMBER data type", index)
+//		}
+//	case DATE:
+//		if typ == reflect.TypeOf(time.Time{}) {
+//			//return converters.EncodeDate(val.Interface())
+//		}
+//
+//	}
+//	return nil, nil
+//}

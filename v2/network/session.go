@@ -74,7 +74,8 @@ func NewSession(connOption *ConnectionOption) *Session {
 	}
 }
 
-// SaveState save current session state
+// SaveState save current session state and accept new state
+// if new state is nil the session will be resetted
 func (session *Session) SaveState(newState *SessionState) {
 	session.states = append(session.states, SessionState{
 		summary:   session.Summary,
@@ -98,9 +99,8 @@ func (session *Session) SaveState(newState *SessionState) {
 	}
 }
 
-// LoadState load last saved session state and remove it from the memory
-//
-// if this is the only session state availabe set session state memory to nil
+// LoadState load last saved session state and return the current state
+// if this is the only session state available set session state memory to nil
 func (session *Session) LoadState() (oldState *SessionState) {
 	index := len(session.states) - 1
 	if index >= 0 {
@@ -127,7 +127,6 @@ func (session *Session) ResetBuffer() {
 	session.Summary = nil
 	session.sendPcks = nil
 	session.inBuffer = nil
-	//session.OutBuffer = nil
 	session.outBuffer.Reset()
 	session.index = 0
 }
@@ -805,7 +804,6 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 				}
 			}
 			session.outBuffer.Write(temp)
-			//session.OutBuffer = append(session.OutBuffer, temp...)
 		}
 	}
 }
@@ -848,27 +846,18 @@ func (session *Session) PutKeyValString(key string, val string, num uint8) {
 func (session *Session) PutKeyVal(key []byte, val []byte, num uint8) {
 	if len(key) == 0 {
 		session.outBuffer.WriteByte(0)
-		//session.OutBuffer = append(session.OutBuffer, 0)
 	} else {
 		session.PutUint(len(key), 4, true, true)
 		session.PutClr(key)
 	}
 	if len(val) == 0 {
 		session.outBuffer.WriteByte(0)
-		//session.OutBuffer = append(session.OutBuffer, 0)
 	} else {
 		session.PutUint(len(val), 4, true, true)
 		session.PutClr(val)
 	}
 	session.PutInt(num, 4, true, true)
 }
-
-//func (session *Session) PutData(data Data) error {
-//	return data.Write(session)
-//}
-//func (session *Session) GetData(data Data) error {
-//	return data.Read(session)
-//}
 
 // GetByte read one uint8 from input buffer
 func (session *Session) GetByte() (uint8, error) {
@@ -920,7 +909,6 @@ func (session *Session) GetInt64(size int, compress bool, bigEndian bool) (int64
 }
 
 // GetInt read int number from input buffer.
-//
 // you should specify the size of the int and either compress or not and stored as big endian or not
 func (session *Session) GetInt(size int, compress bool, bigEndian bool) (int, error) {
 	temp, err := session.GetInt64(size, compress, bigEndian)
@@ -955,10 +943,6 @@ func (session *Session) GetClr() (output []byte, err error) {
 	if err != nil {
 		return
 	}
-	//if size == 253 {
-	//	err = errors.New("TTC error")
-	//	return
-	//}
 	if size == 0 || size == 0xFF {
 		output = nil
 		err = nil
@@ -968,7 +952,6 @@ func (session *Session) GetClr() (output []byte, err error) {
 		output, err = session.read(int(size))
 		return
 	}
-	//output = make([]byte, 0, 1000)
 	var tempBuffer bytes.Buffer
 	for {
 		var size1 int
@@ -1029,6 +1012,7 @@ func (session *Session) WriteBytes(buffer *bytes.Buffer, data ...byte) {
 	buffer.Write(data)
 }
 
+// WriteUint write uint data to external buffer
 func (session *Session) WriteUint(buffer *bytes.Buffer, number interface{}, size uint8, bigEndian, compress bool) {
 	val := reflect.ValueOf(number)
 	var num uint64
@@ -1042,7 +1026,6 @@ func (session *Session) WriteUint(buffer *bytes.Buffer, number interface{}, size
 	}
 	if size == 1 {
 		buffer.WriteByte(uint8(num))
-		//session.OutBuffer = append(session.OutBuffer, uint8(num))
 		return
 	}
 	if compress {
@@ -1055,7 +1038,6 @@ func (session *Session) WriteUint(buffer *bytes.Buffer, number interface{}, size
 		}
 		if size == 0 {
 			buffer.WriteByte(0)
-			//session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			buffer.WriteByte(size)
 			buffer.Write(temp)
@@ -1085,6 +1067,7 @@ func (session *Session) WriteUint(buffer *bytes.Buffer, number interface{}, size
 	}
 }
 
+// WriteInt write int data to external buffer
 func (session *Session) WriteInt(buffer *bytes.Buffer, number interface{}, size uint8, bigEndian, compress bool) {
 	val := reflect.ValueOf(number)
 	var num int64
@@ -1105,7 +1088,6 @@ func (session *Session) WriteInt(buffer *bytes.Buffer, number interface{}, size 
 		}
 		if size == 0 {
 			buffer.WriteByte(0)
-			//session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			if num < 0 {
 				num = num * -1
@@ -1171,11 +1153,12 @@ func (session *Session) WriteClr(buffer *bytes.Buffer, data []byte) {
 	}
 }
 
-// WriteKeyValString write key, val (in form of string) and flag number to output buffer
+// WriteKeyValString write key, val (in form of string) and flag number to external buffer
 func (session *Session) WriteKeyValString(buffer *bytes.Buffer, key string, val string, num uint8) {
 	session.WriteKeyVal(buffer, []byte(key), []byte(val), num)
 }
 
+// WriteKeyVal write key, val, flag number to external buffer
 func (session *Session) WriteKeyVal(buffer *bytes.Buffer, key []byte, val []byte, num uint8) {
 	if len(key) == 0 {
 		buffer.WriteByte(0)

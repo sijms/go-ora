@@ -1,10 +1,14 @@
 package go_ora
 
 import (
+	"bytes"
+	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
 	"math"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -13,6 +17,14 @@ type OracleType int
 type ParameterDirection int
 type NVarChar string
 type TimeStamp time.Time
+type NullNVarChar struct {
+	Valid    bool
+	NVarChar NVarChar
+}
+type NullTimeStamp struct {
+	Valid     bool
+	TimeStamp TimeStamp
+}
 
 //func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
 //	return driver.Value(string(*n)), nil
@@ -92,6 +104,9 @@ const (
 	TimeStampeLTZ    OracleType = 232
 )
 
+type ParameterValue struct {
+	Value driver.Value
+}
 type ParameterType int
 
 const (
@@ -311,16 +326,18 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	return nil
 }
 
-func (par *ParameterInfo) setForInt(value int64) {
+func (par *ParameterInfo) encodeInt(value int64) {
 	par.setForNumber()
 	par.BValue = converters.EncodeInt64(value)
 }
-func (par *ParameterInfo) setForFloat(value float64) error {
+
+func (par *ParameterInfo) encodeFloat(value float64) error {
 	par.setForNumber()
 	var err error
 	par.BValue, err = converters.EncodeDouble(value)
 	return err
 }
+
 func (par *ParameterInfo) setForNumber() {
 	par.DataType = NUMBER
 	par.ContFlag = 0
@@ -329,7 +346,11 @@ func (par *ParameterInfo) setForNumber() {
 	par.CharsetForm = 0
 	par.CharsetID = 0
 }
-func (par *ParameterInfo) setForString(value string, converter converters.IStringConverter, size int) {
+
+//func (par *ParameterInfo) encodeNString(value string, converter converters.IStringConverter, size int) {
+//
+//}
+func (par *ParameterInfo) encodeString(value string, converter converters.IStringConverter, size int) {
 	par.DataType = NCHAR
 	par.ContFlag = 16
 	par.MaxCharLen = len([]rune(value))
@@ -354,17 +375,18 @@ func (par *ParameterInfo) setForString(value string, converter converters.IStrin
 		par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(par.CharsetID)
 	}
 }
-
-func (par *ParameterInfo) setForTime(value time.Time) {
+func (par *ParameterInfo) setForTime() {
 	par.DataType = DATE
 	par.ContFlag = 0
 	par.MaxLen = 11
-	par.BValue = converters.EncodeDate(value)
 	par.CharsetID = 0
 	par.CharsetForm = 0
-	//par.MaxCharLen = 11
 }
-func (par *ParameterInfo) setForRaw(value []byte, size int) {
+func (par *ParameterInfo) encodeTime(value time.Time) {
+	par.setForTime()
+	par.BValue = converters.EncodeDate(value)
+}
+func (par *ParameterInfo) encodeRaw(value []byte, size int) {
 	par.BValue = value
 	par.DataType = RAW
 	par.MaxLen = len(value)
@@ -387,6 +409,7 @@ func (par *ParameterInfo) setForRefCursor() {
 }
 
 func (par *ParameterInfo) setForUDT() {
+	par.Flag = 3
 	par.Version = 1
 	par.DataType = XMLType
 	par.CharsetID = 0
@@ -401,4 +424,1822 @@ func (par *ParameterInfo) setForNull() {
 	par.MaxCharLen = 0
 	par.MaxLen = 1
 	par.CharsetForm = 1
+}
+
+func (par *ParameterValue) setValue(newValue driver.Value) error {
+	if par.Value == nil {
+		par.Value = newValue
+		return nil
+	}
+	switch value := par.Value.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		par.Value = newValue
+	case float32, float64, string, []byte:
+		par.Value = newValue
+	case *int:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = int(temp)
+	case *int8:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = int8(temp)
+	case *int16:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = int16(temp)
+	case *int32:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = int32(temp)
+	case *int64:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = temp
+	case *uint:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint(temp)
+	case *uint8:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint8(temp)
+	case *uint16:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint16(temp)
+	case *uint32:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint32(temp)
+	case *uint64:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint64(temp)
+	case *float32:
+		temp, err := getFloat(newValue)
+		if err != nil {
+			return err
+		}
+		*value = float32(temp)
+	case *float64:
+		temp, err := getFloat(newValue)
+		if err != nil {
+			return err
+		}
+		*value = temp
+	case sql.NullByte:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Byte = uint8(temp)
+		}
+		par.Value = value
+	case sql.NullInt16:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Int16 = int16(temp)
+		}
+		par.Value = value
+	case sql.NullInt32:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Int32 = int32(temp)
+		}
+		par.Value = value
+	case sql.NullInt64:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Int64 = temp
+		}
+		par.Value = value
+	case sql.NullBool:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Bool = temp != 0
+		}
+		par.Value = value
+	case sql.NullFloat64:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getFloat(newValue)
+			if err != nil {
+				return err
+			}
+			value.Float64 = temp
+		}
+		par.Value = value
+	case *sql.NullByte:
+		var tempValue sql.NullByte
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Byte = uint8(temp)
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullInt16:
+		var tempValue sql.NullInt16
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Int16 = int16(temp)
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullInt32:
+		var tempValue sql.NullInt32
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Int32 = int32(temp)
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullInt64:
+		var tempValue sql.NullInt64
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Int64 = temp
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullFloat64:
+		var tempValue sql.NullFloat64
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getFloat(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Float64 = temp
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullBool:
+		var tempValue sql.NullBool
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Bool = temp != 0
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case time.Time:
+		if tempNewVal, ok := newValue.(time.Time); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("time.Time col/par need time.Time value")
+		}
+	case *time.Time:
+		if tempNewVal, ok := newValue.(time.Time); ok {
+			*value = tempNewVal
+		} else {
+			return errors.New("*time.Time col/par need time.Time value")
+		}
+	case sql.NullTime:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			if tempNewVal, ok := newValue.(time.Time); ok {
+				value.Time = tempNewVal
+			} else {
+				return errors.New("sql.NullTime col/par need time.Time or Nil value")
+			}
+		}
+		par.Value = value
+	case *sql.NullTime:
+		var tempVal sql.NullTime
+		if newValue == nil {
+			tempVal.Valid = false
+		} else {
+			tempVal.Valid = true
+			if tempNewVal, ok := newValue.(time.Time); ok {
+				tempVal.Time = tempNewVal
+			} else {
+				return errors.New("*sql.NullTime col/par need time.Time or Nil value")
+			}
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case TimeStamp:
+		if tempNewVal, ok := newValue.(TimeStamp); ok {
+			par.Value = tempNewVal
+		} else if tempNewVal, ok := newValue.(time.Time); ok {
+			par.Value = TimeStamp(tempNewVal)
+		} else {
+			return errors.New("TimeStamp col/par need TimeStamp or time.Time value")
+		}
+	case *TimeStamp:
+		if tempNewVal, ok := newValue.(TimeStamp); ok {
+			*value = tempNewVal
+		} else if tempNewVal, ok := newValue.(time.Time); ok {
+			*value = TimeStamp(tempNewVal)
+		} else {
+			return errors.New("*TimeStamp col/par need TimeStamp or time.Time value")
+		}
+	case NullTimeStamp:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			if tempNewVal, ok := newValue.(TimeStamp); ok {
+				value.TimeStamp = tempNewVal
+			} else if tempNewVal, ok := newValue.(time.Time); ok {
+				value.TimeStamp = TimeStamp(tempNewVal)
+			} else {
+				return errors.New("NullTimeStamp col/par need TimeStamp, time.Time or Nil value")
+			}
+		}
+		par.Value = value
+	case *NullTimeStamp:
+		var tempVal NullTimeStamp
+		if newValue == nil {
+			tempVal.Valid = false
+		} else {
+			tempVal.Valid = true
+			if tempNewVal, ok := newValue.(TimeStamp); ok {
+				tempVal.TimeStamp = tempNewVal
+			} else if tempNewVal, ok := newValue.(time.Time); ok {
+				tempVal.TimeStamp = TimeStamp(tempNewVal)
+			} else {
+				return errors.New("*NullTimeStamp col/par need TimeStamp, time.Time or Nil value")
+			}
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case Clob:
+		if tempNewVal, ok := newValue.(Clob); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("Clob col/par requires Clob value")
+		}
+	case *Clob:
+		var tempVal Clob
+		if tempNewVal, ok := newValue.(Clob); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*Clob col/par requires Clob value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case Blob:
+		if tempNewVal, ok := newValue.(Blob); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("Blob clo/par requires Blob value")
+		}
+	case *Blob:
+		var tempVal Blob
+		if tempNewVal, ok := newValue.(Blob); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*Blob col/par requires Blob value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case *[]byte:
+		var tempVal []byte
+		if tempNewVal, ok := newValue.([]byte); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("[]byte col/par requires []byte or nil value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	//case RefCursor:
+	//case *RefCursor:
+	case *string:
+		*value = getString(newValue)
+	case sql.NullString:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			value.String = getString(newValue)
+		}
+		par.Value = value
+	case *sql.NullString:
+		var tempVal sql.NullString
+		if newValue == nil {
+			tempVal.Valid = false
+		} else {
+			tempVal.Valid = true
+			tempVal.String = getString(newValue)
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case NVarChar:
+		par.Value = NVarChar(getString(newValue))
+	case *NVarChar:
+		*value = NVarChar(getString(newValue))
+	case NullNVarChar:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			value.NVarChar = NVarChar(getString(newValue))
+		}
+		par.Value = value
+	case *NullNVarChar:
+		var tempVal NullNVarChar
+		if newValue == nil {
+			tempVal.Valid = false
+		} else {
+			tempVal.Valid = true
+			tempVal.NVarChar = NVarChar(getString(newValue))
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	default:
+		typ := reflect.TypeOf(par.Value)
+		return errors.New("unsupported type: " + typ.Name())
+	}
+	return nil
+}
+func (par *ParameterInfo) setValue(newValue driver.Value) error {
+	if par.Value == nil {
+		par.Value = newValue
+		return nil
+	}
+	switch value := par.Value.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		par.Value = newValue
+	case float32, float64, string, []byte:
+		par.Value = newValue
+	case *int:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = int(temp)
+	case *int8:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = int8(temp)
+	case *int16:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = int16(temp)
+	case *int32:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = int32(temp)
+	case *int64:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = temp
+	case *uint:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint(temp)
+	case *uint8:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint8(temp)
+	case *uint16:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint16(temp)
+	case *uint32:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint32(temp)
+	case *uint64:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = uint64(temp)
+	case *float32:
+		temp, err := getFloat(newValue)
+		if err != nil {
+			return err
+		}
+		*value = float32(temp)
+	case *float64:
+		temp, err := getFloat(newValue)
+		if err != nil {
+			return err
+		}
+		*value = temp
+	case sql.NullByte:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Byte = uint8(temp)
+		}
+		par.Value = value
+	case sql.NullInt16:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Int16 = int16(temp)
+		}
+		par.Value = value
+	case sql.NullInt32:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Int32 = int32(temp)
+		}
+		par.Value = value
+	case sql.NullInt64:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Int64 = temp
+		}
+		par.Value = value
+	case sql.NullBool:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			value.Bool = temp != 0
+		}
+		par.Value = value
+	case sql.NullFloat64:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			temp, err := getFloat(newValue)
+			if err != nil {
+				return err
+			}
+			value.Float64 = temp
+		}
+		par.Value = value
+	case *sql.NullByte:
+		var tempValue sql.NullByte
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Byte = uint8(temp)
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullInt16:
+		var tempValue sql.NullInt16
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Int16 = int16(temp)
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullInt32:
+		var tempValue sql.NullInt32
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Int32 = int32(temp)
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullInt64:
+		var tempValue sql.NullInt64
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Int64 = temp
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullFloat64:
+		var tempValue sql.NullFloat64
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getFloat(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Float64 = temp
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case *sql.NullBool:
+		var tempValue sql.NullBool
+		if newValue == nil {
+			tempValue.Valid = false
+		} else {
+			tempValue.Valid = true
+			temp, err := getInt(newValue)
+			if err != nil {
+				return err
+			}
+			tempValue.Bool = temp != 0
+		}
+		if value == nil {
+			par.Value = &tempValue
+		} else {
+			*value = tempValue
+		}
+	case time.Time:
+		if tempNewVal, ok := newValue.(time.Time); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("time.Time col/par need time.Time value")
+		}
+	case *time.Time:
+		if tempNewVal, ok := newValue.(time.Time); ok {
+			*value = tempNewVal
+		} else {
+			return errors.New("*time.Time col/par need time.Time value")
+		}
+	case sql.NullTime:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			if tempNewVal, ok := newValue.(time.Time); ok {
+				value.Time = tempNewVal
+			} else {
+				return errors.New("sql.NullTime col/par need time.Time or Nil value")
+			}
+		}
+		par.Value = value
+	case *sql.NullTime:
+		var tempVal sql.NullTime
+		if newValue == nil {
+			tempVal.Valid = false
+		} else {
+			tempVal.Valid = true
+			if tempNewVal, ok := newValue.(time.Time); ok {
+				tempVal.Time = tempNewVal
+			} else {
+				return errors.New("*sql.NullTime col/par need time.Time or Nil value")
+			}
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case TimeStamp:
+		if tempNewVal, ok := newValue.(TimeStamp); ok {
+			par.Value = tempNewVal
+		} else if tempNewVal, ok := newValue.(time.Time); ok {
+			par.Value = TimeStamp(tempNewVal)
+		} else {
+			return errors.New("TimeStamp col/par need TimeStamp or time.Time value")
+		}
+	case *TimeStamp:
+		if tempNewVal, ok := newValue.(TimeStamp); ok {
+			*value = tempNewVal
+		} else if tempNewVal, ok := newValue.(time.Time); ok {
+			*value = TimeStamp(tempNewVal)
+		} else {
+			return errors.New("*TimeStamp col/par need TimeStamp or time.Time value")
+		}
+	case NullTimeStamp:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			if tempNewVal, ok := newValue.(TimeStamp); ok {
+				value.TimeStamp = tempNewVal
+			} else if tempNewVal, ok := newValue.(time.Time); ok {
+				value.TimeStamp = TimeStamp(tempNewVal)
+			} else {
+				return errors.New("NullTimeStamp col/par need TimeStamp, time.Time or Nil value")
+			}
+		}
+		par.Value = value
+	case *NullTimeStamp:
+		var tempVal NullTimeStamp
+		if newValue == nil {
+			tempVal.Valid = false
+		} else {
+			tempVal.Valid = true
+			if tempNewVal, ok := newValue.(TimeStamp); ok {
+				tempVal.TimeStamp = tempNewVal
+			} else if tempNewVal, ok := newValue.(time.Time); ok {
+				tempVal.TimeStamp = TimeStamp(tempNewVal)
+			} else {
+				return errors.New("*NullTimeStamp col/par need TimeStamp, time.Time or Nil value")
+			}
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case Clob:
+		if tempNewVal, ok := newValue.(Clob); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("Clob col/par requires Clob value")
+		}
+	case *Clob:
+		var tempVal Clob
+		if tempNewVal, ok := newValue.(Clob); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*Clob col/par requires Clob value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case Blob:
+		if tempNewVal, ok := newValue.(Blob); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("Blob clo/par requires Blob value")
+		}
+	case *Blob:
+		var tempVal Blob
+		if tempNewVal, ok := newValue.(Blob); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*Blob col/par requires Blob value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case *[]byte:
+		var tempVal []byte
+		if tempNewVal, ok := newValue.([]byte); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("[]byte col/par requires []byte or nil value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	//case RefCursor:
+	//case *RefCursor:
+	case *string:
+		*value = getString(newValue)
+	case sql.NullString:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			value.String = getString(newValue)
+		}
+		par.Value = value
+	case *sql.NullString:
+		var tempVal sql.NullString
+		if newValue == nil {
+			tempVal.Valid = false
+		} else {
+			tempVal.Valid = true
+			tempVal.String = getString(newValue)
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case NVarChar:
+		par.Value = NVarChar(getString(newValue))
+	case *NVarChar:
+		*value = NVarChar(getString(newValue))
+	case NullNVarChar:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			value.NVarChar = NVarChar(getString(newValue))
+		}
+		par.Value = value
+	case *NullNVarChar:
+		var tempVal NullNVarChar
+		if newValue == nil {
+			tempVal.Valid = false
+		} else {
+			tempVal.Valid = true
+			tempVal.NVarChar = NVarChar(getString(newValue))
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	default:
+		typ := reflect.TypeOf(par.Value)
+		return errors.New("unsupported type: " + typ.Name())
+	}
+	return nil
+}
+
+//func (par *ParameterInfo) setValueTo(field reflect.Value) error {
+//	switch value := field.Interface().(type) {
+//	case int:
+//		temp, err := getInt(par.Value)
+//		if err != nil {
+//			return err
+//		}
+//		value = int(temp)
+//	case int64:
+//		temp, err := getInt(par.Value)
+//		if err != nil {
+//			return err
+//		}
+//		value = temp
+//	case *sql.NullString:
+//		if value == nil {
+//
+//		}
+//	}
+//	return nil
+//}
+
+//func (par *ParameterInfo) readColumnValue(session *network.Session) (driver.Value, error) {
+//	if (par.DataType == NCHAR || par.DataType == CHAR) && par.MaxCharLen == 0 {
+//		return nil, nil
+//	}
+//	if par.DataType == RAW && par.MaxLen == 0 {
+//		return nil, nil
+//	}
+//	var err error
+//	switch par.DataType {
+//	case XMLType:
+//		if par.TypeName == "XMLTYPE" {
+//			return nil, errors.New("unsupported data type: XMLTYPE")
+//		}
+//		if par.cusType == nil {
+//			return nil, fmt.Errorf("unregister custom type: %s. call RegisterType first", par.TypeName)
+//		}
+//		_, err = session.GetDlc() // contian toid and some 0s
+//		if err != nil {
+//			return nil, err
+//		}
+//		_, err = session.GetBytes(3) // 3 0s
+//		if err != nil {
+//			return nil, err
+//		}
+//		_, err = session.GetInt(4, true, true)
+//		if err != nil {
+//			return nil, err
+//		}
+//		_, err = session.GetBytes(2) // 1, 1
+//		if err != nil {
+//			return nil, err
+//		}
+//		tempBytes, err := session.GetClr()
+//		if err != nil {
+//			return nil, err
+//		}
+//		newState := network.SessionState{InBuffer: tempBytes}
+//		session.SaveState(&newState)
+//		_, err = session.GetByte()
+//		if err != nil {
+//			return nil, err
+//		}
+//		ctl, err := session.GetInt(4, true, true)
+//		if err != nil {
+//			return nil, err
+//		}
+//		if ctl == 0xFE {
+//			_, err = session.GetInt(4, false, true)
+//			if err != nil {
+//				return nil, err
+//			}
+//		}
+//		for x := 0; x < len(par.cusType.attribs); x++ {
+//			par.cusType.attribs[x].Value, err = par.cusType.attribs[x].readColumnValue(session)
+//			if err != nil {
+//				return nil, err
+//			}
+//		}
+//		_ = session.LoadState()
+//		paramValue := reflect.ValueOf(par.Value)
+//		if paramValue.Kind() == reflect.Ptr {
+//			paramValue.Elem().Set(reflect.ValueOf(par.cusType.getObject()))
+//		} else {
+//			par.Value = par.cusType.getObject()
+//		}
+//	}
+//}
+//func (par *ParameterInfo) setValue(newValue driver.Value, preserveValueStructure bool) error {
+//	if par.Value == nil {
+//		par.Value = newValue
+//		return nil
+//	}
+//	if !preserveValueStructure {
+//		par.Value = newValue
+//		return nil
+//	}
+//	paramValue := reflect.ValueOf(par.Value)
+//	return setValue(&paramValue, newValue)
+//if paramValue
+//var dest reflect.Value
+//if paramValue.Kind() == reflect.Ptr {
+//	dest = paramValue.Elem()
+//	//destType = reflect.TypeOf(par.Value).Elem()
+//} else {
+//	dest = paramValue
+//	//destType = reflect.TypeOf(par.Value)
+//}
+//commonErr := fmt.Errorf("type: %s incompatible with value %v", dest.Type().Name(), newValue)
+//if par.cusType != nil && par.cusType.typ == dest.Type() {
+//	dest.Set(reflect.ValueOf(newValue))
+//	return nil
+//}
+//var destValue reflect.Value
+//switch dest.Interface().(type) {
+//case sql.NullString:
+//	if newValue == nil {
+//		destValue = reflect.ValueOf(sql.NullString{Valid: false, String: ""})
+//	} else {
+//		destValue = reflect.ValueOf(sql.NullString{Valid: true, String: getString(newValue)})
+//	}
+//case sql.NullByte:
+//	if newValue == nil {
+//		destValue = reflect.ValueOf(sql.NullByte{Valid: false, Byte: 0})
+//	} else {
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		destValue = reflect.ValueOf(sql.NullByte{Valid: true, Byte: uint8(temp)})
+//	}
+//case sql.NullInt16:
+//	if newValue == nil {
+//		destValue = reflect.ValueOf(sql.NullInt16{Valid: false, Int16: 0})
+//	} else {
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		destValue = reflect.ValueOf(sql.NullInt16{Valid: true, Int16: int16(temp)})
+//	}
+//case sql.NullInt32:
+//	if newValue == nil {
+//		destValue = reflect.ValueOf(sql.NullInt32{Valid: false, Int32: 0})
+//	} else {
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		destValue = reflect.ValueOf(sql.NullInt32{Valid: true, Int32: int32(temp)})
+//	}
+//case sql.NullInt64:
+//	if newValue == nil {
+//		destValue = reflect.ValueOf(sql.NullInt64{Valid: false, Int64: 0})
+//	} else {
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		destValue = reflect.ValueOf(sql.NullInt64{Valid: true, Int64: temp})
+//	}
+//case sql.NullFloat64:
+//	if newValue == nil {
+//		destValue = reflect.ValueOf(sql.NullFloat64{Valid: false, Float64: 0})
+//	} else {
+//		temp, err := getFloat(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		destValue = reflect.ValueOf(sql.NullFloat64{Valid: true, Float64: temp})
+//	}
+//case sql.NullBool:
+//	if newValue == nil {
+//		destValue = reflect.ValueOf(sql.NullBool{Valid: false, Bool: false})
+//	} else {
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		destValue = reflect.ValueOf(sql.NullBool{Valid: true, Bool: temp != 0})
+//	}
+//case sql.NullTime:
+//	if newValue == nil {
+//		destValue = reflect.ValueOf(sql.NullTime{Valid: false})
+//	} else {
+//		if value, ok := newValue.(time.Time); ok {
+//			destValue = reflect.ValueOf(sql.NullTime{Valid: true, Time: value})
+//		} else {
+//			return errors.New("object of type time.Time require time.Time value")
+//		}
+//	}
+//case time.Time:
+//	if value, ok := newValue.(time.Time); ok {
+//		destValue = reflect.ValueOf(value)
+//	} else {
+//		return errors.New("object of type time.Time require time.Time value")
+//	}
+//case TimeStamp:
+//	if value, ok := newValue.(time.Time); ok {
+//		destValue = reflect.ValueOf(TimeStamp(value))
+//	} else {
+//		return errors.New("object of type TimeStamp require time.Time value")
+//	}
+//case NVarChar:
+//	destValue = reflect.ValueOf(getString(newValue))
+//case Clob:
+//	if value, ok := newValue.(Clob); ok {
+//		destValue = reflect.ValueOf(value)
+//	} else {
+//		return errors.New("object of type Clob require Clob value")
+//	}
+//case Blob:
+//	if value, ok := newValue.(Blob); ok {
+//		destValue = reflect.ValueOf(value)
+//	} else {
+//		return commonErr
+//	}
+//case []byte:
+//	if value, ok := newValue.([]byte); ok {
+//		destValue = reflect.ValueOf(value)
+//	} else {
+//		return commonErr
+//	}
+//default:
+//	switch dest.Kind() {
+//	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return commonErr
+//		}
+//		destValue = reflect.ValueOf(temp)
+//	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return commonErr
+//		}
+//		destValue = reflect.ValueOf(temp)
+//	case reflect.Float32, reflect.Float64:
+//		temp, err := getFloat(newValue)
+//		if err != nil {
+//			return commonErr
+//		}
+//		destValue = reflect.ValueOf(temp)
+//	case reflect.String:
+//		//dest.Set(reflect.ValueOf(getString(newValue)))
+//		destValue = reflect.ValueOf(getString(newValue))
+//	default:
+//		return fmt.Errorf("type %s is not supported", dest.Type().Name())
+//	}
+//}
+//if paramValue.Kind() == reflect.Ptr {
+//	dest.Set(destValue)
+//} else {
+//	par.Value = destValue.Interface()
+//}
+//
+//return nil
+//}
+
+//func setValue(inputObject *reflect.Value, newValue driver.Value) error {
+//	var dest reflect.Value
+//	if inputObject.Kind() == reflect.Ptr && !inputObject.Elem().IsValid() {
+//		typ := inputObject.Type().Elem()
+//		inputObject.Set(reflect.New(typ))
+//	}
+//	if inputObject.Kind() == reflect.Ptr {
+//		dest = inputObject.Elem()
+//	} else {
+//		dest = *inputObject
+//	}
+//	//if !dest.IsValid() {
+//	//	dest.Set(reflect.ValueOf(newValue))
+//	//	return nil
+//	//}
+//	commonErr := fmt.Errorf("type: %s incompatible with value %v", dest.Type().Name(), newValue)
+//	var destValue reflect.Value
+//	switch dest.Interface().(type) {
+//	case sql.NullString:
+//		if newValue == nil {
+//			destValue = reflect.ValueOf(sql.NullString{Valid: false, String: ""})
+//		} else {
+//			destValue = reflect.ValueOf(sql.NullString{Valid: true, String: getString(newValue)})
+//		}
+//	case sql.NullByte:
+//		if newValue == nil {
+//			destValue = reflect.ValueOf(sql.NullByte{Valid: false, Byte: 0})
+//		} else {
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			destValue = reflect.ValueOf(sql.NullByte{Valid: true, Byte: uint8(temp)})
+//		}
+//	case sql.NullInt16:
+//		if newValue == nil {
+//			destValue = reflect.ValueOf(sql.NullInt16{Valid: false, Int16: 0})
+//		} else {
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			destValue = reflect.ValueOf(sql.NullInt16{Valid: true, Int16: int16(temp)})
+//		}
+//	case sql.NullInt32:
+//		if newValue == nil {
+//			destValue = reflect.ValueOf(sql.NullInt32{Valid: false, Int32: 0})
+//		} else {
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			destValue = reflect.ValueOf(sql.NullInt32{Valid: true, Int32: int32(temp)})
+//		}
+//	case sql.NullInt64:
+//		if newValue == nil {
+//			destValue = reflect.ValueOf(sql.NullInt64{Valid: false, Int64: 0})
+//		} else {
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			destValue = reflect.ValueOf(sql.NullInt64{Valid: true, Int64: temp})
+//		}
+//	case sql.NullFloat64:
+//		if newValue == nil {
+//			destValue = reflect.ValueOf(sql.NullFloat64{Valid: false, Float64: 0})
+//		} else {
+//			temp, err := getFloat(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			destValue = reflect.ValueOf(sql.NullFloat64{Valid: true, Float64: temp})
+//		}
+//	case sql.NullBool:
+//		if newValue == nil {
+//			destValue = reflect.ValueOf(sql.NullBool{Valid: false, Bool: false})
+//		} else {
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			destValue = reflect.ValueOf(sql.NullBool{Valid: true, Bool: temp != 0})
+//		}
+//	case sql.NullTime:
+//		if newValue == nil {
+//			destValue = reflect.ValueOf(sql.NullTime{Valid: false})
+//		} else {
+//			if value, ok := newValue.(time.Time); ok {
+//				destValue = reflect.ValueOf(sql.NullTime{Valid: true, Time: value})
+//			} else {
+//				return errors.New("object of type time.Time require time.Time value")
+//			}
+//		}
+//	case time.Time:
+//		if value, ok := newValue.(time.Time); ok {
+//			destValue = reflect.ValueOf(value)
+//		} else {
+//			return errors.New("object of type time.Time require time.Time value")
+//		}
+//	case TimeStamp:
+//		if value, ok := newValue.(time.Time); ok {
+//			destValue = reflect.ValueOf(TimeStamp(value))
+//		} else {
+//			return errors.New("object of type TimeStamp require time.Time value")
+//		}
+//	case NVarChar:
+//		destValue = reflect.ValueOf(getString(newValue))
+//	case Clob:
+//		if value, ok := newValue.(Clob); ok {
+//			destValue = reflect.ValueOf(value)
+//		} else {
+//			return errors.New("object of type Clob require Clob value")
+//		}
+//	case Blob:
+//		if value, ok := newValue.(Blob); ok {
+//			destValue = reflect.ValueOf(value)
+//		} else {
+//			return commonErr
+//		}
+//	case []byte:
+//		if value, ok := newValue.([]byte); ok {
+//			destValue = reflect.ValueOf(value)
+//		} else {
+//			return commonErr
+//		}
+//	default:
+//		switch dest.Kind() {
+//		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return commonErr
+//			}
+//			destValue = reflect.ValueOf(temp)
+//		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return commonErr
+//			}
+//			destValue = reflect.ValueOf(temp)
+//		case reflect.Float32, reflect.Float64:
+//			temp, err := getFloat(newValue)
+//			if err != nil {
+//				return commonErr
+//			}
+//			destValue = reflect.ValueOf(temp)
+//		case reflect.String:
+//			//dest.Set(reflect.ValueOf(getString(newValue)))
+//			destValue = reflect.ValueOf(getString(newValue))
+//		default:
+//			return fmt.Errorf("type %s is not supported", dest.Type().Name())
+//		}
+//	}
+//	if inputObject.Kind() == reflect.Ptr {
+//		inputObject.Elem().Set(destValue)
+//		//dest.Set(destValue)
+//	} else {
+//		inputObject.Set(destValue)
+//		//inputObject.Set(destValue)
+//		//par.Value = destValue.Interface()
+//	}
+//
+//	return nil
+//
+//}
+func (par *ParameterInfo) decodeValue(connection *Connection) error {
+	session := connection.session
+	var tempVal driver.Value
+	if par.BValue == nil {
+		switch par.DataType {
+		case OCIClobLocator:
+			tempVal = Clob{locator: nil}
+		case OCIBlobLocator:
+			tempVal = Blob{locator: nil}
+		default:
+			tempVal = nil
+		}
+	} else {
+		switch par.DataType {
+		case ROWID:
+			rowid, err := newRowID(session)
+			if err != nil {
+				return err
+			}
+			if rowid == nil {
+				tempVal = nil
+			} else {
+				tempVal = string(rowid.getBytes())
+			}
+		case NCHAR, CHAR, LONG:
+			if connection.strConv.GetLangID() != par.CharsetID {
+				tempCharset := connection.strConv.GetLangID()
+				connection.strConv.SetLangID(par.CharsetID)
+				tempVal = connection.strConv.Decode(par.BValue)
+				connection.strConv.SetLangID(tempCharset)
+			} else {
+				tempVal = connection.strConv.Decode(par.BValue)
+			}
+		case NUMBER:
+			tempVal = converters.DecodeNumber(par.BValue)
+		case TIMESTAMP:
+			dateVal, err := converters.DecodeDate(par.BValue)
+			if err != nil {
+				return err
+			}
+			tempVal = TimeStamp(dateVal)
+		case TimeStampDTY:
+			fallthrough
+		case TimeStampeLTZ:
+			fallthrough
+		case TimeStampLTZ_DTY:
+			fallthrough
+		case TimeStampTZ:
+			fallthrough
+		case TimeStampTZ_DTY:
+			fallthrough
+		case DATE:
+			dateVal, err := converters.DecodeDate(par.BValue)
+			if err != nil {
+				return err
+			}
+			tempVal = dateVal
+		case OCIBlobLocator, OCIClobLocator:
+			locator, err := session.GetClr()
+			if err != nil {
+				return err
+			}
+			if par.DataType == OCIClobLocator {
+				tempVal = Clob{locator: locator}
+			} else {
+				tempVal = Blob{locator: locator}
+			}
+		case IBFloat:
+			tempVal = converters.ConvertBinaryFloat(par.BValue)
+		case IBDouble:
+			tempVal = converters.ConvertBinaryDouble(par.BValue)
+		case IntervalYM_DTY:
+			tempVal = converters.ConvertIntervalYM_DTY(par.BValue)
+		case IntervalDS_DTY:
+			tempVal = converters.ConvertIntervalDS_DTY(par.BValue)
+		default:
+			tempVal = par.BValue
+		}
+	}
+	return par.setValue(tempVal)
+}
+func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Connection) error {
+	var err error
+	par.Value = val
+	if val == nil {
+		par.setForNull()
+		return nil
+	}
+	switch value := val.(type) {
+	case int:
+		par.encodeInt(int64(value))
+	case int8:
+		par.encodeInt(int64(value))
+	case int16:
+		par.encodeInt(int64(value))
+	case int32:
+		par.encodeInt(int64(value))
+	case int64:
+		par.encodeInt(value)
+	case *int:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(int64(*value))
+		}
+	case *int8:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(int64(*value))
+		}
+	case *int16:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(int64(*value))
+		}
+	case *int32:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(int64(*value))
+		}
+	case *int64:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(*value)
+		}
+	case uint:
+		par.encodeInt(int64(value))
+	case uint8:
+		par.encodeInt(int64(value))
+	case uint16:
+		par.encodeInt(int64(value))
+	case uint32:
+		par.encodeInt(int64(value))
+	case uint64:
+		par.encodeInt(int64(value))
+	case *uint:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(int64(*value))
+		}
+	case *uint8:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(int64(*value))
+		}
+	case *uint16:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(int64(*value))
+		}
+	case *uint32:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(int64(*value))
+		}
+	case *uint64:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			par.encodeInt(int64(*value))
+		}
+	case float32:
+		err = par.encodeFloat(float64(value))
+		if err != nil {
+			return err
+		}
+	case float64:
+		err = par.encodeFloat(value)
+		if err != nil {
+			return err
+		}
+	case *float32:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			err = par.encodeFloat(float64(*value))
+			if err != nil {
+				return err
+			}
+		}
+	case *float64:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			err = par.encodeFloat(*value)
+			if err != nil {
+				return err
+			}
+		}
+	case sql.NullByte:
+		if value.Valid {
+			par.encodeInt(int64(value.Byte))
+		} else {
+			par.setForNull()
+		}
+	case sql.NullInt16:
+		if value.Valid {
+			par.encodeInt(int64(value.Int16))
+		} else {
+			par.setForNull()
+		}
+	case sql.NullInt32:
+		if value.Valid {
+			par.encodeInt(int64(value.Int32))
+		} else {
+			par.setForNull()
+		}
+	case sql.NullInt64:
+		if value.Valid {
+			par.encodeInt(value.Int64)
+		} else {
+			par.setForNull()
+		}
+	case *sql.NullByte:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			if value.Valid {
+				par.encodeInt(int64(value.Byte))
+			} else {
+				par.setForNull()
+			}
+		}
+	case *sql.NullInt16:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			if value.Valid {
+				par.encodeInt(int64(value.Int16))
+			} else {
+				par.setForNull()
+			}
+		}
+	case *sql.NullInt32:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			if value.Valid {
+				par.encodeInt(int64(value.Int32))
+			} else {
+				par.setForNull()
+			}
+		}
+	case *sql.NullInt64:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			if value.Valid {
+				par.encodeInt(value.Int64)
+			} else {
+				par.setForNull()
+			}
+		}
+	case sql.NullFloat64:
+		if value.Valid {
+			err = par.encodeFloat(value.Float64)
+			if err != nil {
+				return err
+			}
+		} else {
+			par.setForNull()
+		}
+	case *sql.NullFloat64:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			if value.Valid {
+				err = par.encodeFloat(value.Float64)
+				if err != nil {
+					return err
+				}
+			} else {
+				par.setForNull()
+			}
+		}
+	case sql.NullBool:
+		if value.Valid {
+			var tempVal int64 = 0
+			if value.Bool {
+				tempVal = 1
+			}
+			par.encodeInt(tempVal)
+		} else {
+			par.setForNull()
+		}
+	case *sql.NullBool:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			if value.Valid {
+				var tempVal int64 = 0
+				if value.Bool {
+					tempVal = 1
+				}
+				par.encodeInt(tempVal)
+			} else {
+				par.setForNull()
+			}
+		}
+	case time.Time:
+		par.encodeTime(value)
+	case *time.Time:
+		if value == nil {
+			par.setForTime()
+		} else {
+			par.encodeTime(*value)
+		}
+	case sql.NullTime:
+		if value.Valid {
+			par.encodeTime(value.Time)
+		} else {
+			par.setForNull()
+		}
+	case *sql.NullTime:
+		if value == nil {
+			par.setForTime()
+		} else {
+			if value.Valid {
+				par.encodeTime(value.Time)
+			} else {
+				par.setForNull()
+			}
+		}
+	case TimeStamp:
+		par.encodeTime(time.Time(value))
+		par.DataType = TIMESTAMP
+	case *TimeStamp:
+		if value == nil {
+			par.setForTime()
+		} else {
+			par.encodeTime(time.Time(*value))
+		}
+		par.DataType = TIMESTAMP
+	case NullTimeStamp:
+		if value.Valid {
+			par.encodeTime(time.Time(value.TimeStamp))
+			par.DataType = TIMESTAMP
+		} else {
+			par.setForNull()
+		}
+	case *NullTimeStamp:
+		if value == nil {
+			par.setForTime()
+			par.DataType = TIMESTAMP
+		} else {
+			if value.Valid {
+				par.encodeTime(time.Time(value.TimeStamp))
+				par.DataType = TIMESTAMP
+			} else {
+				par.setForNull()
+			}
+		}
+	case Clob:
+		par.encodeString(value.String, connection.strConv, size)
+		if par.Direction == Output {
+			par.DataType = OCIClobLocator
+		}
+	case *Clob:
+		if value == nil {
+			par.encodeString("", connection.strConv, size)
+		} else {
+			par.encodeString(value.String, connection.strConv, size)
+		}
+		if par.Direction == Output {
+			par.DataType = OCIClobLocator
+		}
+	case Blob:
+		par.encodeRaw(value.Data, size)
+		if par.Direction == Output {
+			par.DataType = OCIBlobLocator
+		}
+	case *Blob:
+		if value == nil {
+			par.encodeRaw(nil, size)
+		} else {
+			par.encodeRaw(value.Data, size)
+		}
+		if par.Direction == Output {
+			par.DataType = OCIBlobLocator
+		}
+	case []byte:
+		par.encodeRaw(value, size)
+	case *[]byte:
+		if value == nil {
+			par.encodeRaw(nil, size)
+		} else {
+			par.encodeRaw(*value, size)
+		}
+	case RefCursor, *RefCursor:
+		par.setForRefCursor()
+	case string:
+		par.encodeString(value, connection.strConv, size)
+	case *string:
+		if value == nil {
+			par.encodeString("", connection.strConv, size)
+		} else {
+			par.encodeString(*value, connection.strConv, size)
+		}
+	case sql.NullString:
+		if value.Valid {
+			par.encodeString(value.String, connection.strConv, size)
+		} else {
+			par.setForNull()
+		}
+	case *sql.NullString:
+		if value == nil {
+			par.encodeString("", connection.strConv, size)
+		} else {
+			if value.Valid {
+				par.encodeString(value.String, connection.strConv, size)
+			} else {
+				par.setForNull()
+			}
+		}
+	case NVarChar:
+		par.CharsetForm = 2
+		par.CharsetID = connection.tcpNego.ServernCharset
+		par.encodeString(string(value), connection.strConv, size)
+	case *NVarChar:
+		par.CharsetForm = 2
+		par.CharsetID = connection.tcpNego.ServernCharset
+		if value == nil {
+			par.encodeString("", connection.strConv, size)
+		} else {
+			par.encodeString(string(*value), connection.strConv, size)
+		}
+	case NullNVarChar:
+		if value.Valid {
+			par.CharsetForm = 2
+			par.CharsetID = connection.tcpNego.ServernCharset
+			par.encodeString(string(value.NVarChar), connection.strConv, size)
+		} else {
+			par.setForNull()
+		}
+	case *NullNVarChar:
+		par.CharsetForm = 2
+		par.CharsetID = connection.tcpNego.ServernCharset
+		if value == nil {
+			par.encodeString("", connection.strConv, size)
+		} else {
+			if value.Valid {
+				par.encodeString(string(value.NVarChar), connection.strConv, size)
+			} else {
+				par.setForNull()
+			}
+		}
+	default:
+		custVal := reflect.ValueOf(val)
+		if custVal.Kind() == reflect.Ptr {
+			custVal = custVal.Elem()
+		}
+		if custVal.Kind() == reflect.Struct {
+			par.setForUDT()
+			for _, cusTyp := range connection.cusTyp {
+				if custVal.Type() == cusTyp.typ {
+					par.cusType = &cusTyp
+					par.ToID = cusTyp.toid
+				}
+			}
+			if par.cusType == nil {
+				return errors.New("struct parameter only allowed with user defined type (UDT)")
+			}
+			var objectBuffer bytes.Buffer
+			for _, attrib := range par.cusType.attribs {
+				if fieldIndex, ok := par.cusType.filedMap[attrib.Name]; ok {
+					tempPar := ParameterInfo{
+						Direction:   par.Direction,
+						Flag:        3,
+						CharsetID:   connection.tcpNego.ServerCharset,
+						CharsetForm: 1,
+					}
+					err = tempPar.encodeValue(custVal.Field(fieldIndex).Interface(), 0, connection)
+					if err != nil {
+						return err
+					}
+					connection.session.WriteClr(&objectBuffer, tempPar.BValue)
+				}
+			}
+			par.BValue = objectBuffer.Bytes()
+		}
+	}
+	return nil
 }

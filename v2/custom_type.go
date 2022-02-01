@@ -370,41 +370,13 @@ func (cust *customType) getObject() interface{} {
 				//if err != nil {
 				//	panic(err)
 				//}
-				//var tempPar = ParameterInfo{
-				//	Name:                 "",
-				//	TypeName:             "",
-				//	Direction:            attrib.Direction,
-				//	IsNull:               false,
-				//	AllowNull:            false,
-				//	ColAlias:             "",
-				//	DataType:             0,
-				//	IsXmlType:            false,
-				//	Flag:                 attrib.Flag,
-				//	Precision:            attrib.Precision,
-				//	Scale:                attrib.Scale,
-				//	MaxLen:               attrib.MaxLen,
-				//	MaxCharLen:           attrib.MaxCharLen,
-				//	MaxNoOfArrayElements: attrib.MaxNoOfArrayElements,
-				//	ContFlag:             attrib.ContFlag,
-				//	ToID:                 nil,
-				//	Version:              attrib.Version,
-				//	CharsetID:            attrib.CharsetID,
-				//	CharsetForm:          attrib.CharsetForm,
-				//	BValue:               attrib.BValue,
-				//	Value:                obj.Elem().Field(fieldIndex).Interface(),
-				//	OutputVarPtr:         nil,
-				//	getDataFromServer:    false,
-				//	oaccollid:            0,
-				//	cusType:              nil,
-				//}
-				tempVal := &ParameterValue{obj.Elem().Field(fieldIndex).Interface()}
-				err := tempVal.setValue(attrib.Value)
-				//err := attrib.setValueTo(obj.Elem().Field(fieldIndex))
+				tempPar := ParameterInfo{Value: obj.Elem().Field(fieldIndex).Interface()}
+				err := tempPar.setValue(attrib.Value)
 				if err != nil {
 					return err
 				}
 
-				obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(tempVal.Value))
+				obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(tempPar.Value))
 			}
 		}
 	}

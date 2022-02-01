@@ -212,8 +212,6 @@ func (session *Session) Connect() error {
 		if port == 0 {
 			return errors.New("no available severs to connect to")
 		}
-		//addr := fmt.Sprintf("%s:%d", )
-		//session.conn, err = net.Dial("tcp6", "::1:1521")
 		addr := net.JoinHostPort(host, strconv.Itoa(port))
 		session.conn, err = net.Dial("tcp", addr)
 		if err != nil {

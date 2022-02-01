@@ -103,9 +103,8 @@ type ConnectionString struct {
 // this function help build a will formed databaseURL and accept any character as it
 // convert special charters to corresponding values in URL
 func BuildUrl(server string, port int, service, user, password string, options map[string]string) string {
-	host := net.JoinHostPort(server, strconv.Itoa(port))
 	ret := fmt.Sprintf("oracle://%s:%s@%s/%s", url.QueryEscape(user), url.QueryEscape(password),
-		host, url.QueryEscape(service))
+		net.JoinHostPort(server, strconv.Itoa(port)), url.QueryEscape(service))
 	if options != nil {
 		ret += "?"
 		for key, val := range options {
@@ -177,28 +176,6 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			ret.Ports = append(ret.Ports, defaultPort)
 		}
 	}
-	//if len(u.Host) > 0 {
-	//
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	if len(port) == 0 {
-	//		port = defaultPort
-	//	}
-	//	//fmt.Println(net.SplitHostPort(u.Host))
-	//	//fmt.Println(net.JoinHostPort("::1", "1521"))
-	//	//idxBracket := strings.LastIndex(u.Host, "]")
-	//	//if idxBracket < 0 {
-	//	//	idxBracket = 0
-	//	//}
-	//	//idx := strings.LastIndex(u.Host[idxBracket:], ":")
-	//	//idx += idxBracket
-	//	if idx > 0 {
-	//		ret.Servers = append(ret.Servers, u.Host[:idx])
-	//	} else {
-	//		ret.Servers = append(ret.Servers, u.Host)
-	//	}
-	//}
 	ret.ServiceName = strings.Trim(u.Path, "/")
 	if q != nil {
 		for key, val := range q {
@@ -208,21 +185,20 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			case "SERVER":
 				for _, srv := range val {
 					srv = strings.TrimSpace(srv)
-					idx := strings.Index(srv, ":")
-					if idx > 0 {
-						ret.Servers = append(ret.Servers, srv[:idx])
-						port, err := strconv.Atoi(srv[idx+1:])
+					if srv != "" {
+						host, p, err = net.SplitHostPort(srv)
 						if err != nil {
-							port = 0
+							return nil, err
 						}
-						if port == 0 {
-							ret.Ports = append(ret.Ports, defaultPort)
-						} else {
-							ret.Ports = append(ret.Ports, port)
+						port := defaultPort
+						if p != "" {
+							port, err = strconv.Atoi(p)
+							if err != nil {
+								port = defaultPort
+							}
 						}
-					} else {
-						ret.Servers = append(ret.Servers, srv)
-						ret.Ports = append(ret.Ports, defaultPort)
+						ret.Servers = append(ret.Servers, host)
+						ret.Ports = append(ret.Ports, port)
 					}
 				}
 			case "SERVICE NAME":

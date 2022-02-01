@@ -3,6 +3,7 @@ package go_ora
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"path"
 	"strconv"
@@ -102,8 +103,9 @@ type ConnectionString struct {
 // this function help build a will formed databaseURL and accept any character as it
 // convert special charters to corresponding values in URL
 func BuildUrl(server string, port int, service, user, password string, options map[string]string) string {
-	ret := fmt.Sprintf("oracle://%s:%s@%s:%d/%s", url.QueryEscape(user), url.QueryEscape(password),
-		server, port, url.QueryEscape(service))
+	host := net.JoinHostPort(server, strconv.Itoa(port))
+	ret := fmt.Sprintf("oracle://%s:%s@%s/%s", url.QueryEscape(user), url.QueryEscape(password),
+		host, url.QueryEscape(service))
 	if options != nil {
 		ret += "?"
 		for key, val := range options {
@@ -125,11 +127,12 @@ func BuildUrl(server string, port int, service, user, password string, options m
 // newConnectionStringFromUrl create new connection string from databaseURL data and options
 func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	u, err := url.Parse(databaseUrl)
+
 	if err != nil {
 		return nil, err
 	}
 	q := u.Query()
-	p := u.Port()
+	//p := u.Port()
 	ret := &ConnectionString{
 		Port:                  defaultPort,
 		DBAPrivilege:          NONE,
@@ -156,25 +159,46 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	if strings.ToUpper(ret.UserID) == "SYS" {
 		ret.DBAPrivilege = SYSDBA
 	}
-	if p != "" {
-		port, err := strconv.Atoi(p)
-		if err != nil {
-			ret.Ports = append(ret.Ports, defaultPort)
-		} else {
-			ret.Ports = append(ret.Ports, port)
-		}
+	host, p, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return nil, err
+	}
+	if len(host) > 0 {
+		ret.Servers = append(ret.Servers, host)
+		if p != "" {
+			port, err := strconv.Atoi(p)
+			if err != nil {
+				ret.Ports = append(ret.Ports, defaultPort)
+			} else {
+				ret.Ports = append(ret.Ports, port)
+			}
 
-	} else {
-		ret.Ports = append(ret.Ports, defaultPort)
-	}
-	if len(u.Host) > 0 {
-		idx := strings.Index(u.Host, ":")
-		if idx > 0 {
-			ret.Servers = append(ret.Servers, u.Host[:idx])
 		} else {
-			ret.Servers = append(ret.Servers, u.Host)
+			ret.Ports = append(ret.Ports, defaultPort)
 		}
 	}
+	//if len(u.Host) > 0 {
+	//
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	if len(port) == 0 {
+	//		port = defaultPort
+	//	}
+	//	//fmt.Println(net.SplitHostPort(u.Host))
+	//	//fmt.Println(net.JoinHostPort("::1", "1521"))
+	//	//idxBracket := strings.LastIndex(u.Host, "]")
+	//	//if idxBracket < 0 {
+	//	//	idxBracket = 0
+	//	//}
+	//	//idx := strings.LastIndex(u.Host[idxBracket:], ":")
+	//	//idx += idxBracket
+	//	if idx > 0 {
+	//		ret.Servers = append(ret.Servers, u.Host[:idx])
+	//	} else {
+	//		ret.Servers = append(ret.Servers, u.Host)
+	//	}
+	//}
 	ret.ServiceName = strings.Trim(u.Path, "/")
 	if q != nil {
 		for key, val := range q {

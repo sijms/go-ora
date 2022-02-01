@@ -4,6 +4,9 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.3.0: Add support for Nullable types
+* support for nullable type in output parameters
+* add more nullable type NullTimeStamp and NullNVarChar
 ### version 2.2.25: Add support for User Defined Type (UDT) as input and output parameter
 * see example udt_pars for more help
 ### version 2.2.23: User Defined Type (UDT) as input parameters

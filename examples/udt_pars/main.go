@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"flag"
 	"fmt"
@@ -10,12 +11,12 @@ import (
 )
 
 type test1 struct {
-	Id    int64     `oracle:"name:test_id"`
-	Name  string    `oracle:"name:test_name"`
-	Data1 string    `oracle:"name:test_data1"`
-	Data2 string    `oracle:"name:test_data2"`
-	Data3 string    `oracle:"name:test_data3"`
-	Date  time.Time `oracle:"name:test_date"`
+	Id    int64           `oracle:"name:test_id"`
+	Name  *sql.NullString `oracle:"name:test_name"`
+	Data1 string          `oracle:"name:test_data1"`
+	Data2 string          `oracle:"name:test_data2"`
+	Data3 string          `oracle:"name:test_data3"`
+	Date  time.Time       `oracle:"name:test_date"`
 }
 
 func createTable(conn *go_ora.Connection) error {
@@ -44,7 +45,7 @@ func insertData(conn *go_ora.Connection) error {
 	for index = 1; index <= 100; index++ {
 		var test test1
 		test.Id = int64(index)
-		test.Name = nameText[:index]
+		test.Name = &sql.NullString{String: nameText[:index], Valid: true}
 		test.Data1 = nameText
 		test.Data2 = nameText
 		test.Data3 = nameText
@@ -88,6 +89,7 @@ END;`
 	}
 	fmt.Println("ID: ", visitId)
 	fmt.Println("Test: ", test)
+	fmt.Println("Test Name: ", test.Name)
 	fmt.Println("Finish query output par: ", time.Now().Sub(t))
 	return nil
 }
@@ -119,6 +121,7 @@ func queryData(conn *go_ora.Connection) error {
 		fmt.Println("Data1: ", test.Data1)
 		fmt.Println("Data2: ", test.Data2)
 		fmt.Println("Data3: ", test.Data3)
+		fmt.Println("Time: ", test.Date)
 		count++
 	}
 	if rows.Err() != nil {

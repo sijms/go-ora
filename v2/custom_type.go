@@ -371,7 +371,7 @@ func (cust *customType) getObject() interface{} {
 				//	panic(err)
 				//}
 				tempPar := ParameterInfo{Value: obj.Elem().Field(fieldIndex).Interface()}
-				err := tempPar.setValue(attrib.Value)
+				err := tempPar.setParameterValue(attrib.Value)
 				if err != nil {
 					return err
 				}

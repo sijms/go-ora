@@ -420,7 +420,7 @@ func (par *ParameterInfo) setForNull() {
 	par.CharsetForm = 1
 }
 
-func (par *ParameterInfo) setValue(newValue driver.Value) error {
+func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 	if par.Value == nil {
 		par.Value = newValue
 		return nil
@@ -871,7 +871,7 @@ func (par *ParameterInfo) setValue(newValue driver.Value) error {
 	return nil
 }
 
-func (par *ParameterInfo) decodeValue(connection *Connection) error {
+func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, error) {
 	session := connection.session
 	var tempVal driver.Value
 	if par.BValue == nil {
@@ -888,7 +888,7 @@ func (par *ParameterInfo) decodeValue(connection *Connection) error {
 		case ROWID:
 			rowid, err := newRowID(session)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if rowid == nil {
 				tempVal = nil
@@ -909,7 +909,7 @@ func (par *ParameterInfo) decodeValue(connection *Connection) error {
 		case TIMESTAMP:
 			dateVal, err := converters.DecodeDate(par.BValue)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			tempVal = TimeStamp(dateVal)
 		case TimeStampDTY:
@@ -925,13 +925,13 @@ func (par *ParameterInfo) decodeValue(connection *Connection) error {
 		case DATE:
 			dateVal, err := converters.DecodeDate(par.BValue)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			tempVal = dateVal
 		case OCIBlobLocator, OCIClobLocator:
 			locator, err := session.GetClr()
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if par.DataType == OCIClobLocator {
 				tempVal = Clob{locator: locator}
@@ -950,8 +950,23 @@ func (par *ParameterInfo) decodeValue(connection *Connection) error {
 			tempVal = par.BValue
 		}
 	}
-	return par.setValue(tempVal)
+	return tempVal, nil
 }
+
+func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
+	tempVal, err := par.decodeValue(connection)
+	if err != nil {
+		return err
+	}
+	return par.setParameterValue(tempVal)
+}
+
+func (par *ParameterInfo) decodeColumnValue(connection *Connection) error {
+	var err error
+	par.Value, err = par.decodeValue(connection)
+	return err
+}
+
 func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Connection) error {
 	var err error
 	par.Value = val

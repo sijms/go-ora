@@ -2,6 +2,7 @@ package network
 
 import (
 	"bytes"
+	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -192,6 +193,104 @@ func (session *Session) negotiate() {
 	}
 	session.sslConn = tls.Client(session.conn, config)
 	//session.connOption.Tracer.Print("SSL/TLS HandShake complete")
+}
+
+func (session *Session) ConnectWithContext(cont context.Context) error {
+	dialer := &net.Dialer{}
+	connOption := session.Context.ConnOption
+	session.Disconnect()
+	connOption.Tracer.Print("Connect")
+	var err error
+	var connected = false
+	var host string
+	var port int
+	var loop = true
+	for loop {
+		host, port = connOption.GetActiveServer(false)
+		if port == 0 {
+			return errors.New("no available severs to connect to")
+		}
+		addr := net.JoinHostPort(host, strconv.Itoa(port))
+		session.conn, err = dialer.DialContext(cont, "tcp", addr)
+		if err != nil {
+			connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
+			host, port = connOption.GetActiveServer(true)
+			if port == 0 {
+				break
+			}
+			continue
+		}
+		connOption.Tracer.Printf("using: %s ..... [SUCCEED]", addr)
+		connected = true
+		loop = false
+	}
+	if !connected {
+		return err
+	}
+
+	if connOption.SSL {
+		connOption.Tracer.Print("Using SSL/TLS")
+		session.negotiate()
+	}
+	connOption.Tracer.Print("Open :", connOption.ConnectionData())
+	connectPacket := newConnectPacket(*session.Context)
+	err = session.writePacket(connectPacket)
+	if err != nil {
+		return err
+	}
+	if uint16(connectPacket.packet.length) == connectPacket.packet.dataOffset {
+		session.PutBytes(connectPacket.buffer...)
+		err = session.Write()
+		if err != nil {
+			return err
+		}
+	}
+	pck, err := session.readPacket()
+	if err != nil {
+		return err
+	}
+
+	if acceptPacket, ok := pck.(*AcceptPacket); ok {
+		*session.Context = acceptPacket.sessionCtx
+		session.Context.handshakeComplete = true
+		connOption.Tracer.Print("Handshake Complete")
+		return nil
+	}
+	if redirectPacket, ok := pck.(*RedirectPacket); ok {
+		connOption.Tracer.Print("Redirect")
+		connOption.connData = redirectPacket.reconnectData
+		if len(redirectPacket.protocol()) != 0 {
+			connOption.Protocol = redirectPacket.protocol()
+		}
+		if len(redirectPacket.host()) != 0 {
+			host = redirectPacket.host()
+		}
+		if len(redirectPacket.port()) != 0 {
+			port, err = strconv.Atoi(redirectPacket.port())
+			if err != nil {
+				return errors.New("redirect packet with wrong port")
+			}
+		}
+		connOption.AddServer(host, port)
+		host, port = connOption.GetActiveServer(true)
+		return session.Connect()
+
+	}
+	if refusePacket, ok := pck.(*RefusePacket); ok {
+		refusePacket.extractErrCode()
+		connOption.Tracer.Printf("connection to %s:%d refused with error: %s", host, port, refusePacket.Err.Error())
+		host, port = connOption.GetActiveServer(true)
+		if port == 0 {
+			session.Disconnect()
+			return &refusePacket.Err
+		}
+		return session.Connect()
+		//errorMessage := fmt.Sprintf(
+		//	"connection refused by the server. user reason: %d; system reason: %d; error message: %s",
+		//	refusePacket.UserReason, refusePacket.SystemReason, refusePacket.message)
+		//return errors.New(errorMessage)
+	}
+	return errors.New("connection refused by the server due to unknown reason")
 }
 
 // Connect perform network connection on address:port

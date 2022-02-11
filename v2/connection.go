@@ -78,8 +78,13 @@ type Connection struct {
 	w                 *wallet
 	cusTyp            map[string]customType
 }
-
+type OracleDriverContext struct {
+}
+type OracleConnector struct {
+	driver *OracleDriver
+}
 type OracleDriver struct {
+	connectionString string
 	//m         sync.Mutex
 	//Conn      *Connection
 	//Server    string
@@ -94,6 +99,31 @@ type OracleDriver struct {
 
 func init() {
 	sql.Register("oracle", &OracleDriver{})
+}
+
+func (drv *OracleDriverContext) OpenConnector(name string) (driver.Connector, error) {
+	//conn, err := NewConnection(name)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = conn.Connect()
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	return &OracleConnector{driver: &OracleDriver{connectionString: name}}, nil
+}
+
+func (connector *OracleConnector) Connect(context context.Context) (driver.Conn, error) {
+	conn, err := NewConnection(connector.driver.connectionString)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (connector *OracleConnector) Driver() driver.Driver {
+	return connector.driver
 }
 
 // Open return a new open connection

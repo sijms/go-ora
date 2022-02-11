@@ -543,15 +543,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 								}
 							} else {
 								return errors.New("RefCursor parameter should contain pointer to  RefCursor struct")
-								//if cursor, ok := stmt.Pars[x].Value.(RefCursor); ok {
-								//	cursor.connection = stmt.connection
-								//	cursor.parent = stmt
-								//	err = cursor.load()
-								//	if err != nil {
-								//		return err
-								//	}
-								//	stmt.Pars[x].Value = cursor
-								//}
 							}
 						} else {
 							if stmt.Pars[x].Direction != Input {
@@ -577,7 +568,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					}
 					for x := 0; x < len(dataSet.Cols); x++ {
 						if dataSet.Cols[x].getDataFromServer {
-							err = stmt.calculateParameterValue(&dataSet.Cols[x])
+							err = stmt.calculateColumnValue(&dataSet.Cols[x])
 							if err != nil {
 								return err
 							}
@@ -1103,6 +1094,89 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	return nil
 }
 
+func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
+	session := stmt.connection.session
+	if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
+		stmt._hasBLOB = true
+	}
+
+	if col.DataType == XMLType {
+		if col.TypeName == "XMLTYPE" {
+			return errors.New("unsupported data type: XMLTYPE")
+		}
+		if col.cusType == nil {
+			return fmt.Errorf("unregister custom type: %s. call RegisterType first", col.TypeName)
+		}
+		_, err := session.GetDlc() // contian toid and some 0s
+		if err != nil {
+			return err
+		}
+		_, err = session.GetBytes(3) // 3 0s
+		if err != nil {
+			return err
+		}
+		_, err = session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
+		_, err = session.GetByte()
+		if err != nil {
+			return err
+		}
+		_, err = session.GetByte()
+		if err != nil {
+			return err
+		}
+		tempBytes, err := session.GetClr()
+		if err != nil {
+			return err
+		}
+		newState := network.SessionState{InBuffer: tempBytes}
+		session.SaveState(&newState)
+		_, err = session.GetByte()
+		if err != nil {
+			return err
+		}
+		ctl, err := session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
+		if ctl == 0xFE {
+			_, err = session.GetInt(4, false, true)
+			if err != nil {
+				return err
+			}
+		}
+		for x := 0; x < len(col.cusType.attribs); x++ {
+			err = stmt.calculateColumnValue(&col.cusType.attribs[x])
+			if err != nil {
+				return err
+			}
+		}
+		_ = session.LoadState()
+		paramValue := reflect.ValueOf(col.Value)
+		if paramValue.Kind() == reflect.Ptr {
+			paramValue.Elem().Set(reflect.ValueOf(col.cusType.getObject()))
+		} else {
+			col.Value = col.cusType.getObject()
+		}
+		return nil
+	}
+
+	if (col.DataType == NCHAR || col.DataType == CHAR) && col.MaxCharLen == 0 {
+		col.BValue = nil
+	}
+	if col.DataType == RAW && col.MaxLen == 0 {
+		col.BValue = nil
+	}
+	var err error
+	col.BValue, err = session.GetClr()
+	if err != nil {
+		return err
+	}
+	return col.decodeColumnValue(stmt.connection)
+}
+
 // get values of rows and output parameter according to DataType and binary value (bValue)
 func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	session := stmt.connection.session
@@ -1174,9 +1248,6 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 
 	if (param.DataType == NCHAR || param.DataType == CHAR) && param.MaxCharLen == 0 {
 		param.BValue = nil
-		//return param.setValue(nil)
-		//param.Value = nil
-		//return nil
 	}
 	if param.DataType == RAW && param.MaxLen == 0 {
 		param.BValue = nil
@@ -1186,7 +1257,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	if err != nil {
 		return err
 	}
-	return param.decodeValue(stmt.connection)
+	return param.decodeParameterValue(stmt.connection)
 }
 
 // Close close stmt cursor in the server

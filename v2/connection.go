@@ -6,15 +6,12 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"os"
-	"os/user"
 	"strconv"
 	"strings"
 
 	"github.com/sijms/go-ora/v2/advanced_nego"
 	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
-	"github.com/sijms/go-ora/v2/trace"
 )
 
 type ConnectionState int
@@ -27,12 +24,12 @@ const (
 type LogonMode int
 
 const (
-	NoNewPass LogonMode = 0x1
-	//WithNewPass LogonMode = 0x2
+	NoNewPass   LogonMode = 0x1
+	WithNewPass LogonMode = 0x2
 	SysDba      LogonMode = 0x20 // no verify response from server
 	SysOper     LogonMode = 0x40 // no verify response from server
 	UserAndPass LogonMode = 0x100
-	//PROXY       LogonMode = 0x400
+	PROXY       LogonMode = 0x400
 )
 
 type NLSData struct {
@@ -75,7 +72,6 @@ type Connection struct {
 	transactionID     []byte
 	strConv           converters.IStringConverter
 	NLSData           NLSData
-	w                 *wallet
 	cusTyp            map[string]customType
 }
 type OracleDriverContext struct {
@@ -351,8 +347,9 @@ func (conn *Connection) Open() error {
 	}
 
 	conn.session = network.NewSession(conn.connOption)
-	if conn.connOption.SSL && conn.w != nil {
-		err := conn.session.LoadSSLData(conn.w.certificates, conn.w.privateKeys, conn.w.certificateRequests)
+	W := conn.conStr.w
+	if conn.connOption.SSL && W != nil {
+		err := conn.session.LoadSSLData(W.certificates, W.privateKeys, W.certificateRequests)
 		if err != nil {
 			return err
 		}
@@ -414,7 +411,11 @@ func (conn *Connection) Open() error {
 	//this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
 	//this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
 	//this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompiletimeCapabilities[7] >= (byte) 8;
-
+	//if len(conn.connOption.UserID) > 0 && len(conn.conStr.password) > 0 {
+	//
+	//} else {
+	//	err = conn.doOsAuth()
+	//}
 	err = conn.doAuth()
 	if err != nil {
 		return err
@@ -464,69 +465,58 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	userName := ""
-	User, err := user.Current()
-	if err == nil {
-		userName = User.Username
-	}
-	hostName, _ := os.Hostname()
-	indexOfSlash := strings.LastIndex(os.Args[0], "/")
-	indexOfSlash += 1
-	if indexOfSlash < 0 {
-		indexOfSlash = 0
-	}
+	//userName := ""
+	//User, err := user.Current()
+	//if err == nil {
+	//	userName = User.Username
+	//}
+	//fmt.Println(userName)
+	//idx := strings.Index(userName, "\\")
+	//if idx >= 0 {
+	//	userName = userName[idx+1:]
+	//}
+	//hostName, _ := os.Hostname()
+	//indexOfSlash := strings.LastIndex(os.Args[0], "/")
+	//indexOfSlash += 1
+	//if indexOfSlash < 0 {
+	//	indexOfSlash = 0
+	//}
 
-	connOption := &network.ConnectionOption{
-		//Port:                  conStr.Port,
-		Servers:               conStr.Servers,
-		Ports:                 conStr.Ports,
-		TransportConnectTo:    0xFFFF,
-		SSLVersion:            "",
-		WalletDict:            "",
-		TransportDataUnitSize: 0xFFFF,
-		SessionDataUnitSize:   0xFFFF,
-		Protocol:              "tcp",
-		//Host:                  conStr.Host,
-		UserID: conStr.UserID,
-		//IP:                    "",
-		SID: conStr.SID,
-		//Addr:                  "",
-		//Server:                conn.conStr.Host,
-		ServiceName:  conStr.ServiceName,
-		InstanceName: conStr.InstanceName,
-		PrefetchRows: conStr.PrefetchRows,
-		ClientData: network.ClientData{
-			ProgramPath: os.Args[0],
-			ProgramName: os.Args[0][indexOfSlash:],
-			UserName:    userName,
-			HostName:    hostName,
-			DriverName:  "OracleClientGo",
-			PID:         os.Getpid(),
-		},
-		SSL:       conStr.SSL,
-		SSLVerify: conStr.SSLVerify,
-		//InAddrAny:             false,
-	}
-	if conStr.SSL {
-		connOption.Protocol = "tcps"
-	}
-	if len(conStr.Trace) > 0 {
-		tf, err := os.Create(conStr.Trace)
-		if err != nil {
-			//noinspection GoErrorStringFormat
-			return nil, fmt.Errorf("Can't open trace file: %w", err)
-		}
-		connOption.Tracer = trace.NewTraceWriter(tf)
-	} else {
-		connOption.Tracer = trace.NilTracer()
-	}
+	//connOption := &network.ConnectionOption{
+	//	//Port:                  conStr.Port,
+	//	Servers:               conStr.Servers,
+	//	Ports:                 conStr.Ports,
+	//	TransportConnectTo:    0xFFFF,
+	//	SSLVersion:            "",
+	//	WalletDict:            "",
+	//	TransportDataUnitSize: 0xFFFF,
+	//	SessionDataUnitSize:   0xFFFF,
+	//	Protocol:              "tcp",
+	//	UserID: conStr.UserID, 		"",
+	//	SID: conStr.SID,
+	//	ServiceName:  conStr.ServiceName,
+	//	InstanceName: conStr.InstanceName,
+	//	PrefetchRows: conStr.PrefetchRows,
+	//	ClientData: network.ClientInfo{
+	//		ProgramPath: os.Args[0],
+	//		ProgramName: os.Args[0][indexOfSlash:],
+	//		UserName:    userName,
+	//		HostName:    hostName,
+	//		DriverName:  "OracleClientGo",
+	//		PID:         os.Getpid(),
+	//	},
+	//	SSL:       conStr.SSL,
+	//	SSLVerify: conStr.SSLVerify,
+	//	//InAddrAny:             false,
+	//}
+
 	return &Connection{
 		State:      Closed,
 		conStr:     conStr,
-		connOption: connOption,
+		connOption: &conStr.connOption,
 		autoCommit: true,
-		w:          conStr.w,
-		cusTyp:     map[string]customType{},
+		//w:          conStr.w,
+		cusTyp: map[string]customType{},
 	}, nil
 }
 
@@ -544,32 +534,153 @@ func (conn *Connection) Close() (err error) {
 	return
 }
 
+// doOsAuth a login step that use os authentication
+//func (conn *Connection) doOsAuth() error {
+//	conn.connOption.Tracer.Print("doOsAuth")
+//	conn.session.ResetBuffer()
+//	conn.session.PutBytes(3, 0x73, 0)
+//	if len(conn.connOption.UserID) > 0 {
+//		conn.session.PutBytes(1)
+//		conn.session.PutUint(len(conn.connOption.UserID), 4, true, true)
+//	} else {
+//		conn.session.PutBytes(0, 0)
+//	}
+//	if len(conn.connOption.UserID) > 0 && len(conn.conStr.password) > 0 {
+//		conn.LogonMode |= 0x100
+//	}
+//	conn.LogonMode = conn.LogonMode | NoNewPass
+//	conn.session.PutUint(int(conn.LogonMode), 4, true, true)
+//	conn.session.PutBytes(1)
+//	conn.session.PutBytes(1, 12, 1, 1)
+//	if len(conn.connOption.UserID) > 0 {
+//		conn.session.PutString(conn.connOption.UserID)
+//	}
+//	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.HostName, 0)
+//	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ProgramName, 0)
+//	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.HostName, 0)
+//	conn.session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", conn.connOption.PID), 0)
+//	conn.session.PutKeyValString("AUTH_SID", conn.connOption.ClientInfo.UserName, 0)
+//	conn.session.PutKeyValString("AUTH_CONNECT_STRING", conn.connOption.ConnectionData(), 0)
+//	conn.session.PutKeyValString("SESSION_CLIENT_CHARSET", strconv.Itoa(conn.tcpNego.ServerCharset), 0)
+//	conn.session.PutKeyValString("SESSION_CLIENT_LIB_TYPE", "0", 0)
+//	conn.session.PutKeyValString("SESSION_CLIENT_DRIVER_NAME", "OracleClientGo", 0)
+//	conn.session.PutKeyValString("SESSION_CLIENT_VERSION", "0", 0)
+//	conn.session.PutKeyValString("SESSION_CLIENT_LOBATTR", "1", 0)
+//	//conn.session.PutKeyValString("AUTH_ACL", "8800", 0)
+//	alterSess := "ALTER SESSION SET NLS_LANGUAGE='AMERICAN' NLS_TERRITORY='AMERICA' TIME_ZONE='Africa/Cairo'\x00"
+//	conn.session.PutKeyValString("AUTH_ALTER_SESSION", alterSess, 1)
+//	err := conn.session.Write()
+//	if err != nil {
+//		return err
+//	}
+//
+//	conn.authObject, err = newAuthObject(conn.connOption.UserID, conn.conStr.password, conn.tcpNego, conn.session)
+//	if err != nil {
+//		return err
+//	}
+//	// if proxyAuth ==> mode |= PROXY
+//	err = conn.authObject.Write(conn.connOption, conn.LogonMode, conn.session)
+//	if err != nil {
+//		return err
+//	}
+//	stop := false
+//	for !stop {
+//		msg, err := conn.session.GetByte()
+//		if err != nil {
+//			return err
+//		}
+//		switch msg {
+//		case 4:
+//			conn.session.Summary, err = network.NewSummary(conn.session)
+//			if err != nil {
+//				return err
+//			}
+//			if conn.session.HasError() {
+//				return conn.session.GetError()
+//			}
+//			stop = true
+//		case 8:
+//			dictLen, err := conn.session.GetInt(2, true, true)
+//			if err != nil {
+//				return err
+//			}
+//			conn.SessionProperties = make(map[string]string, dictLen)
+//			for x := 0; x < dictLen; x++ {
+//				key, val, _, err := conn.session.GetKeyVal()
+//				if err != nil {
+//					return err
+//				}
+//				conn.SessionProperties[string(key)] = string(val)
+//			}
+//		case 15:
+//			warning, err := network.NewWarningObject(conn.session)
+//			if err != nil {
+//				return err
+//			}
+//			if warning != nil {
+//				fmt.Println(warning)
+//			}
+//		case 23:
+//			opCode, err := conn.session.GetByte()
+//			if err != nil {
+//				return err
+//			}
+//			if opCode == 5 {
+//				err = conn.loadNLSData()
+//				if err != nil {
+//					return err
+//				}
+//			} else {
+//				err = conn.getServerNetworkInformation(opCode)
+//				if err != nil {
+//					return err
+//				}
+//			}
+//		default:
+//			return errors.New(fmt.Sprintf("message code error: received code %d", msg))
+//		}
+//	}
+//
+//	// if verifyResponse == true
+//	// conn.authObject.VerifyResponse(conn.SessionProperties["AUTH_SVR_RESPONSE"])
+//	return nil
+//}
 // doAuth a login step that occur during open connection
 func (conn *Connection) doAuth() error {
 	conn.connOption.Tracer.Print("doAuth")
-	conn.session.ResetBuffer()
-	conn.session.PutBytes(3, 118, 0, 1)
-	conn.session.PutUint(len(conn.conStr.UserID), 4, true, true)
-	conn.LogonMode = conn.LogonMode | NoNewPass
-	conn.session.PutUint(int(conn.LogonMode), 4, true, true)
-	conn.session.PutBytes(1, 1, 5, 1, 1)
-	conn.session.PutString(conn.conStr.UserID)
-	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientData.HostName, 0)
-	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientData.ProgramName, 0)
-	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientData.HostName, 0)
-	conn.session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", conn.connOption.ClientData.PID), 0)
-	conn.session.PutKeyValString("AUTH_SID", conn.connOption.ClientData.UserName, 0)
-	err := conn.session.Write()
-	if err != nil {
-		return err
-	}
+	if len(conn.connOption.UserID) > 0 && len(conn.conStr.password) > 0 {
+		conn.session.ResetBuffer()
+		conn.session.PutBytes(3, 0x76, 0, 1)
+		conn.session.PutUint(len(conn.connOption.UserID), 4, true, true)
+		conn.LogonMode = conn.LogonMode | NoNewPass
+		conn.session.PutUint(int(conn.LogonMode), 4, true, true)
+		conn.session.PutBytes(1, 1, 5, 1, 1)
+		if len(conn.connOption.UserID) > 0 {
+			conn.session.PutString(conn.connOption.UserID)
+		}
+		conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientInfo.HostName, 0)
+		conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientInfo.ProgramName, 0)
+		conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientInfo.HostName, 0)
+		conn.session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", conn.connOption.ClientInfo.PID), 0)
+		conn.session.PutKeyValString("AUTH_SID", conn.connOption.ClientInfo.UserName, 0)
+		err := conn.session.Write()
+		if err != nil {
+			return err
+		}
 
-	conn.authObject, err = newAuthObject(conn.conStr.UserID, conn.conStr.Password, conn.tcpNego, conn.session)
-	if err != nil {
-		return err
+		conn.authObject, err = newAuthObject(conn.connOption.UserID, conn.conStr.password, conn.tcpNego, conn.session)
+		if err != nil {
+			return err
+		}
+	} else {
+		conn.authObject = &AuthObject{
+			tcpNego:    conn.tcpNego,
+			usePadding: false,
+			customHash: conn.tcpNego.ServerCompileTimeCaps[4]&32 != 0,
+		}
 	}
 	// if proxyAuth ==> mode |= PROXY
-	err = conn.authObject.Write(conn.connOption, conn.LogonMode, conn.session)
+	err := conn.authObject.Write(conn.connOption, conn.LogonMode, conn.session)
 	if err != nil {
 		return err
 	}
@@ -870,4 +981,8 @@ func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, 
 		_ = stmt.Close()
 	}()
 	return stmt.Exec(args)
+}
+
+func SetNTSAuth(newNTSManager advanced_nego.NTSAuthInterface) {
+	advanced_nego.NTSAuth = newNTSManager
 }

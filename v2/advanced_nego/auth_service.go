@@ -30,20 +30,21 @@ func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
 		output.availableServiceNames = []string{"TCPS"}
 		output.availableServiceIDs = []int{2}
 	}
-	str := ""
+	//str :=  ""
 	connOption := comm.session.Context.ConnOption
-	if connOption != nil {
-		snConfig := connOption.SNOConfig
-		if snConfig != nil {
-			var exists bool
-			str, exists = snConfig["sqlnet.authentication_services"]
-			if !exists {
-				str = ""
-			}
-		}
-	}
+	//for
+	//if connOption != nil {
+	//	snConfig := connOption.SNOConfig
+	//	if snConfig != nil {
+	//		var exists bool
+	//		str, exists = snConfig["sqlnet.authentication_services"]
+	//		if !exists {
+	//			str = ""
+	//		}
+	//	}
+	//}
 	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
-	err := output.buildServiceList(str, false, false)
+	err := output.buildServiceList(connOption.AuthService, false, false)
 	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err

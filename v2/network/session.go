@@ -258,7 +258,7 @@ func (session *Session) ConnectWithContext(cont context.Context) error {
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
 		connOption.Tracer.Print("Redirect")
-		connOption.connData = redirectPacket.reconnectData
+		//connOption.connData = redirectPacket.reconnectData
 		if len(redirectPacket.protocol()) != 0 {
 			connOption.Protocol = redirectPacket.protocol()
 		}
@@ -375,7 +375,7 @@ func (session *Session) Connect() error {
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
 		connOption.Tracer.Print("Redirect")
-		connOption.connData = redirectPacket.reconnectData
+		//connOption.connData = redirectPacket.reconnectData
 		if len(redirectPacket.protocol()) != 0 {
 			connOption.Protocol = redirectPacket.protocol()
 		}

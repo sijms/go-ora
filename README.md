@@ -4,6 +4,61 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.3.3: Add support for OS Auth (Windows)
+you can see windows_os_auth example for more detail
+* NTS packets are supplied from the following github package:
+  [go-ntlmssp](https://github.com/Azure/go-ntlmssp)
+* empty username or password will suppose OS Auth by default
+* `AUTH TYPE: "OS"` optional
+* `OS USER` optional if omit the client will use logon user
+* `OS PASS` is obligatory to make OS Auth using NTS
+* `DOMAIN` optional for windows domain
+* `AUTH SERV: "NTS"` optional as NTS is automatically added if the client running on Windows machine
+* `DBA PRIVILEGE: "SYSDBA"` optional if you need a SYSDBA access
+```golang
+urlOptions := map[string]string{
+    // automatically set if you pass an empty oracle user or password
+    // otherwise you need to set it
+    "AUTH TYPE": "OS",
+    // operating system user if empty the driver will use logon user name
+    "OS USER": user,
+    // operating system password needed for os logon
+     "OS PASS": password,
+    // Windows system domain name
+    "DOMAIN": domain,
+    // NTS is the required for Windows os authentication
+    // when you run the program from Windows machine it will be added automatically
+    // otherwise you need to specify it
+    "AUTH SERV": "NTS",
+    // uncomment this option for debugging
+    "TRACE FILE": "trace.log",
+}
+databaseUrl := go_ora.BuildUrl(server, port, service, "", "", urlOptions)
+```
+#### note for advanced users:
+* You can use custom NTS auth manager by implementing the following interface
+```Golang
+type NTSAuthInterface interface {
+	NewNegotiateMessage(domain, machine string) ([]byte, error)
+	ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error)
+}
+```
+* set newNTS auth manager before open the connection
+```golang
+go_ora.SetNTSAuth(newNTSManager)
+```
+* advantage of custom manager: you may not need to provide OS Password. for example using
+.NET or Windows API code as original driver
+```cs
+// CustomStream will take data from NegotiateStream and give it to the driver
+// through NewNegotiateMessage
+// Then take data form the driver (Challenge Message) to NegotiateStream
+// And return back Authentication msg to the driver through ProcessChallenge
+// as you see here CredentialCache.DefaultNetworkCredentials will take auth data
+// (username and password) from logon user
+new NegotiateStream(new YourCustomStream(), true).AuthenticateAsClient(CredentialCache.DefaultNetworkCredentials, "", ProtectionLevel.None, TokenImpersonationLevel.Identification);
+```
+
 ### version 2.3.1: Fix issue related to use ipv6
 now you can define url that contain ipv6
 ```go

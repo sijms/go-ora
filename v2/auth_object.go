@@ -240,15 +240,15 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 		appendKeyVal("AUTH_PBKDF2_SPEEDY_KEY", obj.ESpeedyKey, 0)
 		index++
 	}
-	appendKeyVal("AUTH_TERMINAL", connOption.ClientData.HostName, 0)
+	appendKeyVal("AUTH_TERMINAL", connOption.ClientInfo.HostName, 0)
 	index++
-	appendKeyVal("AUTH_PROGRAM_NM", connOption.ClientData.ProgramName, 0)
+	appendKeyVal("AUTH_PROGRAM_NM", connOption.ClientInfo.ProgramName, 0)
 	index++
-	appendKeyVal("AUTH_MACHINE", connOption.ClientData.HostName, 0)
+	appendKeyVal("AUTH_MACHINE", connOption.ClientInfo.HostName, 0)
 	index++
-	appendKeyVal("AUTH_PID", fmt.Sprintf("%d", connOption.ClientData.PID), 0)
+	appendKeyVal("AUTH_PID", fmt.Sprintf("%d", connOption.ClientInfo.PID), 0)
 	index++
-	appendKeyVal("AUTH_SID", connOption.ClientData.UserName, 0)
+	appendKeyVal("AUTH_SID", connOption.ClientInfo.UserName, 0)
 	index++
 	appendKeyVal("AUTH_CONNECT_STRING", connOption.ConnectionData(), 0)
 	index++
@@ -256,7 +256,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	index++
 	appendKeyVal("SESSION_CLIENT_LIB_TYPE", "0", 0)
 	index++
-	appendKeyVal("SESSION_CLIENT_DRIVER_NAME", connOption.ClientData.DriverName, 0)
+	appendKeyVal("SESSION_CLIENT_DRIVER_NAME", connOption.ClientInfo.DriverName, 0)
 	index++
 	appendKeyVal("SESSION_CLIENT_VERSION", "2.0.0.0", 0)
 	index++
@@ -291,7 +291,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	if len(connOption.UserID) > 0 && len(obj.EPassword) > 0 {
 		mode |= UserAndPass
 	}
-	session.PutUint(int(mode), 4, true, true)
+	session.PutUint(int(mode|NoNewPass), 4, true, true)
 	session.PutBytes(1)
 	session.PutUint(index, 4, true, true)
 	session.PutBytes(1, 1)
@@ -306,6 +306,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 }
 
 func generateSpeedyKey(buffer, key []byte, turns int) []byte {
+
 	mac := hmac.New(sha512.New, key)
 	mac.Write(append(buffer, 0, 0, 0, 1))
 	firstHash := mac.Sum(nil)

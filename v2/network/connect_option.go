@@ -7,43 +7,59 @@ import (
 	"github.com/sijms/go-ora/v2/trace"
 )
 
-type ClientData struct {
+type ClientInfo struct {
 	ProgramPath string
 	ProgramName string
 	UserName    string
+	Password    string
 	HostName    string
+	DomainName  string
 	DriverName  string
 	PID         int
 }
-type ConnectionOption struct {
-	//Port                  int
-	TransportConnectTo    int
-	SSLVersion            string
-	WalletDict            string
+type DatabaseInfo struct {
+	UserID       string
+	Servers      []string
+	Ports        []int
+	serverIndex  int
+	SID          string
+	ServiceName  string
+	InstanceName string
+	DBName       string
+	AuthType     int
+}
+type SessionInfo struct {
+	SSLVersion string
+	//WalletDict            string
 	TransportDataUnitSize uint32
 	SessionDataUnitSize   uint32
 	Protocol              string
+	SSL                   bool
+	SSLVerify             bool
+}
+type AdvNegoSeviceInfo struct {
+	AuthService []string
+}
+type ConnectionOption struct {
+	//Port                  int
+	//TransportConnectTo    int
+
 	//Host                  string
-	UserID      string
-	Servers     []string
-	Ports       []int
-	serverIndex int
+
 	//IP string
-	SID string
+
 	//Addr string
 	//Server string
-	ServiceName  string
-	InstanceName string
-	DomainName   string
-	DBName       string
-	ClientData   ClientData
+
+	ClientInfo
+	DatabaseInfo
+	SessionInfo
+	AdvNegoSeviceInfo
 	//InAddrAny bool
-	Tracer       trace.Tracer
-	connData     string
+	Tracer trace.Tracer
+	//connData     string
 	SNOConfig    map[string]string
 	PrefetchRows int
-	SSL          bool
-	SSLVerify    bool
 }
 
 func (op *ConnectionOption) AddServer(host string, port int) {
@@ -66,12 +82,13 @@ func (op *ConnectionOption) GetActiveServer(jump bool) (string, int) {
 	}
 	return op.Servers[op.serverIndex], op.Ports[op.serverIndex]
 }
+
 func (op *ConnectionOption) ConnectionData() string {
 	//if len(op.connData) > 0 {
 	//	return op.connData
 	//}
 	host, port := op.GetActiveServer(false)
-	FulCid := "(CID=(PROGRAM=" + op.ClientData.ProgramPath + ")(HOST=" + op.ClientData.HostName + ")(USER=" + op.ClientData.UserName + "))"
+	FulCid := "(CID=(PROGRAM=" + op.ProgramPath + ")(HOST=" + op.HostName + ")(USER=" + op.UserName + "))"
 	address := "(ADDRESS=(PROTOCOL=" + op.Protocol + ")(HOST=" + host + ")(PORT=" + strconv.Itoa(port) + "))"
 	result := "(CONNECT_DATA="
 	if op.SID != "" {

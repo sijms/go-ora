@@ -22,26 +22,26 @@ func NewEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
 			availableServiceIDs: []int{0, 1, 8, 10, 6, 3, 2, 11, 12, 15, 16, 17},
 		},
 	}
-	str := ""
-	level := ""
-	connOption := comm.session.Context.ConnOption
-	if connOption != nil {
-		snConfig := connOption.SNOConfig
-		if snConfig != nil {
-			var exists bool
-			str, exists = snConfig["sqlnet.encryption_types_client"]
-			if !exists {
-				str = ""
-			}
-			level, exists = snConfig["sqlnet.encryption_client"]
-			if !exists {
-				level = ""
-			}
-		}
-	}
-	output.readAdvNegoLevel(level)
+	//str := ""
+	//level := ""
+	//connOption := comm.session.Context.ConnOption
+	//if connOption != nil {
+	//	snConfig := connOption.SNOConfig
+	//	if snConfig != nil {
+	//		var exists bool
+	//		str, exists = snConfig["sqlnet.encryption_types_client"]
+	//		if !exists {
+	//			str = ""
+	//		}
+	//		level, exists = snConfig["sqlnet.encryption_client"]
+	//		if !exists {
+	//			level = ""
+	//		}
+	//	}
+	//}
+	//output.readAdvNegoLevel(level)
 	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
-	err := output.buildServiceList(str, true, true)
+	err := output.buildServiceList([]string{}, true, true)
 	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err

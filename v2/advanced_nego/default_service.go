@@ -134,7 +134,7 @@ func (serv *defaultService) readAdvNegoLevel(level string) {
 	}
 }
 
-func (serv *defaultService) buildServiceList(servList string, useLevel, useDefault bool) error {
+func (serv *defaultService) buildServiceList(userList []string, useLevel, useDefault bool) error {
 	serv.selectedIndices = make([]int, 0, 10)
 	//serv.selectedServ = make(map[string]int)
 	if useLevel {
@@ -147,7 +147,6 @@ func (serv *defaultService) buildServiceList(servList string, useLevel, useDefau
 			return errors.New(fmt.Sprintf("unsupported service level value: %d", serv.level))
 		}
 	}
-	userList := strings.Split(servList, ",")
 	userListLength := len(userList)
 	for i := 0; i < userListLength; i++ {
 		userList[i] = strings.TrimSpace(userList[i])

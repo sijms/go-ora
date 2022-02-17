@@ -1,6 +1,7 @@
 package advanced_nego
 
 import (
+	"encoding/binary"
 	"errors"
 	"github.com/sijms/go-ora/v2/network"
 )
@@ -107,8 +108,8 @@ func (nego *AdvNego) Read() error {
 	var authNTS bool = false
 	if authServ, ok := nego.serviceList[1].(*authService); ok {
 		if authServ.active {
-			errors.New("advanced negotiation: advanced authentication still not supported")
 			if authServ.serviceName == "KERBEROS5" {
+				return errors.New("advanced negotiation: KERBEROS5 authentication still not supported")
 				authKerberos = true
 			} else if authServ.serviceName == "NTS" {
 				authNTS = true
@@ -153,7 +154,41 @@ func (nego *AdvNego) Read() error {
 		}
 	}
 	if authNTS {
-
+		connOption := nego.comm.session.Context.ConnOption
+		ntsPacket, err := createNTSNegoPacket(connOption.ClientInfo.DomainName, connOption.ClientInfo.HostName)
+		if err != nil {
+			return err
+		}
+		nego.comm.session.ResetBuffer()
+		nego.comm.session.PutBytes(ntsPacket...)
+		err = nego.comm.session.Write()
+		if err != nil {
+			return err
+		}
+		ntsHeader, err := nego.comm.session.GetBytes(33)
+		if err != nil {
+			return err
+		}
+		sizeOffset := len(ntsHeader) - 8
+		chaSize := binary.LittleEndian.Uint32(ntsHeader[sizeOffset : sizeOffset+4])
+		chaData, err := nego.comm.session.GetBytes(int(chaSize))
+		if err != nil {
+			return err
+		}
+		ntsPacket, err = createNTSAuthPacket(chaData, connOption.ClientInfo.UserName,
+			connOption.ClientInfo.Password)
+		if err != nil {
+			return err
+		}
+		nego.comm.session.ResetBuffer()
+		nego.comm.session.PutBytes(ntsPacket...)
+		err = nego.comm.session.Write()
+		if err != nil {
+			return err
+		}
+		//fmt.Println(nego.comm.session.GetBytes(10))
+		//return errors.New("interrupt")
+		return nil
 	}
 	return nego.comm.session.Write()
 }

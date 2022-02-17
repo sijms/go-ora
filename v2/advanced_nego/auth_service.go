@@ -2,7 +2,6 @@ package advanced_nego
 
 import (
 	"errors"
-	"runtime"
 )
 
 type authService struct {
@@ -23,13 +22,14 @@ func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
 		status: 0xFCFF,
 	}
 	//var avaAuth []string
-	if runtime.GOOS == "windows" {
-		output.availableServiceNames = []string{"", "NTS", "KERBEROS5", "TCPS"}
-		output.availableServiceIDs = []int{0, 1, 1, 2}
-	} else {
-		output.availableServiceNames = []string{"TCPS"}
-		output.availableServiceIDs = []int{2}
-	}
+	output.availableServiceNames = []string{"", "NTS", "KERBEROS5", "TCPS"}
+	output.availableServiceIDs = []int{0, 1, 1, 2}
+	//if runtime.GOOS == "windows" {
+	//
+	//} else {
+	//	output.availableServiceNames = []string{"NTS", "TCPS"}
+	//	output.availableServiceIDs = []int{1, 2}
+	//}
 	//str :=  ""
 	connOption := comm.session.Context.ConnOption
 	//for

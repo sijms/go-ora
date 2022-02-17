@@ -35,7 +35,11 @@ urlOptions := map[string]string{
 }
 databaseUrl := go_ora.BuildUrl(server, port, service, "", "", urlOptions)
 ```
-#### note for advanced users:
+#### note (Remote OS Auth):
+* you can make OS Auth **on the same machine** (Windows Server) 
+or **different machine** (Windows Server) and (Other Client) and in this situation you need to pass 
+`AUTH SERV: "NTS"` as url parameter
+#### note (advanced users):
 * You can use custom NTS auth manager by implementing the following interface
 ```Golang
 type NTSAuthInterface interface {

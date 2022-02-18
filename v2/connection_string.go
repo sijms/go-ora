@@ -3,6 +3,7 @@ package go_ora
 import (
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/advanced_nego"
 	"github.com/sijms/go-ora/v2/network"
 	"github.com/sijms/go-ora/v2/trace"
 	"net"
@@ -238,6 +239,12 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				fallthrough
 			case "OS PASSWORD":
 				ret.connOption.ClientInfo.Password = val[0]
+			case "OS HASH":
+				fallthrough
+			case "OS PASSHASH":
+			case "OS PASSWORD HASH":
+				ret.connOption.ClientInfo.Password = val[0]
+				SetNTSAuth(&advanced_nego.NTSAuthHash{})
 			case "DOMAIN":
 				ret.connOption.DomainName = val[0]
 			case "AUTH SERV":

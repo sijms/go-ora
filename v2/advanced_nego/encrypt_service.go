@@ -22,25 +22,6 @@ func NewEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
 			availableServiceIDs: []int{0, 1, 8, 10, 6, 3, 2, 11, 12, 15, 16, 17},
 		},
 	}
-	//str := ""
-	//level := ""
-	//connOption := comm.session.Context.ConnOption
-	//if connOption != nil {
-	//	snConfig := connOption.SNOConfig
-	//	if snConfig != nil {
-	//		var exists bool
-	//		str, exists = snConfig["sqlnet.encryption_types_client"]
-	//		if !exists {
-	//			str = ""
-	//		}
-	//		level, exists = snConfig["sqlnet.encryption_client"]
-	//		if !exists {
-	//			level = ""
-	//		}
-	//	}
-	//}
-	//output.readAdvNegoLevel(level)
-	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
 	err := output.buildServiceList([]string{"AES128", "AES192", "AES256"}, true, true)
 	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
@@ -86,29 +67,23 @@ func (serv *encryptService) getServiceDataLength() int {
 func (serv *encryptService) activateAlgorithm() error {
 	key := serv.comm.session.Context.AdvancedService.SessionKey
 	iv := make([]byte, 16)
+	var algo security.OracleNetworkEncryption = nil
+	var err error
 	switch serv.algoID {
 	case 0:
 		return nil
 	case 15:
-		algo, err := security.NewOracleNetworkCBCEncrypter(key[:16], iv)
-		if err != nil {
-			return err
-		}
-		serv.comm.session.Context.AdvancedService.CryptAlgo = algo
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], iv)
 	case 16:
-		algo, err := security.NewOracleNetworkCBCEncrypter(key[:24], iv)
-		if err != nil {
-			return err
-		}
-		serv.comm.session.Context.AdvancedService.CryptAlgo = algo
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:24], iv)
 	case 17:
-		algo, err := security.NewOracleNetworkCBCEncrypter(key[:32], iv)
-		if err != nil {
-			return err
-		}
-		serv.comm.session.Context.AdvancedService.CryptAlgo = algo
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:32], iv)
 	default:
-		return errors.New(fmt.Sprintf("advanced negotiation error: encryption service algorithm: %d still not supported", serv.algoID))
+		err = errors.New(fmt.Sprintf("advanced negotiation error: encryption service algorithm: %d still not supported", serv.algoID))
 	}
+	if err != nil {
+		return err
+	}
+	serv.comm.session.Context.AdvancedService.CryptAlgo = algo
 	return nil
 }

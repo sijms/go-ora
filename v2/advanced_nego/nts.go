@@ -15,11 +15,18 @@ var NTSAuth NTSAuthInterface = &NTSAuthDefault{}
 
 type NTSAuthDefault struct{}
 
+type NTSAuthHash struct {
+	NTSAuthDefault
+}
+
 func (nts *NTSAuthDefault) NewNegotiateMessage(domain, machine string) ([]byte, error) {
 	return ntlmssp.NewNegotiateMessage(domain, machine)
 }
 func (nts *NTSAuthDefault) ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error) {
 	return ntlmssp.ProcessChallenge(chaMsgData, user, password)
+}
+func (nts *NTSAuthHash) ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error) {
+	return ntlmssp.ProcessChallengeWithHash(chaMsgData, user, password)
 }
 func createNTSNegoPacket(domain, machine string) ([]byte, error) {
 	var packetData = []byte{

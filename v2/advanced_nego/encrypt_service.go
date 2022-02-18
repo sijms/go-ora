@@ -41,7 +41,7 @@ func NewEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
 	//}
 	//output.readAdvNegoLevel(level)
 	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
-	err := output.buildServiceList([]string{}, true, true)
+	err := output.buildServiceList([]string{"AES128", "AES192", "AES256"}, true, true)
 	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err

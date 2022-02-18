@@ -6,7 +6,7 @@
     - See examples for more help
 ### version 2.3.5: Add support for OS Auth (Windows) With Password Hash
 now you can pass password hash of the user instead of real password
-source of hash:
+#### source of hash:
 * windows registry
 * create the hash by md4(unicode(password))
 passing hash through url option as follow

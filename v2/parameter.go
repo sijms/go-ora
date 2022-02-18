@@ -677,16 +677,24 @@ func (par *ParameterInfo) setValue(newValue driver.Value) error {
 			*value = tempValue
 		}
 	case time.Time:
-		if tempNewVal, ok := newValue.(time.Time); ok {
-			par.Value = tempNewVal
+		if newValue == nil {
+			par.Value = nil
 		} else {
-			return errors.New("time.Time col/par need time.Time value")
+			if tempNewVal, ok := newValue.(time.Time); ok {
+			    par.Value = tempNewVal
+			} else {
+			    return errors.New("time.Time col/par need time.Time value")
+                        }
 		}
 	case *time.Time:
-		if tempNewVal, ok := newValue.(time.Time); ok {
-			*value = tempNewVal
+		if newValue == nil {
+			*value = nil
 		} else {
-			return errors.New("*time.Time col/par need time.Time value")
+			if tempNewVal, ok := newValue.(time.Time); ok {
+			    *value = tempNewVal
+		        } else {
+			    return errors.New("*time.Time col/par need time.Time value")
+                        }
 		}
 	case sql.NullTime:
 		if newValue == nil {

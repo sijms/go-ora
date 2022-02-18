@@ -4,6 +4,33 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.3.5: Add support for OS Auth (Windows) With Password Hash
+now you can pass password hash of the user instead of real password
+source of hash:
+* windows registry
+* create the hash by md4(unicode(password))
+passing hash through url option as follow
+```golang
+urlOptions := map[string]string {
+	"OS HASH": "yourpasswordhash"
+	// or
+	"OS PassHash": "yourpasswordhash"
+	// or
+	"OS Password Hash": "yourpasswordhash"
+}
+```
+#### note:
+you can use NTSAuthInterface
+```golang
+type YourCustomNTSManager struct {
+	NTSAuthDefault
+}
+func (nts *NTSAuthHash) ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error) {
+    // password = get (extract) password hash from Windows registry
+	return ntlmssp.ProcessChallengeWithHash(chaMsgData, user, password)
+}
+// now you can pass empty user and password to the driver
+```
 ### version 2.3.3: Add support for OS Auth (Windows)
 you can see windows_os_auth example for more detail
 * NTS packets are supplied from the following github package:

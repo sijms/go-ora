@@ -40,7 +40,6 @@ type StmtInterface interface {
 type defaultStmt struct {
 	connection         *Connection
 	text               string
-	arrayBindingCount  int
 	disableCompression bool
 	_hasLONG           bool
 	_hasBLOB           bool
@@ -299,7 +298,7 @@ func (stmt *Stmt) writePars(session *network.Session) error {
 	if len(stmt.Pars) > 0 {
 		session.PutBytes(7)
 		for _, par := range stmt.Pars {
-			if !stmt.parse && par.Direction == Output {
+			if !stmt.parse && par.Direction == Output && stmt.stmtType != PLSQL {
 				continue
 			}
 			if par.DataType != RAW {
@@ -317,7 +316,15 @@ func (stmt *Stmt) writePars(session *network.Session) error {
 						tempBuffer.Write(par.BValue)
 						session.PutClr(tempBuffer.Bytes())
 					} else {
-						session.PutClr(par.BValue)
+						if par.MaxNoOfArrayElements > 0 {
+							if par.BValue == nil {
+								session.PutBytes(0)
+							} else {
+								session.PutBytes(par.BValue...)
+							}
+						} else {
+							session.PutClr(par.BValue)
+						}
 					}
 				}
 			}
@@ -358,14 +365,20 @@ func (stmt *Stmt) write(session *network.Session) error {
 		session.PutUint(count, 2, true, true)
 		session.PutUint(exeOf, 2, true, true)
 		session.PutUint(execFlag, 2, true, true)
-		stmt.writePars(session)
+		err := stmt.writePars(session)
+		if err != nil {
+			return err
+		}
 	} else {
 		//stmt.reExec = true
 		err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
 		if err != nil {
 			return err
 		}
-		stmt.writePars(session)
+		err = stmt.writePars(session)
+		if err != nil {
+			return err
+		}
 		stmt.parse = false
 		stmt.define = false
 		stmt.reSendParDef = false
@@ -1245,7 +1258,34 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		}
 		return nil
 	}
-
+	if param.MaxNoOfArrayElements > 0 {
+		size, err := session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
+		if size > 0 {
+			values := make([]driver.Value, size)
+			for x := 0; x < size; x++ {
+				param.BValue, err = session.GetClr()
+				if err != nil {
+					return err
+				}
+				// last unused integer is reader outside this function
+				if x < size-1 {
+					_, err = session.GetInt(2, true, true)
+				}
+				values[x], err = param.decodeValue(stmt.connection)
+				if err != nil {
+					return err
+				}
+			}
+			err = param.setParameterArrayValue(values)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	if (param.DataType == NCHAR || param.DataType == CHAR) && param.MaxCharLen == 0 {
 		param.BValue = nil
 	}

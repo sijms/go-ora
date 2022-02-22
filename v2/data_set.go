@@ -1,6 +1,7 @@
 package go_ora
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -224,19 +225,122 @@ func (dataSet DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, er
 		}
 		obj.SetFloat(temp)
 	default:
-		if obj.Type() == reflect.TypeOf(time.Time{}) {
-			if _, ok := field.(time.Time); ok {
+		switch obj.Type() {
+		case reflect.TypeOf(time.Time{}):
+			switch tempField := field.(type) {
+			case time.Time:
 				obj.Set(reflect.ValueOf(field))
-			} else {
+			case TimeStamp:
+				obj.Set(reflect.ValueOf(time.Time(tempField)))
+			default:
 				return false, fmt.Errorf("go-ora: column %d require type time.Time", colIndex)
 			}
-		} else if obj.Type() == reflect.TypeOf([]byte{}) {
+		case reflect.TypeOf([]byte{}):
 			if _, ok := field.([]byte); ok {
 				obj.Set(reflect.ValueOf(field))
 			} else {
 				return false, fmt.Errorf("go-ora: column %d require type []byte", colIndex)
 			}
-		} else {
+		case reflect.TypeOf(sql.NullTime{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(sql.NullTime{Valid: false}))
+			} else {
+				switch tempField := field.(type) {
+				case time.Time:
+					obj.Set(reflect.ValueOf(sql.NullTime{Valid: true, Time: tempField}))
+				case TimeStamp:
+					obj.Set(reflect.ValueOf(sql.NullTime{Valid: true, Time: time.Time(tempField)}))
+				default:
+					return false, fmt.Errorf("go-ora: column %d require type time.Time or null", colIndex)
+				}
+			}
+
+		case reflect.TypeOf(NullTimeStamp{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(NullTimeStamp{Valid: false}))
+			} else {
+				switch tempField := field.(type) {
+				case time.Time:
+					obj.Set(reflect.ValueOf(NullTimeStamp{Valid: true, TimeStamp: TimeStamp(tempField)}))
+				case TimeStamp:
+					obj.Set(reflect.ValueOf(NullTimeStamp{Valid: true, TimeStamp: tempField}))
+				default:
+					return false, fmt.Errorf("go-ora: column %d require type time.Time or null", colIndex)
+				}
+			}
+		case reflect.TypeOf(sql.NullString{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(sql.NullString{Valid: false}))
+			} else {
+				obj.Set(reflect.ValueOf(sql.NullString{Valid: true, String: getString(field)}))
+			}
+		case reflect.TypeOf(NullNVarChar{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(NullNVarChar{Valid: false}))
+			} else {
+				obj.Set(reflect.ValueOf(NullNVarChar{Valid: true, NVarChar: NVarChar(getString(field))}))
+			}
+		case reflect.TypeOf(sql.NullBool{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(sql.NullBool{Valid: false}))
+			} else {
+				tempInt, err := getInt(field)
+				if err != nil {
+					return false, err
+				}
+				obj.Set(reflect.ValueOf(sql.NullBool{Valid: true, Bool: tempInt != 0}))
+			}
+		case reflect.TypeOf(sql.NullFloat64{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(sql.NullFloat64{Valid: false}))
+			} else {
+				tempFloat, err := getFloat(field)
+				if err != nil {
+					return false, err
+				}
+				obj.Set(reflect.ValueOf(sql.NullFloat64{Valid: true, Float64: tempFloat}))
+			}
+		case reflect.TypeOf(sql.NullInt64{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(sql.NullInt64{Valid: false}))
+			} else {
+				tempInt, err := getInt(field)
+				if err != nil {
+					return false, err
+				}
+				obj.Set(reflect.ValueOf(sql.NullInt64{Valid: true, Int64: tempInt}))
+			}
+		case reflect.TypeOf(sql.NullInt32{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(sql.NullInt32{Valid: false}))
+			} else {
+				tempInt, err := getInt(field)
+				if err != nil {
+					return false, err
+				}
+				obj.Set(reflect.ValueOf(sql.NullInt32{Valid: true, Int32: int32(tempInt)}))
+			}
+		case reflect.TypeOf(sql.NullInt16{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(sql.NullInt16{Valid: false}))
+			} else {
+				tempInt, err := getInt(field)
+				if err != nil {
+					return false, err
+				}
+				obj.Set(reflect.ValueOf(sql.NullInt16{Valid: true, Int16: int16(tempInt)}))
+			}
+		case reflect.TypeOf(sql.NullByte{}):
+			if field == nil {
+				obj.Set(reflect.ValueOf(sql.NullByte{Valid: false}))
+			} else {
+				tempInt, err := getInt(field)
+				if err != nil {
+					return false, err
+				}
+				obj.Set(reflect.ValueOf(sql.NullByte{Valid: true, Byte: uint8(tempInt)}))
+			}
+		default:
 			return false, nil
 		}
 	}

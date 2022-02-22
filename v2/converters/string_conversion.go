@@ -9,7 +9,7 @@ type IStringConverter interface {
 	Encode(string) []byte
 	Decode([]byte) string
 	GetLangID() int
-	SetLangID(langID int)
+	SetLangID(langID int) int
 }
 
 type StringConverter struct {
@@ -25,19 +25,19 @@ type StringConverter struct {
 func MaxBytePerChar(charsetID int) int {
 	switch charsetID {
 	case 0x33D:
-	    return 2
+		return 2
 	case 0x33E:
-	    fallthrough
+		fallthrough
 	case 0x33F:
-	    return 3
+		return 3
 	case 0x340:
-	    return 2
+		return 2
 	case 0x352:
-	    fallthrough
+		fallthrough
 	case 0x353:
-	    fallthrough
+		fallthrough
 	case 0x354:
-	    return 2
+		return 2
 	case 870:
 		fallthrough
 	case 871:
@@ -57,8 +57,10 @@ func MaxBytePerChar(charsetID int) int {
 func (conv *StringConverter) GetLangID() int {
 	return conv.LangID
 }
-func (conv *StringConverter) SetLangID(langID int) {
+func (conv *StringConverter) SetLangID(langID int) int {
+	oldValue := conv.LangID
 	conv.LangID = langID
+	return oldValue
 }
 func (conv *StringConverter) Encode(input string) []byte {
 	if len(input) == 0 {

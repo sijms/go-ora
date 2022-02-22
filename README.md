@@ -4,6 +4,19 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.4.0: Add support for Arrays
+* add support for oracle associative array as input and output parameter type
+* add BulkInsert function which dramatically improve performance (> 10x) during insert
+* add support for nullable type in DataSet.Scan function
+* Bug fixes
+* examples bulk_insert and arrays contain explanation of use of this 2 major features
+```golang
+// sqlText: sql test with parameters
+// rowNum: number of rows to insert
+// columns: each column contain array of driver.Value size of column should
+//          equal to rowNum
+func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driver.Value) (*QueryResult, error) 
+```
 ### version 2.3.5: Add support for OS Auth (Windows) With Password Hash
 now you can pass password hash of the user instead of real password
 #### source of hash:

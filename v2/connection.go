@@ -986,3 +986,74 @@ func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, 
 func SetNTSAuth(newNTSManager advanced_nego.NTSAuthInterface) {
 	advanced_nego.NTSAuth = newNTSManager
 }
+
+// all columns should pass as an array of values
+func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driver.Value) (*QueryResult, error) {
+	if rowNum == 0 {
+		return nil, nil
+	}
+	stmt := NewStmt(sqlText, conn)
+	stmt.arrayBindCount = rowNum
+	defer func() {
+		_ = stmt.Close()
+	}()
+	tracer := conn.connOption.Tracer
+	tracer.Printf("BulkInsert:\n%s", stmt.text)
+	tracer.Printf("Row Num: %d", rowNum)
+	tracer.Printf("Column Num: %d", len(columns))
+	for idx, col := range columns {
+		if len(col) < rowNum {
+			return nil, fmt.Errorf("size of column no. %d is less than rowNum", idx)
+		}
+
+		par, err := stmt.NewParam("", col[0], 0, Input)
+		if err != nil {
+			return nil, err
+		}
+		maxLen := par.MaxLen
+		maxCharLen := par.MaxCharLen
+		for _, val := range col {
+			err = par.encodeValue(val, 0, conn)
+			if err != nil {
+				return nil, err
+			}
+			if par.MaxLen < maxLen {
+				par.MaxLen = maxLen
+			}
+			if par.MaxCharLen < maxCharLen {
+				par.MaxCharLen = maxCharLen
+			}
+		}
+		_ = par.encodeValue(col[0], 0, conn)
+		stmt.Pars = append(stmt.Pars, *par)
+	}
+	session := conn.session
+	session.ResetBuffer()
+	err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
+	for x := 0; x < rowNum; x++ {
+		for idx, col := range columns {
+			err = stmt.Pars[idx].encodeValue(col[x], 0, conn)
+			if err != nil {
+				return nil, err
+			}
+		}
+		err = stmt.writePars(session)
+		if err != nil {
+			return nil, err
+		}
+	}
+	err = session.Write()
+	if err != nil {
+		return nil, err
+	}
+	dataSet := new(DataSet)
+	err = stmt.read(dataSet)
+	if err != nil {
+		return nil, err
+	}
+	result := new(QueryResult)
+	if session.Summary != nil {
+		result.rowsAffected = int64(session.Summary.CurRowNumber)
+	}
+	return result, nil
+}

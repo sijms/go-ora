@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"net"
 	"reflect"
 	"strconv"
@@ -432,7 +433,6 @@ func (session *Session) Disconnect() {
 //	//session.index = oldIndex
 //	//}
 //}
-
 //func (session *Session) DumpIn() {
 //	log.Printf("%#v\n", session.InBuffer)
 //}
@@ -440,7 +440,6 @@ func (session *Session) Disconnect() {
 //func (session *Session) DumpOut() {
 //	log.Printf("%#v\n", session.OutBuffer)
 //}
-
 // Write send data store in output buffer through network
 //
 // if data bigger than SessionDataUnit it should be divided into
@@ -721,18 +720,86 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		session.inBuffer = dataPck.buffer
 		session.index = 0
-		msg, err := session.GetByte()
-		if err != nil {
-			return nil, err
-		}
-		if msg == 4 {
-			session.Summary, err = NewSummary(session)
+		loop := true
+		for loop {
+			msg, err := session.GetByte()
 			if err != nil {
 				return nil, err
 			}
-			if session.HasError() {
-				return nil, session.GetError()
+			switch msg {
+			case 4:
+				loop = false
+				session.Summary, err = NewSummary(session)
+				if err != nil {
+					return nil, err
+				}
+				if session.HasError() {
+					return nil, session.GetError()
+				}
+			case 8:
+				size, err := session.GetInt(2, true, true)
+				if err != nil {
+					return nil, err
+				}
+				for x := 0; x < 2; x++ {
+					_, err = session.GetInt(4, true, true)
+					if err != nil {
+						return nil, err
+					}
+				}
+				for x := 2; x < size; x++ {
+					_, err = session.GetInt(4, true, true)
+					if err != nil {
+						return nil, err
+					}
+				}
+				_, err = session.GetInt(2, true, true)
+				if err != nil {
+					return nil, err
+				}
+				size, err = session.GetInt(2, true, true)
+				for x := 0; x < size; x++ {
+					_, val, num, err := session.GetKeyVal()
+					if err != nil {
+						return nil, err
+					}
+					if num == 163 {
+						session.TimeZone = val
+					}
+				}
+				if session.TTCVersion >= 4 {
+					// get queryID
+					size, err = session.GetInt(4, true, true)
+					if err != nil {
+						return nil, err
+					}
+					if size > 0 {
+						bty, err := session.GetBytes(size)
+						if err != nil {
+							return nil, err
+						}
+						if len(bty) >= 8 {
+							queryID := binary.LittleEndian.Uint64(bty[size-8:])
+							fmt.Println("query ID: ", queryID)
+						}
+					}
+				}
+				if session.TTCVersion >= 7 {
+					length, err := session.GetInt(4, true, true)
+					if err != nil {
+						return nil, err
+					}
+					for i := 0; i < length; i++ {
+						_, err = session.GetInt(8, true, true)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+			default:
+				return nil, errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
 			}
+
 		}
 		fallthrough
 	default:

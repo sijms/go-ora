@@ -11,7 +11,7 @@
 * Bug fixes
 * examples bulk_insert and arrays contain explanation of use of this 2 major features
 ```golang
-// sqlText: sql test with parameters
+// sqlText: sql text with parameters
 // rowNum: number of rows to insert
 // columns: each column contain array of driver.Value size of column should
 //          equal to rowNum

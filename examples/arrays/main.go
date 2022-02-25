@@ -174,6 +174,7 @@ func query2(conn *sql.DB) error {
 		valArray  []float32
 		dateArray []sql.NullTime
 	)
+	// note size here is important and equal to max number of items that array can accommodate
 	_, err := conn.Exec(`BEGIN GOORA_TEMP_PKG.TEST_GET2(:1, :2, :3, :4); END;`,
 		[]int{1, 3, 5}, go_ora.Out{Dest: &nameArray, Size: 10},
 		go_ora.Out{Dest: &valArray, Size: 10},
@@ -187,63 +188,7 @@ func query2(conn *sql.DB) error {
 	fmt.Println("Finish Query2: ", time.Now().Sub(t))
 	return nil
 }
-func usage() {
-	fmt.Println()
-	fmt.Println("array")
-	fmt.Println("  a complete code dealing with array.")
-	fmt.Println()
-	fmt.Println("Usage:")
-	fmt.Println(`  array -server server_url`)
-	flag.PrintDefaults()
-	fmt.Println()
-	fmt.Println("Example:")
-	fmt.Println(`  array -server "oracle://user:pass@server/service_name"`)
-	fmt.Println()
-}
 
-//func query1(conn *sql.DB) error {
-//	var number int64
-//	var sqlText = `BEGIN VARARRAY.TEST_GET(:1, :2); END;`
-//	_, err := conn.Exec(sqlText, []int64{1, 3, 5}, sql.Out{Dest: &number})
-//	if err != nil {
-//		return err
-//	}
-//	fmt.Println("Result: ", number)
-//	return nil
-//}
-
-func query3(conn *sql.DB) error {
-	var cursor go_ora.RefCursor
-	_, err := conn.Exec(`BEGIN VARARRAY.test_get3(:1, :2); END;`, []string{"test1", "test3", "test5"},
-		sql.Out{Dest: &cursor})
-	if err != nil {
-		return err
-	}
-	defer func() {
-		err = cursor.Close()
-		if err != nil {
-			fmt.Println("Can't close RefCursor", err)
-		}
-	}()
-	return queryCursor(&cursor)
-}
-
-func query5(conn *sql.DB) error {
-	var (
-		intArray    []int64
-		stringArray []string
-		dateArray   []time.Time
-	)
-	_, err := conn.Exec("BEGIN VARARRAY.TEST_GET5(:1, :2, :3); END;",
-		go_ora.Out{Dest: &intArray, Size: 10}, go_ora.Out{Dest: &stringArray, Size: 10}, go_ora.Out{Dest: &dateArray, Size: 10})
-	if err != nil {
-		return err
-	}
-	fmt.Println(intArray)
-	fmt.Println(stringArray)
-	fmt.Println(dateArray)
-	return nil
-}
 func queryCursor(cursor *go_ora.RefCursor) error {
 	t := time.Now()
 	rows, err := cursor.Query()
@@ -265,6 +210,20 @@ func queryCursor(cursor *go_ora.RefCursor) error {
 	}
 	fmt.Println("Finish query RefCursor: ", time.Now().Sub(t))
 	return rows.Err()
+}
+
+func usage() {
+	fmt.Println()
+	fmt.Println("array")
+	fmt.Println("  a complete code dealing with array.")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println(`  array -server server_url`)
+	flag.PrintDefaults()
+	fmt.Println()
+	fmt.Println("Example:")
+	fmt.Println(`  array -server "oracle://user:pass@server/service_name"`)
+	fmt.Println()
 }
 
 func main() {

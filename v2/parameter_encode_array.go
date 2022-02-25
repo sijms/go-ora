@@ -202,7 +202,7 @@ func (par *ParameterInfo) encodeArrayTimeStamp(session *network.Session, value [
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
 		for _, tempVal := range value {
-			session.WriteClr(&arrayBuffer, converters.EncodeDate(time.Time(tempVal)))
+			session.WriteClr(&arrayBuffer, converters.EncodeTimeStamp(time.Time(tempVal)))
 		}
 		par.BValue = arrayBuffer.Bytes()
 	}
@@ -254,7 +254,7 @@ func (par *ParameterInfo) encodeArrayNullNVarchar(session *network.Session, conv
 		}
 		par.BValue = arrayBuffer.Bytes()
 	} else {
-		par.MaxLen = 32672
+		par.MaxLen = converters.MAX_LEN_NVARCHAR2
 		par.MaxCharLen = par.MaxLen / converters.MaxBytePerChar(par.CharsetID)
 	}
 }
@@ -290,7 +290,7 @@ func (par *ParameterInfo) encodeArrayNullString(session *network.Session, conver
 		}
 		par.BValue = arrayBuffer.Bytes()
 	} else {
-		par.MaxLen = 32672
+		par.MaxLen = converters.MAX_LEN_VARCHAR2
 		par.MaxCharLen = par.MaxLen / converters.MaxBytePerChar(par.CharsetID)
 	}
 }
@@ -322,7 +322,7 @@ func (par *ParameterInfo) encodeArrayString(session *network.Session, converter 
 		}
 		par.BValue = arrayBuffer.Bytes()
 	} else {
-		par.MaxLen = 32672
+		par.MaxLen = converters.MAX_LEN_VARCHAR2
 		par.MaxCharLen = par.MaxLen / converters.MaxBytePerChar(par.CharsetID)
 	}
 }

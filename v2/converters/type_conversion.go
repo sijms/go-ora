@@ -29,6 +29,20 @@ func EncodeDate(ti time.Time) []byte {
 	return ret
 }
 
+func EncodeTimeStamp(ti time.Time) []byte {
+	ret := make([]byte, 11)
+	ret[0] = uint8(ti.Year()/100 + 100)
+	ret[1] = uint8(ti.Year()%100 + 100)
+	ret[2] = uint8(ti.Month())
+	ret[3] = uint8(ti.Day())
+	ret[4] = uint8(ti.Hour() + 1)
+	ret[5] = uint8(ti.Minute() + 1)
+	ret[6] = uint8(ti.Second() + 1)
+	binary.BigEndian.PutUint32(ret[7:11], uint32(ti.Nanosecond()))
+	return ret
+
+}
+
 // DecodeDate convert oracle time representation into time.Time
 func DecodeDate(data []byte) (time.Time, error) {
 	if len(data) < 7 {

@@ -23,14 +23,14 @@ func (par *ParameterInfo) setForNumber() {
 	par.DataType = NUMBER
 	par.ContFlag = 0
 	par.MaxCharLen = 0
-	par.MaxLen = 22
+	par.MaxLen = converters.MAX_LEN_NUMBER
 	par.CharsetForm = 0
 	par.CharsetID = 0
 }
 func (par *ParameterInfo) setForTime() {
 	par.DataType = DATE
 	par.ContFlag = 0
-	par.MaxLen = 11
+	par.MaxLen = converters.MAX_LEN_DATE
 	par.CharsetID = 0
 	par.CharsetForm = 0
 }
@@ -94,6 +94,12 @@ func (par *ParameterInfo) encodeString(value string, converter converters.IStrin
 func (par *ParameterInfo) encodeTime(value time.Time) {
 	par.setForTime()
 	par.BValue = converters.EncodeDate(value)
+}
+
+func (par *ParameterInfo) encodeTimeStamp(value TimeStamp) {
+	par.setForTime()
+	par.DataType = TIMESTAMP
+	par.BValue = converters.EncodeTimeStamp(time.Time(value))
 }
 
 func (par *ParameterInfo) encodeRaw(value []byte, size int) {
@@ -366,19 +372,18 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			}
 		}
 	case TimeStamp:
-		par.encodeTime(time.Time(value))
-		par.DataType = TIMESTAMP
+		par.encodeTimeStamp(value)
 	case *TimeStamp:
 		if value == nil {
 			par.setForTime()
+			par.DataType = TIMESTAMP
 		} else {
-			par.encodeTime(time.Time(*value))
+			par.encodeTimeStamp(*value)
 		}
-		par.DataType = TIMESTAMP
+
 	case NullTimeStamp:
 		if value.Valid {
-			par.encodeTime(time.Time(value.TimeStamp))
-			par.DataType = TIMESTAMP
+			par.encodeTimeStamp(value.TimeStamp)
 		} else {
 			par.setForNull()
 		}
@@ -388,8 +393,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			par.DataType = TIMESTAMP
 		} else {
 			if value.Valid {
-				par.encodeTime(time.Time(value.TimeStamp))
-				par.DataType = TIMESTAMP
+				par.encodeTimeStamp(value.TimeStamp)
 			} else {
 				par.setForNull()
 			}

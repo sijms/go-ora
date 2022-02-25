@@ -24,26 +24,34 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("Connection string: ", connStr)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	conn, err := sql.Open("oracle", connStr)
+	db, err := sql.Open("oracle", connStr)
 	if err != nil {
-		fmt.Println("Can't open the driver: ", err)
+		fmt.Println("Can't open database: ", err)
 		return
 	}
 
 	defer func() {
-		err = conn.Close()
+		err = db.Close()
 		if err != nil {
-			fmt.Println("Can't close connection: ", err)
+			fmt.Println("Can't close database: ", err)
 		}
 	}()
-	err = conn.Ping()
+	connectCtx, connectCancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer connectCancel()
+	conn, err := db.Conn(connectCtx)
 	if err != nil {
-		fmt.Println("Can't ping connection: ", err)
+		fmt.Println("Can't open connection: ", err)
 		return
 	}
-	_, err = conn.ExecContext(ctx, "begin DBMS_LOCK.sleep(5); end;")
+	defer func() {
+		err = conn.Close()
+		if err != nil {
+			fmt.Println("Can't close connection: ", conn)
+		}
+	}()
+	execCtx, execCancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer execCancel()
+	_, err = conn.ExecContext(execCtx, "begin DBMS_LOCK.sleep(5); end;")
 	if err != nil {
 		fmt.Println("Can't execute: ", err)
 	}

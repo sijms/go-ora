@@ -74,13 +74,14 @@ type Connection struct {
 	NLSData           NLSData
 	cusTyp            map[string]customType
 }
-type OracleDriverContext struct {
-}
+
+//type OracleDriverContext struct {
+//}
 type OracleConnector struct {
-	driver *OracleDriver
+	drv           *OracleDriver
+	connectString string
 }
 type OracleDriver struct {
-	connectionString string
 	//m         sync.Mutex
 	//Conn      *Connection
 	//Server    string
@@ -97,21 +98,18 @@ func init() {
 	sql.Register("oracle", &OracleDriver{})
 }
 
-func (drv *OracleDriverContext) OpenConnector(name string) (driver.Connector, error) {
-	//conn, err := NewConnection(name)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = conn.Connect()
-	//if err != nil {
-	//	return nil, err
-	//}
+func (drv *OracleDriver) OpenConnector(name string) (driver.Connector, error) {
 
-	return &OracleConnector{driver: &OracleDriver{connectionString: name}}, nil
+	return &OracleConnector{drv: drv, connectString: name}, nil
 }
 
-func (connector *OracleConnector) Connect(context context.Context) (driver.Conn, error) {
-	conn, err := NewConnection(connector.driver.connectionString)
+func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, error) {
+
+	conn, err := NewConnection(connector.connectString)
+	if err != nil {
+		return nil, err
+	}
+	err = conn.Open(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +117,7 @@ func (connector *OracleConnector) Connect(context context.Context) (driver.Conn,
 }
 
 func (connector *OracleConnector) Driver() driver.Driver {
-	return connector.driver
+	return connector.drv
 }
 
 // Open return a new open connection
@@ -139,7 +137,7 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 	//drv.UserId = conn.connOption.UserID
 	//drv.DBName = conn.connOption.DBName
 	//drv.m.Unlock()
-	err = conn.Open()
+	err = conn.Open(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -271,9 +269,11 @@ func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
 }
 
 // Ping test if connection is online
-func (conn *Connection) Ping(_ context.Context) error {
+func (conn *Connection) Ping(ctx context.Context) error {
 	conn.connOption.Tracer.Print("Ping")
 	conn.session.ResetBuffer()
+	conn.session.StartContext(ctx)
+	defer conn.session.EndContext()
 	return (&simpleObject{
 		connection:  conn,
 		operationID: 0x93,
@@ -335,7 +335,7 @@ func (conn *Connection) Ping(_ context.Context) error {
 //}
 
 // Open open the connection = bring it online
-func (conn *Connection) Open() error {
+func (conn *Connection) Open(ctx context.Context) error {
 	tracer := conn.connOption.Tracer
 	switch conn.conStr.DBAPrivilege {
 	case SYSDBA:
@@ -354,9 +354,8 @@ func (conn *Connection) Open() error {
 			return err
 		}
 	}
-
 	session := conn.session
-	err := session.Connect(context.Background())
+	err := session.Connect(ctx)
 	if err != nil {
 		return err
 	}
@@ -455,7 +454,19 @@ func (conn *Connection) Open() error {
 func (conn *Connection) Begin() (driver.Tx, error) {
 	conn.connOption.Tracer.Print("Begin transaction")
 	conn.autoCommit = false
-	return &Transaction{conn: conn}, nil
+	return &Transaction{conn: conn, ctx: context.Background()}, nil
+}
+
+func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	if opts.ReadOnly {
+		return nil, errors.New("readonly transaction is not supported")
+	}
+	if opts.Isolation != 0 {
+		return nil, errors.New("only support default value for isolation")
+	}
+	conn.connOption.Tracer.Print("Begin transaction with context")
+	conn.autoCommit = false
+	return &Transaction{conn: conn, ctx: ctx}, nil
 }
 
 // NewConnection create a new connection from databaseURL string

@@ -4,12 +4,14 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.4.1: Add support for connection time out + context read and write
+see context example for more help
 ### version 2.4.0: Add support for Arrays
 * add support for oracle associative array as input and output parameter type
 * add BulkInsert function which dramatically improve performance (> 10x) during insert
 * add support for nullable type in DataSet.Scan function
 * Bug fixes
-* examples bulk_insert and arrays contain explanation of use of this 2 major features
+* examples (bulk_insert and arrays) contain explanation of use of this 2 major features
 ```golang
 // sqlText: sql text with parameters
 // rowNum: number of rows to insert

@@ -356,7 +356,7 @@ func (conn *Connection) Open() error {
 	}
 
 	session := conn.session
-	err := session.Connect()
+	err := session.Connect(context.Background())
 	if err != nil {
 		return err
 	}
@@ -1056,4 +1056,28 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 		result.rowsAffected = int64(session.Summary.CurRowNumber)
 	}
 	return result, nil
+}
+
+func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	conn.connOption.Tracer.Print("Execute With Context")
+	stmt := NewStmt(query, conn)
+	valueArgs := make([]driver.Value, len(args))
+	conn.session.StartContext(ctx)
+	defer conn.session.EndContext()
+	return stmt.Exec(valueArgs)
+}
+
+func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	conn.connOption.Tracer.Print("Query With Context")
+	stmt := NewStmt(query, conn)
+	valueArgs := make([]driver.Value, len(args))
+	conn.session.StartContext(ctx)
+	defer conn.session.EndContext()
+	return stmt.Query(valueArgs)
+}
+func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+	conn.connOption.Tracer.Print("Prepare With Context\n", query)
+	conn.session.StartContext(ctx)
+	defer conn.session.EndContext()
+	return NewStmt(query, conn), nil
 }

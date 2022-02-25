@@ -3,6 +3,7 @@ package network
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sijms/go-ora/v2/trace"
 )
@@ -30,6 +31,7 @@ type DatabaseInfo struct {
 }
 type SessionInfo struct {
 	SSLVersion string
+	Timeout    time.Duration
 	//WalletDict            string
 	TransportDataUnitSize uint32
 	SessionDataUnitSize   uint32

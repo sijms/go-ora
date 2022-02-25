@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type PromotableTransaction int
@@ -70,17 +71,16 @@ func DBAPrivilegeFromString(s string) DBAPrivilege {
 //}
 
 type ConnectionString struct {
-	connOption        network.ConnectionOption
-	DataSource        string
-	Host              string
-	Port              int
-	DBAPrivilege      DBAPrivilege
-	password          string
-	ConnectionTimeOut int
-	Trace             string // Trace file
-	WalletPath        string
-	w                 *wallet
-	authType          AuthType
+	connOption   network.ConnectionOption
+	DataSource   string
+	Host         string
+	Port         int
+	DBAPrivilege DBAPrivilege
+	password     string
+	Trace        string // Trace file
+	WalletPath   string
+	w            *wallet
+	authType     AuthType
 	//EnList             EnList
 	//ConnectionLifeTime int
 	//IncrPoolSize       int
@@ -145,6 +145,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		connOption: network.ConnectionOption{
 			PrefetchRows: 25,
 			SessionInfo: network.SessionInfo{
+				Timeout:               time.Duration(15),
 				TransportDataUnitSize: 0xFFFF,
 				SessionDataUnitSize:   0xFFFF,
 				Protocol:              "tcp",
@@ -156,9 +157,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				Ports:   make([]int, 0, 3),
 			},
 		},
-		Port:              defaultPort,
-		DBAPrivilege:      NONE,
-		ConnectionTimeOut: 15,
+		Port:         defaultPort,
+		DBAPrivilege: NONE,
 		//EnList:                TRUE,
 		//IncrPoolSize:          5,
 		//DecrPoolSize:          5,
@@ -260,10 +260,11 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			case "CONNECT TIMEOUT":
 				fallthrough
 			case "CONNECTION TIMEOUT":
-				ret.ConnectionTimeOut, err = strconv.Atoi(val[0])
+				to, err := strconv.Atoi(val[0])
 				if err != nil {
 					return nil, errors.New("CONNECTION TIMEOUT value must be an integer")
 				}
+				ret.connOption.SessionInfo.Timeout = time.Duration(to)
 			case "TRACE FILE":
 				ret.Trace = val[0]
 			case "PREFETCH_ROWS":

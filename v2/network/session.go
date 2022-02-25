@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sijms/go-ora/v2/converters"
 )
@@ -31,6 +32,8 @@ type SessionState struct {
 }
 
 type Session struct {
+	ctx     context.Context
+	oldCtx  context.Context
 	conn    net.Conn
 	sslConn *tls.Conn
 	//connOption        ConnectionOption
@@ -132,6 +135,50 @@ func (session *Session) ResetBuffer() {
 	session.index = 0
 }
 
+func (session *Session) StartContext(ctx context.Context) {
+	session.oldCtx = session.ctx
+	session.ctx = ctx
+}
+func (session *Session) EndContext() {
+	session.ctx = session.oldCtx
+}
+
+func (session *Session) initRead() error {
+	var err error
+	if deadline, ok := session.ctx.Deadline(); ok {
+		if session.sslConn != nil {
+			err = session.sslConn.SetReadDeadline(deadline)
+		} else {
+			err = session.conn.SetReadDeadline(deadline)
+		}
+	} else {
+		if session.sslConn != nil {
+			err = session.sslConn.SetReadDeadline(time.Time{})
+		} else {
+			err = session.conn.SetReadDeadline(time.Time{})
+		}
+	}
+	return err
+}
+
+func (session *Session) initWrite() error {
+	var err error
+	if deadline, ok := session.ctx.Deadline(); ok {
+		if session.sslConn != nil {
+			err = session.sslConn.SetWriteDeadline(deadline)
+		} else {
+			err = session.conn.SetWriteDeadline(deadline)
+		}
+	} else {
+		if session.sslConn != nil {
+			err = session.sslConn.SetWriteDeadline(time.Time{})
+		} else {
+			err = session.conn.SetWriteDeadline(time.Time{})
+		}
+	}
+	return err
+}
+
 // LoadSSLData load data required for SSL connection like certificate, private keys and
 // certificate requests
 func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
@@ -196,109 +243,12 @@ func (session *Session) negotiate() {
 	//session.connOption.Tracer.Print("SSL/TLS HandShake complete")
 }
 
-func (session *Session) ConnectWithContext(cont context.Context) error {
-	dialer := &net.Dialer{}
-	connOption := session.Context.ConnOption
-	session.Disconnect()
-	connOption.Tracer.Print("Connect")
-	var err error
-	var connected = false
-	var host string
-	var port int
-	var loop = true
-	for loop {
-		host, port = connOption.GetActiveServer(false)
-		if port == 0 {
-			return errors.New("no available severs to connect to")
-		}
-		addr := net.JoinHostPort(host, strconv.Itoa(port))
-		session.conn, err = dialer.DialContext(cont, "tcp", addr)
-		if err != nil {
-			connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
-			host, port = connOption.GetActiveServer(true)
-			if port == 0 {
-				break
-			}
-			continue
-		}
-		connOption.Tracer.Printf("using: %s ..... [SUCCEED]", addr)
-		connected = true
-		loop = false
-	}
-	if !connected {
-		return err
-	}
-
-	if connOption.SSL {
-		connOption.Tracer.Print("Using SSL/TLS")
-		session.negotiate()
-	}
-	connOption.Tracer.Print("Open :", connOption.ConnectionData())
-	connectPacket := newConnectPacket(*session.Context)
-	err = session.writePacket(connectPacket)
-	if err != nil {
-		return err
-	}
-	if uint16(connectPacket.packet.length) == connectPacket.packet.dataOffset {
-		session.PutBytes(connectPacket.buffer...)
-		err = session.Write()
-		if err != nil {
-			return err
-		}
-	}
-	pck, err := session.readPacket()
-	if err != nil {
-		return err
-	}
-
-	if acceptPacket, ok := pck.(*AcceptPacket); ok {
-		*session.Context = acceptPacket.sessionCtx
-		session.Context.handshakeComplete = true
-		connOption.Tracer.Print("Handshake Complete")
-		return nil
-	}
-	if redirectPacket, ok := pck.(*RedirectPacket); ok {
-		connOption.Tracer.Print("Redirect")
-		//connOption.connData = redirectPacket.reconnectData
-		if len(redirectPacket.protocol()) != 0 {
-			connOption.Protocol = redirectPacket.protocol()
-		}
-		if len(redirectPacket.host()) != 0 {
-			host = redirectPacket.host()
-		}
-		if len(redirectPacket.port()) != 0 {
-			port, err = strconv.Atoi(redirectPacket.port())
-			if err != nil {
-				return errors.New("redirect packet with wrong port")
-			}
-		}
-		connOption.AddServer(host, port)
-		host, port = connOption.GetActiveServer(true)
-		return session.Connect()
-
-	}
-	if refusePacket, ok := pck.(*RefusePacket); ok {
-		refusePacket.extractErrCode()
-		connOption.Tracer.Printf("connection to %s:%d refused with error: %s", host, port, refusePacket.Err.Error())
-		host, port = connOption.GetActiveServer(true)
-		if port == 0 {
-			session.Disconnect()
-			return &refusePacket.Err
-		}
-		return session.Connect()
-		//errorMessage := fmt.Sprintf(
-		//	"connection refused by the server. user reason: %d; system reason: %d; error message: %s",
-		//	refusePacket.UserReason, refusePacket.SystemReason, refusePacket.message)
-		//return errors.New(errorMessage)
-	}
-	return errors.New("connection refused by the server due to unknown reason")
-}
-
 // Connect perform network connection on address:port
 // check if the client need to use SSL
 // then send connect packet to the server and
 // receive either accept, redirect or refuse packet
-func (session *Session) Connect() error {
+func (session *Session) Connect(ctx context.Context) error {
+	session.ctx = ctx
 	connOption := session.Context.ConnOption
 	session.Disconnect()
 	connOption.Tracer.Print("Connect")
@@ -307,13 +257,16 @@ func (session *Session) Connect() error {
 	var host string
 	var port int
 	var loop = true
+	dialer := net.Dialer{
+		Timeout: time.Duration(time.Second * session.Context.ConnOption.Timeout),
+	}
 	for loop {
 		host, port = connOption.GetActiveServer(false)
 		if port == 0 {
 			return errors.New("no available severs to connect to")
 		}
 		addr := net.JoinHostPort(host, strconv.Itoa(port))
-		session.conn, err = net.Dial("tcp", addr)
+		session.conn, err = dialer.Dial("tcp", addr)
 		if err != nil {
 			connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
 			host, port = connOption.GetActiveServer(true)
@@ -391,7 +344,7 @@ func (session *Session) Connect() error {
 		}
 		connOption.AddServer(host, port)
 		host, port = connOption.GetActiveServer(true)
-		return session.Connect()
+		return session.Connect(ctx)
 
 	}
 	if refusePacket, ok := pck.(*RefusePacket); ok {
@@ -402,7 +355,7 @@ func (session *Session) Connect() error {
 			session.Disconnect()
 			return &refusePacket.Err
 		}
-		return session.Connect()
+		return session.Connect(ctx)
 		//errorMessage := fmt.Sprintf(
 		//	"connection refused by the server. user reason: %d; system reason: %d; error message: %s",
 		//	refusePacket.UserReason, refusePacket.SystemReason, refusePacket.message)
@@ -512,7 +465,10 @@ func (session *Session) writePacket(pck PacketInterface) error {
 	tracer := session.Context.ConnOption.Tracer
 	tmp := pck.bytes()
 	tracer.LogPacket("Write packet:", tmp)
-	var err error
+	var err = session.initWrite()
+	if err != nil {
+		return err
+	}
 	if session.sslConn != nil {
 		_, err = session.sslConn.Write(tmp)
 	} else {
@@ -552,6 +508,10 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			trials++
 			head := make([]byte, 8)
 			var err error
+			err = session.initRead()
+			if err != nil {
+				return nil, err
+			}
 			if session.sslConn != nil {
 				_, err = session.sslConn.Read(head)
 			} else {
@@ -573,6 +533,10 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			index := uint32(0)
 			for index < length {
 				var temp int
+				err = session.initRead()
+				if err != nil {
+					return nil, err
+				}
 				if session.sslConn != nil {
 					temp, err = session.sslConn.Read(body[index:])
 				} else {
@@ -595,9 +559,11 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				}
 				for _, pck := range session.sendPcks {
 					//log.Printf("Request: %#v\n\n", pck.bytes())
-					var err error
+					err := session.initWrite()
+					if err != nil {
+						return nil, err
+					}
 					if session.Context.ConnOption.SSL {
-
 						_, err = session.sslConn.Write(pck.bytes())
 					} else {
 						_, err = session.conn.Write(pck.bytes())

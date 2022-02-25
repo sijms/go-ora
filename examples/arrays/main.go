@@ -300,24 +300,4 @@ func main() {
 	if err != nil {
 		fmt.Println("Can't call query2: ", err)
 	}
-	//
-	//err = query2(conn)
-	//if err != nil {
-	//	fmt.Println("Can't call stored procedure 2: ", err)
-	//}
-	//err = query3(conn)
-	//if err != nil {
-	//	fmt.Println("Can't call stored procedure 3: ", err)
-	//	return
-	//}
-	//err = query4(conn)
-	//if err != nil {
-	//	fmt.Println("Can't call stored procedure 4: ", err)
-	//	return
-	//}
-	//err = query5(conn)
-	//if err != nil {
-	//	fmt.Println("Can't call stored procedure 5: ", err)
-	//	return
-	//}
 }

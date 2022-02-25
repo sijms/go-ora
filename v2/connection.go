@@ -109,7 +109,7 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	if err != nil {
 		return nil, err
 	}
-	err = conn.Open(ctx)
+	err = conn.OpenWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 	//drv.UserId = conn.connOption.UserID
 	//drv.DBName = conn.connOption.DBName
 	//drv.m.Unlock()
-	err = conn.Open(context.Background())
+	err = conn.Open()
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,12 @@ func (conn *Connection) Ping(ctx context.Context) error {
 //}
 
 // Open open the connection = bring it online
-func (conn *Connection) Open(ctx context.Context) error {
+func (conn *Connection) Open() error {
+	return conn.OpenWithContext(context.Background())
+}
+
+// OpenWithContext open the connection with timeout context
+func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	tracer := conn.connOption.Tracer
 	switch conn.conStr.DBAPrivilege {
 	case SYSDBA:
@@ -1073,15 +1078,25 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 	conn.connOption.Tracer.Print("Execute With Context")
 	stmt := NewStmt(query, conn)
 	valueArgs := make([]driver.Value, len(args))
+	for x := 0; x < len(valueArgs); x++ {
+		valueArgs[x] = args[x].Value
+	}
 	conn.session.StartContext(ctx)
 	defer conn.session.EndContext()
 	return stmt.Exec(valueArgs)
+}
+
+func (conn *Connection) CheckNamedValue(named *driver.NamedValue) error {
+	return nil
 }
 
 func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	conn.connOption.Tracer.Print("Query With Context")
 	stmt := NewStmt(query, conn)
 	valueArgs := make([]driver.Value, len(args))
+	for x := 0; x < len(valueArgs); x++ {
+		valueArgs[x] = args[x].Value
+	}
 	conn.session.StartContext(ctx)
 	defer conn.session.EndContext()
 	return stmt.Query(valueArgs)

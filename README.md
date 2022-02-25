@@ -5,7 +5,15 @@
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
 ### version 2.4.1: Add support for connection time out + context read and write
-see context example for more help
+you can determine connection overall lifetime through url options
+```golang
+// set connection time for 3 second
+urlOptions := map[string]string {
+    "CONNECTION TIMEOUT": "3"
+}
+databaseUrl := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
+```
+see context example for more help about using context
 ### version 2.4.0: Add support for Arrays
 * add support for oracle associative array as input and output parameter type
 * add BulkInsert function which dramatically improve performance (> 10x) during insert

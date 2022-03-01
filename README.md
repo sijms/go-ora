@@ -4,6 +4,9 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.4.3: Input Parameter CLOB and BLOB Accept Large Data Size
+you can pass input CLOB and BLOB with any data size up to
+[data type limit](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/datatype-limits.html#GUID-963C79C9-9303-49FE-8F2D-C8AAF04D3095)
 ### version 2.4.1: Add support for connection time out + context read and write
 you can determine connection overall lifetime through url options
 ```golang

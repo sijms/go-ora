@@ -266,7 +266,12 @@ func (session *Session) Connect(ctx context.Context) error {
 			return errors.New("no available severs to connect to")
 		}
 		addr := net.JoinHostPort(host, strconv.Itoa(port))
-		session.conn, err = dialer.DialContext(ctx, "tcp", addr)
+		if len(session.Context.ConnOption.UnixAddress) > 0 {
+			session.conn, err = dialer.DialContext(ctx, "unix", session.Context.ConnOption.UnixAddress)
+		} else {
+			session.conn, err = dialer.DialContext(ctx, "tcp", addr)
+		}
+
 		if err != nil {
 			connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
 			host, port = connOption.GetActiveServer(true)

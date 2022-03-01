@@ -30,9 +30,9 @@ type DatabaseInfo struct {
 	AuthType     int
 }
 type SessionInfo struct {
-	SSLVersion string
-	Timeout    time.Duration
-	//WalletDict            string
+	SSLVersion            string
+	Timeout               time.Duration
+	UnixAddress           string
 	TransportDataUnitSize uint32
 	SessionDataUnitSize   uint32
 	Protocol              string

@@ -4,6 +4,15 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.4.4: Support for unix socket IPC
+you can use this option if server and client on same linux machine
+by specify the following url option
+```golang
+urlOptions := map[string]string{
+	// change the value according to your machine
+	"unix socket": "/usr/tmp/.oracle/sEXTPROC1"
+}
+```
 ### version 2.4.3: Input Parameter CLOB and BLOB Accept Large Data Size
 you can pass input CLOB and BLOB with any data size up to
 [data type limit](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/datatype-limits.html#GUID-963C79C9-9303-49FE-8F2D-C8AAF04D3095)

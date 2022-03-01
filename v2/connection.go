@@ -1074,16 +1074,16 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 	return result, nil
 }
 
+//func (conn *Connection) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) driver.Row {
+//	return nil
+//}
+
 func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	conn.connOption.Tracer.Print("Execute With Context")
 	stmt := NewStmt(query, conn)
-	valueArgs := make([]driver.Value, len(args))
-	for x := 0; x < len(valueArgs); x++ {
-		valueArgs[x] = args[x].Value
-	}
-	conn.session.StartContext(ctx)
-	defer conn.session.EndContext()
-	return stmt.Exec(valueArgs)
+	defer func() {
+		_ = stmt.Close()
+	}()
+	return stmt.ExecContext(ctx, args)
 }
 
 func (conn *Connection) CheckNamedValue(named *driver.NamedValue) error {
@@ -1091,16 +1091,10 @@ func (conn *Connection) CheckNamedValue(named *driver.NamedValue) error {
 }
 
 func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	conn.connOption.Tracer.Print("Query With Context")
 	stmt := NewStmt(query, conn)
-	valueArgs := make([]driver.Value, len(args))
-	for x := 0; x < len(valueArgs); x++ {
-		valueArgs[x] = args[x].Value
-	}
-	conn.session.StartContext(ctx)
-	defer conn.session.EndContext()
-	return stmt.Query(valueArgs)
+	return stmt.QueryContext(ctx, args)
 }
+
 func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	conn.connOption.Tracer.Print("Prepare With Context\n", query)
 	conn.session.StartContext(ctx)

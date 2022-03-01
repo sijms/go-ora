@@ -123,10 +123,13 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		return nil
 	}
 	tempType := reflect.TypeOf(val)
-	if (tempType.Kind() == reflect.Ptr &&
-		(tempType.Elem().Kind() == reflect.Array || tempType.Elem().Kind() == reflect.Slice)) ||
-		tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice {
-		return par.encodeArrayValue(val, size, connection)
+	if tempType.Kind() == reflect.Ptr {
+		tempType = tempType.Elem()
+	}
+	if tempType != reflect.TypeOf([]byte{}) {
+		if tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice {
+			return par.encodeArrayValue(val, size, connection)
+		}
 	}
 	switch value := val.(type) {
 	case int:
@@ -402,6 +405,27 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		par.encodeString(value.String, connection.strConv, size)
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
+		} else {
+			if par.MaxLen >= converters.MAX_LEN_VARCHAR2 {
+				// here we need to use clob
+				par.DataType = OCIClobLocator
+				lob := &Lob{
+					connection:   connection,
+					sourceOffset: 1,
+					charsetID:    connection.tcpNego.ServerCharset,
+				}
+				err = lob.createTemporary()
+				if err != nil {
+					return err
+				}
+				err = lob.putString(value.String)
+				if err != nil {
+					return err
+				}
+				value.locator = lob.sourceLocator
+				par.BValue = lob.sourceLocator
+				par.Value = value
+			}
 		}
 	case *Clob:
 		if value == nil {
@@ -411,11 +435,46 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		}
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
+		} else {
+			if par.MaxLen >= converters.MAX_LEN_VARCHAR2 {
+				par.DataType = OCIClobLocator
+				lob := &Lob{
+					connection:   connection,
+					sourceOffset: 1,
+					charsetID:    connection.tcpNego.ServerCharset,
+				}
+				err = lob.createTemporary()
+				if err != nil {
+					return err
+				}
+				err = lob.putString(value.String)
+				if err != nil {
+					return err
+				}
+				value.locator = lob.sourceLocator
+				par.BValue = lob.sourceLocator
+			}
 		}
 	case Blob:
 		par.encodeRaw(value.Data, size)
 		if par.Direction == Output {
 			par.DataType = OCIBlobLocator
+		} else {
+			if len(value.Data) >= converters.MAX_LEN_RAW {
+				par.DataType = OCIBlobLocator
+				lob := newLob(connection)
+				err = lob.createTemporaryBLOB()
+				if err != nil {
+					return err
+				}
+				err = lob.putData(value.Data)
+				if err != nil {
+					return err
+				}
+				value.locator = lob.sourceLocator
+				par.BValue = lob.sourceLocator
+				par.Value = value
+			}
 		}
 	case *Blob:
 		if value == nil {
@@ -425,6 +484,21 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		}
 		if par.Direction == Output {
 			par.DataType = OCIBlobLocator
+		} else {
+			if len(value.Data) >= converters.MAX_LEN_RAW {
+				par.DataType = OCIBlobLocator
+				lob := newLob(connection)
+				err = lob.createTemporaryBLOB()
+				if err != nil {
+					return err
+				}
+				err = lob.putData(value.Data)
+				if err != nil {
+					return err
+				}
+				value.locator = lob.sourceLocator
+				par.BValue = lob.sourceLocator
+			}
 		}
 	case []byte:
 		par.encodeRaw(value, size)

@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
@@ -304,6 +305,9 @@ func (stmt *Stmt) writePars(session *network.Session) error {
 			if par.DataType != RAW {
 				if par.DataType == REFCURSOR {
 					session.PutBytes(1, 0)
+				} else if par.Direction == Input && (par.DataType == OCIClobLocator || par.DataType == OCIBlobLocator) {
+					session.PutUint(len(par.BValue), 2, true, true)
+					session.PutClr(par.BValue)
 				} else {
 					if par.cusType != nil {
 						size := len(par.BValue) + 7
@@ -784,18 +788,47 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	return stmt.readLobs(dataSet)
 	//return nil
 }
+
+func (stmt *defaultStmt) freeTemporaryLobs() error {
+	var locators [][]byte
+	for _, par := range stmt.Pars {
+		if par.Direction == Input {
+			switch value := par.Value.(type) {
+			case Clob:
+				if value.locator != nil {
+					locators = append(locators, value.locator)
+				}
+			case *Clob:
+				if value.locator != nil {
+					locators = append(locators, value.locator)
+				}
+			case Blob:
+				if value.locator != nil {
+					locators = append(locators, value.locator)
+				}
+			case *Blob:
+				if value.locator != nil {
+					locators = append(locators, value.locator)
+				}
+			}
+		}
+	}
+	return (&Lob{connection: stmt.connection}).freeAllTemporary(locators)
+}
 func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Value, error) {
 	if locator == nil {
 		return nil, nil
 	}
 	lob := &Lob{
+		connection:    stmt.connection,
 		sourceLocator: locator,
+		sourceLen:     len(locator),
 	}
-	dataSize, err := lob.getSize(stmt.connection)
+	dataSize, err := lob.getSize()
 	if err != nil {
 		return nil, err
 	}
-	lobData, err := lob.getData(stmt.connection)
+	lobData, err := lob.getData()
 	if err != nil {
 		return nil, err
 	}
@@ -1317,10 +1350,22 @@ func (stmt *defaultStmt) Close() error {
 	return nil
 }
 
+func (stmt *Stmt) ExecContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Result, error) {
+	stmt.connection.connOption.Tracer.Printf("Exec With Context:")
+	args := make([]driver.Value, len(namedArgs))
+	for x := 0; x < len(args); x++ {
+		args[x] = namedArgs[x].Value
+	}
+	stmt.connection.session.StartContext(ctx)
+	defer stmt.connection.session.EndContext()
+	return stmt.Exec(args)
+}
+
 // Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	stmt.connection.connOption.Tracer.Printf("Exec:\n%s", stmt.text)
 	var err error
+
 	for x := 0; x < len(args); x++ {
 		var par *ParameterInfo
 		switch tempOut := args[x].(type) {
@@ -1360,6 +1405,9 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		}
 		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
 	}
+	defer func() {
+		_ = stmt.freeTemporaryLobs()
+	}()
 	session := stmt.connection.session
 	//if len(args) > 0 {
 	//	stmt.Pars = nil
@@ -1450,6 +1498,17 @@ func (stmt *Stmt) Query_(args []driver.Value) (*DataSet, error) {
 	return nil, errors.New("the returned driver.rows is not an oracle DataSet")
 }
 
+func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
+	stmt.connection.connOption.Tracer.Printf("Query With Context:", stmt.text)
+	args := make([]driver.Value, len(namedArgs))
+	for x := 0; x < len(args); x++ {
+		args[x] = namedArgs[x].Value
+	}
+	stmt.connection.session.StartContext(ctx)
+	defer stmt.connection.session.EndContext()
+	return stmt.Query(args)
+}
+
 // Query execute a query command and return dataset object in form of driver.Rows interface
 //
 // args is an array of values that corresponding to parameters in sql
@@ -1464,29 +1523,13 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 			return nil, err
 		}
 		stmt.setParam(x, *par)
-		//if x < len(stmt.Pars) {
-		//	if par.MaxLen > stmt.Pars[x].MaxLen {
-		//		stmt.reSendParDef = true
-		//	}
-		//	stmt.Pars[x] = *par
-		//} else {
-		//	stmt.Pars = append(stmt.Pars, par)
-		//}
 	}
-	//stmt.Pars = nil
-	//for x := 0; x < len(args); x++ {
-	//	stmt.AddParam()
-	//}
 	stmt.connection.session.ResetBuffer()
-	// if re-execute
+
 	err := stmt.write(stmt.connection.session)
 	if err != nil {
 		return nil, err
 	}
-	//err = stmt.connection.session.Write()
-	//if err != nil {
-	//	return nil, err
-	//}
 	dataSet := new(DataSet)
 	err = stmt.read(dataSet)
 	if err != nil {

@@ -87,7 +87,11 @@ func (lob *Lob) getSize() (size int64, err error) {
 	return
 }
 func (lob *Lob) getDataWithOffsetSize(offset, count int64) (data []byte, err error) {
-	lob.connection.connOption.Tracer.Printf("Read Lob Data Position: %d, Count: %d\n", offset, count)
+	if offset == 0 && count == 0 {
+		lob.connection.connOption.Tracer.Print("Read Lob Data:")
+	} else {
+		lob.connection.connOption.Tracer.Printf("Read Lob Data Position: %d, Count: %d\n", offset, count)
+	}
 	lob.initialize()
 	lob.size = count
 	lob.sourceOffset = offset + 1
@@ -113,6 +117,7 @@ func (lob *Lob) getData() (data []byte, err error) {
 	return lob.getDataWithOffsetSize(0, 0)
 }
 func (lob *Lob) putData(data []byte) error {
+	lob.connection.connOption.Tracer.Printf("Put Lob Data: %d bytes", len(data))
 	lob.initialize()
 	lob.size = int64(len(data))
 	lob.sendSize = true
@@ -128,6 +133,7 @@ func (lob *Lob) putData(data []byte) error {
 	return lob.read()
 }
 func (lob *Lob) putString(data string, charset int) error {
+	lob.connection.connOption.Tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
 	lob.initialize()
 	lob.charsetID = charset
 	tempCharset := lob.connection.strConv.GetLangID()
@@ -155,6 +161,8 @@ func (lob *Lob) putString(data string, charset int) error {
 	}
 	return lob.read()
 }
+
+//isTemporary: return true if the lob is temporary
 func (lob *Lob) isTemporary() bool {
 	if len(lob.sourceLocator) > 7 {
 		if lob.sourceLocator[7]&1 == 1 || lob.sourceLocator[4]&0x40 == 0x40 {
@@ -164,6 +172,7 @@ func (lob *Lob) isTemporary() bool {
 	return false
 }
 
+//freeAllTemporary: free temporary lobs defined by all_locators
 func (lob *Lob) freeAllTemporary(all_locators [][]byte) error {
 	if len(all_locators) == 0 {
 		return nil
@@ -204,22 +213,18 @@ func (lob *Lob) freeAllTemporary(all_locators [][]byte) error {
 		connection: lob.connection,
 	}).read()
 }
-
 func (lob *Lob) freeTemporary() error {
-	//try
-	//{
-	//	this.Initialize();
-	//	this.m_lobOperation = 273L;
-	//	this.m_sourceLobLocator = lobLocator;
-	//	this.WriteFunctionHeader();
-	//	this.WriteLobOperation();
-	//	this.m_marshallingEngine.m_oraBufWriter.FlushData();
-	//	this.ReceiveResponse();
-	//}
-	return errors.New("unimplemented")
+	lob.initialize()
+	lob.connection.session.ResetBuffer()
+	lob.writeOp(0x111)
+	err := lob.connection.session.Write()
+	if err != nil {
+		return err
+	}
+	return lob.read()
 }
 func (lob *Lob) createTemporaryBLOB() error {
-	lob.connection.connOption.Tracer.Print("Create Temporary BLob")
+	lob.connection.connOption.Tracer.Print("Create Temporary BLob:")
 	lob.sourceLocator = make([]byte, 0x28)
 	lob.sourceLocator[1] = 0x54
 	lob.sourceLen = len(lob.sourceLocator)
@@ -240,7 +245,7 @@ func (lob *Lob) createTemporaryBLOB() error {
 	return lob.read()
 }
 func (lob *Lob) createTemporaryClob(charset, charsetForm int) error {
-	lob.connection.connOption.Tracer.Print("Create Temporary Lob")
+	lob.connection.connOption.Tracer.Print("Create Temporary CLob")
 	lob.sourceLocator = make([]byte, 0x28)
 	lob.sourceLocator[1] = 0x54
 	lob.sourceLen = len(lob.sourceLocator)
@@ -252,11 +257,6 @@ func (lob *Lob) createTemporaryClob(charset, charsetForm int) error {
 	lob.destLen = 0xA
 	lob.charsetID = charset
 	lob.sourceOffset = int64(charsetForm)
-	//if (bNClob) {
-	//	lob.sourceOffset = 2
-	//} else {
-	//	lob.sourceOffset = 1
-	//}
 	//if (bNClob) {
 	//	lob.charsetID = 0x7D0
 	//} else {
@@ -273,6 +273,7 @@ func (lob *Lob) createTemporaryClob(charset, charsetForm int) error {
 }
 
 func (lob *Lob) open(mode, opID int) error {
+	lob.connection.connOption.Tracer.Printf("Open Lob: Mode= %d   Operation ID= %d", mode, opID)
 	if lob.isTemporary() {
 		if lob.sourceLocator[7]&8 == 8 {
 			return errors.New("TTC Error")
@@ -295,6 +296,7 @@ func (lob *Lob) open(mode, opID int) error {
 	}
 }
 func (lob *Lob) close(opID int) error {
+	lob.connection.connOption.Tracer.Print("Close Lob: ")
 	if lob.isTemporary() {
 		if lob.sourceLocator[7]&8 == 8 {
 			return errors.New("TTC Error")
@@ -397,13 +399,6 @@ func (lob *Lob) writeOp(operationID int) {
 		session.PutUint(lob.size, 8, true, true)
 	}
 }
-
-// write lob command to network session
-//func (lob *Lob) write(operationID int) error {
-//	lob.connection.session.ResetBuffer()
-//	lob.writeOp(operationID)
-//	return lob.connection.session.Write()
-//}
 
 // read lob response from network session
 func (lob *Lob) read() error {
@@ -576,4 +571,39 @@ func (lob *Lob) readData() error {
 		}
 	}
 	return nil
+}
+func (lob *Lob) GetLobId(locator []byte) []byte {
+	//BitConverter.ToString(lobLocator, 10, 10);
+	return locator[10 : 10+10]
+}
+func (lob *Lob) append(dest []byte) error {
+	lob.initialize()
+	lob.destLocator = dest
+	lob.destLen = len(dest)
+	lob.connection.session.ResetBuffer()
+	lob.writeOp(0x80)
+	err := lob.connection.session.Write()
+	if err != nil {
+		return err
+	}
+	return lob.read()
+}
+
+func (lob *Lob) copy(srcLocator, dstLocator []byte, srcOffset, dstOffset, length int64) error {
+	lob.initialize()
+	lob.sourceLocator = srcLocator
+	lob.sourceLen = len(srcLocator)
+	lob.destLocator = dstLocator
+	lob.destLen = len(dstLocator)
+	lob.sourceOffset = srcOffset
+	lob.destOffset = dstOffset
+	lob.size = length
+	lob.sendSize = true
+	lob.connection.session.ResetBuffer()
+	lob.writeOp(4)
+	err := lob.connection.session.Write()
+	if err != nil {
+		return err
+	}
+	return lob.read()
 }

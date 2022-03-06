@@ -401,6 +401,51 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				par.setForNull()
 			}
 		}
+	case NClob:
+		par.CharsetForm = 2
+		par.CharsetID = connection.tcpNego.ServernCharset
+		par.encodeString(value.String, connection.strConv, size)
+		if par.Direction == Output {
+			par.DataType = OCIClobLocator
+		} else {
+			if par.MaxLen >= converters.MAX_LEN_NVARCHAR2 {
+				par.DataType = OCIClobLocator
+				lob := newLob(connection)
+				err = lob.createTemporaryClob(connection.tcpNego.ServernCharset, 2)
+				if err != nil {
+					return err
+				}
+				err = lob.putString(value.String, connection.tcpNego.ServernCharset)
+				if err != nil {
+					return err
+				}
+				value.locator = lob.sourceLocator
+				par.BValue = lob.sourceLocator
+				par.Value = value
+			}
+		}
+	case *NClob:
+		par.CharsetForm = 2
+		par.CharsetID = connection.tcpNego.ServernCharset
+		par.encodeString(value.String, connection.strConv, size)
+		if par.Direction == Output {
+			par.DataType = OCIClobLocator
+		} else {
+			if par.MaxLen >= converters.MAX_LEN_NVARCHAR2 {
+				par.DataType = OCIClobLocator
+				lob := newLob(connection)
+				err = lob.createTemporaryClob(connection.tcpNego.ServernCharset, 2)
+				if err != nil {
+					return err
+				}
+				err = lob.putString(value.String, connection.tcpNego.ServernCharset)
+				if err != nil {
+					return err
+				}
+				value.locator = lob.sourceLocator
+				par.BValue = lob.sourceLocator
+			}
+		}
 	case Clob:
 		par.encodeString(value.String, connection.strConv, size)
 		if par.Direction == Output {
@@ -409,16 +454,12 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			if par.MaxLen >= converters.MAX_LEN_VARCHAR2 {
 				// here we need to use clob
 				par.DataType = OCIClobLocator
-				lob := &Lob{
-					connection:   connection,
-					sourceOffset: 1,
-					charsetID:    connection.tcpNego.ServerCharset,
-				}
-				err = lob.createTemporary()
+				lob := newLob(connection)
+				err = lob.createTemporaryClob(connection.tcpNego.ServerCharset, 1)
 				if err != nil {
 					return err
 				}
-				err = lob.putString(value.String)
+				err = lob.putString(value.String, connection.tcpNego.ServerCharset)
 				if err != nil {
 					return err
 				}
@@ -438,22 +479,38 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		} else {
 			if par.MaxLen >= converters.MAX_LEN_VARCHAR2 {
 				par.DataType = OCIClobLocator
-				lob := &Lob{
-					connection:   connection,
-					sourceOffset: 1,
-					charsetID:    connection.tcpNego.ServerCharset,
-				}
-				err = lob.createTemporary()
+				lob := newLob(connection)
+				err = lob.createTemporaryClob(connection.tcpNego.ServerCharset, 1)
 				if err != nil {
 					return err
 				}
-				err = lob.putString(value.String)
+				err = lob.putString(value.String, connection.tcpNego.ServerCharset)
 				if err != nil {
 					return err
 				}
 				value.locator = lob.sourceLocator
 				par.BValue = lob.sourceLocator
 			}
+		}
+	case BFile:
+		par.encodeRaw(nil, size)
+		par.DataType = OCIFileLocator
+		if par.Direction == Input {
+			par.MaxLen = 4000
+			if !value.isInit() {
+				return errors.New("BFile must be initialized")
+			}
+			par.BValue = value.lob.sourceLocator
+		}
+	case *BFile:
+		par.encodeRaw(nil, size)
+		par.DataType = OCIFileLocator
+		if par.Direction == Input {
+			par.MaxLen = 40000
+			if !value.isInit() {
+				return errors.New("BFile must be initialized")
+			}
+			par.BValue = value.lob.sourceLocator
 		}
 	case Blob:
 		par.encodeRaw(value.Data, size)

@@ -1005,6 +1005,9 @@ func SetNTSAuth(newNTSManager advanced_nego.NTSAuthInterface) {
 
 // all columns should pass as an array of values
 func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driver.Value) (*QueryResult, error) {
+	if conn.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	if rowNum == 0 {
 		return nil, nil
 	}
@@ -1096,6 +1099,9 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 }
 
 func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+	if conn.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	conn.connOption.Tracer.Print("Prepare With Context\n", query)
 	conn.session.StartContext(ctx)
 	defer conn.session.EndContext()

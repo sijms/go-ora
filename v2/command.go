@@ -305,7 +305,8 @@ func (stmt *Stmt) writePars(session *network.Session) error {
 			if par.DataType != RAW {
 				if par.DataType == REFCURSOR {
 					session.PutBytes(1, 0)
-				} else if par.Direction == Input && (par.DataType == OCIClobLocator || par.DataType == OCIBlobLocator) {
+				} else if par.Direction == Input &&
+					(par.DataType == OCIClobLocator || par.DataType == OCIBlobLocator || par.DataType == OCIFileLocator) {
 					session.PutUint(len(par.BValue), 2, true, true)
 					session.PutClr(par.BValue)
 				} else {
@@ -867,6 +868,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 					switch val := par.Value.(type) {
 					case *Clob:
 						if val.locator == nil {
+							val.Valid = false
 							val.String = ""
 						} else {
 							tempVal, err := stmt.readLob(par, val.locator)
@@ -881,6 +883,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 						}
 					case Clob:
 						if val.locator == nil {
+							val.Valid = false
 							val.String = ""
 						} else {
 							tempVal, err := stmt.readLob(par, val.locator)
@@ -896,6 +899,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 						stmt.Pars[parIndex].Value = val
 					case *Blob:
 						if val.locator == nil {
+							val.Valid = false
 							val.Data = nil
 						} else {
 							tempVal, err := stmt.readLob(par, val.locator)
@@ -910,6 +914,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 						}
 					case Blob:
 						if val.locator == nil {
+							val.Valid = false
 							val.Data = nil
 						} else {
 							tempVal, err := stmt.readLob(par, val.locator)
@@ -924,23 +929,6 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 						}
 						stmt.Pars[parIndex].Value = val
 					}
-					//if par.Value == nil {
-					//	continue
-					//}
-					//if lobLocator, ok := par.Value.([]byte); ok {
-					//	val, err := stmt.readLob(par, lobLocator)
-					//	if err != nil {
-					//		return err
-					//	}
-					//	typ := reflect.TypeOf(par.Value)
-					//	if typ.Kind() == reflect.Ptr {
-					//		reflect.ValueOf(par.Value).Elem().Set(reflect.ValueOf(val))
-					//	} else {
-					//		par.Value = val
-					//	}
-					//} else {
-					//	return errors.New("error reading lob: lob locator is not present")
-					//}
 				}
 			}
 		} else {
@@ -1008,69 +996,6 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 								}
 							}
 						}
-						//if lobLocator, ok := row[colIndex].([]byte); ok {
-						//	var err error
-						//	row[colIndex], err = stmt.readLob(col, lobLocator)
-						//	if err != nil {
-						//		return err
-						//	}
-						//} else {
-						//	return errors.New("error reading lob: lob locator is not present")
-						//}
-						//lob := &Lob{
-						//	sourceLocator: nil,
-						//}
-						//
-						//if lobLocator, ok := row[colIndex].([]byte); ok {
-						//	lob.sourceLocator = lobLocator
-						//} else {
-						//	return errors.New("error reading lob: lob locator is not present")
-						//}
-						//lob := &Lob{
-						//	sourceLocator: row[colIndex],
-						//}
-						//session.SaveState()
-						//dataSize, err := lob.getSize(stmt.connection)
-						//if err != nil {
-						//	return err
-						//}
-						//lobData, err := lob.getData(stmt.connection)
-						//if err != nil {
-						//	return err
-						//}
-						//if col.DataType == OCIBlobLocator {
-						//	if dataSize != int64(len(lobData)) {
-						//		return errors.New("error reading lob data: data size mismatching")
-						//	}
-						//	row[colIndex] = lobData
-						//} else {
-						//	tempCharset := stmt.connection.strConv.GetLangID()
-						//	if lob.variableWidthChar() {
-						//		if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
-						//			stmt.connection.strConv.SetLangID(2002)
-						//		} else {
-						//			stmt.connection.strConv.SetLangID(2000)
-						//		}
-						//	} else {
-						//		stmt.connection.strConv.SetLangID(col.CharsetID)
-						//	}
-						//	resultClobString := stmt.connection.strConv.Decode(lobData)
-						//	stmt.connection.strConv.SetLangID(tempCharset)
-						//	if dataSize != int64(len([]rune(resultClobString))) {
-						//		return errors.New("error reading clob data")
-						//	}
-						//	row[colIndex] = resultClobString
-						//	//if row[colIndex] != nil {
-						//	//	typ := reflect.TypeOf(row[colIndex])
-						//	//	if typ.Kind() == reflect.Ptr {
-						//	//		reflect.ValueOf(row[colIndex]).Elem().Set(reflect.ValueOf(resultClobString))
-						//	//	} else {
-						//	//		row[colIndex] = resultClobString
-						//	//	}
-						//	//} else {
-						//	//	row[colIndex] = resultClobString
-						//	//}
-						//}
 					}
 				}
 			}
@@ -1335,6 +1260,9 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 
 // Close close stmt cursor in the server
 func (stmt *defaultStmt) Close() error {
+	if stmt.connection.State != Opened {
+		return &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	if stmt.cursorID != 0 {
 		session := stmt.connection.session
 		session.ResetBuffer()
@@ -1351,6 +1279,9 @@ func (stmt *defaultStmt) Close() error {
 }
 
 func (stmt *Stmt) ExecContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Result, error) {
+	if stmt.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	stmt.connection.connOption.Tracer.Printf("Exec With Context:")
 	args := make([]driver.Value, len(namedArgs))
 	for x := 0; x < len(args); x++ {
@@ -1363,6 +1294,9 @@ func (stmt *Stmt) ExecContext(ctx context.Context, namedArgs []driver.NamedValue
 
 // Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
+	if stmt.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	stmt.connection.connOption.Tracer.Printf("Exec:\n%s", stmt.text)
 	var err error
 
@@ -1437,6 +1371,9 @@ func (stmt *Stmt) CheckNamedValue(named *driver.NamedValue) error {
 }
 
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) (*ParameterInfo, error) {
+	if stmt.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	param := &ParameterInfo{
 		Name:        name,
 		Direction:   direction,
@@ -1488,6 +1425,9 @@ func (stmt *Stmt) AddRefCursorParam(name string) {
 //
 // args is an array of values that corresponding to parameters in sql
 func (stmt *Stmt) Query_(args []driver.Value) (*DataSet, error) {
+	if stmt.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	result, err := stmt.Query(args)
 	if err != nil {
 		return nil, err
@@ -1499,6 +1439,9 @@ func (stmt *Stmt) Query_(args []driver.Value) (*DataSet, error) {
 }
 
 func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
+	if stmt.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	stmt.connection.connOption.Tracer.Printf("Query With Context:", stmt.text)
 	args := make([]driver.Value, len(namedArgs))
 	for x := 0; x < len(args); x++ {
@@ -1513,6 +1456,9 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 //
 // args is an array of values that corresponding to parameters in sql
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
+	if stmt.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	stmt.connection.connOption.Tracer.Printf("Query:\n%s", stmt.text)
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	//stmt._noOfRowsToFetch = 25

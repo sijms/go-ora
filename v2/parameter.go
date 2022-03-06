@@ -14,24 +14,10 @@ import (
 
 type OracleType int
 type ParameterDirection int
-type NVarChar string
-type TimeStamp time.Time
-type NullNVarChar struct {
-	Valid    bool
-	NVarChar NVarChar
-}
-type NullTimeStamp struct {
-	Valid     bool
-	TimeStamp TimeStamp
-}
 
 //func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
 //	return driver.Value(string(*n)), nil
 //}
-
-func (n *NVarChar) Value() (driver.Value, error) {
-	return driver.Value(string(*n)), nil
-}
 
 const (
 	Input  ParameterDirection = 1
@@ -668,12 +654,31 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		} else {
 			*value = tempVal
 		}
+	case BFile:
+		if tempNewVal, ok := newValue.(BFile); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("BFile col/par requires BFile value")
+		}
+	case *BFile:
+		var tempVal BFile
+		if tempNewVal, ok := newValue.(BFile); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*BFile col/par requires BFile value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
 	case Clob:
 		if tempNewVal, ok := newValue.(Clob); ok {
 			par.Value = tempNewVal
 		} else {
 			return errors.New("Clob col/par requires Clob value")
 		}
+
 	case *Clob:
 		var tempVal Clob
 		if tempNewVal, ok := newValue.(Clob); ok {
@@ -779,9 +784,11 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 	if par.BValue == nil {
 		switch par.DataType {
 		case OCIClobLocator:
-			tempVal = Clob{locator: nil}
+			tempVal = Clob{locator: nil, Valid: false}
 		case OCIBlobLocator:
-			tempVal = Blob{locator: nil}
+			tempVal = Blob{locator: nil, Valid: false}
+		case OCIFileLocator:
+			tempVal = BFile{lob: Lob{sourceLocator: nil, connection: connection}}
 		default:
 			tempVal = nil
 		}
@@ -807,12 +814,6 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 			}
 		case NUMBER:
 			tempVal = converters.DecodeNumber(par.BValue)
-		case TIMESTAMP:
-			dateVal, err := converters.DecodeDate(par.BValue)
-			if err != nil {
-				return nil, err
-			}
-			tempVal = TimeStamp(dateVal)
 		case TimeStampDTY:
 			fallthrough
 		case TimeStampeLTZ:
@@ -823,6 +824,12 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 			fallthrough
 		case TimeStampTZ_DTY:
 			fallthrough
+		case TIMESTAMP:
+			dateVal, err := converters.DecodeDate(par.BValue)
+			if err != nil {
+				return nil, err
+			}
+			tempVal = TimeStamp(dateVal)
 		case DATE:
 			dateVal, err := converters.DecodeDate(par.BValue)
 			if err != nil {
@@ -838,6 +845,19 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 				tempVal = Clob{locator: locator}
 			} else {
 				tempVal = Blob{locator: locator}
+			}
+		case OCIFileLocator:
+			locator, err := session.GetClr()
+			if err != nil {
+				return nil, err
+			}
+			tempVal = BFile{
+				isOpened: false,
+				lob: Lob{
+					sourceLocator: locator,
+					sourceLen:     len(locator),
+					connection:    connection,
+				},
 			}
 		case IBFloat:
 			tempVal = converters.ConvertBinaryFloat(par.BValue)

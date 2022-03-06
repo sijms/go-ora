@@ -340,6 +340,8 @@ func (dataSet DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, er
 				}
 				obj.Set(reflect.ValueOf(sql.NullByte{Valid: true, Byte: uint8(tempInt)}))
 			}
+		case reflect.TypeOf(BFile{}):
+			obj.Set(reflect.ValueOf(field))
 		default:
 			return false, nil
 		}

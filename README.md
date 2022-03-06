@@ -4,6 +4,46 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.4.5: Support BFile
+* connect as sys and create directory object that refer to physical directory
+* `grant read,write on directory 'dirName' to user`
+* put text file in the directory with name = fileName
+```golang
+// create and open connection before use BFile
+conn, err := go_ora.NewConnection(connStr)
+// check for error
+err = conn.Open()
+// check for error
+defer conn.Close()
+
+// Create BFile object
+file, err := go_ora.BFile(conn, dirName, fileName)
+// check for error
+
+// before use BFile it must be opened
+err = file.Open()
+// check for error
+defer file.Close()
+
+// does the file exist
+exists, err := file.Exists()
+// check for error
+
+if exists {
+    length, err := file.GetLength()
+    // check for error
+    
+    // read all data
+    data, err := file.Read()
+    
+    // read at position 2
+    data, err = file.ReadFromPos(2)
+    
+    // read 5 bytes count start at position 2
+    data, err = file.ReadBytesFromPos(2, 5)
+```
+* you can pass BFile object as input parameter or receive it from query or output parameters
+for more detail see example bfile
 ### version 2.4.4: Support for unix socket IPC
 you can use this option if server and client on same linux machine
 by specify the following url option

@@ -92,7 +92,7 @@ func BFileOutputPar(conn *go_ora.Connection) error {
 		id   int64
 		file go_ora.BFile
 	)
-	_, err := conn.Exec(sqlText, go_ora.Out{Dest: &id}, go_ora.Out{Dest: &file, Size: 1000})
+	_, err := conn.Exec(sqlText, go_ora.Out{Dest: &id}, go_ora.Out{Dest: &file})
 	if err != nil {
 		return err
 	}

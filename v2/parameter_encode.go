@@ -494,9 +494,11 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		}
 	case BFile:
 		par.encodeRaw(nil, size)
+		if par.MaxLen == 0 {
+			par.MaxLen = 4000
+		}
 		par.DataType = OCIFileLocator
 		if par.Direction == Input {
-			par.MaxLen = 4000
 			if !value.isInit() {
 				return errors.New("BFile must be initialized")
 			}
@@ -504,9 +506,11 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		}
 	case *BFile:
 		par.encodeRaw(nil, size)
+		if par.MaxLen == 0 {
+			par.MaxLen = 4000
+		}
 		par.DataType = OCIFileLocator
 		if par.Direction == Input {
-			par.MaxLen = 40000
 			if !value.isInit() {
 				return errors.New("BFile must be initialized")
 			}

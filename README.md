@@ -4,6 +4,41 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.4.8: JDBC connect string
+* Add new function go_ora.BuildJDBC
+```golang
+    // program will extract server, ports and protocol and build
+    // connection table
+    connStr := `(DESCRIPTION=
+    (ADDRESS_LIST=
+    	(LOAD_BALANCE=OFF)
+        (FAILOVER=ON)
+    	(address=(PROTOCOL=tcps)(host=localhost)(PORT=2484))
+    	(address=(protocol=tcp)(host=localhost)(port=1521))
+    )
+    (CONNECT_DATA=
+    	(SERVICE_NAME=service)
+        (SERVER=DEDICATED)
+    )
+    (SOURCE_ROUTE=yes)
+    )`
+    // use urlOption to set other options like:
+    // TRACE FILE = for debug
+    // note SSL automatically set from connStr (address=...
+    // SSL Verify = need to cancel certifiate verification
+    // wallet path
+    databaseUrl := go_ora.BuildJDBC(user, password, connStr, urlOptions)
+    conn, err := sql.Open("oracle", databaseUrl)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+    err = conn.Ping()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+```
 ### version 2.4.5: Support BFile
 * connect as sys and create directory object that refer to physical directory
 * `grant read,write on directory 'dirName' to user`

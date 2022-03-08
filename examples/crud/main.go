@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	_ "github.com/sijms/go-ora/v2"
-
 	"os"
 	"time"
 )
@@ -41,7 +40,11 @@ VALUES(:1, :2, :3, :4)`)
 	nameText := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	val := 1.1
 	for index = 1; index <= 100; index++ {
-		_, err = stmt.Exec(index, nameText, val, time.Now())
+		if index%5 == 0 {
+			_, err = stmt.Exec(index, nameText, val, nil)
+		} else {
+			_, err = stmt.Exec(index, nameText, val, time.Now())
+		}
 		if err != nil {
 			return err
 		}
@@ -57,11 +60,17 @@ func queryData(conn *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			fmt.Println("Can't close dataset: ", err)
+		}
+	}()
 	var (
 		id   int64
 		name string
 		val  float32
-		date time.Time
+		date sql.NullTime
 	)
 	for rows.Next() {
 		err = rows.Scan(&id, &name, &val, &date)
@@ -145,58 +154,58 @@ func main() {
 	fmt.Println("Connection string: ", connStr)
 	conn, err := sql.Open("oracle", server)
 	if err != nil {
-		fmt.Println("Can't open the driver", err)
+		fmt.Println("Can't open the driver: ", err)
 		return
 	}
 
 	defer func() {
 		err = conn.Close()
 		if err != nil {
-			fmt.Println("Can't close connection", err)
+			fmt.Println("Can't close connection: ", err)
 		}
 	}()
 
 	err = conn.Ping()
 	if err != nil {
-		fmt.Println("Can't ping connection", err)
+		fmt.Println("Can't ping connection: ", err)
 		return
 	}
 
 	err = createTable(conn)
 	if err != nil {
-		fmt.Println("Can't create table", err)
+		fmt.Println("Can't create table: ", err)
 		return
 	}
 	defer func() {
 		err = dropTable(conn)
 		if err != nil {
-			fmt.Println("Can't drop table", err)
+			fmt.Println("Can't drop table: ", err)
 		}
 	}()
 
 	err = insertData(conn)
 	if err != nil {
-		fmt.Println("Can't insert data", err)
+		fmt.Println("Can't insert data: ", err)
 		return
 	}
 	err = queryData(conn)
 	if err != nil {
-		fmt.Println("Can't query data", err)
+		fmt.Println("Can't query data: ", err)
 		return
 	}
 	err = updateData(conn)
 	if err != nil {
-		fmt.Println("Can't update data", err)
+		fmt.Println("Can't update data: ", err)
 		return
 	}
 	err = queryData(conn)
 	if err != nil {
-		fmt.Println("Can't query data", err)
+		fmt.Println("Can't query data: ", err)
 		return
 	}
 	err = deleteData(conn)
 	if err != nil {
-		fmt.Println("Can't delete data", err)
+		fmt.Println("Can't delete data: ", err)
 		return
 	}
 

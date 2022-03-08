@@ -201,6 +201,12 @@ where  e.deptno = dc.deptno`
 		fmt.Println("Can't query rows", err)
 		return
 	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			fmt.Println("Can't close dataset: ", err)
+		}
+	}()
 	var (
 		name  string
 		count int64

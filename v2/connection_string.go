@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -108,6 +109,12 @@ type ConnectionString struct {
 
 }
 
+// BuildJDBC create url from user, password and JDBC description string
+func BuildJDBC(user, password, connStr string) string {
+	return fmt.Sprintf("oracle://%s:%s@?connStr=\"%s\"", url.QueryEscape(user), url.QueryEscape(password),
+		url.QueryEscape(connStr))
+}
+
 // BuildUrl create databaseURL from server, port, service, user, password, urlOptions
 // this function help build a will formed databaseURL and accept any character as it
 // convert special charters to corresponding values in URL
@@ -130,6 +137,25 @@ func BuildUrl(server string, port int, service, user, password string, options m
 		ret = strings.TrimRight(ret, "&")
 	}
 	return ret
+}
+
+func extractServers(connStr string) ([]string, error) {
+
+	r, err := regexp.Compile(`\(\s*HOS\s*=\s*(\w+)\s*\)`)
+	if err != nil {
+		return nil, err
+	}
+	matches := r.FindAllStringSubmatch(connStr, -1)
+	servers := make([]string, 0, 5)
+	for _, match := range matches {
+		if len(match) == 2 {
+			servers = append(servers, match[1])
+		}
+	}
+	if len(servers) == 0 {
+		return nil, errors.New("no server found in connection string")
+	}
+	return servers, nil
 }
 
 // newConnectionStringFromUrl create new connection string from databaseURL data and options
@@ -176,6 +202,17 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	if strings.ToUpper(ret.connOption.UserID) == "SYS" {
 		ret.DBAPrivilege = SYSDBA
 	}
+	//if q != nil {
+	//	if q.Has("connStr") {
+	//		connStr := strings.ToUpper(q.Get("connStr"))
+	//		// get hosts
+	//		servers, err := extractServers(connStr)
+	//		if err != nil {
+	//			return nil, err
+	//		}
+	//
+	//	}
+	//}
 	host, p, err := net.SplitHostPort(u.Host)
 	if err != nil {
 		return nil, err

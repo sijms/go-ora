@@ -131,6 +131,12 @@ func readWithSql(conn *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			fmt.Println("Can't close dataset: ", err)
+		}
+	}()
 	var (
 		visitID int64
 		data1   sql.NullString

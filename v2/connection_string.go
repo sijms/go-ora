@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -110,9 +109,25 @@ type ConnectionString struct {
 }
 
 // BuildJDBC create url from user, password and JDBC description string
-func BuildJDBC(user, password, connStr string) string {
-	return fmt.Sprintf("oracle://%s:%s@?connStr=\"%s\"", url.QueryEscape(user), url.QueryEscape(password),
-		url.QueryEscape(connStr))
+func BuildJDBC(user, password, connStr string, options map[string]string) string {
+	if options == nil {
+		options = make(map[string]string)
+	}
+	options["connStr"] = connStr
+	ret := fmt.Sprintf("oracle://%s:%s@?", url.QueryEscape(user), url.QueryEscape(password))
+	for key, val := range options {
+		val = strings.TrimSpace(val)
+		for _, temp := range strings.Split(val, ",") {
+			temp = strings.TrimSpace(temp)
+			if strings.ToUpper(key) == "SERVER" {
+				ret += fmt.Sprintf("%s=%s&", key, temp)
+			} else {
+				ret += fmt.Sprintf("%s=%s&", key, url.QueryEscape(temp))
+			}
+		}
+	}
+	ret = strings.TrimRight(ret, "&")
+	return ret
 }
 
 // BuildUrl create databaseURL from server, port, service, user, password, urlOptions
@@ -139,25 +154,6 @@ func BuildUrl(server string, port int, service, user, password string, options m
 	return ret
 }
 
-func extractServers(connStr string) ([]string, error) {
-
-	r, err := regexp.Compile(`\(\s*HOS\s*=\s*(\w+)\s*\)`)
-	if err != nil {
-		return nil, err
-	}
-	matches := r.FindAllStringSubmatch(connStr, -1)
-	servers := make([]string, 0, 5)
-	for _, match := range matches {
-		if len(match) == 2 {
-			servers = append(servers, match[1])
-		}
-	}
-	if len(servers) == 0 {
-		return nil, errors.New("no server found in connection string")
-	}
-	return servers, nil
-}
-
 // newConnectionStringFromUrl create new connection string from databaseURL data and options
 func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	u, err := url.Parse(databaseUrl)
@@ -179,8 +175,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				SSLVerify:             true,
 			},
 			DatabaseInfo: network.DatabaseInfo{
-				Servers: make([]string, 0, 3),
-				Ports:   make([]int, 0, 3),
+				Servers: make([]network.ServerAddr, 0, 3),
 			},
 		},
 		Port:         defaultPort,
@@ -202,36 +197,27 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	if strings.ToUpper(ret.connOption.UserID) == "SYS" {
 		ret.DBAPrivilege = SYSDBA
 	}
-	//if q != nil {
-	//	if q.Has("connStr") {
-	//		connStr := strings.ToUpper(q.Get("connStr"))
-	//		// get hosts
-	//		servers, err := extractServers(connStr)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//
-	//	}
-	//}
-	host, p, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		return nil, err
-	}
-	if len(host) > 0 {
-		ret.connOption.Servers = append(ret.connOption.Servers, host)
-		if p != "" {
-			port, err := strconv.Atoi(p)
-			if err != nil {
-				ret.connOption.Ports = append(ret.connOption.Ports, defaultPort)
-			} else {
-				ret.connOption.Ports = append(ret.connOption.Ports, port)
-			}
 
-		} else {
-			ret.connOption.Ports = append(ret.connOption.Ports, defaultPort)
+	if q != nil && q.Has("connStr") {
+		err = ret.connOption.UpdateDatabaseInfo(q.Get("connStr"))
+		if err != nil {
+			return nil, err
 		}
+	} else {
+		host, p, err := net.SplitHostPort(u.Host)
+		if err != nil {
+			return nil, err
+		}
+		if len(host) > 0 {
+			tempAddr := network.ServerAddr{Addr: host, Port: defaultPort}
+			tempAddr.Port, err = strconv.Atoi(p)
+			if err != nil {
+				tempAddr.Port = defaultPort
+			}
+			ret.connOption.Servers = append(ret.connOption.Servers, tempAddr)
+		}
+		ret.connOption.ServiceName = strings.Trim(u.Path, "/")
 	}
-	ret.connOption.ServiceName = strings.Trim(u.Path, "/")
 	if q != nil {
 		for key, val := range q {
 			switch strings.ToUpper(key) {
@@ -241,19 +227,18 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				for _, srv := range val {
 					srv = strings.TrimSpace(srv)
 					if srv != "" {
-						host, p, err = net.SplitHostPort(srv)
+						host, p, err := net.SplitHostPort(srv)
 						if err != nil {
 							return nil, err
 						}
-						port := defaultPort
+						tempAddr := network.ServerAddr{Addr: host, Port: defaultPort}
 						if p != "" {
-							port, err = strconv.Atoi(p)
+							tempAddr.Port, err = strconv.Atoi(p)
 							if err != nil {
-								port = defaultPort
+								tempAddr.Port = defaultPort
 							}
 						}
-						ret.connOption.Servers = append(ret.connOption.Servers, host)
-						ret.connOption.Ports = append(ret.connOption.Ports, port)
+						ret.connOption.Servers = append(ret.connOption.Servers, tempAddr)
 					}
 				}
 			case "SERVICE NAME":
@@ -399,8 +384,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		}
 		if len(ret.password) == 0 {
 			serv := ret.connOption.Servers[0]
-			port := ret.connOption.Ports[0]
-			cred, err := ret.w.getCredential(serv, port, ret.connOption.ServiceName, ret.connOption.UserID)
+			cred, err := ret.w.getCredential(serv.Addr, serv.Port, ret.connOption.ServiceName, ret.connOption.UserID)
 			if err != nil {
 				return nil, err
 			}

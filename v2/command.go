@@ -854,9 +854,9 @@ func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Valu
 		}
 		resultClobString := stmt.connection.strConv.Decode(lobData)
 		stmt.connection.strConv.SetLangID(tempCharset)
-		if dataSize != int64(len([]rune(resultClobString))) {
-			return nil, errors.New("error reading clob data")
-		}
+		//if dataSize != int64(len([]rune(resultClobString))) {
+		//	return nil, errors.New("error reading clob data")
+		//}
 		return resultClobString, nil
 	}
 }

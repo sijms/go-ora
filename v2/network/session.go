@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"net"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -230,11 +229,11 @@ func (session *Session) negotiate() {
 			session.SSL.roots.AddCert(cert)
 		}
 	}
-	host, _ := connOption.GetActiveServer(false)
+	host := connOption.GetActiveServer(false)
 	config := &tls.Config{
 		Certificates: session.SSL.tlsCertificates,
 		RootCAs:      session.SSL.roots,
-		ServerName:   host,
+		ServerName:   host.Addr,
 	}
 	if !connOption.SSLVerify {
 		config.InsecureSkipVerify = true
@@ -254,18 +253,17 @@ func (session *Session) Connect(ctx context.Context) error {
 	connOption.Tracer.Print("Connect")
 	var err error
 	var connected = false
-	var host string
-	var port int
+	var host *ServerAddr
 	var loop = true
 	dialer := net.Dialer{
-		Timeout: time.Duration(time.Second * session.Context.ConnOption.Timeout),
+		Timeout: time.Second * session.Context.ConnOption.Timeout,
 	}
 	for loop {
-		host, port = connOption.GetActiveServer(false)
-		if port == 0 {
+		host = connOption.GetActiveServer(false)
+		if host == nil {
 			return errors.New("no available severs to connect to")
 		}
-		addr := net.JoinHostPort(host, strconv.Itoa(port))
+		addr := host.networkAddr()
 		if len(session.Context.ConnOption.UnixAddress) > 0 {
 			session.conn, err = dialer.DialContext(ctx, "unix", session.Context.ConnOption.UnixAddress)
 		} else {
@@ -274,8 +272,8 @@ func (session *Session) Connect(ctx context.Context) error {
 
 		if err != nil {
 			connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
-			host, port = connOption.GetActiveServer(true)
-			if port == 0 {
+			host = connOption.GetActiveServer(true)
+			if host == nil {
 				break
 			}
 			continue
@@ -284,26 +282,13 @@ func (session *Session) Connect(ctx context.Context) error {
 		connected = true
 		loop = false
 	}
-	//for serverIndex = 0; serverIndex < len(connOption.Servers); serverIndex++ {
-	//	host := connOption.Servers[serverIndex]
-	//	port := connOption.Ports[serverIndex]
-	//
-	//	addr := fmt.Sprintf("%s:%d", host, port)
-	//	session.conn, err = net.Dial("tcp", addr)
-	//	if err != nil {
-	//		connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
-	//		continue
-	//	}
-	//	connOption.Tracer.Printf("using: %s ..... [SUCCEED]", addr)
-	//	connected = true
-	//	//connOption.Host = host
-	//	//connOption.Port = port
-	//	break
-	//}
 	if !connected {
 		return err
 	}
-
+	err = connOption.updateSSL(host)
+	if err != nil {
+		return err
+	}
 	if connOption.SSL {
 		connOption.Tracer.Print("Using SSL/TLS")
 		session.negotiate()
@@ -335,27 +320,39 @@ func (session *Session) Connect(ctx context.Context) error {
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
 		connOption.Tracer.Print("Redirect")
 		//connOption.connData = redirectPacket.reconnectData
-		if len(redirectPacket.protocol()) != 0 {
-			connOption.Protocol = redirectPacket.protocol()
+		servers, err := extractServers(redirectPacket.redirectAddr)
+		if err != nil {
+			return err
 		}
-		if len(redirectPacket.host()) != 0 {
-			host = redirectPacket.host()
+		for _, srv := range servers {
+			connOption.AddServer(srv)
 		}
-		if len(redirectPacket.port()) != 0 {
-			port, err = strconv.Atoi(redirectPacket.port())
-			if err != nil {
-				return errors.New("redirect packet with wrong port")
-			}
-		}
-		connOption.AddServer(host, port)
-		host, port = connOption.GetActiveServer(true)
+		//if len(redirectPacket.protocol()) != 0 {
+		//	connOption.Protocol = redirectPacket.protocol()
+		//}
+		//if len(redirectPacket.host()) != 0 {
+		//	host = redirectPacket.host()
+		//}
+		//if len(redirectPacket.port()) != 0 {
+		//	port, err = strconv.Atoi(redirectPacket.port())
+		//	if err != nil {
+		//		return errors.New("redirect packet with wrong port")
+		//	}
+		//}
+		//connOption.AddServer(host, port)
+		host = connOption.GetActiveServer(true)
 		return session.Connect(ctx)
-
 	}
 	if refusePacket, ok := pck.(*RefusePacket); ok {
 		refusePacket.extractErrCode()
-		connOption.Tracer.Printf("connection to %s:%d refused with error: %s", host, port, refusePacket.Err.Error())
-		host, port = connOption.GetActiveServer(true)
+		var addr string
+		var port int
+		if host != nil {
+			addr = host.Addr
+			port = host.Port
+		}
+		connOption.Tracer.Printf("connection to %s:%d refused with error: %s", addr, port, refusePacket.Err.Error())
+		host = connOption.GetActiveServer(true)
 		if port == 0 {
 			session.Disconnect()
 			return &refusePacket.Err

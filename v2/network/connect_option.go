@@ -1,6 +1,10 @@
 package network
 
 import (
+	"errors"
+	"fmt"
+	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -8,6 +12,11 @@ import (
 	"github.com/sijms/go-ora/v2/trace"
 )
 
+type ServerAddr struct {
+	Protocol string
+	Addr     string
+	Port     int
+}
 type ClientInfo struct {
 	ProgramPath string
 	ProgramName string
@@ -20,14 +29,14 @@ type ClientInfo struct {
 }
 type DatabaseInfo struct {
 	UserID       string
-	Servers      []string
-	Ports        []int
+	Servers      []ServerAddr
 	serverIndex  int
 	SID          string
 	ServiceName  string
 	InstanceName string
 	DBName       string
 	AuthType     int
+	connStr      string
 }
 type SessionInfo struct {
 	SSLVersion            string
@@ -64,34 +73,154 @@ type ConnectionOption struct {
 	PrefetchRows int
 }
 
-func (op *ConnectionOption) AddServer(host string, port int) {
+func extractServers(connStr string) ([]ServerAddr, error) {
+	start := 0
+	end := 0
+	ret := make([]ServerAddr, 0, 5)
+	upperConnString := strings.ToUpper(connStr)
+	start = strings.Index(upperConnString[end:], "(ADDRESS=")
+	for start >= 0 {
+		end = strings.Index(upperConnString[start+len("(ADDRESS="):], "(ADDRESS=")
+		if end == -1 {
+			end = len(upperConnString)
+		} else {
+			end = end + start + len("(ADDRESS=")
+		}
+
+		r, err := regexp.Compile(`(?i)\(\s*HOST\s*=\s*(\w+)\s*\)`)
+		if err != nil {
+			return nil, err
+		}
+		tempString := connStr[start:end]
+		match := r.FindStringSubmatch(tempString)
+		server := ServerAddr{
+			Port: 1521,
+		}
+		if len(match) > 1 {
+			server.Addr = match[1]
+		}
+		r, err = regexp.Compile(`(?i)\(\s*PORT\s*=\s*(\w+)\s*\)`)
+		if err != nil {
+			return nil, err
+		}
+		match = r.FindStringSubmatch(tempString)
+		if len(match) > 1 {
+			server.Port, err = strconv.Atoi(match[1])
+			if err != nil {
+				return nil, err
+			}
+		}
+		r, err = regexp.Compile(`(?i)\(\s*PROTOCOL\s*=\s*(\w+)\s*\)`)
+		if err != nil {
+			return nil, err
+		}
+		match = r.FindStringSubmatch(tempString)
+		if len(match) > 1 {
+			server.Protocol = match[1]
+		}
+
+		if len(server.Addr) > 0 {
+			ret = append(ret, server)
+		}
+		start = strings.Index(upperConnString[end:], "(ADDRESS=")
+		if start >= 0 {
+			start = start + end
+		}
+	}
+	return ret, nil
+}
+
+func (op *ConnectionOption) updateSSL(server *ServerAddr) error {
+	if server != nil {
+		if strings.ToLower(server.Protocol) == "tcps" {
+			op.SSL = true
+			return nil
+		} else if strings.ToLower(server.Protocol) == "tcp" {
+			op.SSL = false
+			return nil
+		}
+	}
+	if strings.ToLower(op.Protocol) == "tcp" {
+		op.SSL = false
+	} else if strings.ToLower(op.Protocol) == "tcps" {
+		op.SSL = true
+	} else {
+		return fmt.Errorf("unknown or missing protocol: %s", op.Protocol)
+	}
+	return nil
+}
+func (op *ConnectionOption) UpdateDatabaseInfo(connStr string) error {
+	op.connStr = connStr
+	var err error
+	op.Servers, err = extractServers(connStr)
+	if err != nil {
+		return err
+	}
+	if len(op.Servers) == 0 {
+		return errors.New("no address passed in connection string")
+	}
+	r, err := regexp.Compile(`(?i)\(\s*SERVICE_NAME\s*=\s*(\w+)\s*\)`)
+	if err != nil {
+		return err
+	}
+	match := r.FindStringSubmatch(connStr)
+	if len(match) > 1 {
+		op.DatabaseInfo.ServiceName = match[1]
+	}
+	r, err = regexp.Compile(`(?i)\(\s*SID\s*=\s*(\w+)\s*\)`)
+	if err != nil {
+		return err
+	}
+	match = r.FindStringSubmatch(connStr)
+	if len(match) > 1 {
+		op.DatabaseInfo.SID = match[1]
+	}
+	r, err = regexp.Compile(`(?i)\(\s*INSTANCE_NAME\s*=\s*(\w+)\s*\)`)
+	if err != nil {
+		return err
+	}
+	match = r.FindStringSubmatch(connStr)
+	if len(match) > 1 {
+		op.DatabaseInfo.InstanceName = match[1]
+	}
+	return nil
+}
+func (op *ConnectionOption) AddServer(server ServerAddr) {
 	for i := 0; i < len(op.Servers); i++ {
-		if strings.ToUpper(host) == strings.ToUpper(op.Servers[i]) &&
-			port == op.Ports[i] {
+		if server.IsEqual(&op.Servers[i]) {
 			return
 		}
 	}
-	op.Servers = append(op.Servers, host)
-	op.Ports = append(op.Ports, port)
+	op.Servers = append(op.Servers, server)
 }
-
-func (op *ConnectionOption) GetActiveServer(jump bool) (string, int) {
+func (serv *ServerAddr) IsEqual(input *ServerAddr) bool {
+	return strings.ToUpper(serv.Addr) == strings.ToUpper(input.Addr) &&
+		serv.Port == input.Port
+}
+func (serv *ServerAddr) networkAddr() string {
+	return net.JoinHostPort(serv.Addr, strconv.Itoa(serv.Port))
+}
+func (op *ConnectionOption) GetActiveServer(jump bool) *ServerAddr {
 	if jump {
 		op.serverIndex++
 	}
 	if op.serverIndex >= len(op.Servers) {
-		return "", 0
+		return nil
 	}
-	return op.Servers[op.serverIndex], op.Ports[op.serverIndex]
+	return &op.Servers[op.serverIndex]
 }
 
 func (op *ConnectionOption) ConnectionData() string {
-	//if len(op.connData) > 0 {
-	//	return op.connData
-	//}
-	host, port := op.GetActiveServer(false)
+	if len(op.connStr) != 0 {
+		return op.connStr
+	}
+	host := op.GetActiveServer(false)
+	protocol := op.Protocol
+	if host.Protocol != "" {
+		protocol = host.Protocol
+	}
 	FulCid := "(CID=(PROGRAM=" + op.ProgramPath + ")(HOST=" + op.HostName + ")(USER=" + op.UserName + "))"
-	address := "(ADDRESS=(PROTOCOL=" + op.Protocol + ")(HOST=" + host + ")(PORT=" + strconv.Itoa(port) + "))"
+	address := "(ADDRESS=(PROTOCOL=" + protocol + ")(HOST=" + host.Addr + ")(PORT=" + strconv.Itoa(host.Port) + "))"
 	result := "(CONNECT_DATA="
 	if op.SID != "" {
 		result += "(SID=" + op.SID + ")"

@@ -74,57 +74,37 @@ type ConnectionOption struct {
 }
 
 func extractServers(connStr string) ([]ServerAddr, error) {
-	start := 0
-	end := 0
+	r, err := regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w,\.,\-]+)\s*\)|\(\s*(PORT)\s*=\s*(\w+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\))+\)`)
+	if err != nil {
+		return nil, err
+	}
 	ret := make([]ServerAddr, 0, 5)
-	upperConnString := strings.ToUpper(connStr)
-	start = strings.Index(upperConnString[end:], "(ADDRESS=")
-	for start >= 0 {
-		end = strings.Index(upperConnString[start+len("(ADDRESS="):], "(ADDRESS=")
-		if end == -1 {
-			end = len(upperConnString)
-		} else {
-			end = end + start + len("(ADDRESS=")
-		}
-
-		r, err := regexp.Compile(`(?i)\(\s*HOST\s*=\s*(\w+)\s*\)`)
-		if err != nil {
-			return nil, err
-		}
-		tempString := connStr[start:end]
-		match := r.FindStringSubmatch(tempString)
+	matchs := r.FindAllStringSubmatch(connStr, -1)
+	for _, match := range matchs {
 		server := ServerAddr{
 			Port: 1521,
 		}
-		if len(match) > 1 {
-			server.Addr = match[1]
-		}
-		r, err = regexp.Compile(`(?i)\(\s*PORT\s*=\s*(\w+)\s*\)`)
-		if err != nil {
-			return nil, err
-		}
-		match = r.FindStringSubmatch(tempString)
-		if len(match) > 1 {
-			server.Port, err = strconv.Atoi(match[1])
-			if err != nil {
-				return nil, err
+		for x := 2; x < len(match); x++ {
+			if strings.ToUpper(match[x]) == "PROTOCOL" {
+				x++
+				server.Protocol = match[x]
+				continue
+			}
+			if strings.ToUpper(match[x]) == "PORT" {
+				x++
+				server.Port, err = strconv.Atoi(match[x])
+				if err != nil {
+					return nil, err
+				}
+				continue
+			}
+			if strings.ToUpper(match[x]) == "HOST" {
+				x++
+				server.Addr = match[x]
 			}
 		}
-		r, err = regexp.Compile(`(?i)\(\s*PROTOCOL\s*=\s*(\w+)\s*\)`)
-		if err != nil {
-			return nil, err
-		}
-		match = r.FindStringSubmatch(tempString)
-		if len(match) > 1 {
-			server.Protocol = match[1]
-		}
-
 		if len(server.Addr) > 0 {
 			ret = append(ret, server)
-		}
-		start = strings.Index(upperConnString[end:], "(ADDRESS=")
-		if start >= 0 {
-			start = start + end
 		}
 	}
 	return ret, nil
@@ -149,6 +129,7 @@ func (op *ConnectionOption) updateSSL(server *ServerAddr) error {
 	}
 	return nil
 }
+
 func (op *ConnectionOption) UpdateDatabaseInfo(connStr string) error {
 	op.connStr = connStr
 	var err error
@@ -220,7 +201,13 @@ func (op *ConnectionOption) ConnectionData() string {
 		protocol = host.Protocol
 	}
 	FulCid := "(CID=(PROGRAM=" + op.ProgramPath + ")(HOST=" + op.HostName + ")(USER=" + op.UserName + "))"
-	address := "(ADDRESS=(PROTOCOL=" + protocol + ")(HOST=" + host.Addr + ")(PORT=" + strconv.Itoa(host.Port) + "))"
+	var address string
+	if len(op.UnixAddress) > 0 {
+		address = "(ADDRESS=(PROTOCOL=IPC)(KEY=EXTPROC1))"
+	} else {
+		address = "(ADDRESS=(PROTOCOL=" + protocol + ")(HOST=" + host.Addr + ")(PORT=" + strconv.Itoa(host.Port) + "))"
+	}
+
 	result := "(CONNECT_DATA="
 	if op.SID != "" {
 		result += "(SID=" + op.SID + ")"

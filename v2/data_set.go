@@ -101,7 +101,10 @@ func (dataSet *DataSet) setBitVector(bitVector []byte) {
 }
 
 func (dataSet *DataSet) Close() error {
-	return dataSet.parent.Close()
+	if dataSet.parent.CanClose() {
+		return dataSet.parent.Close()
+	}
+	return nil
 }
 
 // Next_ act like Next in sql package return false if no other rows in dataset

@@ -114,20 +114,7 @@ func BuildJDBC(user, password, connStr string, options map[string]string) string
 		options = make(map[string]string)
 	}
 	options["connStr"] = connStr
-	ret := fmt.Sprintf("oracle://%s:%s@?", url.QueryEscape(user), url.QueryEscape(password))
-	for key, val := range options {
-		val = strings.TrimSpace(val)
-		for _, temp := range strings.Split(val, ",") {
-			temp = strings.TrimSpace(temp)
-			if strings.ToUpper(key) == "SERVER" {
-				ret += fmt.Sprintf("%s=%s&", key, temp)
-			} else {
-				ret += fmt.Sprintf("%s=%s&", key, url.QueryEscape(temp))
-			}
-		}
-	}
-	ret = strings.TrimRight(ret, "&")
-	return ret
+	return BuildUrl("", 0, "", user, password, options)
 }
 
 // BuildUrl create databaseURL from server, port, service, user, password, urlOptions

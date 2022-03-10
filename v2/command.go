@@ -35,6 +35,7 @@ type StmtInterface interface {
 	//getExeOption() int
 	read(dataSet *DataSet) error
 	Close() error
+	CanClose() bool
 	//Exec(args []driver.Value) (driver.Result, error)
 	//Query(args []driver.Value) (driver.rows, error)
 }
@@ -55,8 +56,12 @@ type defaultStmt struct {
 	scnForSnapshot     []int
 	arrayBindCount     int
 	containOutputPars  bool
+	autoClose          bool
 }
 
+func (stmt *defaultStmt) CanClose() bool {
+	return stmt.autoClose
+}
 func (stmt *defaultStmt) hasMoreRows() bool {
 	return stmt._hasMoreRows
 }

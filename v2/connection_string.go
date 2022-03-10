@@ -198,31 +198,27 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		ret.DBAPrivilege = SYSDBA
 	}
 
-	if q != nil && q.Has("connStr") {
-		err = ret.connOption.UpdateDatabaseInfo(q.Get("connStr"))
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		host, p, err := net.SplitHostPort(u.Host)
-		if err != nil {
-			return nil, err
-		}
-		if len(host) > 0 {
-			tempAddr := network.ServerAddr{Addr: host, Port: defaultPort}
-			tempAddr.Port, err = strconv.Atoi(p)
-			if err != nil {
-				tempAddr.Port = defaultPort
-			}
-			ret.connOption.Servers = append(ret.connOption.Servers, tempAddr)
-		}
-		ret.connOption.ServiceName = strings.Trim(u.Path, "/")
+	host, p, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return nil, err
 	}
+	if len(host) > 0 {
+		tempAddr := network.ServerAddr{Addr: host, Port: defaultPort}
+		tempAddr.Port, err = strconv.Atoi(p)
+		if err != nil {
+			tempAddr.Port = defaultPort
+		}
+		ret.connOption.Servers = append(ret.connOption.Servers, tempAddr)
+	}
+	ret.connOption.ServiceName = strings.Trim(u.Path, "/")
 	if q != nil {
 		for key, val := range q {
 			switch strings.ToUpper(key) {
-			//case "DATA SOURCE":
-			//	conStr.DataSource = val
+			case "CONNSTR":
+				err = ret.connOption.UpdateDatabaseInfo(q.Get("connStr"))
+				if err != nil {
+					return nil, err
+				}
 			case "SERVER":
 				for _, srv := range val {
 					srv = strings.TrimSpace(srv)

@@ -74,7 +74,7 @@ type ConnectionOption struct {
 }
 
 func extractServers(connStr string) ([]ServerAddr, error) {
-	r, err := regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w,\.,\-]+)\s*\)|\(\s*(PORT)\s*=\s*(\w+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\))+\)`)
+	r, err := regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w,\.,\-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\))+\)`)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (op *ConnectionOption) UpdateDatabaseInfo(connStr string) error {
 	if len(op.Servers) == 0 {
 		return errors.New("no address passed in connection string")
 	}
-	r, err := regexp.Compile(`(?i)\(\s*SERVICE_NAME\s*=\s*(\w+)\s*\)`)
+	r, err := regexp.Compile(`(?i)\(\s*SERVICE_NAME\s*=\s*([\w,\.,\-]+)\s*\)`)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (op *ConnectionOption) UpdateDatabaseInfo(connStr string) error {
 	if len(match) > 1 {
 		op.DatabaseInfo.ServiceName = match[1]
 	}
-	r, err = regexp.Compile(`(?i)\(\s*SID\s*=\s*(\w+)\s*\)`)
+	r, err = regexp.Compile(`(?i)\(\s*SID\s*=\s*([\w,\.,\-]+)\s*\)`)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (op *ConnectionOption) UpdateDatabaseInfo(connStr string) error {
 	if len(match) > 1 {
 		op.DatabaseInfo.SID = match[1]
 	}
-	r, err = regexp.Compile(`(?i)\(\s*INSTANCE_NAME\s*=\s*(\w+)\s*\)`)
+	r, err = regexp.Compile(`(?i)\(\s*INSTANCE_NAME\s*=\s*([\w,\.,\-]+)\s*\)`)
 	if err != nil {
 		return err
 	}

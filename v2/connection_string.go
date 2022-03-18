@@ -112,8 +112,8 @@ type ConnectionString struct {
 // this function help build a will formed databaseURL and accept any character as it
 // convert special charters to corresponding values in URL
 func BuildUrl(server string, port int, service, user, password string, options map[string]string) string {
-	ret := fmt.Sprintf("oracle://%s:%s@%s/%s", url.QueryEscape(user), url.QueryEscape(password),
-		net.JoinHostPort(server, strconv.Itoa(port)), url.QueryEscape(service))
+	ret := fmt.Sprintf("oracle://%s:%s@%s/%s", url.PathEscape(user), url.PathEscape(password),
+		net.JoinHostPort(server, strconv.Itoa(port)), url.PathEscape(service))
 	if options != nil {
 		ret += "?"
 		for key, val := range options {

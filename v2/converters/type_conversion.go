@@ -162,10 +162,11 @@ func DecodeDouble(inputData []byte) float64 {
 	if err != nil {
 		return math.NaN()
 	}
+	absExponent := int(math.Abs(float64(exponent)))
 	if negative {
-		return -math.Floor(float64(mantissa)*math.Pow10(exponent)*1000000000000) / 1000000000000
+		return -math.Round(float64(mantissa)*math.Pow10(exponent)*math.Pow10(absExponent)) / math.Pow10(absExponent)
 	}
-	return math.Floor(float64(mantissa)*math.Pow10(exponent)*1000000000000) / 1000000000000
+	return math.Round(float64(mantissa)*math.Pow10(exponent)*math.Pow10(absExponent)) / math.Pow10(absExponent)
 
 }
 

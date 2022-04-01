@@ -52,29 +52,16 @@ type AdvNegoSeviceInfo struct {
 	AuthService []string
 }
 type ConnectionOption struct {
-	//Port                  int
-	//TransportConnectTo    int
-
-	//Host                  string
-
-	//IP string
-
-	//Addr string
-	//Server string
-
 	ClientInfo
 	DatabaseInfo
 	SessionInfo
 	AdvNegoSeviceInfo
-	//InAddrAny bool
-	Tracer trace.Tracer
-	//connData     string
-	SNOConfig    map[string]string
+	Tracer       trace.Tracer
 	PrefetchRows int
 }
 
 func extractServers(connStr string) ([]ServerAddr, error) {
-	r, err := regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w,\.,\-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\))+\)`)
+	r, err := regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w,\.,\-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(COMMUNITY)\s*=\s*([\w,\.,\-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\))+\)`)
 	if err != nil {
 		return nil, err
 	}

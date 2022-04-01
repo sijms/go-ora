@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"github.com/sijms/go-ora/v2/network"
 	"reflect"
-
-	//charmap "golang.org/x/text/encoding/charmap"
 	"regexp"
 	"strings"
 )
@@ -31,13 +29,9 @@ type StmtInterface interface {
 	fetch(dataSet *DataSet) error
 	hasBLOB() bool
 	hasLONG() bool
-	//write() error
-	//getExeOption() int
 	read(dataSet *DataSet) error
 	Close() error
-	CanClose() bool
-	//Exec(args []driver.Value) (driver.Result, error)
-	//Query(args []driver.Value) (driver.rows, error)
+	CanAutoClose() bool
 }
 type defaultStmt struct {
 	connection         *Connection
@@ -59,7 +53,7 @@ type defaultStmt struct {
 	autoClose          bool
 }
 
-func (stmt *defaultStmt) CanClose() bool {
+func (stmt defaultStmt) CanAutoClose() bool {
 	return stmt.autoClose
 }
 func (stmt *defaultStmt) hasMoreRows() bool {

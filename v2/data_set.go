@@ -101,7 +101,7 @@ func (dataSet *DataSet) setBitVector(bitVector []byte) {
 }
 
 func (dataSet *DataSet) Close() error {
-	if dataSet.parent.CanClose() {
+	if dataSet.parent.CanAutoClose() {
 		return dataSet.parent.Close()
 	}
 	return nil

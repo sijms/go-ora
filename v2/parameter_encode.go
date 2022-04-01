@@ -562,36 +562,32 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			}
 		}
 	case []byte:
-		if len(value) > converters.MAX_LEN_RAW {
-			valAsBlob := fromBytesToBlob(value)
-			return par.encodeValue(valAsBlob, size, connection)
+		if len(value) > converters.MAX_LEN_RAW && par.Direction == Input {
+			return par.encodeValue(Blob{Valid: true, Data: value}, size, connection)
 		}
 		par.encodeRaw(value, size)
 	case *[]byte:
 		if value == nil {
 			par.encodeRaw(nil, size)
 		} else {
-			if len(*value) > converters.MAX_LEN_RAW {
-				valAsBlob := fromBytesToBlob(*value)
-				return par.encodeValue(&valAsBlob, size, connection)
+			if len(*value) > converters.MAX_LEN_RAW && par.Direction == Input {
+				return par.encodeValue(&Blob{Valid: true, Data: *value}, size, connection)
 			}
 			par.encodeRaw(*value, size)
 		}
 	case RefCursor, *RefCursor:
 		par.setForRefCursor()
 	case string:
-		if len(value) > converters.MAX_LEN_NVARCHAR2 {
-			vasAsClob := fromStringToClob(value)
-			return par.encodeValue(vasAsClob, size, connection)
+		if len(value) > converters.MAX_LEN_NVARCHAR2 && par.Direction == Input {
+			return par.encodeValue(Clob{Valid: true, String: value}, size, connection)
 		}
 		par.encodeString(value, connection.strConv, size)
 	case *string:
 		if value == nil {
 			par.encodeString("", connection.strConv, size)
 		} else {
-			if len(*value) > converters.MAX_LEN_NVARCHAR2 {
-				valToClob := fromStringToClob(*value)
-				return par.encodeValue(&valToClob, size, connection)
+			if len(*value) > converters.MAX_LEN_NVARCHAR2 && par.Direction == Input {
+				return par.encodeValue(&Clob{Valid: true, String: *value}, size, connection)
 			}
 			par.encodeString(*value, connection.strConv, size)
 		}
@@ -681,14 +677,14 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	return nil
 }
 
-func fromStringToClob(s string) Clob {
-	return Clob{
-		String: s,
-	}
-}
+//func fromStringToClob(s string) Clob {
+//	return Clob{
+//		String: s,
+//	}
+//}
 
-func fromBytesToBlob(b []byte) Blob {
-	return Blob{
-		Data: b,
-	}
-}
+//func fromBytesToBlob(b []byte) Blob {
+//	return Blob{
+//		Data: b,
+//	}
+//}

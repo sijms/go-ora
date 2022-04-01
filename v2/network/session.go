@@ -239,7 +239,6 @@ func (session *Session) negotiate() {
 		config.InsecureSkipVerify = true
 	}
 	session.sslConn = tls.Client(session.conn, config)
-	//session.connOption.Tracer.Print("SSL/TLS HandShake complete")
 }
 
 // Connect perform network connection on address:port
@@ -327,19 +326,6 @@ func (session *Session) Connect(ctx context.Context) error {
 		for _, srv := range servers {
 			connOption.AddServer(srv)
 		}
-		//if len(redirectPacket.protocol()) != 0 {
-		//	connOption.Protocol = redirectPacket.protocol()
-		//}
-		//if len(redirectPacket.host()) != 0 {
-		//	host = redirectPacket.host()
-		//}
-		//if len(redirectPacket.port()) != 0 {
-		//	port, err = strconv.Atoi(redirectPacket.port())
-		//	if err != nil {
-		//		return errors.New("redirect packet with wrong port")
-		//	}
-		//}
-		//connOption.AddServer(host, port)
 		host = connOption.GetActiveServer(true)
 		return session.Connect(ctx)
 	}
@@ -358,10 +344,6 @@ func (session *Session) Connect(ctx context.Context) error {
 			return &refusePacket.Err
 		}
 		return session.Connect(ctx)
-		//errorMessage := fmt.Sprintf(
-		//	"connection refused by the server. user reason: %d; system reason: %d; error message: %s",
-		//	refusePacket.UserReason, refusePacket.SystemReason, refusePacket.message)
-		//return errors.New(errorMessage)
 	}
 	return errors.New("connection refused by the server due to unknown reason")
 }

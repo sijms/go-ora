@@ -163,9 +163,9 @@ func DecodeDouble(inputData []byte) float64 {
 		return math.NaN()
 	}
 	if negative {
-		return -float64(mantissa) * math.Pow10(exponent)
+		return -math.Floor(float64(mantissa)*math.Pow10(exponent)*1000000000000) / 1000000000000
 	}
-	return float64(mantissa) * math.Pow10(exponent)
+	return math.Floor(float64(mantissa)*math.Pow10(exponent)*1000000000000) / 1000000000000
 
 }
 

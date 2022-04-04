@@ -234,11 +234,16 @@ func DecodeNumber(inputData []byte) interface{} {
 	}
 
 fallbackToFloat:
+	//if negative {
+	//	return -float64(mantissa) * math.Pow10(exponent)
+	//}
+	//
+	//return float64(mantissa) * math.Pow10(exponent)
+	absExponent := int(math.Abs(float64(exponent)))
 	if negative {
-		return -float64(mantissa) * math.Pow10(exponent)
+		return -math.Round(float64(mantissa)*math.Pow10(exponent)*math.Pow10(absExponent)) / math.Pow10(absExponent)
 	}
-
-	return float64(mantissa) * math.Pow10(exponent)
+	return math.Round(float64(mantissa)*math.Pow10(exponent)*math.Pow10(absExponent)) / math.Pow10(absExponent)
 }
 
 // ToNumber encode mantissa, sign and exponent as a []byte expected by Oracle

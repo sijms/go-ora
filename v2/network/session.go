@@ -773,8 +773,111 @@ func (session *Session) PutBytes(data ...byte) {
 	session.outBuffer.Write(data)
 }
 
+//type uinteger interface {
+//	uint64 | uint32 | uint16 | uint8 | uint
+//}
+//type integer interface {
+//	int64 | int32 | int16 | int8 | int | uinteger
+//}
+//type hasLength interface {
+//	string | []byte
+//}
+
+//func putInteger[N integer](session *Session, number N, size uint8, bigEndian, compress bool) {
+//	num := int64(number)
+//	if compress {
+//		temp := make([]byte, 8)
+//		binary.BigEndian.PutUint64(temp, uint64(num))
+//		temp = bytes.TrimLeft(temp, "\x00")
+//		if size > uint8(len(temp)) {
+//			size = uint8(len(temp))
+//		}
+//		if size == 0 {
+//			session.outBuffer.WriteByte(0)
+//			//session.OutBuffer = append(session.OutBuffer, 0)
+//		} else {
+//			if num < 0 {
+//				num = num * -1
+//				size = size & 0x80
+//			}
+//			session.outBuffer.WriteByte(size)
+//			session.outBuffer.Write(temp)
+//		}
+//	} else {
+//		if size == 1 {
+//			session.outBuffer.WriteByte(uint8(num))
+//		} else {
+//			temp := make([]byte, size)
+//			if bigEndian {
+//				switch size {
+//				case 2:
+//					binary.BigEndian.PutUint16(temp, uint16(num))
+//				case 4:
+//					binary.BigEndian.PutUint32(temp, uint32(num))
+//				case 8:
+//					binary.BigEndian.PutUint64(temp, uint64(num))
+//				}
+//			} else {
+//				switch size {
+//				case 2:
+//					binary.LittleEndian.PutUint16(temp, uint16(num))
+//				case 4:
+//					binary.LittleEndian.PutUint32(temp, uint32(num))
+//				case 8:
+//					binary.LittleEndian.PutUint64(temp, uint64(num))
+//				}
+//			}
+//			session.outBuffer.Write(temp)
+//		}
+//	}
+//}
+//func putUinteger[N integer](session *Session, number N, size uint8, bigEndian, compress bool) {
+//	num := uint64(number)
+//	if size == 1 {
+//		session.outBuffer.WriteByte(uint8(num))
+//		return
+//	}
+//	if compress {
+//		// if the size is one byte no compression occur only one byte written
+//		temp := make([]byte, 8)
+//		binary.BigEndian.PutUint64(temp, num)
+//		temp = bytes.TrimLeft(temp, "\x00")
+//		if size > uint8(len(temp)) {
+//			size = uint8(len(temp))
+//		}
+//		if size == 0 {
+//			session.outBuffer.WriteByte(0)
+//		} else {
+//			session.outBuffer.WriteByte(size)
+//			session.outBuffer.Write(temp)
+//		}
+//	} else {
+//		temp := make([]byte, size)
+//		if bigEndian {
+//			switch size {
+//			case 2:
+//				binary.BigEndian.PutUint16(temp, uint16(num))
+//			case 4:
+//				binary.BigEndian.PutUint32(temp, uint32(num))
+//			case 8:
+//				binary.BigEndian.PutUint64(temp, num)
+//			}
+//		} else {
+//			switch size {
+//			case 2:
+//				binary.LittleEndian.PutUint16(temp, uint16(num))
+//			case 4:
+//				binary.LittleEndian.PutUint32(temp, uint32(num))
+//			case 8:
+//				binary.LittleEndian.PutUint64(temp, num)
+//			}
+//		}
+//		session.outBuffer.Write(temp)
+//	}
+//}
+
 // PutUint write uint number with size entered either use bigEndian or not and use compression or not to
-func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, compress bool) {
+func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compress bool) {
 	var num uint64
 	switch number := number.(type) {
 	case int64:
@@ -951,6 +1054,22 @@ func (session *Session) PutClr(data []byte) {
 		session.outBuffer.Write(data)
 	}
 }
+
+//func putKeyVal[N hasLength](session *Session, key, value N, num uint8) {
+//	if len(key) == 0 {
+//		session.outBuffer.WriteByte(0)
+//	} else {
+//		session.PutUint(len(key), 4, true, true)
+//		session.PutClr(key)
+//	}
+//	if len(value) == 0 {
+//		session.outBuffer.WriteByte(0)
+//	} else {
+//		session.PutUint(len(value), 4, true, true)
+//		session.PutClr(value)
+//	}
+//	session.PutInt(num, 4, true, true)
+//}
 
 // PutKeyValString write key, val (in form of string) and flag number to output buffer
 func (session *Session) PutKeyValString(key string, val string, num uint8) {

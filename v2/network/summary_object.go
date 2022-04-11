@@ -171,6 +171,9 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 		return nil, err
 	}
 	if length > 0 {
+		if len(result.bindErrors) == 0 {
+			result.bindErrors = make([]BindError, length)
+		}
 		num, err := session.GetByte()
 		if err != nil {
 			return nil, err
@@ -198,6 +201,9 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 		return nil, err
 	}
 	if length > 0 {
+		if len(result.bindErrors) == 0 {
+			result.bindErrors = make([]BindError, length)
+		}
 		_, _ = session.GetByte()
 		for x := 0; x < length; x++ {
 			_, err := session.GetInt(2, true, true)

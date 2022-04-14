@@ -527,10 +527,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 							stmt.Pars[x].BValue = nil
 							stmt.Pars[x].Value = nil
 						} else {
-							//stmt.Pars[x].BValue, err = session.GetClr()
-							//if err != nil {
-							//	return err
-							//}
+
 							err = stmt.calculateParameterValue(&stmt.Pars[x])
 							if err != nil {
 								return err
@@ -1066,10 +1063,9 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 
 func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 	session := stmt.connection.session
-	if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
-		stmt._hasBLOB = true
-	}
-
+	//if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
+	//	stmt._hasBLOB = true
+	//}
 	if col.DataType == XMLType {
 		if col.TypeName == "XMLTYPE" {
 			return errors.New("unsupported data type: XMLTYPE")
@@ -1132,27 +1128,15 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 		}
 		return nil
 	}
-
-	if (col.DataType == NCHAR || col.DataType == CHAR) && col.MaxCharLen == 0 {
-		col.BValue = nil
-	}
-	if col.DataType == RAW && col.MaxLen == 0 {
-		col.BValue = nil
-	}
-	var err error
-	col.BValue, err = session.GetClr()
-	if err != nil {
-		return err
-	}
 	return col.decodeColumnValue(stmt.connection)
 }
 
 // get values of rows and output parameter according to DataType and binary value (bValue)
 func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	session := stmt.connection.session
-	if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator {
-		stmt._hasBLOB = true
-	}
+	//if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator {
+	//	stmt._hasBLOB = true
+	//}
 	if param.DataType == XMLType {
 		if param.TypeName == "XMLTYPE" {
 			return errors.New("unsupported data type: XMLTYPE")
@@ -1223,15 +1207,16 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		if size > 0 {
 			values := make([]driver.Value, size)
 			for x := 0; x < size; x++ {
-				param.BValue, err = session.GetClr()
-				if err != nil {
-					return err
-				}
+				//param.BValue, err = session.GetClr()
+				//if err != nil {
+				//	return err
+				//}
 				// last unused integer is reader outside this function
+
+				values[x], err = param.decodeValue(stmt.connection)
 				if x < size-1 {
 					_, err = session.GetInt(2, true, true)
 				}
-				values[x], err = param.decodeValue(stmt.connection)
 				if err != nil {
 					return err
 				}
@@ -1242,17 +1227,6 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 			}
 		}
 		return nil
-	}
-	if (param.DataType == NCHAR || param.DataType == CHAR) && param.MaxCharLen == 0 {
-		param.BValue = nil
-	}
-	if param.DataType == RAW && param.MaxLen == 0 {
-		param.BValue = nil
-	}
-	var err error
-	param.BValue, err = session.GetClr()
-	if err != nil {
-		return err
 	}
 	return param.decodeParameterValue(stmt.connection)
 }

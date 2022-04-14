@@ -781,6 +781,31 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, error) {
 	session := connection.session
 	var tempVal driver.Value
+	var err error
+	if par.DataType == ROWID {
+		rowid, err := newRowID(session)
+		if err != nil {
+			return nil, err
+		}
+		if rowid == nil {
+			tempVal = nil
+		} else {
+			tempVal = string(rowid.getBytes())
+		}
+		return tempVal, nil
+	}
+	if (par.DataType == NCHAR || par.DataType == CHAR) && par.MaxCharLen == 0 {
+		par.BValue = nil
+		return nil, nil
+	}
+	if par.DataType == RAW && par.MaxLen == 0 {
+		par.BValue = nil
+		return nil, nil
+	}
+	par.BValue, err = session.GetClr()
+	if err != nil {
+		return nil, err
+	}
 	if par.BValue == nil {
 		switch par.DataType {
 		case OCIClobLocator:
@@ -795,15 +820,7 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 	} else {
 		switch par.DataType {
 		case ROWID:
-			rowid, err := newRowID(session)
-			if err != nil {
-				return nil, err
-			}
-			if rowid == nil {
-				tempVal = nil
-			} else {
-				tempVal = string(rowid.getBytes())
-			}
+
 		case NCHAR, CHAR, LONG:
 			if connection.strConv.GetLangID() != par.CharsetID {
 				tempCharset := connection.strConv.SetLangID(par.CharsetID)

@@ -1031,19 +1031,25 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 		}
 		maxLen := par.MaxLen
 		maxCharLen := par.MaxCharLen
-		for _, val := range col {
+		for index, val := range col {
+			if index == 0 {
+				continue
+			}
 			err = par.encodeValue(val, 0, conn)
 			if err != nil {
 				return nil, err
 			}
-			if par.MaxLen < maxLen {
-				par.MaxLen = maxLen
+			if maxLen < par.MaxLen {
+				maxLen = par.MaxLen
 			}
-			if par.MaxCharLen < maxCharLen {
-				par.MaxCharLen = maxCharLen
+			if maxCharLen < par.MaxCharLen {
+				maxCharLen = par.MaxCharLen
 			}
 		}
+
 		_ = par.encodeValue(col[0], 0, conn)
+		par.MaxLen = maxLen
+		par.MaxCharLen = maxCharLen
 		stmt.Pars = append(stmt.Pars, *par)
 	}
 	session := conn.session
@@ -1077,8 +1083,11 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 	return result, nil
 }
 
-//func (conn *Connection) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) driver.Row {
-//	return nil
+//func (conn *Connection) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) *driver.Row {
+//	stmt := NewStmt(query, conn)
+//	stmt.autoClose = true
+//	rows, err := stmt.QueryContext(ctx, args)
+//	return rows.
 //}
 
 func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {

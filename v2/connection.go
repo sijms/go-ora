@@ -1083,13 +1083,6 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 	return result, nil
 }
 
-//func (conn *Connection) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) *driver.Row {
-//	stmt := NewStmt(query, conn)
-//	stmt.autoClose = true
-//	rows, err := stmt.QueryContext(ctx, args)
-//	return rows.
-//}
-
 func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true

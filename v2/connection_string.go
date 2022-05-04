@@ -279,6 +279,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				}
 			case "UNIX SOCKET":
 				ret.connOption.SessionInfo.UnixAddress = val[0]
+			case "PROXY CLIENT NAME":
+				ret.connOption.DatabaseInfo.ProxyClientName = val[0]
 				//case "ENLIST":
 				//	ret.EnList = EnListFromString(val[0])
 				//case "INC POOL SIZE":

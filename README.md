@@ -4,6 +4,12 @@
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - See examples for more help
+### version 2.4.18: Add support for proxy user
+if you need to connect with proxy user pass following connection
+string
+```golang
+oracle://proxy_user:proxy_password@host:port/service?proxy client name=schema_owner
+```
 ### version 2.4.8: JDBC connect string
 * Add new function go_ora.BuildJDBC
 ```golang

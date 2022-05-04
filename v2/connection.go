@@ -29,7 +29,7 @@ const (
 	SysDba      LogonMode = 0x20
 	SysOper     LogonMode = 0x40
 	UserAndPass LogonMode = 0x100
-	PROXY       LogonMode = 0x400
+	//PROXY       LogonMode = 0x400
 )
 
 type NLSData struct {

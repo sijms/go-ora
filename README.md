@@ -3,6 +3,8 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+    - I always update the driver fixing issues and add new features so
+      always ensure that you get latest release
     - See examples for more help
 ### version 2.4.18: Add support for proxy user
 if you need to connect with proxy user pass following connection

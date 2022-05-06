@@ -206,6 +206,16 @@ func (dataSet DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, er
 		obj.Set(reflect.ValueOf(field))
 		return true, nil
 	}
+	if temp, ok := obj.Interface().(sql.Scanner); ok {
+		err := temp.Scan(field)
+		return err == nil, err
+	}
+	if obj.CanAddr() {
+		if temp, ok := obj.Addr().Interface().(sql.Scanner); ok {
+			err := temp.Scan(field)
+			return err == nil, err
+		}
+	}
 	switch obj.Type().Kind() {
 	case reflect.String:
 		obj.SetString(getString(field))
@@ -257,7 +267,6 @@ func (dataSet DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, er
 					return false, fmt.Errorf("go-ora: column %d require type time.Time or null", colIndex)
 				}
 			}
-
 		case reflect.TypeOf(NullTimeStamp{}):
 			if field == nil {
 				obj.Set(reflect.ValueOf(NullTimeStamp{Valid: false}))

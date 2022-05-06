@@ -260,7 +260,7 @@ func (session *Session) Connect(ctx context.Context) error {
 	for loop {
 		host = connOption.GetActiveServer(false)
 		if host == nil {
-			return errors.New("no available severs to connect to")
+			return errors.New("no available servers to connect to")
 		}
 		addr := host.networkAddr()
 		if len(session.Context.ConnOption.UnixAddress) > 0 {

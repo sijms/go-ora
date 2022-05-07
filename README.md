@@ -6,6 +6,10 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
+### version 2.4.20: Query To Struct
+- you can query to struct that contain basic types (int, float, string, datetime)
+or any types that implement sql.Scanner interface
+- see query to struct example for more information
 ### version 2.4.18: Add support for proxy user
 if you need to connect with proxy user pass following connection
 string

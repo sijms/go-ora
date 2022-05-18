@@ -1390,7 +1390,7 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 //
 // note: better to use sql.Out structure see examples for more information
 func (stmt *Stmt) AddRefCursorParam(name string) {
-	par, _ := stmt.NewParam("1", new(RefCursor), 0, Output)
+	par, _ := stmt.NewParam(name, new(RefCursor), 0, Output)
 	stmt.Pars = append(stmt.Pars, *par)
 }
 

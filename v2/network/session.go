@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/trace"
 	"net"
 	"reflect"
 	"strings"
@@ -64,7 +65,29 @@ type Session struct {
 	//certificates      []*x509.Certificate
 }
 
+func NewSessionWithInputBufferForDebug(input []byte) *Session {
+	options := &ConnectionOption{
+		AdvNegoSeviceInfo: AdvNegoSeviceInfo{AuthService: nil},
+		SessionInfo: SessionInfo{
+			SessionDataUnitSize:   0xFFFF,
+			TransportDataUnitSize: 0xFFFF,
+		},
+		Tracer: trace.NilTracer(),
+	}
+	return &Session{
+		ctx:      context.Background(),
+		conn:     nil,
+		inBuffer: input,
+		index:    0,
+		//connOption:      *connOption,
+		Context:         NewSessionContext(options),
+		Summary:         nil,
+		UseBigClrChunks: false,
+		ClrChunkSize:    0x40,
+	}
+}
 func NewSession(connOption *ConnectionOption) *Session {
+
 	return &Session{
 		conn:     nil,
 		inBuffer: nil,

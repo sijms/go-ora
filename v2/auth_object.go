@@ -41,7 +41,8 @@ type AuthObject struct {
 }
 
 // create authentication object through reading data from network
-func newAuthObject(username string, password string, tcpNego *TCPNego, session *network.Session) (*AuthObject, error) {
+func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Connection) (*AuthObject, error) {
+	session := conn.session
 	ret := new(AuthObject)
 	ret.tcpNego = tcpNego
 	ret.usePadding = false
@@ -118,6 +119,23 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, session *
 						}
 					}
 				}
+			}
+		case 15:
+			warning, err := network.NewWarningObject(conn.session)
+			if err != nil {
+				return nil, err
+			}
+			if warning != nil {
+				fmt.Println(warning)
+			}
+		case 23:
+			opCode, err := conn.session.GetByte()
+			if err != nil {
+				return nil, err
+			}
+			err = conn.getServerNetworkInformation(opCode)
+			if err != nil {
+				return nil, err
 			}
 		default:
 			return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", messageCode))

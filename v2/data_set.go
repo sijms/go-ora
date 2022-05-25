@@ -206,9 +206,6 @@ func (dataSet DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, er
 		obj.Set(reflect.ValueOf(field))
 		return true, nil
 	}
-	if obj.Type() == reflect.TypeOf(sql.NullTime{}) {
-		fmt.Println("null time")
-	}
 	if temp, ok := obj.Interface().(sql.Scanner); ok {
 		err := temp.Scan(field)
 		return err == nil, err

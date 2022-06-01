@@ -427,10 +427,7 @@ func (connStr *ConnectionString) validate() error {
 	}
 
 	// get client info
-	temp, err := user.Current()
-	if err != nil {
-		return err
-	}
+	temp, _ := user.Current()
 	idx := strings.Index(temp.Username, "\\")
 	if idx >= 0 {
 		if len(connStr.connOption.DomainName) == 0 {

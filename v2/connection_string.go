@@ -427,18 +427,21 @@ func (connStr *ConnectionString) validate() error {
 	}
 
 	// get client info
+	var idx int
 	temp, _ := user.Current()
-	idx := strings.Index(temp.Username, "\\")
-	if idx >= 0 {
-		if len(connStr.connOption.DomainName) == 0 {
-			connStr.connOption.DomainName = temp.Username[:idx]
-		}
-		if len(connStr.connOption.ClientInfo.UserName) == 0 {
-			connStr.connOption.ClientInfo.UserName = temp.Username[idx+1:]
-		}
-	} else {
-		if len(connStr.connOption.ClientInfo.UserName) == 0 {
-			connStr.connOption.ClientInfo.UserName = temp.Username
+	if temp != nil {
+		idx = strings.Index(temp.Username, "\\")
+		if idx >= 0 {
+			if len(connStr.connOption.DomainName) == 0 {
+				connStr.connOption.DomainName = temp.Username[:idx]
+			}
+			if len(connStr.connOption.ClientInfo.UserName) == 0 {
+				connStr.connOption.ClientInfo.UserName = temp.Username[idx+1:]
+			}
+		} else {
+			if len(connStr.connOption.ClientInfo.UserName) == 0 {
+				connStr.connOption.ClientInfo.UserName = temp.Username
+			}
 		}
 	}
 	connStr.connOption.HostName, _ = os.Hostname()

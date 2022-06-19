@@ -22,7 +22,7 @@ func NewEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
 			availableServiceIDs: []int{0, 1, 8, 10, 6, 3, 2, 11, 12, 15, 16, 17},
 		},
 	}
-	err := output.buildServiceList([]string{"AES128", "AES192", "AES256"}, true, true)
+	err := output.buildServiceList([]string{"DES56C", "AES128", "AES192", "AES256"}, true, true)
 	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err
@@ -66,18 +66,20 @@ func (serv *encryptService) getServiceDataLength() int {
 
 func (serv *encryptService) activateAlgorithm() error {
 	key := serv.comm.session.Context.AdvancedService.SessionKey
-	iv := make([]byte, 16)
+	//iv := make([]byte, 16)
 	var algo security.OracleNetworkEncryption = nil
 	var err error
 	switch serv.algoID {
 	case 0:
 		return nil
+	case 2:
+		algo, err = security.NewOracleNetworkDESCryptor(key[:8], nil)
 	case 15:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], iv)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], nil)
 	case 16:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:24], iv)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:24], nil)
 	case 17:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:32], iv)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:32], nil)
 	default:
 		err = errors.New(fmt.Sprintf("advanced negotiation error: encryption service algorithm: %d still not supported", serv.algoID))
 	}

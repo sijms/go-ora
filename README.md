@@ -6,6 +6,9 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
+### version 2.4.28: Binary Double And Float Fix
+- Now you can read binary double and float without error issue#217
+- You can avoid calling cgo function `user.Current()` if you define environmental variable $USER
 ### version 2.4.20: Query To Struct
 - you can query to struct that contain basic types (int, float, string, datetime)
 or any types that implement sql.Scanner interface

@@ -11,7 +11,7 @@ package network
 
 type SessionContext struct {
 	//conn net.Conn
-	connOption ConnectionOption
+	connOption *ConnectionOption
 	//PortNo int
 	//InstanceName string
 	//HostName string
@@ -45,7 +45,7 @@ type SessionContext struct {
 }
 
 // NewSessionContext create session context from connection option
-func NewSessionContext(connOption ConnectionOption) *SessionContext {
+func NewSessionContext(connOption *ConnectionOption) *SessionContext {
 	return &SessionContext{
 		SessionDataUnit:   connOption.SessionDataUnitSize,
 		TransportDataUnit: connOption.TransportDataUnitSize,

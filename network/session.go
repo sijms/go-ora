@@ -2,6 +2,7 @@ package network
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -17,16 +18,18 @@ type Data interface {
 	Write(session *Session) error
 	Read(session *Session) error
 }
-type sessionState struct {
+type SessionState struct {
 	summary   *SummaryObject
 	sendPcks  []PacketInterface
-	inBuffer  []byte
-	outBuffer []byte
+	InBuffer  []byte
+	OutBuffer bytes.Buffer
 	index     int
 }
 type Session struct {
-	conn              net.Conn
-	connOption        ConnectionOption
+	ctx    context.Context
+	oldCtx context.Context
+	conn   net.Conn
+	//connOption        ConnectionOption
 	Context           *SessionContext
 	sendPcks          []PacketInterface
 	inBuffer          []byte
@@ -40,40 +43,54 @@ type Session struct {
 	HasEOSCapability  bool
 	HasFSAPCapability bool
 	Summary           *SummaryObject
-	states            []sessionState
+	states            []SessionState
 	StrConv           converters.IStringConverter
 }
 
-func NewSession(connOption ConnectionOption) *Session {
+func NewSession(connOption *ConnectionOption) *Session {
 	return &Session{
-		conn:       nil,
-		inBuffer:   nil,
-		index:      0,
-		connOption: connOption,
-		Context:    NewSessionContext(connOption),
-		Summary:    nil,
+		conn:     nil,
+		inBuffer: nil,
+		index:    0,
+		Context:  NewSessionContext(connOption),
+		Summary:  nil,
 	}
 }
 
-func (session *Session) SaveState() {
-	session.states = append(session.states, sessionState{
+func (session *Session) SaveState(newState *SessionState) {
+	session.states = append(session.states, SessionState{
 		summary:   session.Summary,
 		sendPcks:  session.sendPcks,
-		inBuffer:  session.inBuffer,
-		outBuffer: session.outBuffer.Bytes(),
+		InBuffer:  session.inBuffer,
+		OutBuffer: session.outBuffer,
 		index:     session.index,
 	})
+	if newState == nil {
+		session.Summary = nil
+		session.sendPcks = nil
+		session.inBuffer = nil
+		session.outBuffer = bytes.Buffer{}
+		session.index = 0
+	} else {
+		session.Summary = newState.summary
+		session.sendPcks = newState.sendPcks
+		session.inBuffer = newState.InBuffer
+		session.outBuffer = newState.OutBuffer
+		session.index = newState.index
+	}
 }
 
-func (session *Session) LoadState() {
+func (session *Session) LoadState() (oldState *SessionState) {
 	index := len(session.states) - 1
+	if index >= 0 {
+		oldState = &session.states[index]
+	}
 	if index >= 0 {
 		currentState := session.states[index]
 		session.Summary = currentState.summary
 		session.sendPcks = currentState.sendPcks
-		session.inBuffer = currentState.inBuffer
-		session.outBuffer.Reset()
-		session.outBuffer.Write(currentState.outBuffer) //  = currentState.outBuffer
+		session.inBuffer = currentState.InBuffer
+		session.outBuffer = currentState.OutBuffer
 		session.index = currentState.index
 		if index == 0 {
 			session.states = nil
@@ -81,6 +98,16 @@ func (session *Session) LoadState() {
 			session.states = session.states[:index]
 		}
 	}
+	return
+}
+
+// ResetBuffer empty in and out buffer and set read index to 0
+func (session *Session) ResetBuffer() {
+	session.Summary = nil
+	session.sendPcks = nil
+	session.inBuffer = nil
+	session.outBuffer.Reset()
+	session.index = 0
 }
 
 func (session *Session) Connect() error {
@@ -103,7 +130,7 @@ func (session *Session) Connect() error {
 	if err != nil {
 		return err
 	}
-	if connectPacket.packet.length == 58 {
+	if connectPacket.length == 58 {
 		session.PutBytes(connectPacket.buffer...)
 		err = session.Write()
 		if err != nil {
@@ -168,15 +195,13 @@ func (session *Session) Disconnect() {
 	}
 }
 
-func (session *Session) ResetBuffer() {
-	session.Summary = nil
-	session.sendPcks = nil
-	session.inBuffer = nil
-	//session.outBuffer = nil
-	session.outBuffer.Reset()
-	session.index = 0
+func (session *Session) StartContext(ctx context.Context) {
+	session.oldCtx = session.ctx
+	session.ctx = ctx
 }
-
+func (session *Session) EndContext() {
+	session.ctx = session.oldCtx
+}
 func (session *Session) Debug() {
 	//if session.index > 350 && session.index < 370 {
 	fmt.Println("index: ", session.index)
@@ -333,7 +358,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		pck := newRedirectPacketFromData(packetData)
 		dataLen := binary.BigEndian.Uint16(packetData[8:])
 		var data string
-		if pck.packet.length <= pck.packet.dataOffset {
+		if pck.length <= pck.dataOffset {
 			packetData, err = readPacketData(session.conn)
 			dataPck := newDataPacketFromData(packetData)
 			data = string(dataPck.buffer)
@@ -342,7 +367,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		//fmt.Println("data returned: ", data)
 		length := strings.Index(data, "\x00")
-		if pck.packet.flag&2 != 0 && length > 0 {
+		if pck.flag&2 != 0 && length > 0 {
 			pck.redirectAddr = data[:length]
 			pck.reconnectData = data[length:]
 		} else {
@@ -429,6 +454,9 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			if session.HasError() {
 				return nil, errors.New(session.GetError())
 			}
+		} else {
+			session.index = 0
+			return dataPck, nil
 		}
 		fallthrough
 	default:
@@ -438,11 +466,11 @@ func (session *Session) readPacket() (PacketInterface, error) {
 
 func (session *Session) PutBytes(data ...byte) {
 	session.outBuffer.Write(data)
-	//session.outBuffer = append(session.outBuffer, )
+	//session.OutBuffer = append(session.OutBuffer, )
 }
 
 //func (session *Session) PutByte(num byte) {
-//		session.outBuffer = append(session.outBuffer, num)
+//		session.OutBuffer = append(session.OutBuffer, num)
 //}
 
 func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, compress bool) {
@@ -473,7 +501,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 	}
 	if size == 1 {
 		session.outBuffer.WriteByte(uint8(num))
-		//session.outBuffer = append(session.outBuffer, uint8(num))
+		//session.OutBuffer = append(session.OutBuffer, uint8(num))
 		return
 	}
 	if compress {
@@ -486,12 +514,12 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			//session.outBuffer = append(session.outBuffer, 0)
+			//session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			session.outBuffer.WriteByte(size)
 			session.outBuffer.Write(temp)
-			//session.outBuffer = append(session.outBuffer, size)
-			//session.outBuffer = append(session.outBuffer, temp...)
+			//session.OutBuffer = append(session.OutBuffer, size)
+			//session.OutBuffer = append(session.OutBuffer, temp...)
 		}
 	} else {
 		temp := make([]byte, size)
@@ -515,7 +543,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 			}
 		}
 		session.outBuffer.Write(temp)
-		//session.outBuffer = append(session.outBuffer, temp...)
+		//session.OutBuffer = append(session.OutBuffer, temp...)
 	}
 }
 
@@ -555,7 +583,7 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			//session.outBuffer = append(session.outBuffer, 0)
+			//session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			if num < 0 {
 				num = num * -1
@@ -563,13 +591,13 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 			}
 			session.outBuffer.WriteByte(size)
 			session.outBuffer.Write(temp)
-			//session.outBuffer = append(session.outBuffer, size)
-			//session.outBuffer = append(session.outBuffer, temp...)
+			//session.OutBuffer = append(session.OutBuffer, size)
+			//session.OutBuffer = append(session.OutBuffer, temp...)
 		}
 	} else {
 		if size == 1 {
 			session.outBuffer.WriteByte(uint8(num))
-			//session.outBuffer = append(session.outBuffer, uint8(num))
+			//session.OutBuffer = append(session.OutBuffer, uint8(num))
 		} else {
 			temp := make([]byte, size)
 			if bigEndian {
@@ -592,7 +620,7 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 				}
 			}
 			session.outBuffer.Write(temp)
-			//session.outBuffer = append(session.outBuffer, temp...)
+			//session.OutBuffer = append(session.OutBuffer, temp...)
 		}
 	}
 }
@@ -601,7 +629,7 @@ func (session *Session) PutClr(data []byte) {
 	dataLen := len(data)
 	if dataLen == 0 {
 		session.outBuffer.WriteByte(0)
-		//session.outBuffer = append(session.outBuffer, 0)
+		//session.OutBuffer = append(session.OutBuffer, 0)
 		return
 	}
 	if dataLen > 0x40 {
@@ -630,14 +658,14 @@ func (session *Session) PutKeyValString(key string, val string, num uint8) {
 func (session *Session) PutKeyVal(key []byte, val []byte, num uint8) {
 	if len(key) == 0 {
 		session.outBuffer.WriteByte(0)
-		//session.outBuffer = append(session.outBuffer, 0)
+		//session.OutBuffer = append(session.OutBuffer, 0)
 	} else {
 		session.PutUint(len(key), 4, true, true)
 		session.PutClr(key)
 	}
 	if len(val) == 0 {
 		session.outBuffer.WriteByte(0)
-		//session.outBuffer = append(session.outBuffer, 0)
+		//session.OutBuffer = append(session.OutBuffer, 0)
 	} else {
 		session.PutUint(len(val), 4, true, true)
 		session.PutClr(val)

@@ -66,12 +66,34 @@ type Connection struct {
 	strConv           converters.IStringConverter
 	NLSData           NLSData
 }
-
 type oracleDriver struct {
+}
+type OracleConnector struct {
+	drv           *oracleDriver
+	connectString string
 }
 
 func init() {
 	sql.Register("oracle", &oracleDriver{})
+}
+func (drv *OracleDriver) OpenConnector(name string) (driver.Connector, error) {
+
+	return &OracleConnector{drv: drv, connectString: name}, nil
+}
+func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, error) {
+
+	conn, err := NewConnection(connector.connectString)
+	if err != nil {
+		return nil, err
+	}
+	err = conn.OpenWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+func (connector *OracleConnector) Driver() driver.Driver {
+	return connector.drv
 }
 func (drv *oracleDriver) Open(name string) (driver.Conn, error) {
 
@@ -83,9 +105,9 @@ func (drv *oracleDriver) Open(name string) (driver.Conn, error) {
 	return conn, conn.Open()
 }
 
-func (conn *Connection) SetStringConveter(conveter converters.IStringConverter) {
-	conn.strConv = conveter
-	conn.session.StrConv = conveter
+func (conn *Connection) SetStringConverter(converter converters.IStringConverter) {
+	conn.strConv = converter
+	conn.session.StrConv = converter
 }
 
 func (conn *Connection) GetNLS() (*NLSData, error) {
@@ -199,9 +221,11 @@ func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
 	return NewStmt(query, conn), nil
 }
 
-func (conn *Connection) Ping(_ context.Context) error {
+func (conn *Connection) Ping(ctx context.Context) error {
 	conn.connOption.Tracer.Print("Ping")
 	conn.session.ResetBuffer()
+	conn.session.StartContext(ctx)
+	defer conn.session.EndContext()
 	return (&simpleObject{
 		session:     conn.session,
 		operationID: 0x93,
@@ -340,7 +364,30 @@ func (conn *Connection) Open() error {
 
 	return nil
 }
-
+func (conn *Connection) OpenWithContext(ctx context.Context) error {
+	tracer := conn.connOption.Tracer
+	switch conn.conStr.DBAPrivilege {
+	case SYSDBA:
+		conn.LogonMode |= SysDba
+	case SYSOPER:
+		conn.LogonMode |= SysOper
+	default:
+		conn.LogonMode = 0
+	}
+	conn.session = network.NewSession(conn.connOption)
+	//W := conn.conStr.w
+	//if conn.connOption.SSL && W != nil {
+	//	err := conn.session.LoadSSLData(W.certificates, W.privateKeys, W.certificateRequests)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	session := conn.session
+	err := session.Connect(ctx)
+	if err != nil {
+		return err
+	}
+}
 func (conn *Connection) Begin() (driver.Tx, error) {
 	conn.connOption.Tracer.Print("Begin transaction")
 	conn.autoCommit = false

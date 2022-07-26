@@ -46,7 +46,7 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 				return nil, err
 			}
 			if session.HasError() {
-				return nil, errors.New(session.GetError())
+				return nil, session.GetError()
 			}
 			loop = false
 		case 8:
@@ -172,15 +172,15 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	//	session.PutKeyValString("AUTH_NEWPASSWORD", ENewPassword, 0)
 	//	index ++
 	//}
-	session.PutKeyValString("AUTH_TERMINAL", connOption.ClientData.HostName, 0)
+	session.PutKeyValString("AUTH_TERMINAL", connOption.ClientInfo.HostName, 0)
 	index++
-	session.PutKeyValString("AUTH_PROGRAM_NM", connOption.ClientData.ProgramName, 0)
+	session.PutKeyValString("AUTH_PROGRAM_NM", connOption.ClientInfo.ProgramName, 0)
 	index++
-	session.PutKeyValString("AUTH_MACHINE", connOption.ClientData.HostName, 0)
+	session.PutKeyValString("AUTH_MACHINE", connOption.ClientInfo.HostName, 0)
 	index++
-	session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", connOption.ClientData.PID), 0)
+	session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", connOption.ClientInfo.PID), 0)
 	index++
-	session.PutKeyValString("AUTH_SID", connOption.ClientData.UserName, 0)
+	session.PutKeyValString("AUTH_SID", connOption.ClientInfo.UserName, 0)
 	index++
 	session.PutKeyValString("AUTH_CONNECT_STRING", connOption.ConnectionData(), 0)
 	index++
@@ -188,7 +188,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	index++
 	session.PutKeyValString("SESSION_CLIENT_LIB_TYPE", "0", 0)
 	index++
-	session.PutKeyValString("SESSION_CLIENT_DRIVER_NAME", connOption.ClientData.DriverName, 0)
+	session.PutKeyValString("SESSION_CLIENT_DRIVER_NAME", connOption.ClientInfo.DriverName, 0)
 	index++
 	session.PutKeyValString("SESSION_CLIENT_VERSION", "1.0.0.0", 0)
 	index++

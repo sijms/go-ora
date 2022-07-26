@@ -20,7 +20,7 @@ type TCPNego struct {
 	ServerRuntimeCaps     []byte
 }
 
-func NewTCPNego(session *network.Session) (*TCPNego, error) {
+func newTCPNego(session *network.Session) (*TCPNego, error) {
 	session.ResetBuffer()
 	session.PutBytes(1, 6, 0)
 	session.PutBytes([]byte("OracleClientGo\x00")...)

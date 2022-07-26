@@ -455,7 +455,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					stmt._hasMoreRows = false
 					stmt.connection.session.Summary = nil
 				} else {
-					return errors.New(stmt.connection.session.GetError())
+					return stmt.connection.session.GetError()
 				}
 
 			}
@@ -948,7 +948,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		lob := &Lob{
 			sourceLocator: data,
 		}
-		session.SaveState()
+		session.SaveState(nil)
 		dataSize, err := lob.getSize(stmt.connection)
 		if err != nil {
 			return err
@@ -994,7 +994,7 @@ func (stmt *defaultStmt) Close() error {
 		session.PutBytes(17, 105, 0, 1, 1, 1)
 		session.PutInt(stmt.cursorID, 4, true, true)
 		return (&simpleObject{
-			session:     session,
+			connection:  stmt.connection,
 			operationID: 0x93,
 			data:        nil,
 			err:         nil,

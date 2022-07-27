@@ -49,10 +49,10 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			return nil, err
 		}
 	}
-	result.CurRowNumber, err = session.GetInt(4, true, true)
-	if err != nil {
-		return nil, err
-	}
+	//result.CurRowNumber, err = session.GetInt(4, true, true)
+	//if err != nil {
+	//	return nil, err
+	//}
 	result.RetCode, err = session.GetInt(2, true, true)
 	if err != nil {
 		return nil, err

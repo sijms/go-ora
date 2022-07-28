@@ -572,7 +572,8 @@ func (conn *Connection) doAuth() error {
 	conn.LogonMode = conn.LogonMode | NoNewPass
 	conn.session.PutUint(int(conn.LogonMode), 4, true, true)
 	conn.session.PutBytes(1, 1, 5, 1, 1)
-	conn.session.PutBytes([]byte(conn.connOption.UserID)...)
+	conn.session.PutClr([]byte(conn.connOption.UserID))
+	//conn.session.PutBytes([]byte(conn.connOption.UserID)...)
 	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientInfo.HostName, 0)
 	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientInfo.ProgramName, 0)
 	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientInfo.HostName, 0)

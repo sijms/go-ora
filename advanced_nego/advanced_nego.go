@@ -7,7 +7,9 @@ import (
 	"github.com/sijms/go-ora/network"
 )
 
-var version int = 0xB200200
+//var version int = 0xB200200
+
+var version int = 0x9200100
 
 type AdvNego struct {
 	comm        *AdvancedNegoComm

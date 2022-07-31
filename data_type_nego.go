@@ -60,26 +60,33 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 		b32kTypeSupported:      false,
 		supportSessionStateOps: false,
 	}
+
+	//if (!this.connection.enableDataInLocator) {
+	//	var10000 = this.jdbcThinCompileTimeCapabilities;
+	//	var10000[23] &= -5;
+	//}
+	//
+	//if (var4) {
+	//	var10000 = this.jdbcThinRuntimeCapabilities;
+	//	var10000[6] |= KPCCAP_RTB_TTC_ZCPY;
+	//}
+	//
+	//if (var2 == null || var2.length < 1 || (var2[1] & 1) != 1) {
+	//	var10000 = this.jdbcThinRuntimeCapabilities;
+	//	var10000[1] &= -2;
+	//}
+
 	if len(result.Server.ServerCompileTimeCaps) <= 27 || result.Server.ServerCompileTimeCaps[27] == 0 {
 		result.CompileTimeCaps[27] = 0
 	}
-	if len(result.Server.ServerCompileTimeCaps) > 4 && result.Server.ServerCompileTimeCaps[4]&8 != 0 {
+	if !result.Server.hasCompileTimeCaps(4, 8) {
 		result.CompileTimeCaps[4] = 0
 	}
-	if len(result.Server.ServerCompileTimeCaps) >= 4 && result.Server.ServerCompileTimeCaps[4]&32 != 0 {
+	if !result.Server.hasCompileTimeCaps(4, 32) {
 		result.CompileTimeCaps[4] &= 223
 		//this.connection.isO7L_MRExposed = false;
 	}
 
-	//final boolean hasServerCompileTimeCapability(int var1, int var2) {
-	//	boolean var3 = false;
-	//	if (this.serverCompileTimeCapabilities != null &&
-	//		this.serverCompileTimeCapabilities.length > var1 &&
-	//		(this.serverCompileTimeCapabilities[var1] & var2) != 0) {
-	//		var3 = true;
-	//	}
-	//	return var3;
-	//}
 	xmlTypeClientSideDecoding := false
 	if len(result.Server.ServerCompileTimeCaps) > 7 {
 		if result.Server.ServerCompileTimeCaps[7] >= 8 && xmlTypeClientSideDecoding {

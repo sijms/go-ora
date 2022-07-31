@@ -74,6 +74,9 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 	var key []byte
 	padding := false
 	var err error
+	if ret.VerifierType == 0 {
+		ret.VerifierType = 2361
+	}
 	if ret.VerifierType == 2361 {
 		key, err = getKeyFromUserNameAndPassword(username, password)
 		if err != nil {

@@ -434,6 +434,34 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
 	}
 	tracer.Print("TTC Version: ", conn.session.TTCVersion)
+	if len(conn.tcpNego.ServerRuntimeCaps) > 6 && conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
+		tracer.Print("Max length for char/byte types: 0x7FFF")
+		converters.MAX_LEN_VARCHAR2 = 0x7FFF
+		converters.MAX_LEN_NVARCHAR2 = 0x7FFF
+		converters.MAX_LEN_RAW = 0x7FFF
+	} else {
+		tracer.Print("Max length for char/byte types: 0xFA0")
+		converters.MAX_LEN_VARCHAR2 = 0xFA0
+		converters.MAX_LEN_NVARCHAR2 = 0xFA0
+		converters.MAX_LEN_RAW = 0xFA0
+	}
+	//if (this.serverRuntimeCapabilities != null && this.serverRuntimeCapabilities.length > 6 && (this.serverRuntimeCapabilities[6] & T4C8TTIdty.KPCCAP_RTB_TTC_ZCPY) != 0 && this.thinNetUseZeroCopyIO && (this.net.getSessionAttributes().getNegotiatedOptions() & 64) != 0 && this.getDataIntegrityAlgorithmName().equals("") && this.getEncryptionAlgorithmName().equals("")) {
+	//	this.useZeroCopyIO = true;
+	//} else {
+	//	this.useZeroCopyIO = false;
+	//}
+	//
+	//if (this.hasServerCompileTimeCapability(23, 64) && bit(var6.jdbcThinCompileTimeCapabilities[23], 64)) {
+	//	this.useLobPrefetch = true;
+	//} else {
+	//	this.useLobPrefetch = false;
+	//}
+	//
+	//if (this.serverRuntimeCapabilities != null && this.serverRuntimeCapabilities.length > T4C8TTIdty.KPCCAP_RTB_TTC && bit(this.serverRuntimeCapabilities[T4C8TTIdty.KPCCAP_RTB_TTC], T4C8TTIdty.KPCCAP_RTB_TTC_SESSSTATEOPS)) {
+	//	this.svrSupportsRequests = true;
+	//} else {
+	//	this.svrSupportsRequests = false;
+	//}
 
 	err = conn.doAuth()
 	if err != nil {

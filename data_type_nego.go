@@ -407,7 +407,7 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	result.addTypeRep(231, 231, 1)
 	result.addTypeRep(232, 231, 1)
 	result.addTypeRep(233, 233, 1)
-	result.addTypeRep(252, 252, 1)
+	result.addTypeRep(252, 252, 0)
 	result.addTypeRep(241, 109, 1)
 	result.addTypeRep(515, 0, 0)
 

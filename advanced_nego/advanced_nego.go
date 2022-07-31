@@ -9,7 +9,8 @@ import (
 
 //var version int = 0xB200200
 
-var version int = 0x9200100
+//var version int = 0x9200100
+var version int = 0xA200000
 
 type AdvNego struct {
 	comm        *AdvancedNegoComm

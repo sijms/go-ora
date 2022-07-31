@@ -41,6 +41,10 @@ type SummaryObject struct {
 func NewSummary(session *Session) (*SummaryObject, error) {
 	result := new(SummaryObject)
 	var err error
+	//result.EndOfCallStatus, err = session.GetInt(4, true, true)
+	//if err != nil {
+	//	return nil, err
+	//}
 	if session.TTCVersion >= 3 {
 		if session.HasFSAPCapability {
 			result.EndToEndECIDSequence, err = session.GetInt(2, true, true)

@@ -993,12 +993,16 @@ func (stmt *defaultStmt) Close() error {
 		session.ResetBuffer()
 		session.PutBytes(17, 105, 0, 1, 1, 1)
 		session.PutInt(stmt.cursorID, 4, true, true)
-		return (&simpleObject{
-			connection:  stmt.connection,
-			operationID: 0x93,
-			data:        nil,
-			err:         nil,
-		}).write().read()
+		if stmt.connection.dBVersion.Number >= 10102 {
+			return (&simpleObject{
+				connection:  stmt.connection,
+				operationID: 0x93,
+				data:        nil,
+				err:         nil,
+			}).write().read()
+		} else {
+			return session.Write()
+		}
 	}
 	return nil
 }

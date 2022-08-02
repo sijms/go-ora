@@ -219,17 +219,15 @@ func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
 }
 
 func (conn *Connection) Ping(ctx context.Context) error {
-	if conn.dBVersion.Number >= 10102 {
-		conn.connOption.Tracer.Print("Ping")
-		conn.session.ResetBuffer()
-		conn.session.StartContext(ctx)
-		defer conn.session.EndContext()
-		return (&simpleObject{
-			connection:  conn,
-			operationID: 0x93,
-			data:        nil,
-		}).write().read()
-	}
+	conn.connOption.Tracer.Print("Ping")
+	conn.session.ResetBuffer()
+	conn.session.StartContext(ctx)
+	defer conn.session.EndContext()
+	return (&simpleObject{
+		connection:  conn,
+		operationID: 0x93,
+		data:        nil,
+	}).write().read()
 	return nil
 }
 

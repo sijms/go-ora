@@ -75,9 +75,20 @@ func NewAuthObject(username string, password string, tcpNego *TCPNego, session *
 	padding := false
 	var err error
 	if ret.VerifierType == 0 {
-		ret.VerifierType = 2361
-	}
-	if ret.VerifierType == 2361 {
+		key, err = getKeyFromUserNameAndPassword(username, password)
+		if err != nil {
+			return nil, err
+		}
+		ret.ServerSessKey, err = decryptSessionKey2(key[:8], ret.EServerSessKey)
+		if err != nil {
+			return nil, err
+		}
+		ret.EPassword, err = encryptPassword2(password, ret.ServerSessKey)
+		if err != nil {
+			return nil, err
+		}
+		return ret, nil
+	} else if ret.VerifierType == 2361 {
 		key, err = getKeyFromUserNameAndPassword(username, password)
 		if err != nil {
 			return nil, err
@@ -160,7 +171,8 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	session.PutUint(keyValSize, 4, true, true)
 	session.PutBytes(1, 1)
 	if len(connOption.UserID) > 0 {
-		session.PutBytes([]byte(connOption.UserID)...)
+		//session.PutBytes([]byte(connOption.UserID)...)
+		session.PutClr([]byte(connOption.UserID))
 	}
 	index := 0
 	if len(obj.EClientSessKey) > 0 {
@@ -330,6 +342,21 @@ func decryptSessionKey(padding bool, encKey []byte, sessionKey string) ([]byte, 
 	return output[:len(output)-cutLen], nil
 }
 
+func decryptSessionKey2(encKey []byte, sessionKey string) ([]byte, error) {
+	result, err := hex.DecodeString(sessionKey)
+	if err != nil {
+		return nil, err
+	}
+	blk, err := des.NewCipher(encKey)
+	if err != nil {
+		return nil, err
+	}
+	enc := cipher.NewCBCDecrypter(blk, make([]byte, 8))
+	output := make([]byte, len(result))
+	enc.CryptBlocks(output, result)
+	return output, nil
+}
+
 func EncryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, error) {
 	blk, err := aes.NewCipher(encKey)
 	if err != nil {
@@ -347,12 +374,30 @@ func EncryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, 
 func EncryptPassword(password string, key []byte) (string, error) {
 	buff1 := make([]byte, 0x10)
 	_, err := rand.Read(buff1)
-	//buff_1 = []byte{109, 250, 127, 252, 157, 165, 29, 6, 165, 174, 50, 93, 165, 202, 192, 100}
 	if err != nil {
 		return "", nil
 	}
 	buffer := append(buff1, []byte(password)...)
 	return EncryptSessionKey(true, key, buffer)
+}
+func encryptPassword2(password string, key []byte) (string, error) {
+	padding := 0
+	temp := []byte(password)
+	if len(password)%8 > 0 {
+		padding = 8 - (len(password) % 8)
+		temp = append(temp, bytes.Repeat([]byte{0}, padding)...)
+	}
+	blk, err := des.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	enc := cipher.NewCBCEncrypter(blk, make([]byte, 8))
+	output := make([]byte, len(temp))
+	enc.CryptBlocks(output, temp)
+	encPassword := hex.EncodeToString(output)
+	encPassword += strconv.Itoa(padding)
+	// [36, -90, -28, -115, -91, 95, -80, -2]
+	return strings.ToUpper(encPassword), nil
 }
 
 func CalculateKeysHash(verifierType int, key1 []byte, key2 []byte) ([]byte, error) {

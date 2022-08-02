@@ -116,7 +116,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutBytes(0, 0, 0, 0, 0)
 	}
 	if parse {
-		session.PutBytes(stmt.connection.strConv.Encode(stmt.text)...)
+		session.PutClr(stmt.connection.strConv.Encode(stmt.text))
 	}
 	if define {
 		session.PutBytes(0)

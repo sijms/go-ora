@@ -276,7 +276,11 @@ func (stmt *Stmt) write(session *network.Session) error {
 		}
 		stmt.parse = false
 		stmt.define = false
-		stmt.reSendParDef = false
+		if stmt.connection.dBVersion.Number >= 10102 {
+			stmt.reSendParDef = false
+		} else {
+			stmt.reSendParDef = true
+		}
 	}
 	//if !stmt.reExec {
 	//exeOp := stmt.getExeOption()

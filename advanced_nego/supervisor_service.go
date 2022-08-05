@@ -17,8 +17,7 @@ func NewSupervisorService(comm *AdvancedNegoComm) (*supervisorService, error) {
 			serviceType: 4,
 			version:     0xB200200,
 		},
-		cid: []byte{0, 0, 16, 28, 102, 236, 40, 234},
-		//cid:       []byte{9, 9, 9, 9, 9, 9, 9, 9},
+		cid:       []byte{0, 0, 16, 28, 102, 236, 40, 234},
 		servArray: []int{4, 1, 2, 3},
 	}
 	return output, nil

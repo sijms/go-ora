@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/converters"
+	"github.com/sijms/go-ora/converters"
 	"io"
 	"reflect"
 	"strings"

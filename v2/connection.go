@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sijms/go-ora/v2/advanced_nego"
-	"github.com/sijms/go-ora/v2/converters"
-	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/advanced_nego"
+	"github.com/sijms/go-ora/converters"
+	"github.com/sijms/go-ora/network"
 )
 
 type ConnectionState int

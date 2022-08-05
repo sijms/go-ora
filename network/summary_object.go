@@ -16,8 +16,8 @@ type SummaryObject struct {
 	errorPos             int // uint16
 	sqlType              uint8
 	oerFatal             uint8
-	Flags                uint8 // uint16
-	userCursorOPT        uint8 // uint16
+	Flags                int // uint16
+	userCursorOPT        int // uint16
 	upiParam             uint8
 	warningFlag          uint8
 	rba                  int // uint32
@@ -35,11 +35,6 @@ type SummaryObject struct {
 }
 
 func NewSummary(session *Session) (*SummaryObject, error) {
-	//if (this.negotiatedTTCversion >= 7) {
-	//	this.oer = new T4CTTIoer(this);
-	//} else {
-	//	this.oer = new T4CTTIoer11(this);
-	//}
 	result := new(SummaryObject)
 	var err error
 	if session.HasEOSCapability {
@@ -56,7 +51,6 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			}
 		}
 	}
-
 	result.CurRowNumber, err = session.GetInt(4, true, true)
 	if err != nil {
 		return nil, err
@@ -89,15 +83,27 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 	if err != nil {
 		return nil, err
 	}
-	result.Flags, err = session.GetByte()
-	//result.Flags, err = session.GetInt(2, true, true)
-	if err != nil {
-		return nil, err
-	}
-	result.userCursorOPT, err = session.GetByte()
-	//result.userCursorOPT, err = session.GetInt(2, true, true)
-	if err != nil {
-		return nil, err
+	if session.TTCVersion >= 7 {
+		result.Flags, err = session.GetInt(2, true, true)
+		if err != nil {
+			return nil, err
+		}
+		result.userCursorOPT, err = session.GetInt(2, true, true)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		var temp uint8
+		temp, err = session.GetByte()
+		if err != nil {
+			return nil, err
+		}
+		result.Flags = int(temp)
+		temp, err = session.GetByte()
+		if err != nil {
+			return nil, err
+		}
+		result.userCursorOPT = int(temp)
 	}
 	result.upiParam, err = session.GetByte()
 	if err != nil {
@@ -148,76 +154,102 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 		return nil, err
 	}
 	_, _ = session.GetDlc()
-	_, _ = session.GetDlc()
-	_, _ = session.GetDlc()
-	_, _ = session.GetDlc()
-	//length, err := session.GetDlc()
-	//length, err := session.GetInt(2, true, true)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if length > 0 {
-	//	result.bindErrors = make([]BindError, length)
-	//	num, err := session.GetByte()
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	flag := num == 0xFE
-	//	for x := 0; x < length; x++ {
-	//		if flag {
-	//			_, _ = session.GetByte()
-	//		}
-	//		result.bindErrors[x].errorCode, err = session.GetInt(2, true, true)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//	}
-	//	if flag {
-	//		_, _ = session.GetByte()
-	//	}
-	//}
-	//length, err = session.GetInt(4, true, true)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if length > 0 {
-	//	num, err := session.GetByte()
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	flag := num == 0xFE
-	//	for x := 0; x < length; x++ {
-	//		if flag {
-	//			_, _ = session.GetByte()
-	//		}
-	//		result.bindErrors[x].rowOffset, err = session.GetInt(4, true, true)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//	}
-	//	if flag {
-	//		_, _ = session.GetByte()
-	//	}
-	//}
-	//length, err = session.GetInt(2, true, true)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if length > 0 {
-	//	_, _ = session.GetByte()
-	//	for x := 0; x < length; x++ {
-	//		_, err := session.GetInt(2, true, true)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//		result.bindErrors[x].errorMsg, err = session.GetClr()
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//		_, _ = session.GetByte()
-	//		_, _ = session.GetByte()
-	//	}
-	//}
+	if session.TTCVersion < 7 {
+		_, _ = session.GetDlc()
+		_, _ = session.GetDlc()
+		_, _ = session.GetDlc()
+	} else {
+		length, err := session.GetInt(2, true, true)
+		if err != nil {
+			return nil, err
+		}
+		if length > 0 {
+			result.bindErrors = make([]BindError, length)
+			num, err := session.GetByte()
+			if err != nil {
+				return nil, err
+			}
+			flag := num == 0xFE
+			for x := 0; x < length; x++ {
+				if flag {
+					if session.UseBigClrChunks {
+						_, _ = session.GetInt(4, true, true)
+					} else {
+						_, _ = session.GetByte()
+					}
+				}
+				result.bindErrors[x].errorCode, err = session.GetInt(2, true, true)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if flag {
+				_, _ = session.GetByte()
+			}
+		}
+		length, err = session.GetInt(4, true, true)
+		if err != nil {
+			return nil, err
+		}
+		if length > 0 {
+			if len(result.bindErrors) == 0 {
+				result.bindErrors = make([]BindError, length)
+			}
+			num, err := session.GetByte()
+			if err != nil {
+				return nil, err
+			}
+			flag := num == 0xFE
+			for x := 0; x < length; x++ {
+				if flag {
+					if session.UseBigClrChunks {
+						_, _ = session.GetInt(4, true, true)
+					} else {
+						_, _ = session.GetByte()
+					}
+				}
+				result.bindErrors[x].rowOffset, err = session.GetInt(4, true, true)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if flag {
+				_, _ = session.GetByte()
+			}
+		}
+		length, err = session.GetInt(2, true, true)
+		if err != nil {
+			return nil, err
+		}
+		if length > 0 {
+			if len(result.bindErrors) == 0 {
+				result.bindErrors = make([]BindError, length)
+			}
+			_, _ = session.GetByte()
+			for x := 0; x < length; x++ {
+				_, err := session.GetInt(2, true, true)
+				if err != nil {
+					return nil, err
+				}
+				result.bindErrors[x].errorMsg, err = session.GetClr()
+				if err != nil {
+					return nil, err
+				}
+				_, _ = session.GetByte()
+				_, _ = session.GetByte()
+			}
+		}
+		if session.TTCVersion >= 7 {
+			result.RetCode, err = session.GetInt(4, true, true)
+			if err != nil {
+				return nil, err
+			}
+			result.CurRowNumber, err = session.GetInt(8, true, true)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	if result.RetCode != 0 {
 		result.ErrorMessage, err = session.GetClr()
 		if err != nil {

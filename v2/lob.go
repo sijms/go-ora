@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/network"
+	"github.com/sijms/go-ora/v2/network"
 )
 
 type Clob struct {

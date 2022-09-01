@@ -1038,8 +1038,11 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 		if err != nil {
 			return nil, err
 		}
+
 		maxLen := par.MaxLen
 		maxCharLen := par.MaxCharLen
+		dataType := par.DataType
+
 		for index, val := range col {
 			if index == 0 {
 				continue
@@ -1048,17 +1051,24 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 			if err != nil {
 				return nil, err
 			}
+
 			if maxLen < par.MaxLen {
 				maxLen = par.MaxLen
 			}
+
 			if maxCharLen < par.MaxCharLen {
 				maxCharLen = par.MaxCharLen
+			}
+
+			if par.DataType != dataType && par.DataType != NCHAR {
+				dataType = par.DataType
 			}
 		}
 
 		_ = par.encodeValue(col[0], 0, conn)
 		par.MaxLen = maxLen
 		par.MaxCharLen = maxCharLen
+		par.DataType = dataType
 		stmt.Pars = append(stmt.Pars, *par)
 	}
 	session := conn.session

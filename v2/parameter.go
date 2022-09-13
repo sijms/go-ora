@@ -15,9 +15,9 @@ import (
 type OracleType int
 type ParameterDirection int
 
-//func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
+// func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
 //	return driver.Value(string(*n)), nil
-//}
+// }
 
 const (
 	Input  ParameterDirection = 1
@@ -31,12 +31,12 @@ type Out struct {
 	Size int
 }
 
-//internal enum BindDirection
-//{
-//Output = 16,
-//Input = 32,
-//InputOutput = 48,
-//}
+// internal enum BindDirection
+// {
+// Output = 16,
+// Input = 32,
+// InputOutput = 48,
+// }
 
 //go:generate stringer -type=OracleType
 
@@ -138,8 +138,8 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.Precision, err = session.GetByte()
-	//precision, err := session.GetInt(1, false, false)
-	//var scale int
+	// precision, err := session.GetInt(1, false, false)
+	// var scale int
 	switch par.DataType {
 	case NUMBER:
 		fallthrough
@@ -170,18 +170,18 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		}
 	default:
 		par.Scale, err = session.GetByte()
-		//scale, err = session.GetInt(1, false, false)
+		// scale, err = session.GetInt(1, false, false)
 	}
-	//if par.Scale == uint8(-127) {
+	// if par.Scale == uint8(-127) {
 	//
-	//}
+	// }
 	if par.DataType == NUMBER && par.Precision == 0 && (par.Scale == 0 || par.Scale == 0xFF) {
 		par.Precision = 38
 		par.Scale = 0xFF
 	}
 
-	//par.Scale = uint16(scale)
-	//par.Precision = uint16(precision)
+	// par.Scale = uint16(scale)
+	// par.Precision = uint16(precision)
 	par.MaxLen, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err
@@ -292,7 +292,7 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	}
 	if par.ToID == nil {
 		session.PutBytes(0)
-		//session.PutInt(0, 1, false, false)
+		// session.PutInt(0, 1, false, false)
 	} else {
 		session.PutInt(len(par.ToID), 4, true, true)
 		session.PutClr(par.ToID)
@@ -300,7 +300,7 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	session.PutUint(par.Version, 2, true, true)
 	session.PutUint(par.CharsetID, 2, true, true)
 	session.PutBytes(uint8(par.CharsetForm))
-	//session.PutUint(par.CharsetForm, 1, false, false)
+	// session.PutUint(par.CharsetForm, 1, false, false)
 	session.PutUint(par.MaxCharLen, 4, true, true)
 	if session.TTCVersion >= 8 {
 		session.PutInt(par.oaccollid, 4, true, true)
@@ -721,8 +721,8 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		} else {
 			*value = tempVal
 		}
-	//case RefCursor:
-	//case *RefCursor:
+	// case RefCursor:
+	// case *RefCursor:
 	case *string:
 		*value = getString(newValue)
 	case sql.NullString:
@@ -830,7 +830,20 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 				tempVal = connection.strConv.Decode(par.BValue)
 			}
 		case NUMBER:
-			tempVal = converters.DecodeNumber(par.BValue)
+			// Scale = 0 and Precision <18 --> int64
+			if par.Scale == 0 && par.Precision <= 18 {
+				tempVal, err = converters.NumberToInt64(par.BValue)
+				if err != nil {
+					return nil, err
+				}
+			} else if par.Scale > 0 {
+				tempVal, err = converters.NumberToString(par.BValue)
+				if err != nil {
+					return tempVal, err
+				}
+			} else {
+				tempVal = converters.DecodeNumber(par.BValue)
+			}
 		case TimeStampDTY:
 			fallthrough
 		case TimeStampeLTZ:

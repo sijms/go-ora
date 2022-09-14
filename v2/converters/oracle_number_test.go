@@ -125,14 +125,17 @@ func TestNewNumber(t *testing.T) {
 }
 
 var TestOraNumberValue = []struct {
-	SelectText   string
-	OracleText   string
-	Float        float64
-	Integer      int64
-	IsInteger    bool
-	Binary       []byte
-	wantErr      bool
-	wantInt64Err bool
+	SelectText    string
+	OracleText    string
+	Float         float64
+	Integer       int64
+	Uint64        uint64
+	IsUint64      bool
+	IsInteger     bool
+	Binary        []byte
+	wantErr       bool
+	wantInt64Err  bool
+	wantUInt64Err bool
 }{
 	{
 		SelectText: "0",
@@ -465,6 +468,26 @@ var TestOraNumberValue = []struct {
 	},
 	{SelectText: "Infinity", OracleText: "Infinity", Binary: []byte{255, 101}, wantInt64Err: true},
 	{SelectText: "NULL", OracleText: "", Binary: []byte{255}, wantErr: true, wantInt64Err: true},
+	{
+		SelectText:   "18446744073709550615",
+		OracleText:   "18446744073709550615",
+		Binary:       []byte{202, 19, 45, 68, 45, 8, 38, 10, 56, 7, 16},
+		wantErr:      false,
+		wantInt64Err: true,
+		Uint64:       18446744073709550615,
+		IsUint64:     true,
+	},
+	{
+		SelectText:    "-1",
+		OracleText:    "-1",
+		Binary:        []byte{62, 100, 102},
+		Integer:       -1,
+		wantErr:       false,
+		wantInt64Err:  false,
+		Uint64:        0,
+		IsUint64:      true,
+		wantUInt64Err: true,
+	},
 }
 
 func TestNumberString(t *testing.T) {
@@ -498,6 +521,42 @@ func TestNumberToInt64(t *testing.T) {
 		})
 	}
 }
+
+func TestNumberToUInt64(t *testing.T) {
+	for _, tt := range TestOraNumberValue {
+		t.Run(tt.SelectText, func(t *testing.T) {
+			if !tt.IsUint64 {
+				t.Skip()
+			}
+			n := NewNumber(tt.Binary)
+			got, err := n.UInt64()
+			if (err != nil) != tt.wantUInt64Err {
+				t.Errorf("String() error = %v, wantUInt64Err %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.Uint64 {
+				t.Errorf("Uint64() want %v got %v ", tt.OracleText, got)
+			}
+		})
+	}
+}
+
+// func TestNumber_toLnxFmt(t *testing.T) {
+// 	for _, tt := range TestOraNumberValue {
+// 		t.Run(tt.SelectText, func(t *testing.T) {
+// 			b, err := toBytes(tt.Binary)
+// 			if (err != nil) != tt.wantErr {
+// 				t.Errorf("String() error = %v, wantErr %v", err, tt.wantErr)
+// 				return
+// 			}
+// 			fmt.Println(string(b))
+// 			got, _ := ByteToNumber(b)
+// 			if !reflect.DeepEqual(got, tt.Binary) {
+// 				t.Errorf("ByteToNumber() got = %v, want %v", got, tt.Binary)
+// 			}
+// 		})
+// 	}
+// }
 
 func Benchmark_Number_To_String(b *testing.B) {
 	for i := 0; i < b.N; i++ {

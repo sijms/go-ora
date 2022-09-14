@@ -836,6 +836,12 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 				if err != nil {
 					return nil, err
 				}
+			} else if par.Scale == 0 && (converters.CompareBytes(par.BValue, converters.Int64MaxByte) > 0 &&
+				converters.CompareBytes(par.BValue, converters.Uint64MaxByte) < 0) {
+				tempVal, err = converters.NumberToUInt64(par.BValue)
+				if err != nil {
+					return tempVal, err
+				}
 			} else if par.Scale > 0 {
 				tempVal, err = converters.NumberToString(par.BValue)
 				if err != nil {

@@ -15,8 +15,10 @@ const (
 )
 
 var (
-	int64MaxByte = []byte{202, 10, 23, 34, 73, 4, 69, 55, 78, 59, 8}
-	int64MinByte = []byte{53, 92, 79, 68, 29, 98, 33, 47, 24, 43, 93, 102}
+	Int64MaxByte  = []byte{202, 10, 23, 34, 73, 4, 69, 55, 78, 59, 8}
+	Int64MinByte  = []byte{53, 92, 79, 68, 29, 98, 33, 47, 24, 43, 93, 102}
+	Uint64MinByte = []byte{128}
+	Uint64MaxByte = []byte{202, 19, 45, 68, 45, 8, 38, 10, 56, 17, 16}
 )
 
 // Number Convert Oracle Number Internal storage format to String
@@ -37,6 +39,10 @@ func (num *Number) Int64() (int64, error) {
 	return NumberToInt64(num.data)
 }
 
+func (num *Number) UInt64() (uint64, error) {
+	return NumberToUInt64(num.data)
+}
+
 func NumberToString(b []byte) (string, error) {
 	rb, err := toBytes(b)
 	if err != nil {
@@ -49,8 +55,23 @@ func NumberToString(b []byte) (string, error) {
 }
 
 func NumberToInt64(data []byte) (int64, error) {
-	return toInt64Internal(data, int64MaxByte, int64MinByte)
+	return toInt64Internal(data, Int64MaxByte, Int64MinByte)
 }
+
+func NumberToUInt64(data []byte) (uint64, error) {
+	return toUInt64Internal(data, Uint64MaxByte, Uint64MinByte)
+}
+
+// func StringToNumber(s string) ([]byte, error) {
+// 	return ByteToNumber([]byte(s))
+// }
+
+// func ByteToNumber(b []byte) ([]byte, error) {
+// 	if b[0] == '-' {
+// 		return _toLnxFmt(b[1:], true), nil
+// 	}
+// 	return _toLnxFmt(b, false), nil
+// }
 
 func toBytes(b []byte) ([]byte, error) {
 	if _isZero(b) {
@@ -166,6 +187,17 @@ func toInt64Internal(data, max, min []byte) (int64, error) {
 	return toInt64(data)
 }
 
+func toUInt64Internal(data, max, min []byte) (uint64, error) {
+	if _isZero(data) {
+		return 0, nil
+	}
+	if _isInf(data) || compareBytes(data, max) > 0 ||
+		compareBytes(data, min) < 0 {
+		return 0, fmt.Errorf("Overflow Exception ")
+	}
+	return toUInt64(data)
+}
+
 func toInt64(data []byte) (int64, error) {
 	positive := _isPositive(data)
 	var (
@@ -207,6 +239,37 @@ func toInt64(data []byte) (int64, error) {
 	return -l, nil
 }
 
+func toUInt64(data []byte) (uint64, error) {
+	positive := _isPositive(data)
+	if !positive {
+		return 0, fmt.Errorf("Overflow Exception ")
+	}
+	var (
+		b1 int
+		b2 int
+		b3 int
+	)
+	b1 = int(data[0]&0x7f - 65)
+	if positive || (len(data) == 21 && data[20] != 102) {
+		b2 = len(data) - 1
+	} else {
+		b2 = len(data) - 2
+	}
+	if b2 > b1+1 {
+		b3 = b1 + 1
+	} else {
+		b3 = b2
+	}
+	var l uint64
+	for i := 0; i < b3; i++ {
+		l = l*100 + (uint64(data[i+1]) - 1)
+	}
+	for i := b1 - b2; i >= 0; i-- {
+		l *= 100
+	}
+	return l, nil
+}
+
 // 长度为1且第一位为0x80 129
 func _isZero(b []byte) bool {
 	return b[0] == 128 && len(b) == 1
@@ -220,6 +283,7 @@ func _isPosInf(b []byte) bool {
 	// -1 =255
 	return len(b) == 2 && b[0] == 255 && b[1] == 101
 }
+
 func _isPositive(b []byte) bool {
 	return (b[0] & 128) != 0
 }
@@ -305,6 +369,34 @@ func _fromLnxFmt(b []byte) []byte {
 	return newData
 }
 
+// func _toLnxFmt(b []byte, negative bool) []byte {
+// 	var data []byte
+// 	l := len(b)
+// 	if !negative {
+// 		fmt.Println(b)
+// 		data = make([]byte, l)
+// 		data[0] = b[0] + 128 + 64 + 1
+// 		for i := 1; i < l; i++ {
+// 			data[i] = b[i] + 1
+// 		}
+// 	} else {
+// 		if l-1 < 20 {
+// 			data = make([]byte, l+1)
+// 		} else {
+// 			data = make([]byte, l)
+// 		}
+// 		data[0] = b[0] + 128 + 64 + 1 ^ 0xFF
+// 		var i int
+// 		for i = 1; i < l; i++ {
+// 			data[i] = 101 - b[i]
+// 		}
+// 		if i <= 20 {
+// 			data[i] = 102
+// 		}
+// 	}
+// 	return data
+// }
+
 func _byteToChars(paramByte byte, result []byte, pos int) int {
 	if paramByte < 0 {
 		return 0
@@ -337,6 +429,10 @@ func _byteTo2Chars(paramByte byte, result []byte, pos int) {
 		result[pos] = '0'
 		result[pos+1] = '0'
 	}
+}
+
+func CompareBytes(byte1, byte2 []byte) int {
+	return compareBytes(byte1, byte2)
 }
 
 func compareBytes(byte1, byte2 []byte) int {

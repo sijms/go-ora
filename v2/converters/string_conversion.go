@@ -3,6 +3,7 @@ package converters
 import (
 	"encoding/binary"
 	"unicode/utf16"
+	"unsafe"
 )
 
 type IStringConverter interface {
@@ -109,7 +110,7 @@ func (conv *StringConverter) Encode(input string) []byte {
 				}
 			} else {
 				output = append(output, uint8(conv.eReplace))
-				//output[x] = uint8(conv.eReplace)
+				// output[x] = uint8(conv.eReplace)
 			}
 		}
 		return output
@@ -129,7 +130,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 		fallthrough
 	case 873:
 		// utf-8 encoding
-		return string(input)
+		return *(*string)(unsafe.Pointer(&input))
 	case 2000:
 		index := 0
 		var inputData []byte
@@ -143,7 +144,8 @@ func (conv *StringConverter) Decode(input []byte) string {
 			output[index/2] = binary.BigEndian.Uint16(input[index : index+2])
 			index += 2
 		}
-		return string(utf16.Decode(output))
+		b := utf16.Decode(output)
+		return *(*string)(unsafe.Pointer(&b))
 	case 2002:
 		index := 0
 		var inputData []byte
@@ -157,7 +159,8 @@ func (conv *StringConverter) Decode(input []byte) string {
 			output[index/2] = binary.LittleEndian.Uint16(input[index : index+2])
 			index += 2
 		}
-		return string(utf16.Decode(output))
+		b := utf16.Decode(output)
+		return *(*string)(unsafe.Pointer(&b))
 	case 0x33D:
 		fallthrough
 	case 0x352:
@@ -169,7 +172,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 		for index < len(input) {
 			if input[index] > 127 {
 				if index+1 > len(input) {
-					return string(input)
+					return *(*string)(unsafe.Pointer(&input))
 				}
 				result = int(binary.BigEndian.Uint16(input[index:]))
 				index++
@@ -194,7 +197,9 @@ func (conv *StringConverter) Decode(input []byte) string {
 			}
 			output = append(output, uint16(char))
 		}
-		return string(utf16.Decode(output))
+		b := utf16.Decode(output)
+		return *(*string)(unsafe.Pointer(&b))
+		// return string(utf16.Decode(output))
 	case 0x354:
 		index := 0
 		result := 0
@@ -202,7 +207,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 		for index < len(input) {
 			if input[index] > 128 {
 				if index+1 > len(input) {
-					return string(input)
+					return *(*string)(unsafe.Pointer(&input))
 				}
 				result = int(binary.BigEndian.Uint16(input[index:]))
 				index++
@@ -227,7 +232,8 @@ func (conv *StringConverter) Decode(input []byte) string {
 			}
 			output = append(output, uint16(char))
 		}
-		return string(utf16.Decode(output))
+		b := utf16.Decode(output)
+		return *(*string)(unsafe.Pointer(&b))
 	case 0x33E:
 		fallthrough
 	case 0x33F:
@@ -242,7 +248,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 				num6 = 0x100
 				index++
 				if index+2 > len(input) {
-					return string(input)
+					return *(*string)(unsafe.Pointer(&input))
 				}
 				result = int(binary.BigEndian.Uint16(input[index:]))
 				index--
@@ -271,7 +277,8 @@ func (conv *StringConverter) Decode(input []byte) string {
 			}
 			output = append(output, uint16(char))
 		}
-		return string(utf16.Decode(output))
+		b := utf16.Decode(output)
+		return *(*string)(unsafe.Pointer(&b))
 	case 0x340:
 		index := 0
 		result := 0
@@ -279,7 +286,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 		for index < len(input) {
 			if input[index] > 223 || input[index] > 127 && input[index] < 161 {
 				if index+1 > len(input) {
-					return string(input)
+					return *(*string)(unsafe.Pointer(&input))
 				}
 				result = int(binary.BigEndian.Uint16(input[index:]))
 				index++
@@ -304,10 +311,11 @@ func (conv *StringConverter) Decode(input []byte) string {
 			}
 			output = append(output, uint16(char))
 		}
-		return string(utf16.Decode(output))
+		b := utf16.Decode(output)
+		return *(*string)(unsafe.Pointer(&b))
 	default:
 		if conv.dBuffer == nil {
-			return string(input)
+			return *(*string)(unsafe.Pointer(&input))
 		}
 		output := make([]uint16, len(input))
 		for x := 0; x < len(input); x++ {
@@ -323,6 +331,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 			}
 
 		}
-		return string(utf16.Decode(output))
+		b := utf16.Decode(output)
+		return *(*string)(unsafe.Pointer(&b))
 	}
 }

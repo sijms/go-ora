@@ -28,15 +28,16 @@ type ClientInfo struct {
 	PID         int
 }
 type DatabaseInfo struct {
-	UserID       string
-	Servers      []ServerAddr
-	serverIndex  int
-	SID          string
-	ServiceName  string
-	InstanceName string
-	DBName       string
-	AuthType     int
-	connStr      string
+	UserID          string
+	Servers         []ServerAddr
+	serverIndex     int
+	SID             string
+	ProxyClientName string
+	ServiceName     string
+	InstanceName    string
+	DBName          string
+	AuthType        int
+	connStr         string
 }
 type SessionInfo struct {
 	SSLVersion            string

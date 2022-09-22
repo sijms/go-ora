@@ -3,6 +3,7 @@ package advanced_nego
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/sijms/go-ora/v2/network"
 )
 
@@ -93,7 +94,7 @@ func (nego *AdvNego) Read() error {
 			return err
 		}
 		if serviceHeader[2] != 0 {
-			return errors.New("advanced negotiation error: during receive service header")
+			return fmt.Errorf("advanced negotiation error: during receive service header: network excpetion: ora-%d", serviceHeader[2])
 		}
 		err = nego.serviceList[serviceHeader[0]].readServiceData(serviceHeader[1])
 		if err != nil {

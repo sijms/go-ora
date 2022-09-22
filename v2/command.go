@@ -1134,9 +1134,9 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 // get values of rows and output parameter according to DataType and binary value (bValue)
 func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	session := stmt.connection.session
-	//if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator {
-	//	stmt._hasBLOB = true
-	//}
+	if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator {
+		stmt._hasBLOB = true
+	}
 	if param.DataType == XMLType {
 		if param.TypeName == "XMLTYPE" {
 			return errors.New("unsupported data type: XMLTYPE")
@@ -1390,7 +1390,7 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 //
 // note: better to use sql.Out structure see examples for more information
 func (stmt *Stmt) AddRefCursorParam(name string) {
-	par, _ := stmt.NewParam("1", new(RefCursor), 0, Output)
+	par, _ := stmt.NewParam(name, new(RefCursor), 0, Output)
 	stmt.Pars = append(stmt.Pars, *par)
 }
 

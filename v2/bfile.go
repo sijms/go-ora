@@ -113,3 +113,15 @@ func (file *BFile) ReadFromPos(pos int64) ([]byte, error) {
 func (file *BFile) ReadBytesFromPos(pos, count int64) ([]byte, error) {
 	return file.lob.getDataWithOffsetSize(pos, count)
 }
+
+func (file *BFile) Scan(value interface{}) error {
+	switch temp := value.(type) {
+	case *BFile:
+		file = temp
+	case BFile:
+		*file = temp
+	default:
+		return errors.New("BFILE column type require BFile value")
+	}
+	return nil
+}

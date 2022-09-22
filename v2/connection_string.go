@@ -279,6 +279,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				}
 			case "UNIX SOCKET":
 				ret.connOption.SessionInfo.UnixAddress = val[0]
+			case "PROXY CLIENT NAME":
+				ret.connOption.DatabaseInfo.ProxyClientName = val[0]
 				//case "ENLIST":
 				//	ret.EnList = EnListFromString(val[0])
 				//case "INC POOL SIZE":
@@ -425,21 +427,32 @@ func (connStr *ConnectionString) validate() error {
 	}
 
 	// get client info
-	temp, err := user.Current()
-	if err != nil {
-		return err
-	}
-	idx := strings.Index(temp.Username, "\\")
-	if idx >= 0 {
-		if len(connStr.connOption.DomainName) == 0 {
-			connStr.connOption.DomainName = temp.Username[:idx]
-		}
-		if len(connStr.connOption.ClientInfo.UserName) == 0 {
-			connStr.connOption.ClientInfo.UserName = temp.Username[idx+1:]
+	var idx int
+	var temp *user.User
+	if userName := os.Getenv("USER"); len(userName) > 0 {
+		temp = &user.User{
+			Uid:      "",
+			Gid:      "",
+			Username: userName,
+			Name:     userName,
+			HomeDir:  "",
 		}
 	} else {
-		if len(connStr.connOption.ClientInfo.UserName) == 0 {
-			connStr.connOption.ClientInfo.UserName = temp.Username
+		temp, _ = user.Current()
+	}
+	if temp != nil {
+		idx = strings.Index(temp.Username, "\\")
+		if idx >= 0 {
+			if len(connStr.connOption.DomainName) == 0 {
+				connStr.connOption.DomainName = temp.Username[:idx]
+			}
+			if len(connStr.connOption.ClientInfo.UserName) == 0 {
+				connStr.connOption.ClientInfo.UserName = temp.Username[idx+1:]
+			}
+		} else {
+			if len(connStr.connOption.ClientInfo.UserName) == 0 {
+				connStr.connOption.ClientInfo.UserName = temp.Username
+			}
 		}
 	}
 	connStr.connOption.HostName, _ = os.Hostname()

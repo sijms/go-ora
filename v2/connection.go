@@ -29,7 +29,7 @@ const (
 	SysDba      LogonMode = 0x20
 	SysOper     LogonMode = 0x40
 	UserAndPass LogonMode = 0x100
-	PROXY       LogonMode = 0x400
+	//PROXY       LogonMode = 0x400
 )
 
 type NLSData struct {
@@ -412,6 +412,15 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
 	}
 	tracer.Print("TTC Version: ", conn.session.TTCVersion)
+	if len(conn.tcpNego.ServerRuntimeCaps) > 6 && conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
+		converters.MAX_LEN_VARCHAR2 = 0x7FFF
+		converters.MAX_LEN_NVARCHAR2 = 0x7FFF
+		converters.MAX_LEN_RAW = 0x7FFF
+	} else {
+		converters.MAX_LEN_VARCHAR2 = 0xFA0
+		converters.MAX_LEN_NVARCHAR2 = 0xFA0
+		converters.MAX_LEN_RAW = 0xFA0
+	}
 	//this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
 	//this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
 	//this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompiletimeCapabilities[7] >= (byte) 8;
@@ -684,7 +693,7 @@ func (conn *Connection) doAuth() error {
 			return err
 		}
 
-		conn.authObject, err = newAuthObject(conn.connOption.UserID, conn.conStr.password, conn.tcpNego, conn.session)
+		conn.authObject, err = newAuthObject(conn.connOption.UserID, conn.conStr.password, conn.tcpNego, conn)
 		if err != nil {
 			return err
 		}
@@ -1029,21 +1038,37 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 		if err != nil {
 			return nil, err
 		}
+
 		maxLen := par.MaxLen
 		maxCharLen := par.MaxCharLen
-		for _, val := range col {
+		dataType := par.DataType
+
+		for index, val := range col {
+			if index == 0 {
+				continue
+			}
 			err = par.encodeValue(val, 0, conn)
 			if err != nil {
 				return nil, err
 			}
-			if par.MaxLen < maxLen {
-				par.MaxLen = maxLen
+
+			if maxLen < par.MaxLen {
+				maxLen = par.MaxLen
 			}
-			if par.MaxCharLen < maxCharLen {
-				par.MaxCharLen = maxCharLen
+
+			if maxCharLen < par.MaxCharLen {
+				maxCharLen = par.MaxCharLen
+			}
+
+			if par.DataType != dataType && par.DataType != NCHAR {
+				dataType = par.DataType
 			}
 		}
+
 		_ = par.encodeValue(col[0], 0, conn)
+		par.MaxLen = maxLen
+		par.MaxCharLen = maxCharLen
+		par.DataType = dataType
 		stmt.Pars = append(stmt.Pars, *par)
 	}
 	session := conn.session
@@ -1076,10 +1101,6 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 	}
 	return result, nil
 }
-
-//func (conn *Connection) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) driver.Row {
-//	return nil
-//}
 
 func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	stmt := NewStmt(query, conn)

@@ -1,8 +1,6 @@
 package go_ora
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/sijms/go-ora/network"
@@ -10,38 +8,21 @@ import (
 )
 
 type DataTypeNego struct {
-	MessageCode        uint8
-	Server             *TCPNego
-	TypeAndRep         []int16
-	RuntimeTypeAndRep  []int16
-	DataTypeRepFor1100 int16
-	CompileTimeCaps    []byte
-	RuntimeCap         []byte
-	DBTimeZone         []byte
+	MessageCode            uint8
+	Server                 *TCPNego
+	TypeAndRep             []int16
+	RuntimeTypeAndRep      []int16
+	DataTypeRepFor1100     int16
+	DataTypeRepFor1200     int16
+	CompileTimeCaps        []byte
+	RuntimeCap             []byte
+	DBTimeZone             []byte
+	b32kTypeSupported      bool
+	supportSessionStateOps bool
 }
 
 const bufferGrow int = 2369
 
-//internal TTCDataTypeNegotiation(MarshallingEngine marshallingEngine,
-//	byte[] serverCompileTimeCap, byte[] serverRunTimeCap,
-//	short networkCharSetId,
-//	short networkNCharSetId,
-//	byte networkFlags)
-//: base(marshallingEngine, (byte) 2)
-//{
-//this.m_clientRemoteIn = networkCharSetId;
-//this.m_clientRemoteOut = networkCharSetId;
-//this.m_ncharSetId = networkNCharSetId;
-//this.m_clientFlags = networkFlags;
-//
-//
-//
-//
-//internal override void ReInit(MarshallingEngine marshallingEngine)
-//{
-//base.ReInit(marshallingEngine);
-//this.m_dbTimeZoneBytes = (byte[]) null;
-//}
 func (n *DataTypeNego) addTypeRep(dty int16, ndty int16, rep int16) {
 	if n.TypeAndRep == nil {
 		n.TypeAndRep = make([]int16, bufferGrow)
@@ -61,26 +42,83 @@ func (n *DataTypeNego) addTypeRep(dty int16, ndty int16, rep int16) {
 	}
 }
 
-func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, error) {
+func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	result := DataTypeNego{
 		MessageCode: 2,
 		Server:      nego,
 		TypeAndRep:  make([]int16, bufferGrow),
+
 		CompileTimeCaps: []byte{
-			6, 1, 0, 0, 10, 1, 1, 6,
-			1, 1, 1, 1, 1, 1, 0, 0x29,
-			0x90, 3, 7, 3, 0, 1, 0, 0x6B,
-			1, 0, 5, 1, 0, 0, 0, 0,
-			0, 0, 0, 0, 1, 2},
-		RuntimeCap: []byte{2, 1, 0, 0, 0, 0, 0},
-	}
-	if result.Server.ServerCompileTimeCaps == nil ||
-		len(result.Server.ServerCompileTimeCaps) <= 37 ||
-		result.Server.ServerCompileTimeCaps[37]&2 != 2 {
-		result.CompileTimeCaps[37] = 0
-		result.CompileTimeCaps[1] = 0
+			6, 1, 0, 0, 106, 1, 1, 12,
+			1, 1, 1, 1, 1, 1, 0, 41,
+			144, 3, 7, 3, 0, 1, 0, 79,
+			1, 55, 4, 1, 0, 0, 0, 28,
+			0, 0, 10, 160, 3, 179, 0,
+			15, 6,
+		},
+		RuntimeCap:             []byte{2, 1, 0, 0, 0, 0, 0},
+		b32kTypeSupported:      false,
+		supportSessionStateOps: false,
 	}
 
+	//if (!this.connection.enableDataInLocator) {
+	//	var10000 = this.jdbcThinCompileTimeCapabilities;
+	//	var10000[23] &= -5;
+	//}
+	//
+	//if (var4) {
+	//	var10000 = this.jdbcThinRuntimeCapabilities;
+	//	var10000[6] |= KPCCAP_RTB_TTC_ZCPY;
+	//}
+	//
+	//if (var2 == null || var2.length < 1 || (var2[1] & 1) != 1) {
+	//	var10000 = this.jdbcThinRuntimeCapabilities;
+	//	var10000[1] &= -2;
+	//}
+
+	if len(result.Server.ServerCompileTimeCaps) <= 27 || result.Server.ServerCompileTimeCaps[27] == 0 {
+		result.CompileTimeCaps[27] = 0
+	}
+	if !result.Server.hasCompileTimeCaps(4, 8) {
+		result.CompileTimeCaps[4] = 0
+	}
+	if !result.Server.hasCompileTimeCaps(4, 32) {
+		result.CompileTimeCaps[4] &= 223
+		//this.connection.isO7L_MRExposed = false;
+	}
+
+	xmlTypeClientSideDecoding := false
+	if len(result.Server.ServerCompileTimeCaps) > 7 {
+		if result.Server.ServerCompileTimeCaps[7] >= 8 && xmlTypeClientSideDecoding {
+			result.CompileTimeCaps[36] = 4
+		} else if result.Server.ServerCompileTimeCaps[7] < 7 {
+			result.CompileTimeCaps[36] = 0
+		}
+	}
+	if len(result.Server.ServerRuntimeCaps) < 1 || result.Server.ServerRuntimeCaps[1]&1 != 1 {
+		result.RuntimeCap[1] &= 0
+	}
+	if len(result.Server.ServerRuntimeCaps) > 6 {
+		if result.Server.ServerRuntimeCaps[6]&4 == 4 {
+			result.RuntimeCap[6] |= 4
+			result.b32kTypeSupported = true
+		}
+		if result.Server.ServerRuntimeCaps[6]&16 == 16 {
+			result.supportSessionStateOps = true
+		}
+		if result.Server.ServerRuntimeCaps[6]&2 == 2 {
+			result.RuntimeCap[6] |= 2
+		}
+	}
+	if len(result.Server.ServerCompileTimeCaps) <= 37 || result.Server.ServerCompileTimeCaps[37]&2 != 2 {
+		result.CompileTimeCaps[37] &= 253
+		result.RuntimeCap[1] &= 254
+	}
+	//this.connection.isServerBigSCN = this.connection.getServerCompileTimeCapability(7) >= 8;
+	//if (this.connection.enableTGSupport || this.connection.enableACSupport) {
+	//	var10000 = this.jdbcThinCompileTimeCapabilities;
+	//	var10000[37] = (byte)(var10000[37] | 8);
+	//}
 	result.TypeAndRep[0] = 1
 	result.addTypeRep(1, 1, 1)
 	result.addTypeRep(2, 2, 10)
@@ -287,6 +325,9 @@ func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, erro
 	result.addTypeRep(575, 575, 1)
 	result.addTypeRep(576, 576, 1)
 	result.addTypeRep(578, 578, 1)
+	result.addTypeRep(563, 563, 1)
+	result.addTypeRep(564, 564, 1)
+	result.addTypeRep(579, 579, 1)
 	result.addTypeRep(580, 580, 1)
 	result.addTypeRep(581, 581, 1)
 	result.addTypeRep(582, 582, 1)
@@ -373,51 +414,80 @@ func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, erro
 	result.addTypeRep(231, 231, 1)
 	result.addTypeRep(232, 231, 1)
 	result.addTypeRep(233, 233, 1)
+	result.addTypeRep(252, 252, 0)
 	result.addTypeRep(241, 109, 1)
 	result.addTypeRep(515, 0, 0)
+
 	result.DataTypeRepFor1100 = result.TypeAndRep[0]
 	result.addTypeRep(590, 590, 1)
 	result.addTypeRep(591, 591, 1)
 	result.addTypeRep(592, 592, 1)
-	if result.Server.ServerCompileTimeCaps != nil && len(result.Server.ServerCompileTimeCaps) > 7 && result.Server.ServerCompileTimeCaps[7] == 5 {
-		result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1100]
-	} else {
+	result.addTypeRep(613, 613, 1)
+	result.addTypeRep(614, 614, 1)
+	result.addTypeRep(615, 615, 1)
+	result.addTypeRep(616, 616, 1)
+	result.addTypeRep(611, 611, 1)
+	result.addTypeRep(612, 612, 1)
+	result.addTypeRep(593, 593, 1)
+	result.addTypeRep(594, 594, 1)
+	result.addTypeRep(595, 595, 1)
+	result.addTypeRep(596, 596, 1)
+	result.addTypeRep(597, 597, 1)
+	result.addTypeRep(598, 598, 1)
+	result.addTypeRep(599, 599, 1)
+	result.addTypeRep(600, 600, 1)
+	result.addTypeRep(601, 601, 1)
+	result.addTypeRep(602, 602, 1)
+	result.addTypeRep(603, 603, 1)
+	result.addTypeRep(604, 604, 1)
+	result.addTypeRep(605, 605, 1)
+	result.addTypeRep(622, 622, 1)
+	result.addTypeRep(623, 623, 1)
+	result.addTypeRep(624, 624, 1)
+	result.addTypeRep(625, 625, 1)
+	result.addTypeRep(626, 626, 1)
+	result.addTypeRep(627, 627, 1)
+	result.addTypeRep(628, 628, 1)
+	result.addTypeRep(629, 629, 1)
+	result.addTypeRep(630, 630, 1)
+	result.addTypeRep(631, 631, 1)
+	result.addTypeRep(632, 632, 1)
+	result.addTypeRep(637, 637, 1)
+	result.addTypeRep(638, 638, 1)
+	result.addTypeRep(636, 636, 1)
+	result.DataTypeRepFor1200 = result.TypeAndRep[0]
+	result.addTypeRep(639, 639, 1)
+	result.addTypeRep(640, 640, 1)
+	if result.Server.ServerCompileTimeCaps[7] >= 8 {
 		result.RuntimeTypeAndRep = result.TypeAndRep
+	} else if result.Server.ServerCompileTimeCaps[7] >= 7 {
+		result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1200]
+	} else {
+		result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1100]
 	}
-	session.ResetBuffer()
-	session.PutBytes(result.bytes()...)
-	err := session.Write()
-	if err != nil {
-		return nil, err
-	}
+	return &result
+}
+func (nego *DataTypeNego) read(session *network.Session) error {
 	msg, err := session.GetByte()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if msg != 2 {
-		return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 2", msg))
+		return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 2", msg))
 	}
-
-	if result.RuntimeCap[1] == 1 {
-		result.DBTimeZone, err = session.GetBytes(11)
+	if nego.RuntimeCap[1] == 1 {
+		nego.DBTimeZone, err = session.GetBytes(11)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if result.CompileTimeCaps[37]&2 == 2 {
+		if nego.CompileTimeCaps[37]&2 == 2 {
 			_, _ = session.GetInt(4, false, false)
 		}
 	}
-	//getNum := func(session *network.Session, flag uint8) (int, error) {
-	//	if flag == 0 {
-	//		return session.GetInt(1, false, false)
-	//	} else {
-	//		return session.GetInt(2, false, true)
-	//	}
-	//}
 	level := 0
 	for {
 		var num int
-		if result.CompileTimeCaps[27] == 0 {
+		if nego.CompileTimeCaps[27] == 0 {
 			num, err = session.GetInt(1, false, false)
 		} else {
 			num, err = session.GetInt(2, false, true)
@@ -435,57 +505,45 @@ func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, erro
 		}
 		level++
 	}
-	return &result, nil
-}
 
-func (nego *DataTypeNego) bytes() []byte {
-	var result bytes.Buffer
-	//var result = make([]byte, 7, 1000)
+	return nil
+}
+func (nego *DataTypeNego) write(session *network.Session) error {
+	session.ResetBuffer()
 	if nego.Server.ServerCompileTimeCaps == nil || len(nego.Server.ServerCompileTimeCaps) <= 27 || nego.Server.ServerCompileTimeCaps[27] == 0 {
 		nego.CompileTimeCaps[27] = 0
 	}
-	//result.WriteByte(nego.MessageCode)
-	result.Write([]byte{nego.MessageCode, 0, 0, 0, 0, nego.Server.ServerFlags, uint8(len(nego.CompileTimeCaps))})
-	result.Write(nego.CompileTimeCaps)
-	result.WriteByte(uint8(len(nego.RuntimeCap)))
-	result.Write(nego.RuntimeCap)
-	//result[0] = nego.MessageCode
-	//result[5] = nego.Server.ServerFlags
-	//result[6] = uint8(len(nego.CompileTimeCaps))
-	//result = append(result, nego.CompileTimeCaps...)
-	//result = append(result, uint8(len(nego.RuntimeCap)))
-	//result = append(result, nego.RuntimeCap...)
+	session.PutBytes(nego.MessageCode)
+	// client remote in
+	//session.PutBytes(0, 0, 0, 0)
+	session.PutInt(nego.Server.ServerCharset, 2, false, false)
+	// client remote out
+	session.PutInt(nego.Server.ServerCharset, 2, false, false)
+	session.PutBytes(nego.Server.ServerFlags, uint8(len(nego.CompileTimeCaps)))
+	session.PutBytes(nego.CompileTimeCaps...)
+	session.PutBytes(uint8(len(nego.RuntimeCap)))
+	session.PutBytes(nego.RuntimeCap...)
 	if nego.RuntimeCap[1]&1 == 1 {
-		result.Write(TZBytes())
-		//result = append(result, TZBytes()...)
+		session.PutBytes(TZBytes()...)
 		if nego.CompileTimeCaps[37]&2 == 2 {
-			result.Write([]byte{0, 0, 0, 0})
-			//result = append(result, []byte{0, 0, 0, 0}...)
+			session.PutBytes(0, 0, 0, 21)
 		}
 	}
-	temp := []byte{0, 0}
-	binary.LittleEndian.PutUint16(temp, uint16(nego.Server.ServernCharset))
-	result.Write(temp)
-	//result = append(result, temp...)
+	session.PutInt(nego.Server.ServernCharset, 2, false, false)
 	// marshal type reps
 	size := nego.RuntimeTypeAndRep[0]
 	if nego.CompileTimeCaps[27] == 0 {
 		for _, x := range nego.RuntimeTypeAndRep[1:size] {
-			result.WriteByte(uint8(x))
-			//result = append(result, uint8(x))
+			session.PutBytes(uint8(x))
 		}
-		result.WriteByte(0)
-		//result = append(result, 0)
+		session.PutBytes(0)
 	} else {
 		for _, x := range nego.RuntimeTypeAndRep[1:size] {
-			binary.BigEndian.PutUint16(temp, uint16(x))
-			//result = append(result, temp...)
-			result.Write(temp)
+			session.PutInt(x, 2, true, false)
 		}
-		result.Write([]byte{0, 0})
-		//result = append(result, []byte{0, 0}...)
+		session.PutBytes(0, 0)
 	}
-	return result.Bytes()
+	return session.Write()
 }
 
 func TZBytes() []byte {

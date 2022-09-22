@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/trace"
 	"net"
 	"reflect"
 	"strings"
@@ -64,7 +65,29 @@ type Session struct {
 	//certificates      []*x509.Certificate
 }
 
+func NewSessionWithInputBufferForDebug(input []byte) *Session {
+	options := &ConnectionOption{
+		AdvNegoSeviceInfo: AdvNegoSeviceInfo{AuthService: nil},
+		SessionInfo: SessionInfo{
+			SessionDataUnitSize:   0xFFFF,
+			TransportDataUnitSize: 0xFFFF,
+		},
+		Tracer: trace.NilTracer(),
+	}
+	return &Session{
+		ctx:      context.Background(),
+		conn:     nil,
+		inBuffer: input,
+		index:    0,
+		//connOption:      *connOption,
+		Context:         NewSessionContext(options),
+		Summary:         nil,
+		UseBigClrChunks: false,
+		ClrChunkSize:    0x40,
+	}
+}
 func NewSession(connOption *ConnectionOption) *Session {
+
 	return &Session{
 		conn:     nil,
 		inBuffer: nil,
@@ -260,7 +283,7 @@ func (session *Session) Connect(ctx context.Context) error {
 	for loop {
 		host = connOption.GetActiveServer(false)
 		if host == nil {
-			return errors.New("no available severs to connect to")
+			return errors.New("no available servers to connect to")
 		}
 		addr := host.networkAddr()
 		if len(session.Context.ConnOption.UnixAddress) > 0 {
@@ -427,7 +450,7 @@ func (session *Session) Write() error {
 // Read numBytes of data from input buffer if requested data is larger
 // than input buffer session will get the remaining from network stream
 func (session *Session) read(numBytes int) ([]byte, error) {
-	if session.index+numBytes > len(session.inBuffer) {
+	for session.index+numBytes > len(session.inBuffer) {
 		pck, err := session.readPacket()
 		if err != nil {
 			return nil, err

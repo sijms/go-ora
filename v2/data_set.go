@@ -33,7 +33,7 @@ type DataSet struct {
 	maxRowSize      int
 	Cols            []ParameterInfo
 	rows            []Row
-	currentRow      Row
+	CurrentRow      Row
 	lasterr         error
 	index           int
 	parent          StmtInterface

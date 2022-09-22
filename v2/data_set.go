@@ -5,13 +5,14 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/network"
-	"github.com/sijms/go-ora/v2/trace"
 	"io"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/trace"
 )
 
 // Compile time Sentinels for implemented Interfaces.
@@ -57,8 +58,8 @@ func (dataSet *DataSet) load(session *network.Session) error {
 	if columnCount > dataSet.columnCount {
 		dataSet.columnCount = columnCount
 	}
-	if len(dataSet.currentRow) != dataSet.columnCount {
-		dataSet.currentRow = make(Row, dataSet.columnCount)
+	if len(dataSet.CurrentRow) != dataSet.columnCount {
+		dataSet.CurrentRow = make(Row, dataSet.columnCount)
 	}
 	dataSet.rowCount, err = session.GetInt(4, true, true)
 	if err != nil {
@@ -109,7 +110,7 @@ func (dataSet *DataSet) Close() error {
 
 // Next_ act like Next in sql package return false if no other rows in dataset
 func (dataSet *DataSet) Next_() bool {
-	err := dataSet.Next(dataSet.currentRow)
+	err := dataSet.Next(dataSet.CurrentRow)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
 			return false
@@ -126,7 +127,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 	if dataSet.lasterr != nil {
 		return dataSet.lasterr
 	}
-	for srcIndex, destIndex := 0, 0; srcIndex < len(dataSet.currentRow); srcIndex, destIndex = srcIndex+1, destIndex+1 {
+	for srcIndex, destIndex := 0, 0; srcIndex < len(dataSet.CurrentRow); srcIndex, destIndex = srcIndex+1, destIndex+1 {
 		if destIndex >= len(dest) {
 			return errors.New("go-ora: mismatching between Scan function input count and column count")
 		}
@@ -137,7 +138,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 		if destTyp.Kind() != reflect.Ptr {
 			return errors.New("go-ora: argument in scan should be passed as pointers")
 		}
-		col := dataSet.currentRow[srcIndex]
+		col := dataSet.CurrentRow[srcIndex]
 		result, err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem(), srcIndex)
 		if err != nil {
 			return err
@@ -150,11 +151,11 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 		}
 		processedFields := 0
 		for x := 0; x < destTyp.Elem().NumField(); x++ {
-			if srcIndex+processedFields >= len(dataSet.currentRow) {
+			if srcIndex+processedFields >= len(dataSet.CurrentRow) {
 				continue
 				//return errors.New("go-ora: mismatching between Scan function input count and column count")
 			}
-			//col := dataSet.currentRow[srcIndex + processedFields]
+			//col := dataSet.CurrentRow[srcIndex + processedFields]
 			f := destTyp.Elem().Field(x)
 			tag := f.Tag.Get("db")
 			if len(tag) == 0 {
@@ -200,7 +201,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 // for non-supported type
 // error means error occur during operation
 func (dataSet DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, error) {
-	field := dataSet.currentRow[colIndex]
+	field := dataSet.CurrentRow[colIndex]
 	col := dataSet.Cols[colIndex]
 	if col.cusType != nil && col.cusType.typ == obj.Type() {
 		obj.Set(reflect.ValueOf(field))

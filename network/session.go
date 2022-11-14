@@ -162,6 +162,9 @@ func (session *Session) StartContext(ctx context.Context) {
 	session.ctx = ctx
 }
 func (session *Session) EndContext() {
+	if session.oldCtx == nil {
+		session.oldCtx = context.Background()
+	}
 	session.ctx = session.oldCtx
 }
 

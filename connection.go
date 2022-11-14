@@ -388,6 +388,8 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 
 	// advanced negotiation
+	session.StartContext(ctx)
+	defer session.EndContext()
 	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
 		tracer.Print("Advance Negotiation")
 		ano, err := advanced_nego.NewAdvNego(session)

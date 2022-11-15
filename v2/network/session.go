@@ -89,6 +89,7 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 func NewSession(connOption *ConnectionOption) *Session {
 
 	return &Session{
+		ctx:      context.Background(),
 		conn:     nil,
 		inBuffer: nil,
 		index:    0,

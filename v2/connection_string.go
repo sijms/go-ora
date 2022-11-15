@@ -154,9 +154,11 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		connOption: network.ConnectionOption{
 			PrefetchRows: 25,
 			SessionInfo: network.SessionInfo{
-				Timeout:               time.Duration(15),
-				TransportDataUnitSize: 0xFFFF,
-				SessionDataUnitSize:   0xFFFF,
+				Timeout: time.Duration(15),
+				//TransportDataUnitSize: 0xFFFF,
+				//SessionDataUnitSize:   0xFFFF,
+				TransportDataUnitSize: 0x200000,
+				SessionDataUnitSize:   0x200000,
 				Protocol:              "tcp",
 				SSL:                   false,
 				SSLVerify:             true,

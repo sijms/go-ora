@@ -463,7 +463,9 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 			return nil, errors.New("the packet received is not data packet")
 		}
 	}
-	ret := session.inBuffer[session.index : session.index+numBytes]
+	ret := make([]byte, numBytes)
+	copy(ret, session.inBuffer[session.index:session.index+numBytes])
+	//ret := session.inBuffer[session.index : session.index+numBytes]
 	session.index += numBytes
 	return ret, nil
 }
@@ -1077,40 +1079,80 @@ func (session *Session) GetNullTermString(maxSize int) (result string, err error
 
 // GetClr reed variable length bytearray from input buffer
 func (session *Session) GetClr() (output []byte, err error) {
-	var size uint8
-	var rb []byte
-	size, err = session.GetByte()
+	var nb byte
+	nb, err = session.GetByte()
 	if err != nil {
 		return
 	}
-	if size == 0 || size == 0xFF {
+	if nb == 0 || nb == 0xFF {
 		output = nil
 		err = nil
 		return
 	}
-	if size != 0xFE {
-		output, err = session.read(int(size))
-		return
-	}
+	chunkSize := int(nb)
+	var chunk []byte
 	var tempBuffer bytes.Buffer
-	for {
-		var size1 int
-		if session.UseBigClrChunks {
-			size1, err = session.GetInt(4, true, true)
-		} else {
-			size1, err = session.GetInt(1, false, false)
+	if chunkSize == 0xFE {
+		for chunkSize > 0 {
+			if session.UseBigClrChunks {
+				chunkSize, err = session.GetInt(4, true, true)
+			} else {
+				nb, err = session.GetByte()
+				chunkSize = int(nb)
+			}
+			if err != nil {
+				return
+			}
+			chunk, err = session.GetBytes(chunkSize)
+			if err != nil {
+				return
+			}
+			tempBuffer.Write(chunk)
 		}
-		if err != nil || size1 == 0 {
-			break
-		}
-		rb, err = session.read(size1)
+	} else {
+		chunk, err = session.GetBytes(chunkSize)
 		if err != nil {
 			return
 		}
-		tempBuffer.Write(rb)
+		tempBuffer.Write(chunk)
 	}
 	output = tempBuffer.Bytes()
 	return
+	//var size uint8
+	//var rb []byte
+	//size, err = session.GetByte()
+	//if err != nil {
+	//	return
+	//}
+	//if size == 0 || size == 0xFF {
+	//	output = nil
+	//	err = nil
+	//	return
+	//}
+	//if size != 0xFE {
+	//	output, err = session.read(int(size))
+	//	return
+	//}
+	//
+	//for {
+	//	var size1 int
+	//	if session.UseBigClrChunks {
+	//		size1, err = session.GetInt(4, true, true)
+	//	} else {
+	//		size, err = session.GetByte()
+	//		size1 = int(size)
+	//	}
+	//	if err != nil || size1 == 0 {
+	//		break
+	//	}
+	//	rb, err = session.read(size1)
+	//	if err != nil {
+	//		return
+	//	}
+	//	tempBuffer.Write(rb)
+	//}
+	//output = tempBuffer.Bytes()
+	//return
 }
 
 // GetDlc read variable length bytearray from input buffer

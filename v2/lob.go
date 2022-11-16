@@ -517,60 +517,98 @@ func (lob *Lob) read() error {
 // read lob data chunks from network session
 func (lob *Lob) readData() error {
 	session := lob.connection.session
-	num1 := 0 // data readed in the call of this function
-	var chunkSize = 0
-	var err error
-	//num3 := offset // the data readed from the start of read operation
-	num4 := 0
-	for num4 != 4 {
-		switch num4 {
-		case 0:
-			nb, err := session.GetByte()
-			if err != nil {
-				return err
-			}
-			chunkSize = int(nb)
-			if chunkSize == 0xFE {
-				num4 = 2
-			} else {
-				num4 = 1
-			}
-		case 1:
-			chunk, err := session.GetBytes(chunkSize)
-			if err != nil {
-				return err
-			}
-			lob.data.Write(chunk)
-			num1 += chunkSize
-			num4 = 4
-		case 2:
-			if session.UseBigClrChunks {
-				chunkSize, err = session.GetInt(4, true, true)
-			} else {
-				var nb byte
-				nb, err = session.GetByte()
-				chunkSize = int(nb)
-			}
-			if err != nil {
-				return err
-			}
-			if chunkSize <= 0 {
-				num4 = 4
-			} else {
-				num4 = 3
-			}
-		case 3:
-			chunk, err := session.GetBytes(chunkSize)
-			if err != nil {
-				return err
-			}
-			lob.data.Write(chunk)
-			num1 += chunkSize
-			//num3 += chunkSize
-			num4 = 2
-		}
+	tempBytes, err := session.GetClr()
+	if err != nil {
+		return err
 	}
+	lob.data.Write(tempBytes)
 	return nil
+	//totalLength := 0 // data readed in the call of this function
+	//var chunkSize = 0
+	//var err error
+	//
+	//nb, err := session.GetByte()
+	//if err != nil {
+	//	return err
+	//}
+	//chunkSize = int(nb)
+	//if chunkSize == 0xFE {
+	//	for chunkSize > 0 {
+	//		if session.UseBigClrChunks {
+	//			chunkSize, err = session.GetInt(4, true, true)
+	//		} else {
+	//			var nb byte
+	//			nb, err = session.GetByte()
+	//			chunkSize = int(nb)
+	//		}
+	//		if err != nil {
+	//			return err
+	//		}
+	//		chunk, err := session.GetBytes(chunkSize)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		lob.data.Write(chunk)
+	//		totalLength += chunkSize
+	//	}
+	//} else {
+	//	chunk, err := session.GetBytes(chunkSize)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	lob.data.Write(chunk)
+	//	totalLength += chunkSize
+	//}
+	////num4 := 0
+	////for num4 != 4 {
+	////	switch num4 {
+	////	case 0:
+	////		nb, err := session.GetByte()
+	////		if err != nil {
+	////			return err
+	////		}
+	////		chunkSize = int(nb)
+	////		if chunkSize == 0xFE {
+	////			num4 = 2
+	////		} else {
+	////			num4 = 1
+	////		}
+	////	case 1:
+	////		chunk, err := session.GetBytes(chunkSize)
+	////		if err != nil {
+	////			return err
+	////		}
+	////		lob.data.Write(chunk)
+	////		totalLength += chunkSize
+	////		num4 = 4
+	////	case 2:
+	////		if session.UseBigClrChunks {
+	////			chunkSize, err = session.GetInt(4, true, true)
+	////		} else {
+	////			var nb byte
+	////			nb, err = session.GetByte()
+	////			chunkSize = int(nb)
+	////		}
+	////		if err != nil {
+	////			return err
+	////		}
+	////		if chunkSize <= 0 {
+	////			num4 = 4
+	////		} else {
+	////			num4 = 3
+	////		}
+	////	case 3:
+	////		chunk, err := session.GetBytes(chunkSize)
+	////		if err != nil {
+	////			return err
+	////		}
+	////		lob.data.Write(chunk)
+	////		totalLength += chunkSize
+	////		//num3 += chunkSize
+	////		num4 = 2
+	////	}
+	////}
+	//return nil
 }
 func (lob *Lob) GetLobId(locator []byte) []byte {
 	//BitConverter.ToString(lobLocator, 10, 10);

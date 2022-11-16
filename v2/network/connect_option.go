@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -39,6 +40,11 @@ type DatabaseInfo struct {
 	AuthType        int
 	connStr         string
 }
+
+type DialerContext interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
+
 type SessionInfo struct {
 	SSLVersion            string
 	Timeout               time.Duration
@@ -48,6 +54,7 @@ type SessionInfo struct {
 	Protocol              string
 	SSL                   bool
 	SSLVerify             bool
+	Dialer                DialerContext
 }
 type AdvNegoSeviceInfo struct {
 	AuthService []string

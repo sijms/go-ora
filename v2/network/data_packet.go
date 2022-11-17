@@ -77,17 +77,13 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext) (*Data
 		},
 		sessionCtx: sessionCtx,
 		dataFlag:   binary.BigEndian.Uint16(packetData[8:]),
-		//buffer:     packetData[10:],
+		buffer:     packetData[10:],
 	}
 	if sessionCtx.handshakeComplete && sessionCtx.Version >= 315 {
 		pck.length = binary.BigEndian.Uint32(packetData)
 	} else {
 		pck.length = uint32(binary.BigEndian.Uint16(packetData))
 	}
-	pck.buffer = packetData[10:pck.length]
-	//if bytes.Contains(pck.buffer, []byte{1, 71, 200, 50}) {
-	//	fmt.Println(pck.buffer[len(pck.buffer)-10:])
-	//}
 	var err error
 	if sessionCtx.AdvancedService.CryptAlgo != nil || sessionCtx.AdvancedService.HashAlgo != nil {
 		pck.buffer = pck.buffer[:len(pck.buffer)-1]

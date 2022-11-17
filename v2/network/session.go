@@ -463,9 +463,9 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 			return nil, errors.New("the packet received is not data packet")
 		}
 	}
-	ret := make([]byte, numBytes)
-	copy(ret, session.inBuffer[session.index:session.index+numBytes])
-	//ret := session.inBuffer[session.index : session.index+numBytes]
+	//ret := make([]byte, numBytes)
+	//copy(ret, session.inBuffer[session.index:session.index+numBytes])
+	ret := session.inBuffer[session.index : session.index+numBytes]
 	session.index += numBytes
 	return ret, nil
 }

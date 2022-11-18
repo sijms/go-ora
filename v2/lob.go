@@ -55,10 +55,7 @@ func (lob *Lob) initialize() {
 
 // variableWidthChar if lob has variable width char or not
 func (lob *Lob) variableWidthChar() bool {
-	if len(lob.sourceLocator) > 6 && lob.sourceLocator[6]&128 == 128 {
-		return true
-	}
-	return false
+	return len(lob.sourceLocator) > 6 && lob.sourceLocator[6]&128 == 128
 }
 
 // littleEndianClob if CLOB is littleEndian or not
@@ -173,46 +170,46 @@ func (lob *Lob) isTemporary() bool {
 }
 
 //freeAllTemporary: free temporary lobs defined by all_locators
-func (lob *Lob) freeAllTemporary(all_locators [][]byte) error {
-	if len(all_locators) == 0 {
-		return nil
-	}
-	lob.connection.connOption.Tracer.Printf("Free %d Temporary Lobs", len(all_locators))
-	session := lob.connection.session
-	freeTemp := func(locators [][]byte) {
-		totalLen := 0
-		for _, locator := range locators {
-			totalLen += len(locator)
-		}
-		session.PutBytes(0x11, 0x60, 0, 1)
-		session.PutUint(totalLen, 4, true, true)
-		session.PutBytes(0, 0, 0, 0, 0, 0, 0)
-		session.PutUint(0x80111, 4, true, true)
-		session.PutBytes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-		for _, locator := range locators {
-			session.PutBytes(locator...)
-		}
-	}
-	start := 0
-	end := 0
-	session.ResetBuffer()
-	for start < len(all_locators) {
-		end = start + 25000
-		if end > len(all_locators) {
-			end = len(all_locators)
-		}
-		freeTemp(all_locators[start:end])
-		start += end
-	}
-	session.PutBytes(0x3, 0x93, 0x0)
-	err := session.Write()
-	if err != nil {
-		return err
-	}
-	return (&simpleObject{
-		connection: lob.connection,
-	}).read()
-}
+//func (lob *Lob) freeAllTemporary(all_locators [][]byte) error {
+//	if len(all_locators) == 0 {
+//		return nil
+//	}
+//	lob.connection.connOption.Tracer.Printf("Free %d Temporary Lobs", len(all_locators))
+//	session := lob.connection.session
+//	freeTemp := func(locators [][]byte) {
+//		totalLen := 0
+//		for _, locator := range locators {
+//			totalLen += len(locator)
+//		}
+//		session.PutBytes(0x11, 0x60, 0, 1)
+//		session.PutUint(totalLen, 4, true, true)
+//		session.PutBytes(0, 0, 0, 0, 0, 0, 0)
+//		session.PutUint(0x80111, 4, true, true)
+//		session.PutBytes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+//		for _, locator := range locators {
+//			session.PutBytes(locator...)
+//		}
+//	}
+//	start := 0
+//	end := 0
+//	session.ResetBuffer()
+//	for start < len(all_locators) {
+//		end = start + 25000
+//		if end > len(all_locators) {
+//			end = len(all_locators)
+//		}
+//		freeTemp(all_locators[start:end])
+//		start += end
+//	}
+//	session.PutBytes(0x3, 0x93, 0x0)
+//	err := session.Write()
+//	if err != nil {
+//		return err
+//	}
+//	return (&simpleObject{
+//		connection: lob.connection,
+//	}).read()
+//}
 func (lob *Lob) freeTemporary() error {
 	lob.initialize()
 	lob.connection.session.ResetBuffer()

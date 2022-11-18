@@ -796,29 +796,76 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 func (stmt *defaultStmt) freeTemporaryLobs() error {
 	var locators [][]byte
 	for _, par := range stmt.Pars {
-		if par.Direction == Input {
-			switch value := par.Value.(type) {
-			case Clob:
-				if value.locator != nil {
-					locators = append(locators, value.locator)
-				}
-			case *Clob:
-				if value.locator != nil {
-					locators = append(locators, value.locator)
-				}
-			case Blob:
-				if value.locator != nil {
-					locators = append(locators, value.locator)
-				}
-			case *Blob:
-				if value.locator != nil {
-					locators = append(locators, value.locator)
-				}
+		//if par.Direction == Input {
+		switch value := par.Value.(type) {
+		case Clob:
+			if value.locator != nil {
+				locators = append(locators, value.locator)
+			}
+		case *Clob:
+			if value.locator != nil {
+				locators = append(locators, value.locator)
+			}
+		case Blob:
+			if value.locator != nil {
+				locators = append(locators, value.locator)
+			}
+		case *Blob:
+			if value.locator != nil {
+				locators = append(locators, value.locator)
+			}
+		case NClob:
+			if value.locator != nil {
+				locators = append(locators, value.locator)
+			}
+		case *NClob:
+			if value.locator != nil {
+				locators = append(locators, value.locator)
 			}
 		}
+		//}
 	}
-	return (&Lob{connection: stmt.connection}).freeAllTemporary(locators)
+	if len(locators) == 0 {
+		return nil
+	}
+	stmt.connection.connOption.Tracer.Printf("Free %d Temporary Lobs", len(locators))
+	session := stmt.connection.session
+	freeTemp := func(locators [][]byte) {
+		totalLen := 0
+		for _, locator := range locators {
+			totalLen += len(locator)
+		}
+		session.PutBytes(0x11, 0x60, 0, 1)
+		session.PutUint(totalLen, 4, true, true)
+		session.PutBytes(0, 0, 0, 0, 0, 0, 0)
+		session.PutUint(0x80111, 4, true, true)
+		session.PutBytes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+		for _, locator := range locators {
+			session.PutBytes(locator...)
+		}
+	}
+	start := 0
+	end := 0
+	session.ResetBuffer()
+	for start < len(locators) {
+		end = start + 25000
+		if end > len(locators) {
+			end = len(locators)
+		}
+		freeTemp(locators[start:end])
+		start += end
+	}
+	session.PutBytes(0x3, 0x93, 0x0)
+	err := session.Write()
+	if err != nil {
+		return err
+	}
+	return (&simpleObject{
+		connection: stmt.connection,
+	}).read()
+	//return (&Lob{connection: stmt.connection}).freeAllTemporary(locators)
 }
+
 func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Value, error) {
 	if locator == nil {
 		return nil, nil
@@ -863,6 +910,7 @@ func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Valu
 		return resultClobString, nil
 	}
 }
+
 func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 	if stmt._hasBLOB {
 		if stmt.containOutputPars {

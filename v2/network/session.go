@@ -10,11 +10,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/trace"
 	"net"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/v2/trace"
 
 	"github.com/sijms/go-ora/v2/converters"
 )
@@ -279,8 +280,11 @@ func (session *Session) Connect(ctx context.Context) error {
 	var connected = false
 	var host *ServerAddr
 	var loop = true
-	dialer := net.Dialer{
-		Timeout: time.Second * session.Context.ConnOption.Timeout,
+	dialer := connOption.Dialer
+	if dialer == nil {
+		dialer = &net.Dialer{
+			Timeout: time.Second * session.Context.ConnOption.Timeout,
+		}
 	}
 	for loop {
 		host = connOption.GetActiveServer(false)

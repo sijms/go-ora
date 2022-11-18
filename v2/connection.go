@@ -80,6 +80,7 @@ type Connection struct {
 type OracleConnector struct {
 	drv           *OracleDriver
 	connectString string
+	dialer        network.DialerContext
 }
 type OracleDriver struct {
 	//m         sync.Mutex
@@ -109,6 +110,7 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	if err != nil {
 		return nil, err
 	}
+	conn.connOption.Dialer = connector.dialer
 	err = conn.OpenWithContext(ctx)
 	if err != nil {
 		return nil, err
@@ -118,6 +120,10 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 
 func (connector *OracleConnector) Driver() driver.Driver {
 	return connector.drv
+}
+
+func (connector *OracleConnector) Dialer(dialer network.DialerContext) {
+	connector.dialer = dialer
 }
 
 // Open return a new open connection

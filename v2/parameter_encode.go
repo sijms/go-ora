@@ -518,6 +518,9 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		}
 	case Blob:
 		par.encodeRaw(value.Data, size)
+		if par.MaxLen == 0 {
+			par.MaxLen = 1
+		}
 		if par.Direction == Output {
 			par.DataType = OCIBlobLocator
 		} else {
@@ -542,6 +545,9 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			par.encodeRaw(nil, size)
 		} else {
 			par.encodeRaw(value.Data, size)
+		}
+		if par.MaxLen == 0 {
+			par.MaxLen = 1
 		}
 		if par.Direction == Output {
 			par.DataType = OCIBlobLocator

@@ -145,8 +145,8 @@ func (lob *Lob) putString(data string, charset int) error {
 	}
 	lobData := lob.connection.strConv.Encode(data)
 	lob.connection.strConv.SetLangID(tempCharset)
-	lob.size = int64(len([]rune(data)))
-	lob.sendSize = true
+	// lob.size = int64(len([]rune(data)))
+	// lob.sendSize = true
 	lob.sourceOffset = 1
 	lob.connection.session.ResetBuffer()
 	lob.writeOp(0x40)

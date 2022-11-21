@@ -794,6 +794,18 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 		}
 		return tempVal, nil
 	}
+	if par.DataType == UROWID {
+		rowid, err := newURowID(session)
+		if err != nil {
+			return nil, err
+		}
+		if rowid == nil {
+			tempVal = nil
+		} else {
+			tempVal = string(rowid.getBytes())
+		}
+		return tempVal, nil
+	}
 	if (par.DataType == NCHAR || par.DataType == CHAR) && par.MaxCharLen == 0 {
 		par.BValue = nil
 		return nil, nil

@@ -377,8 +377,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			}
 			if cred == nil {
 				return nil, errors.New(
-					fmt.Sprintf("cannot find credentials for server: %s, service: %s,  username: %s",
-						serv, ret.connOption.ServiceName, ret.connOption.UserID))
+					fmt.Sprintf("cannot find credentials for server: %s:%d, service: %s,  username: %s",
+						serv.Addr, serv.Port, ret.connOption.ServiceName, ret.connOption.UserID))
 			}
 			ret.connOption.UserID = cred.username
 			ret.password = cred.password

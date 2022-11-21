@@ -9,6 +9,7 @@ import (
 	_ "crypto/sha1"
 	"encoding/asn1"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -82,6 +83,43 @@ func (w *wallet) read() error {
 		w.password = make([]byte, 16)
 		dec.CryptBlocks(w.password, fileData[index:index+16])
 		index += 16
+	} else if num3 == 0x35 {
+		index++
+		rgbKey, err := hex.DecodeString(string(fileData[index : index+16]))
+		if err != nil {
+			return err
+		}
+		index += 16
+
+		blk, err := des.NewCipher(rgbKey)
+		if err != nil {
+			return err
+		}
+		dec := cipher.NewCBCDecrypter(blk, []byte{0, 0, 0, 0, 0, 0, 0, 0})
+		temp, err := hex.DecodeString(string(fileData[index : index+0x30]))
+		if err != nil {
+			return err
+		}
+		index += 0x30
+		output := make([]byte, len(temp))
+		dec.CryptBlocks(output, temp)
+		num := int(output[len(output)-1])
+		cutLen := 0
+		if num <= dec.BlockSize() {
+			apply := true
+			for x := len(output) - num; x < len(output); x++ {
+				if output[x] != uint8(num) {
+					apply = false
+					break
+				}
+			}
+			if apply {
+				cutLen = int(output[len(output)-1])
+			}
+			w.password = output[:len(output)-cutLen]
+		} else {
+			w.password = output
+		}
 	} else {
 		return errors.New("invalid wallet header")
 	}

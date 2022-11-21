@@ -691,6 +691,24 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		} else {
 			*value = tempVal
 		}
+	case NClob:
+		if tempNewVal, ok := newValue.(NClob); ok {
+			par.Value = tempNewVal
+		} else {
+			errors.New("NClob col/par requires NClob value")
+		}
+	case *NClob:
+		var tempVal NClob
+		if tempNewVal, ok := newValue.(NClob); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*NClob col/par requires NClob value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
 	case Blob:
 		if tempNewVal, ok := newValue.(Blob); ok {
 			par.Value = tempNewVal
@@ -821,7 +839,11 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 	if par.BValue == nil {
 		switch par.DataType {
 		case OCIClobLocator:
-			tempVal = Clob{locator: nil, Valid: false}
+			if par.CharsetForm == 1 {
+				tempVal = Clob{locator: nil, Valid: false}
+			} else {
+				tempVal = NClob{locator: nil, Valid: false}
+			}
 		case OCIBlobLocator:
 			tempVal = Blob{locator: nil, Valid: false}
 		case OCIFileLocator:
@@ -871,7 +893,11 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 				return nil, err
 			}
 			if par.DataType == OCIClobLocator {
-				tempVal = Clob{locator: locator}
+				if par.CharsetForm == 1 {
+					tempVal = Clob{locator: locator}
+				} else {
+					tempVal = NClob{locator: locator}
+				}
 			} else {
 				tempVal = Blob{locator: locator}
 			}

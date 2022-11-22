@@ -534,7 +534,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 							stmt.Pars[x].BValue = nil
 							stmt.Pars[x].Value = nil
 						} else {
-
 							err = stmt.calculateParameterValue(&stmt.Pars[x])
 							if err != nil {
 								return err
@@ -948,6 +947,37 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							}
 						}
 						stmt.Pars[parIndex].Value = val
+					case *NClob:
+						if val.locator == nil {
+							val.Valid = false
+							val.String = ""
+						} else {
+							tempVal, err := stmt.readLob(par, val.locator)
+							if err != nil {
+								return err
+							}
+							if stringVal, ok := tempVal.(string); ok {
+								val.String = stringVal
+							} else {
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+							}
+						}
+					case NClob:
+						if val.locator == nil {
+							val.Valid = false
+							val.String = ""
+						} else {
+							tempVal, err := stmt.readLob(par, val.locator)
+							if err != nil {
+								return err
+							}
+							if stringVal, ok := tempVal.(string); ok {
+								val.String = stringVal
+							} else {
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+							}
+						}
+						stmt.Pars[parIndex].Value = val
 					case *Blob:
 						if val.locator == nil {
 							val.Valid = false
@@ -1005,6 +1035,34 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 								}
 							}
 						case Clob:
+							if val.locator == nil {
+								row[colIndex] = nil
+							} else {
+								tempVal, err := stmt.readLob(col, val.locator)
+								if err != nil {
+									return err
+								}
+								if stringVal, ok := tempVal.(string); ok {
+									row[colIndex] = stringVal
+								} else {
+									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								}
+							}
+						case *NClob:
+							if val.locator == nil {
+								row[colIndex] = nil
+							} else {
+								tempVal, err := stmt.readLob(col, val.locator)
+								if err != nil {
+									return err
+								}
+								if stringVal, ok := tempVal.(string); ok {
+									row[colIndex] = stringVal
+								} else {
+									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								}
+							}
+						case NClob:
 							if val.locator == nil {
 								row[colIndex] = nil
 							} else {

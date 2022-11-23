@@ -1124,7 +1124,11 @@ func (conn *Connection) CheckNamedValue(named *driver.NamedValue) error {
 func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
-	return stmt.QueryContext(ctx, args)
+	rows, err := stmt.QueryContext(ctx, args)
+	if err != nil {
+		_ = stmt.Close()
+	}
+	return rows, err
 }
 
 func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {

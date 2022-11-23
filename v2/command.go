@@ -483,6 +483,9 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	for loop {
 		msg, err := session.GetByte()
 		if err != nil {
+			if session.Summary != nil {
+				stmt.cursorID = stmt.connection.session.Summary.CursorID
+			}
 			return err
 		}
 		switch msg {

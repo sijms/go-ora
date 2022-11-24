@@ -286,7 +286,7 @@ func (session *Session) Connect(ctx context.Context) error {
 			Timeout: time.Second * session.Context.ConnOption.Timeout,
 		}
 	}
-	connOption.serverIndex = 0
+	//connOption.serverIndex = 0
 	for loop {
 		host = connOption.GetActiveServer(false)
 		if host == nil {
@@ -372,7 +372,7 @@ func (session *Session) Connect(ctx context.Context) error {
 		}
 		connOption.Tracer.Printf("connection to %s:%d refused with error: %s", addr, port, refusePacket.Err.Error())
 		host = connOption.GetActiveServer(true)
-		if port == 0 {
+		if host == nil {
 			session.Disconnect()
 			return &refusePacket.Err
 		}

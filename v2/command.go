@@ -462,15 +462,27 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 		stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
 		stmt.connection.connOption.Tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
 	}
-	stmt.connection.session.ResetBuffer()
-	stmt.connection.session.PutBytes(3, 5, 0)
-	stmt.connection.session.PutInt(stmt.cursorID, 2, true, true)
-	stmt.connection.session.PutInt(stmt._noOfRowsToFetch, 2, true, true)
-	err := stmt.connection.session.Write()
+	session := stmt.connection.session
+	session.ResetBuffer()
+	session.PutBytes(3, 5, 0)
+	session.PutInt(stmt.cursorID, 2, true, true)
+	session.PutInt(stmt._noOfRowsToFetch, 2, true, true)
+	err := session.Write()
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			stmt.connection.State = Closed
+			_ = stmt.connection.restore()
+		}
 		return err
 	}
-	return stmt.read(dataSet)
+	err = stmt.read(dataSet)
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			stmt.connection.State = Closed
+			_ = stmt.connection.restore()
+		}
+	}
+	return err
 }
 
 // read this is common read for stmt it read many information related to

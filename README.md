@@ -6,6 +6,22 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
+### version 2.5.13: Add Support For FailOver (Experimental)
+* to use failover pass it into connection string as follow
+```golang
+urlOptions := map[string]string{
+	"FAILOVER": "5",
+	"TRACE FILE": "trace.log",
+}
+databaseUrl := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
+```
+* FAILOVER value is integer indicate how many times the driver will try to reconnect after lose connection default value = 0
+* failover will activated when stmt receive io.EOF error during read or write
+* FAILOVER work in 3 places:
+    * Query when fail the driver will reconnect and re-query up to failover number.
+    * Exec when fail the driver will reconnect and re-exec up to failover number.
+    * Fetch when fail the driver will reconnect up to failover time then return the error (whatever failover success or fail)
+
 ### version 2.4.28: Binary Double And Float Fix
 - Now you can read binary double and float without error issue#217
 - You can avoid calling cgo function `user.Current()` if you define environmental variable $USER

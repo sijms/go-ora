@@ -345,6 +345,22 @@ func (conn *Connection) Open() error {
 	return conn.OpenWithContext(context.Background())
 }
 
+func (conn *Connection) restore() error {
+	tracer := conn.connOption.Tracer
+	failOver := conn.connOption.Failover
+	var err error
+	tracer.Print("connection reset")
+	for trial := 0; trial < failOver; trial++ {
+		err = conn.Open()
+		if err != nil {
+			tracer.Print("Error: ", err)
+			continue
+		}
+		break
+	}
+	return err
+}
+
 // OpenWithContext open the connection with timeout context
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	tracer := conn.connOption.Tracer
@@ -356,6 +372,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	default:
 		conn.LogonMode = 0
 	}
+	conn.connOption.ResetServerIndex()
 	conn.session = network.NewSession(conn.connOption)
 	W := conn.conStr.w
 	if conn.connOption.SSL && W != nil {

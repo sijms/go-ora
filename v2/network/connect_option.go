@@ -177,6 +177,9 @@ func (serv *ServerAddr) IsEqual(input *ServerAddr) bool {
 func (serv *ServerAddr) networkAddr() string {
 	return net.JoinHostPort(serv.Addr, strconv.Itoa(serv.Port))
 }
+func (op *ConnectionOption) ResetServerIndex() {
+	op.serverIndex = 0
+}
 func (op *ConnectionOption) GetActiveServer(jump bool) *ServerAddr {
 	if jump {
 		op.serverIndex++

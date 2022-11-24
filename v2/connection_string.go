@@ -283,6 +283,11 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				ret.connOption.SessionInfo.UnixAddress = val[0]
 			case "PROXY CLIENT NAME":
 				ret.connOption.DatabaseInfo.ProxyClientName = val[0]
+			case "FAILOVER":
+				ret.connOption.Failover, err = strconv.Atoi(val[0])
+				if err != nil {
+					ret.connOption.Failover = 0
+				}
 				//case "ENLIST":
 				//	ret.EnList = EnListFromString(val[0])
 				//case "INC POOL SIZE":

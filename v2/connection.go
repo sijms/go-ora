@@ -356,7 +356,6 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	default:
 		conn.LogonMode = 0
 	}
-
 	conn.session = network.NewSession(conn.connOption)
 	W := conn.conStr.w
 	if conn.connOption.SSL && W != nil {

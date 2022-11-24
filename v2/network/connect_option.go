@@ -66,6 +66,7 @@ type ConnectionOption struct {
 	AdvNegoSeviceInfo
 	Tracer       trace.Tracer
 	PrefetchRows int
+	Failover     int
 }
 
 func extractServers(connStr string) ([]ServerAddr, error) {

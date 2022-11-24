@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sijms/go-ora/v2/network"
+	"io"
 	"reflect"
 	"regexp"
 	"strings"
@@ -1438,16 +1439,20 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	//for x := 0; x < len(args); x++ {
 	//	stmt.AddParam("", args[x], 0, Input)
 	//}
-	session.ResetBuffer()
-	err = stmt.write(session)
+	_, err = stmt._query()
 	if err != nil {
 		return nil, err
 	}
-	dataSet := new(DataSet)
-	err = stmt.read(dataSet)
-	if err != nil {
-		return nil, err
-	}
+	//session.ResetBuffer()
+	//err = stmt.write(session)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//dataSet := new(DataSet)
+	//err = stmt.read(dataSet)
+	//if err != nil {
+	//	return nil, err
+	//}
 	result := new(QueryResult)
 	if session.Summary != nil {
 		result.rowsAffected = int64(session.Summary.CurRowNumber)
@@ -1541,6 +1546,67 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	return stmt.Query(args)
 }
 
+func (stmt *Stmt) reset() {
+	stmt.reSendParDef = false
+	stmt.parse = true
+	stmt.execute = true
+	stmt.define = false
+	stmt._hasBLOB = false
+	stmt._hasLONG = false
+	stmt.disableCompression = true
+	stmt.arrayBindCount = 0
+}
+func (stmt *Stmt) _query() (driver.Rows, error) {
+	var err error
+	var dataSet *DataSet
+	tracer := stmt.connection.connOption.Tracer
+	failOver := stmt.connection.connOption.Failover
+	if failOver == 0 {
+		failOver = 1
+	}
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		if stmt.connection.State != Opened {
+			tracer.Print("connection reset")
+			err = stmt.connection.Open()
+			if err != nil {
+				tracer.Print("Error: ", err)
+			}
+			continue
+		}
+		stmt.reset()
+		stmt.connection.session.ResetBuffer()
+		err = stmt.write(stmt.connection.session)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				tracer.Print("connection reset")
+				stmt.connection.State = Closed
+				err = stmt.connection.Open()
+				if err != nil {
+					tracer.Print("Error: ", err)
+				}
+				continue
+			}
+			return nil, err
+		}
+		dataSet = new(DataSet)
+		err = stmt.read(dataSet)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				stmt.connection.connOption.Tracer.Print("connection reset")
+				stmt.connection.State = Closed
+				err = stmt.connection.Open()
+				if err != nil {
+					tracer.Print("Error: ", err)
+				}
+				continue
+			}
+			return nil, err
+		}
+		break
+	}
+	return dataSet, err
+}
+
 // Query execute a query command and return dataset object in form of driver.Rows interface
 //
 // args is an array of values that corresponding to parameters in sql
@@ -1548,6 +1614,7 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
+
 	stmt.connection.connOption.Tracer.Printf("Query:\n%s", stmt.text)
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	//stmt._noOfRowsToFetch = 25
@@ -1559,18 +1626,8 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 		}
 		stmt.setParam(x, *par)
 	}
-	stmt.connection.session.ResetBuffer()
 
-	err := stmt.write(stmt.connection.session)
-	if err != nil {
-		return nil, err
-	}
-	dataSet := new(DataSet)
-	err = stmt.read(dataSet)
-	if err != nil {
-		return nil, err
-	}
-	return dataSet, nil
+	return stmt._query()
 }
 
 func (stmt *Stmt) NumInput() int {

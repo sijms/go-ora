@@ -286,9 +286,13 @@ func (session *Session) Connect(ctx context.Context) error {
 			Timeout: time.Second * session.Context.ConnOption.Timeout,
 		}
 	}
+	connOption.serverIndex = 0
 	for loop {
 		host = connOption.GetActiveServer(false)
 		if host == nil {
+			if err != nil {
+				return err
+			}
 			return errors.New("no available servers to connect to")
 		}
 		addr := host.networkAddr()

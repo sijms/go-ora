@@ -3,6 +3,7 @@ package converters
 import (
 	"encoding/binary"
 	"unicode/utf16"
+	"unsafe"
 )
 
 type IStringConverter interface {
@@ -109,7 +110,7 @@ func (conv *StringConverter) Encode(input string) []byte {
 				}
 			} else {
 				output = append(output, uint8(conv.eReplace))
-				//output[x] = uint8(conv.eReplace)
+				// output[x] = uint8(conv.eReplace)
 			}
 		}
 		return output
@@ -129,7 +130,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 		fallthrough
 	case 873:
 		// utf-8 encoding
-		return string(input)
+		return BytesToString(input)
 	case 2000:
 		index := 0
 		var inputData []byte
@@ -325,4 +326,8 @@ func (conv *StringConverter) Decode(input []byte) string {
 		}
 		return string(utf16.Decode(output))
 	}
+}
+
+func BytesToString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }

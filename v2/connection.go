@@ -349,8 +349,8 @@ func (conn *Connection) restore() error {
 	tracer := conn.connOption.Tracer
 	failOver := conn.connOption.Failover
 	var err error
-	tracer.Print("connection reset")
 	for trial := 0; trial < failOver; trial++ {
+		tracer.Print("reconnect trial #", trial+1)
 		err = conn.Open()
 		if err != nil {
 			tracer.Print("Error: ", err)

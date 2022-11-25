@@ -1578,7 +1578,7 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 	}
 	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
 		if stmt.connection.State != Opened {
-			tracer.Print("connection reset")
+			tracer.Print("reconnect trial #", writeTrials+1)
 			err = stmt.connection.Open()
 			if err != nil {
 				tracer.Print("Error: ", err)
@@ -1590,7 +1590,7 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 		err = stmt.write(stmt.connection.session)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				tracer.Print("connection reset")
+				tracer.Print("reconnect trial #", writeTrials+1)
 				stmt.connection.State = Closed
 				err = stmt.connection.Open()
 				if err != nil {
@@ -1604,7 +1604,7 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 		err = stmt.read(dataSet)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				stmt.connection.connOption.Tracer.Print("connection reset")
+				stmt.connection.connOption.Tracer.Print("reconnect trial #", writeTrials+1)
 				stmt.connection.State = Closed
 				err = stmt.connection.Open()
 				if err != nil {

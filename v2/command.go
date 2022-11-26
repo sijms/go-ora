@@ -1451,20 +1451,28 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	//for x := 0; x < len(args); x++ {
 	//	stmt.AddParam("", args[x], 0, Input)
 	//}
-	_, err = stmt._query()
+	//_, err = stmt._query()
+	//if err != nil {
+	//	return nil, err
+	//}
+	session.ResetBuffer()
+	err = stmt.write(session)
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			stmt.connection.State = Closed
+			_ = stmt.connection.restore()
+		}
 		return nil, err
 	}
-	//session.ResetBuffer()
-	//err = stmt.write(session)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//dataSet := new(DataSet)
-	//err = stmt.read(dataSet)
-	//if err != nil {
-	//	return nil, err
-	//}
+	dataSet := new(DataSet)
+	err = stmt.read(dataSet)
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			stmt.connection.State = Closed
+			_ = stmt.connection.restore()
+		}
+		return nil, err
+	}
 	result := new(QueryResult)
 	if session.Summary != nil {
 		result.rowsAffected = int64(session.Summary.CurRowNumber)
@@ -1568,6 +1576,7 @@ func (stmt *Stmt) reset() {
 	stmt.disableCompression = true
 	stmt.arrayBindCount = 0
 }
+
 func (stmt *Stmt) _query() (driver.Rows, error) {
 	var err error
 	var dataSet *DataSet

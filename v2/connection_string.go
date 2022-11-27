@@ -6,6 +6,7 @@ import (
 	"github.com/sijms/go-ora/v2/advanced_nego"
 	"github.com/sijms/go-ora/v2/network"
 	"github.com/sijms/go-ora/v2/trace"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -79,6 +80,7 @@ type ConnectionString struct {
 	password     string
 	Trace        string // Trace file
 	WalletPath   string
+	walletPass   string
 	w            *wallet
 	authType     AuthType
 	//EnList             EnList
@@ -234,6 +236,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				ret.connOption.InstanceName = val[0]
 			case "WALLET":
 				ret.WalletPath = val[0]
+			case "WALLET PASSWORD":
+				ret.walletPass = val[0]
 			case "AUTH TYPE":
 				if strings.ToUpper(val[0]) == "OS" {
 					ret.authType = OS
@@ -370,10 +374,23 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		if len(ret.connOption.ServiceName) == 0 {
 			return nil, errors.New("you should specify server/service if you will use wallet")
 		}
-		ret.w, err = NewWallet(path.Join(ret.WalletPath, "cwallet.sso"))
-		if err != nil {
-			return nil, err
+		if _, err = os.Stat(path.Join(ret.WalletPath, "ewallet.p12")); err == nil && len(ret.walletPass) > 0 {
+			fileData, err := ioutil.ReadFile(path.Join(ret.WalletPath, "ewallet.p12"))
+			if err != nil {
+				return nil, err
+			}
+			w := &wallet{password: []byte(ret.walletPass)}
+			err = w.readPKCS12(fileData)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			ret.w, err = NewWallet(path.Join(ret.WalletPath, "cwallet.sso"))
+			if err != nil {
+				return nil, err
+			}
 		}
+
 		if len(ret.password) == 0 {
 			serv := ret.connOption.Servers[0]
 			cred, err := ret.w.getCredential(serv.Addr, serv.Port, ret.connOption.ServiceName, ret.connOption.UserID)

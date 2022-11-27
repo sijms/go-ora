@@ -54,13 +54,23 @@ func (w *wallet) read() error {
 		return err
 	}
 	index := 0
-	if !bytes.Equal(fileData[index:index+4], []byte{161, 248, 78, 54}) {
-		return errors.New("invalid wallet")
+	if !bytes.Equal(fileData[index:index+3], []byte{161, 248, 78}) {
+		return errors.New("TCPS: Invalid SSL Wallet (Magic)")
 	}
-	index += 4
-	if fileData[3] != 54 && fileData[4] != 55 {
+	index += 3
+	switch fileData[index] {
+	case 54:
+		fallthrough
+	case 55:
+		index += 1
+	case 56:
+		return errors.New("oracle 19c wallet is not supported")
+	default:
 		return errors.New("invalid magic version")
 	}
+	//if fileData[3] != 54 && fileData[4] != 55 {
+	//
+	//}
 	num1 := binary.BigEndian.Uint32(fileData[index : index+4])
 	index += 4
 	//num2 := binary.BigEndian.Uint32(fileData[index: index + 4])
@@ -123,7 +133,11 @@ func (w *wallet) read() error {
 	} else {
 		return errors.New("invalid wallet header")
 	}
-	encryptedData, err := w.decodeASN1(fileData[index:])
+	return w.readPKCS12(fileData[index:])
+}
+
+func (w *wallet) readPKCS12(data []byte) error {
+	encryptedData, err := w.decodeASN1(data)
 	if err != nil {
 		return err
 	}
@@ -208,7 +222,7 @@ func (w *wallet) decrypt(encryptedData []byte) error {
 		output := make([]byte, len(encryptedData))
 		decr.CryptBlocks(output, encryptedData)
 		// remove padding
-		if output[len(output)-1] < 8 {
+		if int(output[len(output)-1]) <= blk.BlockSize() {
 			num := int(output[len(output)-1])
 			padding := bytes.Repeat([]byte{uint8(num)}, num)
 			if bytes.Equal(output[len(output)-num:], padding) {

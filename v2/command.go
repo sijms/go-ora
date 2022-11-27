@@ -1594,7 +1594,7 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 			}
 			continue
 		}
-		stmt.reset()
+		//stmt.reset()
 		stmt.connection.session.ResetBuffer()
 		err = stmt.write(stmt.connection.session)
 		if err != nil {

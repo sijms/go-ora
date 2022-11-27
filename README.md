@@ -23,8 +23,8 @@ databaseUrl := go_ora.BuildUrl(server, port, service, user, password, urlOptions
 * failover will activated when stmt receive io.EOF error during read or write
 * FAILOVER work in 3 places:
     * Query when fail the driver will reconnect and re-query up to failover number.
-    * Exec when fail the driver will reconnect and re-exec up to failover number.
-    * Fetch when fail the driver will reconnect up to failover time then return the error (whatever failover success or fail)
+    * Exec when fail the driver will reconnect up to failover times then return the error to avoid unintended re-execution.
+    * Fetch when fail the driver will reconnect up to failover times then return the error (whatever failover success or fail)
 
 ### version 2.4.28: Binary Double And Float Fix
 - Now you can read binary double and float without error issue#217

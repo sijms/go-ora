@@ -6,7 +6,7 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
-### version 2.5.16: Add Support for cwallet.sso created with auto-auto_login_local option
+### version 2.5.16: Add Support for cwallet.sso created with -auto_login_local option
 * note that this type of oracle wallets only work on the machine where they were created 
 ### version 2.5.14: Failover and wallet update
 * Exec will return error after connection restore

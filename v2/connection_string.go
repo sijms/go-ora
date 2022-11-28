@@ -452,18 +452,8 @@ func (connStr *ConnectionString) validate() error {
 
 	// get client info
 	var idx int
-	var temp *user.User
-	if userName := os.Getenv("USER"); len(userName) > 0 {
-		temp = &user.User{
-			Uid:      "",
-			Gid:      "",
-			Username: userName,
-			Name:     userName,
-			HomeDir:  "",
-		}
-	} else {
-		temp, _ = user.Current()
-	}
+	var temp = getCurrentUser()
+
 	if temp != nil {
 		idx = strings.Index(temp.Username, "\\")
 		if idx >= 0 {
@@ -511,4 +501,19 @@ func uniqueAppendString(list []string, newItem string, ignoreCase bool) ([]strin
 		list = append(list, newItem)
 	}
 	return list, !found
+}
+
+func getCurrentUser() *user.User {
+	if userName := os.Getenv("USER"); len(userName) > 0 {
+		return &user.User{
+			Uid:      "",
+			Gid:      "",
+			Username: userName,
+			Name:     userName,
+			HomeDir:  "",
+		}
+	} else {
+		temp, _ := user.Current()
+		return temp
+	}
 }

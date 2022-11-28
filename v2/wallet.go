@@ -6,6 +6,8 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/des"
+	"crypto/hmac"
+	"crypto/sha1"
 	_ "crypto/sha1"
 	"encoding/asn1"
 	"encoding/binary"
@@ -13,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -58,22 +61,21 @@ func (w *wallet) read() error {
 		return errors.New("TCPS: Invalid SSL Wallet (Magic)")
 	}
 	index += 3
+	autoLoginLocal := false
 	switch fileData[index] {
 	case 54:
 		fallthrough
 	case 55:
 		index += 1
 	case 56:
-		return errors.New("oracle 19c wallet is not supported")
+		autoLoginLocal = true
+		index += 1
 	default:
 		return errors.New("invalid magic version")
 	}
-	//if fileData[3] != 54 && fileData[4] != 55 {
-	//
-	//}
 	num1 := binary.BigEndian.Uint32(fileData[index : index+4])
 	index += 4
-	//num2 := binary.BigEndian.Uint32(fileData[index: index + 4])
+	size := binary.BigEndian.Uint32(fileData[index : index+4])
 	index += 4
 	if num1 != 6 {
 		return errors.New("invalid wallet header version")
@@ -90,9 +92,25 @@ func (w *wallet) read() error {
 			return err
 		}
 		dec := cipher.NewCBCDecrypter(blk, []byte{192, 52, 216, 49, 28, 2, 206, 248, 81, 240, 20, 75, 129, 237, 75, 242})
-		w.password = make([]byte, 16)
-		dec.CryptBlocks(w.password, fileData[index:index+16])
-		index += 16
+		passwordLen := int(size) - 1 - 16
+		w.password = make([]byte, passwordLen)
+		dec.CryptBlocks(w.password, fileData[index:index+passwordLen])
+		index += passwordLen
+		if autoLoginLocal {
+			hostname, _ := os.Hostname()
+			currentUser := getCurrentUser()
+			if idx := strings.Index(hostname, "."); idx != -1 {
+				hostname = hostname[:idx]
+			}
+			key := []byte(hostname + currentUser.Name)
+			mac := hmac.New(sha1.New, key)
+			mac.Write(w.password)
+			tempPassword := mac.Sum(nil)
+			for x := 0; x < len(tempPassword); x++ {
+				tempPassword[x] = (tempPassword[x]+128)%128%127 + 1
+			}
+			w.password = tempPassword[:16]
+		}
 	} else if num3 == 0x35 {
 		index++
 		rgbKey, err := hex.DecodeString(string(fileData[index : index+16]))

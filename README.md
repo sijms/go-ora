@@ -8,7 +8,6 @@
     - See examples for more help
 ### version 2.5.14: Failover and wallet update
 * Exec will return error after connection restore
-* oracle 19c cwallet.sso is not supported
 * add new field _**WALLET PASSWORD**_ to read ewallet.p12 file
 ### version 2.5.13: Add Support For Failover (Experimental)
 * to use failover pass it into connection string as follow

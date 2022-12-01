@@ -283,11 +283,10 @@ func (session *Session) BreakConnection() error {
 	if err != nil {
 		return err
 	}
-	pck, err := session.readPacket()
+	_, err = session.readPacket()
 	if err != nil {
 		return err
 	}
-	fmt.Println(pck.bytes())
 	return nil
 }
 

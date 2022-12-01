@@ -266,6 +266,31 @@ func (session *Session) negotiate() {
 	session.sslConn = tls.Client(session.conn, config)
 }
 
+func (session *Session) BreakConnection() error {
+	tempCtx := session.oldCtx
+	session.StartContext(context.Background())
+	defer func() {
+		session.EndContext()
+		session.oldCtx = tempCtx
+	}()
+	marker := newMarkerPacket(1, session.Context)
+	err := session.writePacket(marker)
+	if err != nil {
+		return err
+	}
+	marker = newMarkerPacket(2, session.Context)
+	err = session.writePacket(marker)
+	if err != nil {
+		return err
+	}
+	pck, err := session.readPacket()
+	if err != nil {
+		return err
+	}
+	fmt.Println(pck.bytes())
+	return nil
+}
+
 // Connect perform network connection on address:port
 // check if the client need to use SSL
 // then send connect packet to the server and
@@ -463,6 +488,9 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 	for session.index+numBytes > len(session.inBuffer) {
 		pck, err := session.readPacket()
 		if err != nil {
+			if e, ok := err.(net.Error); ok && e.Timeout() {
+				_ = session.BreakConnection()
+			}
 			return nil, err
 		}
 		if dataPck, ok := pck.(*DataPacket); ok {

@@ -267,6 +267,8 @@ func (session *Session) negotiate() {
 }
 
 func (session *Session) BreakConnection() error {
+	tracer := session.Context.ConnOption.Tracer
+	tracer.Print("Break Connection")
 	tempCtx := session.oldCtx
 	session.StartContext(context.Background())
 	defer func() {
@@ -278,16 +280,14 @@ func (session *Session) BreakConnection() error {
 	if err != nil {
 		return err
 	}
-	marker = newMarkerPacket(2, session.Context)
-	err = session.writePacket(marker)
+	_, err = session.readPacket()
 	if err != nil {
 		return err
 	}
-	pck, err := session.readPacket()
+	_, err = session.readPacket()
 	if err != nil {
-		return err
+		tracer.Print("Connection Break With Error: ", err)
 	}
-	fmt.Println(pck.bytes())
 	return nil
 }
 

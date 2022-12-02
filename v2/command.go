@@ -649,16 +649,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			if err != nil {
 				return err
 			}
-			//if num > 0 {
-			//	_, err = session.GetBytes(num)
-			//	if err != nil {
-			//		return err
-			//	}
-			//}
-			//fmt.Println(num)
-			//if (num > 0)
-			//	this.m_marshallingEngine.UnmarshalNBytes_ScanOnly(num);
-			// get session timezone
 			size, err = session.GetInt(2, true, true)
 			for x := 0; x < size; x++ {
 				_, val, num, err := session.GetKeyVal()

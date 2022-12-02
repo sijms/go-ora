@@ -20,6 +20,8 @@ import (
 	"github.com/sijms/go-ora/v2/converters"
 )
 
+var ErrConnectionReset error = errors.New("connection reset")
+
 type Data interface {
 	Write(session *Session) error
 	Read(session *Session) error
@@ -720,17 +722,20 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				return nil, err
 			}
 		}
+		//return nil, ErrConnectionReset
 		packetData, err = readPacketData()
 		if err != nil {
 			return nil, err
 		}
 		dataPck, err := newDataPacketFromData(packetData, session.Context)
+		return dataPck, err
 		if err != nil {
 			return nil, err
 		}
 		if dataPck == nil {
 			return nil, errors.New("connection break")
 		}
+
 		session.inBuffer = dataPck.buffer
 		session.index = 0
 		loop := true

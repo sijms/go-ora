@@ -3,8 +3,6 @@ package go_ora
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"github.com/sijms/go-ora/v2/network"
 )
 
 type Clob struct {
@@ -407,19 +405,19 @@ func (lob *Lob) read() error {
 			return err
 		}
 		switch msg {
-		case 4:
-			session.Summary, err = network.NewSummary(session)
-			if err != nil {
-				return err
-			}
-			if session.HasError() {
-				if session.Summary.RetCode == 1403 {
-					session.Summary = nil
-				} else {
-					return session.GetError()
-				}
-			}
-			loop = false
+		//case 4:
+		//	session.Summary, err = network.NewSummary(session)
+		//	if err != nil {
+		//		return err
+		//	}
+		//	if session.HasError() {
+		//		if session.Summary.RetCode == 1403 {
+		//			session.Summary = nil
+		//		} else {
+		//			return session.GetError()
+		//		}
+		//	}
+		//	loop = false
 
 		case 8:
 			// read rpa message
@@ -470,42 +468,59 @@ func (lob *Lob) read() error {
 					lob.isNull = true
 				}
 			}
-		case 9:
-			if session.HasEOSCapability {
-				temp, err := session.GetInt(4, true, true)
-				if err != nil {
-					return err
-				}
-				if session.Summary != nil {
-					session.Summary.EndOfCallStatus = temp
-				}
-			}
-			loop = false
+		//case 9:
+		//	if session.HasEOSCapability {
+		//		temp, err := session.GetInt(4, true, true)
+		//		if err != nil {
+		//			return err
+		//		}
+		//		if session.Summary != nil {
+		//			session.Summary.EndOfCallStatus = temp
+		//		}
+		//	}
+		//	loop = false
 		case 14:
 			// get the data
 			err = lob.readData()
 			if err != nil {
 				return err
 			}
-		case 15:
-			warning, err := network.NewWarningObject(session)
-			if err != nil {
-				return err
-			}
-			if warning != nil {
-				fmt.Println(warning)
-			}
-		case 23:
-			opCode, err := session.GetByte()
-			if err != nil {
-				return err
-			}
-			err = lob.connection.getServerNetworkInformation(opCode)
-			if err != nil {
-				return err
-			}
+		//case 15:
+		//	warning, err := network.NewWarningObject(session)
+		//	if err != nil {
+		//		return err
+		//	}
+		//	if warning != nil {
+		//		fmt.Println(warning)
+		//	}
+		//case 23:
+		//	opCode, err := session.GetByte()
+		//	if err != nil {
+		//		return err
+		//	}
+		//	err = lob.connection.getServerNetworkInformation(opCode)
+		//	if err != nil {
+		//		return err
+		//	}
 		default:
-			return errors.New(fmt.Sprintf("TTC error: received code %d during LOB reading", msg))
+			err = lob.connection.readResponse(msg)
+			if err != nil {
+				return err
+			}
+			if msg == 4 {
+				if session.HasError() {
+					if session.Summary.RetCode == 1403 {
+						session.Summary = nil
+					} else {
+						return session.GetError()
+					}
+				}
+				loop = false
+			}
+			if msg == 9 {
+				loop = false
+			}
+			//return errors.New(fmt.Sprintf("TTC error: received code %d during LOB reading", msg))
 		}
 	}
 	return nil

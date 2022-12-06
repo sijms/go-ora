@@ -502,25 +502,25 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			return err
 		}
 		switch msg {
-		case 4:
-			stmt.connection.session.Summary, err = network.NewSummary(session)
-			if err != nil {
-				return err
-			}
-			stmt.connection.connOption.Tracer.Printf("Summary: RetCode:%d, Error Message:%q", stmt.connection.session.Summary.RetCode, string(stmt.connection.session.Summary.ErrorMessage))
-
-			stmt.cursorID = stmt.connection.session.Summary.CursorID
-			stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0
-			if stmt.connection.session.HasError() {
-				if stmt.connection.session.Summary.RetCode == 1403 {
-					stmt._hasMoreRows = false
-					stmt.connection.session.Summary = nil
-				} else {
-					return stmt.connection.session.GetError()
-				}
-
-			}
-			loop = false
+		//case 4:
+		//	stmt.connection.session.Summary, err = network.NewSummary(session)
+		//	if err != nil {
+		//		return err
+		//	}
+		//	stmt.connection.connOption.Tracer.Printf("Summary: RetCode:%d, Error Message:%q", stmt.connection.session.Summary.RetCode, string(stmt.connection.session.Summary.ErrorMessage))
+		//
+		//	stmt.cursorID = stmt.connection.session.Summary.CursorID
+		//	stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0
+		//	if stmt.connection.session.HasError() {
+		//		if stmt.connection.session.Summary.RetCode == 1403 {
+		//			stmt._hasMoreRows = false
+		//			stmt.connection.session.Summary = nil
+		//		} else {
+		//			return stmt.connection.session.GetError()
+		//		}
+		//
+		//	}
+		//	loop = false
 		case 6:
 			//_, err = session.GetByte()
 			err = dataSet.load(session)
@@ -778,17 +778,35 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				}
 			}
 			dataSet.setBitVector(bitVector)
-		case 23:
-			opCode, err := session.GetByte()
-			if err != nil {
-				return err
-			}
-			err = stmt.connection.getServerNetworkInformation(opCode)
-			if err != nil {
-				return err
-			}
+		//case 23:
+		//	opCode, err := session.GetByte()
+		//	if err != nil {
+		//		return err
+		//	}
+		//	err = stmt.connection.getServerNetworkInformation(opCode)
+		//	if err != nil {
+		//		return err
+		//	}
 		default:
-			return errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
+			err = stmt.connection.readResponse(msg)
+			if err != nil {
+				return err
+			}
+			if msg == 4 {
+				stmt.cursorID = stmt.connection.session.Summary.CursorID
+				stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0
+				if stmt.connection.session.HasError() {
+					if stmt.connection.session.Summary.RetCode == 1403 {
+						stmt._hasMoreRows = false
+						stmt.connection.session.Summary = nil
+					} else {
+						return stmt.connection.session.GetError()
+					}
+
+				}
+				loop = false
+			}
+			//return errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
 		}
 	}
 	if stmt.connection.connOption.Tracer.IsOn() {

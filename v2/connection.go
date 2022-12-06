@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"strconv"
@@ -1155,4 +1156,111 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 	conn.session.StartContext(ctx)
 	defer conn.session.EndContext()
 	return NewStmt(query, conn), nil
+}
+
+func (conn *Connection) readResponse(msgCode uint8) error {
+	session := conn.session
+	tracer := conn.connOption.Tracer
+	var err error
+	switch msgCode {
+	case 4:
+		conn.session.Summary, err = network.NewSummary(session)
+		if err != nil {
+			return err
+		}
+		tracer.Printf("Summary: RetCode:%d, Error Message:%q", session.Summary.RetCode, string(session.Summary.ErrorMessage))
+	case 8:
+		size, err := session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+		for x := 0; x < 2; x++ {
+			_, err = session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+		}
+		for x := 2; x < size; x++ {
+			_, err = session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+		}
+		_, err = session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+		size, err = session.GetInt(2, true, true)
+		for x := 0; x < size; x++ {
+			_, val, num, err := session.GetKeyVal()
+			if err != nil {
+				return err
+			}
+			//fmt.Println(key, val, num)
+			if num == 163 {
+				session.TimeZone = val
+				//fmt.Println("session time zone", session.TimeZone)
+			}
+		}
+		if session.TTCVersion >= 4 {
+			// get queryID
+			size, err = session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+			if size > 0 {
+				bty, err := session.GetBytes(size)
+				if err != nil {
+					return err
+				}
+				if len(bty) >= 8 {
+					queryID := binary.LittleEndian.Uint64(bty[size-8:])
+					fmt.Println("query ID: ", queryID)
+				}
+			}
+		}
+		if session.TTCVersion >= 7 {
+			length, err := session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+			for i := 0; i < length; i++ {
+				_, err = session.GetInt(8, true, true)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	case 9:
+		if session.HasEOSCapability {
+			temp, err := session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+			if session.Summary != nil {
+				session.Summary.EndOfCallStatus = temp
+			}
+		}
+	case 15:
+		warning, err := network.NewWarningObject(session)
+		if err != nil {
+			return err
+		}
+		if warning != nil {
+			fmt.Println(warning)
+		}
+	case 23:
+		opCode, err := session.GetByte()
+		if err != nil {
+			return err
+		}
+		err = conn.getServerNetworkInformation(opCode)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New(fmt.Sprintf("TTC error: received code %d during response reading", msgCode))
+	}
+	return nil
+	// cancel loop if = 4 or 9
 }

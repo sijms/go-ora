@@ -153,6 +153,15 @@ func (nego *AdvNego) Read() error {
 			nego.comm.writeUB4(2)
 			nego.comm.writeUB1(1)
 		}
+		krbConf := "sqlnet.kerberos5_conf"
+		krbCCName := "sqlnet.kerberos5_cc_name"
+		err = nego.comm.session.Write()
+		if err != nil {
+			return err
+		}
+		// handShake
+		err = nego.kerbosHandshake(krbConf, krbCCName)
+		return err
 	}
 	if authNTS {
 		connOption := nego.comm.session.Context.ConnOption
@@ -239,3 +248,42 @@ func (nego *AdvNego) StartServices() error {
 	}
 	return nil
 }
+
+func (nego *AdvNego) kerbosHandshake(krbConf, krbCCName string) error {
+	header, err := nego.readHeader()
+	if err != nil {
+		return err
+	}
+	for i := 0; i < header[2]; i++ {
+		serviceHeader, err := nego.readServiceHeader()
+		if err != nil {
+			return err
+		}
+		if serviceHeader[2] != 0 {
+			return fmt.Errorf("advanced negotiation error: during receive service header: network excpetion: ora-%d", serviceHeader[2])
+		}
+	}
+	serviceName, err := nego.comm.readString()
+	if err != nil {
+		return err
+	}
+	serverHostName, err := nego.comm.readString()
+	if err != nil {
+		return err
+	}
+	if len(serviceName) == 0 {
+		return errors.New("kerberos negotiation error: Service Name not received")
+	}
+	if len(serverHostName) == 0 {
+		return errors.New("kerberos negotiation error: Server hostname not received")
+	}
+	if len(krbConf) == 0 {
+		return errors.New("kerberos negotiation error: KERBEROS5_CONF missing")
+	}
+	if len(krbCCName) == 0 {
+		return errors.New("kerberos negotiation error: KERBEROS5_CC_NAME missing")
+	}
+	return nil
+}
+
+//this.KerberosHandshake(listOfService, KRB5Conf, KRB5CCName);

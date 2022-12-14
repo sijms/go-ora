@@ -16,6 +16,7 @@ type KerberosAuthInterface interface {
 
 var kerberosAuth KerberosAuthInterface = nil
 
+// Set Kerberos5 Authentication inferface used for kerberos authentication
 func SetKerberosAuth(input KerberosAuthInterface) {
 	kerberosAuth = input
 }

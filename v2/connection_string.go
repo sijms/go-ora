@@ -36,8 +36,9 @@ const (
 type AuthType int
 
 const (
-	Normal AuthType = 0
-	OS     AuthType = 1
+	Normal   AuthType = 0
+	OS       AuthType = 1
+	Kerberos AuthType = 2
 )
 const defaultPort int = 1521
 
@@ -241,6 +242,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			case "AUTH TYPE":
 				if strings.ToUpper(val[0]) == "OS" {
 					ret.authType = OS
+				} else if strings.ToUpper(val[0]) == "KERBEROS" {
+					ret.authType = Kerberos
 				} else {
 					ret.authType = Normal
 				}
@@ -428,13 +431,16 @@ func (connStr *ConnectionString) validate() error {
 	if len(connStr.connOption.SID) == 0 && len(connStr.connOption.ServiceName) == 0 {
 		return errors.New("empty SID and service name")
 	}
-	if len(connStr.connOption.UserID) == 0 || len(connStr.password) == 0 {
+	if len(connStr.connOption.UserID) == 0 || len(connStr.password) == 0 && connStr.authType == Normal {
 		connStr.authType = OS
 	}
 	if connStr.authType == OS {
 		if runtime.GOOS == "windows" {
 			connStr.connOption.AuthService = append(connStr.connOption.AuthService, "NTS")
 		}
+	}
+	if connStr.authType == Kerberos {
+		connStr.connOption.AuthService = append(connStr.connOption.AuthService, "KERBEROS5")
 	}
 	if connStr.connOption.SSL {
 		connStr.connOption.Protocol = "tcps"

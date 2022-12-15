@@ -27,6 +27,7 @@ type ClientInfo struct {
 	DomainName  string
 	DriverName  string
 	PID         int
+	UseKerberos bool
 }
 type DatabaseInfo struct {
 	UserID          string

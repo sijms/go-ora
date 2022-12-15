@@ -122,7 +122,7 @@ func (nego *AdvNego) Read() error {
 	if authServ, ok := nego.serviceList[1].(*authService); ok {
 		if authServ.active {
 			if authServ.serviceName == "KERBEROS5" {
-				return errors.New("advanced negotiation: KERBEROS5 authentication still not supported")
+				//return errors.New("advanced negotiation: KERBEROS5 authentication still not supported")
 				authKerberos = true
 			} else if authServ.serviceName == "NTS" {
 				authNTS = true
@@ -299,6 +299,7 @@ func (nego *AdvNego) kerbosHandshake(authServ *authService) error {
 	}
 	// if address is ipv6 then num1 = 24 otherwise = 2
 	num1 := 2
+	localAddress = net.IP{172, 17, 0, 2}
 	if len(localAddress) > 4 {
 		num1 = 24
 	}
@@ -331,7 +332,8 @@ func (nego *AdvNego) kerbosHandshake(authServ *authService) error {
 			return err
 		}
 		if serviceHeader[2] != 0 {
-			return fmt.Errorf("advanced negotiation error: during receive service header: network excpetion: ora-%d", serviceHeader[2])
+			return &network.OracleError{ErrCode: serviceHeader[2]}
+			//return fmt.Errorf("advanced negotiation error: during receive service header: network excpetion: ora-%d", serviceHeader[2])
 		}
 	}
 	// get packet header (2)

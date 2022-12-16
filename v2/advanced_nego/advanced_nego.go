@@ -342,7 +342,7 @@ func (nego *AdvNego) kerbosHandshake(authServ *authService) error {
 		return err
 	}
 	// num2 = get ub1
-	_, err = nego.comm.readUB1()
+	_, err = nego.comm.session.GetByte()
 	if err != nil {
 		return err
 	}

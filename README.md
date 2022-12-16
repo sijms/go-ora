@@ -6,6 +6,30 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
+### version 2.5.19: Add Support for Kerberos5 Authentication
+* note that kerberos need an intact dns system
+* to test kerberos you need 3 machine
+  * kerberos server you can use this link to install [i use ubuntu because easy steps](https://ubuntu.com/server/docs/service-kerberos)
+  * oracle server you can configure it from this [link](https://docs.oracle.com/cd/E11882_01/network.112/e40393/asokerb.htm#ASOAG9636)
+  * client which contain our gocode note until now I use c++ code to get service ticket data so you need to install kerberos client and dev 
+* there is an example code for kerberos created with help of c++
+  * build c++ code as shared library
+  * integrate c code inside go
+  * there is pure golang kerberos package [gokrb5](https://github.com/jcmturner/gokrb5) still i cannot use it instead of c++ code
+```golang
+urlOptions := map[string]string{
+    "AUTH TYPE":  "KERBEROS",
+}
+// note empty password
+connStr := go_ora.BuildUrl("server", 1521, "service", "krb_user", "", urlOptions)
+
+type KerberosAuth struct{}
+func (kerb KerberosAuth) Authenticate(server, service string) ([]byte, error) {
+    // run a c++ function Authenticate
+    return nil, nil
+}
+advanced_nego.SetKerberosAuth(&KerberosAuth{})
+```
 ### version 2.5.16: Add Support for cwallet.sso created with -auto_login_local option
 * note that this type of oracle wallets only work on the machine where they were created 
 ### version 2.5.14: Failover and wallet update

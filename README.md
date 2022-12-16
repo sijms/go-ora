@@ -18,6 +18,7 @@
   * there is pure golang kerberos package [gokrb5](https://github.com/jcmturner/gokrb5) still i cannot use it instead of c++ code
 ```golang
 urlOptions := map[string]string{
+    "TRACE FILE": "trace.log",
     "AUTH TYPE":  "KERBEROS",
 }
 // note empty password
@@ -26,7 +27,6 @@ connStr := go_ora.BuildUrl("server", 1521, "service", "krb_user", "", urlOptions
 type KerberosAuth struct{}
 func (kerb KerberosAuth) Authenticate(server, service string) ([]byte, error) {
     // run a c++ function Authenticate
-    return nil, nil
 }
 advanced_nego.SetKerberosAuth(&KerberosAuth{})
 ```

@@ -11,11 +11,8 @@
 * to test kerberos you need 3 machine
   * kerberos server you can use this link to install [i use ubuntu because easy steps](https://ubuntu.com/server/docs/service-kerberos)
   * oracle server you can configure it from this [link](https://docs.oracle.com/cd/E11882_01/network.112/e40393/asokerb.htm#ASOAG9636)
-  * client which contain our gocode note until now I use c++ code to get service ticket data so you need to install kerberos client and dev 
-* there is an example code for kerberos created with help of c++
-  * build c++ code as shared library
-  * integrate c code inside go
-  * there is pure golang kerberos package [gokrb5](https://github.com/jcmturner/gokrb5) still i cannot use it instead of c++ code
+  * client which contain our gocode using package [gokrb5](https://github.com/jcmturner/gokrb5)
+* there is an example code for kerberos, but you need to call `kinit user` before using the example
 ```golang
 urlOptions := map[string]string{
     "TRACE FILE": "trace.log",
@@ -26,7 +23,7 @@ connStr := go_ora.BuildUrl("server", 1521, "service", "krb_user", "", urlOptions
 
 type KerberosAuth struct{}
 func (kerb KerberosAuth) Authenticate(server, service string) ([]byte, error) {
-    // run a c++ function Authenticate
+    // see implementation in examples/kerberos
 }
 advanced_nego.SetKerberosAuth(&KerberosAuth{})
 ```

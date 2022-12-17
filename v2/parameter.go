@@ -29,6 +29,7 @@ const (
 type Out struct {
 	Dest driver.Value
 	Size int
+	In   bool
 }
 
 // internal enum BindDirection

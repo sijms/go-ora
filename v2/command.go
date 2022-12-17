@@ -1414,22 +1414,38 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		var par *ParameterInfo
 		switch tempOut := args[x].(type) {
 		case sql.Out:
-			par, err = stmt.NewParam("", tempOut.Dest, 0, Output)
+			direction := Output
+			if tempOut.In {
+				direction = InOut
+			}
+			par, err = stmt.NewParam("", tempOut.Dest, 0, direction)
 			if err != nil {
 				return nil, err
 			}
 		case *sql.Out:
-			par, err = stmt.NewParam("", tempOut.Dest, 0, Output)
+			direction := Output
+			if tempOut.In {
+				direction = InOut
+			}
+			par, err = stmt.NewParam("", tempOut.Dest, 0, direction)
 			if err != nil {
 				return nil, err
 			}
 		case Out:
-			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, Output)
+			direction := Output
+			if tempOut.In {
+				direction = InOut
+			}
+			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, direction)
 			if err != nil {
 				return nil, err
 			}
 		case *Out:
-			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, Output)
+			direction := Output
+			if tempOut.In {
+				direction = InOut
+			}
+			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, direction)
 			if err != nil {
 				return nil, err
 			}

@@ -151,7 +151,13 @@ func (w *wallet) read() error {
 	} else {
 		return errors.New("invalid wallet header")
 	}
-	return w.readPKCS12(fileData[index:])
+	err = w.readPKCS12(fileData[index:])
+	if err != nil {
+		if autoLoginLocal {
+			return fmt.Errorf("can't read wallet with auto login local properties: %v", err)
+		}
+	}
+	return err
 }
 
 func (w *wallet) readPKCS12(data []byte) error {

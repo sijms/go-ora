@@ -6,14 +6,10 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"os"
-	"os/user"
-	"strconv"
-	"strings"
-
+	"github.com/sijms/go-ora/advanced_nego"
 	"github.com/sijms/go-ora/converters"
 	"github.com/sijms/go-ora/network"
-	"github.com/sijms/go-ora/trace"
+	"strconv"
 )
 
 type ConnectionState int
@@ -37,6 +33,7 @@ const (
 type NLSData struct {
 	Calender        string
 	Comp            string
+	Language        string
 	LengthSemantics string
 	NCharConvExcep  string
 	DateLang        string
@@ -66,14 +63,36 @@ type Connection struct {
 	strConv           converters.IStringConverter
 	NLSData           NLSData
 }
-
-type oracleDriver struct {
+type OracleDriver struct {
+}
+type OracleConnector struct {
+	drv           *OracleDriver
+	connectString string
 }
 
 func init() {
-	sql.Register("oracle", &oracleDriver{})
+	sql.Register("oracle", &OracleDriver{})
 }
-func (drv *oracleDriver) Open(name string) (driver.Conn, error) {
+func (drv *OracleDriver) OpenConnector(name string) (driver.Connector, error) {
+
+	return &OracleConnector{drv: drv, connectString: name}, nil
+}
+func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, error) {
+
+	conn, err := NewConnection(connector.connectString)
+	if err != nil {
+		return nil, err
+	}
+	err = conn.OpenWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+func (connector *OracleConnector) Driver() driver.Driver {
+	return connector.drv
+}
+func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 
 	conn, err := NewConnection(name)
 	if err != nil {
@@ -83,9 +102,9 @@ func (drv *oracleDriver) Open(name string) (driver.Conn, error) {
 	return conn, conn.Open()
 }
 
-func (conn *Connection) SetStringConveter(conveter converters.IStringConverter) {
-	conn.strConv = conveter
-	conn.session.StrConv = conveter
+func (conn *Connection) SetStringConverter(converter converters.IStringConverter) {
+	conn.strConv = converter
+	conn.session.StrConv = converter
 }
 
 func (conn *Connection) GetNLS() (*NLSData, error) {
@@ -199,14 +218,17 @@ func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
 	return NewStmt(query, conn), nil
 }
 
-func (conn *Connection) Ping(_ context.Context) error {
+func (conn *Connection) Ping(ctx context.Context) error {
 	conn.connOption.Tracer.Print("Ping")
 	conn.session.ResetBuffer()
+	conn.session.StartContext(ctx)
+	defer conn.session.EndContext()
 	return (&simpleObject{
-		session:     conn.session,
+		connection:  conn,
 		operationID: 0x93,
 		data:        nil,
 	}).write().read()
+	return nil
 }
 
 //func (conn *Connection) Logoff() error {
@@ -263,9 +285,86 @@ func (conn *Connection) Ping(_ context.Context) error {
 //}
 
 func (conn *Connection) Open() error {
+	return conn.OpenWithContext(context.Background())
+	//tracer := conn.connOption.Tracer
+	//tracer.Print("Open :", conn.connOption.ConnectionData())
+	//
+	//switch conn.conStr.DBAPrivilege {
+	//case SYSDBA:
+	//	conn.LogonMode |= SysDba
+	//case SYSOPER:
+	//	conn.LogonMode |= SysOper
+	//default:
+	//	conn.LogonMode = 0
+	//}
+	//conn.session = network.NewSession(conn.connOption)
+	//err := conn.session.Connect()
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//tracer.Print("TCP Negotiation")
+	//conn.tcpNego, err = newTCPNego(conn.session)
+	//if err != nil {
+	//	return err
+	//}
+	//tracer.Print("Server Charset: ", conn.tcpNego.ServerCharset)
+	//tracer.Print("Server National Charset: ", conn.tcpNego.ServernCharset)
+	//// create string converter object
+	//conn.strConv = converters.NewStringConverter(conn.tcpNego.ServerCharset)
+	//conn.session.StrConv = conn.strConv
+	//tracer.Print("Data Type Negotiation")
+	//conn.dataNego, err = buildTypeNego(conn.tcpNego, conn.session)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//conn.session.TTCVersion = conn.dataNego.CompileTimeCaps[7]
+	//
+	//if conn.tcpNego.ServerCompileTimeCaps[7] < conn.session.TTCVersion {
+	//	conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
+	//}
+	//tracer.Print("TTC Version: ", conn.session.TTCVersion)
+	//err = conn.doAuth()
+	//if err != nil {
+	//	return err
+	//}
+	//conn.State = Opened
+	//conn.dBVersion, err = GetDBVersion(conn.session)
+	//if err != nil {
+	//	return err
+	//}
+	//tracer.Print("Connected")
+	//tracer.Print("Database Version: ", conn.dBVersion.Text)
+	//if len(conn.SessionProperties) == 0 {
+	//	//return errors.New(fmt.Sprint("Session properties is null"))
+	//} else {
+	//	sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	conn.sessionID = int(sessionID)
+	//	serialNum, err := strconv.ParseUint(conn.SessionProperties["AUTH_SERIAL_NUM"], 10, 32)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	conn.serialID = int(serialNum)
+	//	conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
+	//	conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
+	//	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
+	//	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
+	//	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
+	//}
+	//
+	//_, err = conn.GetNLS()
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//return nil
+}
+func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	tracer := conn.connOption.Tracer
-	tracer.Print("Open :", conn.connOption.ConnectionData())
-
 	switch conn.conStr.DBAPrivilege {
 	case SYSDBA:
 		conn.LogonMode |= SysDba
@@ -274,14 +373,43 @@ func (conn *Connection) Open() error {
 	default:
 		conn.LogonMode = 0
 	}
-	conn.session = network.NewSession(*conn.connOption)
-	err := conn.session.Connect()
+	conn.session = network.NewSession(conn.connOption)
+	//W := conn.conStr.w
+	//if conn.connOption.SSL && W != nil {
+	//	err := conn.session.LoadSSLData(W.certificates, W.privateKeys, W.certificateRequests)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	session := conn.session
+	err := session.Connect(ctx)
 	if err != nil {
 		return err
 	}
 
+	// advanced negotiation
+	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
+		tracer.Print("Advance Negotiation")
+		ano, err := advanced_nego.NewAdvNego(session)
+		if err != nil {
+			return err
+		}
+		err = ano.Write()
+		if err != nil {
+			return err
+		}
+		err = ano.Read()
+		if err != nil {
+			return err
+		}
+		err = ano.StartServices()
+		if err != nil {
+			return err
+		}
+	}
+
 	tracer.Print("TCP Negotiation")
-	conn.tcpNego, err = NewTCPNego(conn.session)
+	conn.tcpNego, err = newTCPNego(conn.session)
 	if err != nil {
 		return err
 	}
@@ -290,18 +418,52 @@ func (conn *Connection) Open() error {
 	// create string converter object
 	conn.strConv = converters.NewStringConverter(conn.tcpNego.ServerCharset)
 	conn.session.StrConv = conn.strConv
+	conn.tcpNego.ServerFlags |= 2
 	tracer.Print("Data Type Negotiation")
-	conn.dataNego, err = buildTypeNego(conn.tcpNego, conn.session)
+	conn.dataNego = buildTypeNego(conn.tcpNego, conn.session)
+	err = conn.dataNego.write(conn.session)
 	if err != nil {
 		return err
 	}
-
+	err = conn.dataNego.read(conn.session)
+	if err != nil {
+		return err
+	}
 	conn.session.TTCVersion = conn.dataNego.CompileTimeCaps[7]
-
+	conn.session.UseBigScn = conn.tcpNego.ServerCompileTimeCaps[7] >= 8
 	if conn.tcpNego.ServerCompileTimeCaps[7] < conn.session.TTCVersion {
 		conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
 	}
 	tracer.Print("TTC Version: ", conn.session.TTCVersion)
+	if len(conn.tcpNego.ServerRuntimeCaps) > 6 && conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
+		tracer.Print("Max length for char/byte types: 0x7FFF")
+		converters.MAX_LEN_VARCHAR2 = 0x7FFF
+		converters.MAX_LEN_NVARCHAR2 = 0x7FFF
+		converters.MAX_LEN_RAW = 0x7FFF
+	} else {
+		tracer.Print("Max length for char/byte types: 0xFA0")
+		converters.MAX_LEN_VARCHAR2 = 0xFA0
+		converters.MAX_LEN_NVARCHAR2 = 0xFA0
+		converters.MAX_LEN_RAW = 0xFA0
+	}
+	//if (this.serverRuntimeCapabilities != null && this.serverRuntimeCapabilities.length > 6 && (this.serverRuntimeCapabilities[6] & T4C8TTIdty.KPCCAP_RTB_TTC_ZCPY) != 0 && this.thinNetUseZeroCopyIO && (this.net.getSessionAttributes().getNegotiatedOptions() & 64) != 0 && this.getDataIntegrityAlgorithmName().equals("") && this.getEncryptionAlgorithmName().equals("")) {
+	//	this.useZeroCopyIO = true;
+	//} else {
+	//	this.useZeroCopyIO = false;
+	//}
+	//
+	//if (this.hasServerCompileTimeCapability(23, 64) && bit(var6.jdbcThinCompileTimeCapabilities[23], 64)) {
+	//	this.useLobPrefetch = true;
+	//} else {
+	//	this.useLobPrefetch = false;
+	//}
+	//
+	//if (this.serverRuntimeCapabilities != null && this.serverRuntimeCapabilities.length > T4C8TTIdty.KPCCAP_RTB_TTC && bit(this.serverRuntimeCapabilities[T4C8TTIdty.KPCCAP_RTB_TTC], T4C8TTIdty.KPCCAP_RTB_TTC_SESSSTATEOPS)) {
+	//	this.svrSupportsRequests = true;
+	//} else {
+	//	this.svrSupportsRequests = false;
+	//}
+
 	err = conn.doAuth()
 	if err != nil {
 		return err
@@ -313,38 +475,45 @@ func (conn *Connection) Open() error {
 	}
 	tracer.Print("Connected")
 	tracer.Print("Database Version: ", conn.dBVersion.Text)
-	if len(conn.SessionProperties) == 0 {
-		//return errors.New(fmt.Sprint("Session properties is null"))
-	} else {
-		sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)
-		if err != nil {
-			return err
-		}
-		conn.sessionID = int(sessionID)
-		serialNum, err := strconv.ParseUint(conn.SessionProperties["AUTH_SERIAL_NUM"], 10, 32)
-		if err != nil {
-			return err
-		}
-		conn.serialID = int(serialNum)
-		conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
-		conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
-		conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
-		conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
-		conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
-	}
-
-	_, err = conn.GetNLS()
+	sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)
 	if err != nil {
 		return err
 	}
-
+	conn.sessionID = int(sessionID)
+	serialNum, err := strconv.ParseUint(conn.SessionProperties["AUTH_SERIAL_NUM"], 10, 32)
+	if err != nil {
+		return err
+	}
+	conn.serialID = int(serialNum)
+	conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
+	//conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
+	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
+	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
+	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
+	if len(conn.NLSData.Language) == 0 {
+		//_, err = conn.GetNLS()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
-
 func (conn *Connection) Begin() (driver.Tx, error) {
 	conn.connOption.Tracer.Print("Begin transaction")
 	conn.autoCommit = false
 	return &Transaction{conn: conn}, nil
+}
+
+func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	if opts.ReadOnly {
+		return nil, errors.New("readonly transaction is not supported")
+	}
+	if opts.Isolation != 0 {
+		return nil, errors.New("only support default value for isolation")
+	}
+	conn.connOption.Tracer.Print("Begin transaction with context")
+	conn.autoCommit = false
+	return &Transaction{conn: conn, ctx: ctx}, nil
 }
 
 func NewConnection(databaseUrl string) (*Connection, error) {
@@ -353,60 +522,60 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	userName := ""
-	User, err := user.Current()
-	if err == nil {
-		userName = User.Username
-	}
-	hostName, _ := os.Hostname()
-	indexOfSlash := strings.LastIndex(os.Args[0], "/")
-	indexOfSlash += 1
-	if indexOfSlash < 0 {
-		indexOfSlash = 0
-	}
-
-	connOption := &network.ConnectionOption{
-		Port:                  conStr.Port,
-		TransportConnectTo:    0xFFFF,
-		SSLVersion:            "",
-		WalletDict:            "",
-		TransportDataUnitSize: 0xFFFF,
-		SessionDataUnitSize:   0xFFFF,
-		Protocol:              "tcp",
-		Host:                  conStr.Host,
-		UserID:                conStr.UserID,
-		//IP:                    "",
-		SID: conStr.SID,
-		//Addr:                  "",
-		//Server:                conn.conStr.Host,
-		ServiceName:  conStr.ServiceName,
-		InstanceName: conStr.InstanceName,
-		PrefetchRows: conStr.PrefetchRows,
-		ClientData: network.ClientData{
-			ProgramPath: os.Args[0],
-			ProgramName: os.Args[0][indexOfSlash:],
-			UserName:    userName,
-			HostName:    hostName,
-			DriverName:  "OracleClientGo",
-			PID:         os.Getpid(),
-		},
-		//InAddrAny:             false,
-	}
-
-	if len(conStr.Trace) > 0 {
-		tf, err := os.Create(conStr.Trace)
-		if err != nil {
-			//noinspection GoErrorStringFormat
-			return nil, fmt.Errorf("Can't open trace file: %w", err)
-		}
-		connOption.Tracer = trace.NewTraceWriter(tf)
-	} else {
-		connOption.Tracer = trace.NilTracer()
-	}
+	//userName := ""
+	//User, err := user.Current()
+	//if err == nil {
+	//	userName = User.Username
+	//}
+	//hostName, _ := os.Hostname()
+	//indexOfSlash := strings.LastIndex(os.Args[0], "/")
+	//indexOfSlash += 1
+	//if indexOfSlash < 0 {
+	//	indexOfSlash = 0
+	//}
+	//
+	//connOption := &network.ConnectionOption{
+	//	Port:                  conStr.Port,
+	//	TransportConnectTo:    0xFFFF,
+	//	SSLVersion:            "",
+	//	WalletDict:            "",
+	//	TransportDataUnitSize: 0xFFFF,
+	//	SessionDataUnitSize:   0xFFFF,
+	//	Protocol:              "tcp",
+	//	Host:                  conStr.Host,
+	//	UserID:                conStr.UserID,
+	//	//IP:                    "",
+	//	SID: conStr.SID,
+	//	//Addr:                  "",
+	//	//Server:                conn.conStr.Host,
+	//	ServiceName:  conStr.ServiceName,
+	//	InstanceName: conStr.InstanceName,
+	//	PrefetchRows: conStr.PrefetchRows,
+	//	ClientData: network.ClientData{
+	//		ProgramPath: os.Args[0],
+	//		ProgramName: os.Args[0][indexOfSlash:],
+	//		UserName:    userName,
+	//		HostName:    hostName,
+	//		DriverName:  "OracleClientGo",
+	//		PID:         os.Getpid(),
+	//	},
+	//	//InAddrAny:             false,
+	//}
+	//
+	//if len(conStr.Trace) > 0 {
+	//	tf, err := os.Create(conStr.Trace)
+	//	if err != nil {
+	//		//noinspection GoErrorStringFormat
+	//		return nil, fmt.Errorf("Can't open trace file: %w", err)
+	//	}
+	//	connOption.Tracer = trace.NewTraceWriter(tf)
+	//} else {
+	//	connOption.Tracer = trace.NilTracer()
+	//}
 	return &Connection{
 		State:      Closed,
 		conStr:     conStr,
-		connOption: connOption,
+		connOption: &conStr.connOption,
 		autoCommit: true,
 	}, nil
 }
@@ -428,22 +597,23 @@ func (conn *Connection) doAuth() error {
 	conn.connOption.Tracer.Print("doAuth")
 	conn.session.ResetBuffer()
 	conn.session.PutBytes(3, 118, 0, 1)
-	conn.session.PutUint(len(conn.conStr.UserID), 4, true, true)
+	conn.session.PutUint(len(conn.connOption.UserID), 4, true, true)
 	conn.LogonMode = conn.LogonMode | NoNewPass
 	conn.session.PutUint(int(conn.LogonMode), 4, true, true)
 	conn.session.PutBytes(1, 1, 5, 1, 1)
-	conn.session.PutBytes([]byte(conn.conStr.UserID)...)
-	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientData.HostName, 0)
-	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientData.ProgramName, 0)
-	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientData.HostName, 0)
-	conn.session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", conn.connOption.ClientData.PID), 0)
-	conn.session.PutKeyValString("AUTH_SID", conn.connOption.ClientData.UserName, 0)
+	conn.session.PutClr([]byte(conn.connOption.UserID))
+	//conn.session.PutBytes([]byte(conn.connOption.UserID)...)
+	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientInfo.HostName, 0)
+	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientInfo.ProgramName, 0)
+	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientInfo.HostName, 0)
+	conn.session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", conn.connOption.ClientInfo.PID), 0)
+	conn.session.PutKeyValString("AUTH_SID", conn.connOption.ClientInfo.UserName, 0)
 	err := conn.session.Write()
 	if err != nil {
 		return err
 	}
 
-	conn.authObject, err = NewAuthObject(conn.conStr.UserID, conn.conStr.Password, conn.tcpNego, conn.session)
+	conn.authObject, err = NewAuthObject(conn.connOption.UserID, conn.conStr.password, conn.tcpNego, conn.session)
 	if err != nil {
 		return err
 	}
@@ -465,7 +635,7 @@ func (conn *Connection) doAuth() error {
 				return err
 			}
 			if conn.session.HasError() {
-				return errors.New(conn.session.GetError())
+				return conn.session.GetError()
 			}
 			stop = true
 		case 8:
@@ -498,4 +668,8 @@ func (conn *Connection) doAuth() error {
 	// if verifyResponse == true
 	// conn.authObject.VerifyResponse(conn.SessionProperties["AUTH_SVR_RESPONSE"])
 	return nil
+}
+
+func SetNTSAuth(newNTSManager advanced_nego.NTSAuthInterface) {
+	advanced_nego.NTSAuth = newNTSManager
 }

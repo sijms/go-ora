@@ -5,9 +5,6 @@ type BindError struct {
 	rowOffset int
 	errorMsg  []byte
 }
-
-// SummaryObject this object carry summary about last operation from the server
-// including error
 type SummaryObject struct {
 	EndOfCallStatus      int // uint32
 	EndToEndECIDSequence int // uint16
@@ -37,7 +34,6 @@ type SummaryObject struct {
 	bindErrors           []BindError
 }
 
-// NewSummary create new summary object by read data from the session
 func NewSummary(session *Session) (*SummaryObject, error) {
 	result := new(SummaryObject)
 	var err error
@@ -47,10 +43,12 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			return nil, err
 		}
 	}
-	if session.HasFSAPCapability {
-		result.EndToEndECIDSequence, err = session.GetInt(2, true, true)
-		if err != nil {
-			return nil, err
+	if session.TTCVersion >= 3 {
+		if session.HasFSAPCapability {
+			result.EndToEndECIDSequence, err = session.GetInt(2, true, true)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	result.CurRowNumber, err = session.GetInt(4, true, true)
@@ -85,13 +83,27 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 	if err != nil {
 		return nil, err
 	}
-	result.Flags, err = session.GetInt(2, true, true)
-	if err != nil {
-		return nil, err
-	}
-	result.userCursorOPT, err = session.GetInt(2, true, true)
-	if err != nil {
-		return nil, err
+	if session.TTCVersion >= 7 {
+		result.Flags, err = session.GetInt(2, true, true)
+		if err != nil {
+			return nil, err
+		}
+		result.userCursorOPT, err = session.GetInt(2, true, true)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		var temp uint8
+		temp, err = session.GetByte()
+		if err != nil {
+			return nil, err
+		}
+		result.Flags = int(temp)
+		temp, err = session.GetByte()
+		if err != nil {
+			return nil, err
+		}
+		result.userCursorOPT = int(temp)
 	}
 	result.upiParam, err = session.GetByte()
 	if err != nil {
@@ -142,70 +154,100 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 		return nil, err
 	}
 	_, _ = session.GetDlc()
-	length, err := session.GetInt(2, true, true)
-	if err != nil {
-		return nil, err
-	}
-	if length > 0 {
-		result.bindErrors = make([]BindError, length)
-		num, err := session.GetByte()
+	if session.TTCVersion < 7 {
+		_, _ = session.GetDlc()
+		_, _ = session.GetDlc()
+		_, _ = session.GetDlc()
+	} else {
+		length, err := session.GetInt(2, true, true)
 		if err != nil {
 			return nil, err
 		}
-		flag := num == 0xFE
-		for x := 0; x < length; x++ {
-			if flag {
-				_, _ = session.GetByte()
-			}
-			result.bindErrors[x].errorCode, err = session.GetInt(2, true, true)
+		if length > 0 {
+			result.bindErrors = make([]BindError, length)
+			num, err := session.GetByte()
 			if err != nil {
 				return nil, err
 			}
+			flag := num == 0xFE
+			for x := 0; x < length; x++ {
+				if flag {
+					if session.UseBigClrChunks {
+						_, _ = session.GetInt(4, true, true)
+					} else {
+						_, _ = session.GetByte()
+					}
+				}
+				result.bindErrors[x].errorCode, err = session.GetInt(2, true, true)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if flag {
+				_, _ = session.GetByte()
+			}
 		}
-		if flag {
-			_, _ = session.GetByte()
-		}
-	}
-	length, err = session.GetInt(4, true, true)
-	if err != nil {
-		return nil, err
-	}
-	if length > 0 {
-		num, err := session.GetByte()
+		length, err = session.GetInt(4, true, true)
 		if err != nil {
 			return nil, err
 		}
-		flag := num == 0xFE
-		for x := 0; x < length; x++ {
+		if length > 0 {
+			if len(result.bindErrors) == 0 {
+				result.bindErrors = make([]BindError, length)
+			}
+			num, err := session.GetByte()
+			if err != nil {
+				return nil, err
+			}
+			flag := num == 0xFE
+			for x := 0; x < length; x++ {
+				if flag {
+					if session.UseBigClrChunks {
+						_, _ = session.GetInt(4, true, true)
+					} else {
+						_, _ = session.GetByte()
+					}
+				}
+				result.bindErrors[x].rowOffset, err = session.GetInt(4, true, true)
+				if err != nil {
+					return nil, err
+				}
+			}
 			if flag {
 				_, _ = session.GetByte()
 			}
-			result.bindErrors[x].rowOffset, err = session.GetInt(4, true, true)
-			if err != nil {
-				return nil, err
+		}
+		length, err = session.GetInt(2, true, true)
+		if err != nil {
+			return nil, err
+		}
+		if length > 0 {
+			if len(result.bindErrors) == 0 {
+				result.bindErrors = make([]BindError, length)
+			}
+			_, _ = session.GetByte()
+			for x := 0; x < length; x++ {
+				_, err := session.GetInt(2, true, true)
+				if err != nil {
+					return nil, err
+				}
+				result.bindErrors[x].errorMsg, err = session.GetClr()
+				if err != nil {
+					return nil, err
+				}
+				_, _ = session.GetByte()
+				_, _ = session.GetByte()
 			}
 		}
-		if flag {
-			_, _ = session.GetByte()
-		}
-	}
-	length, err = session.GetInt(2, true, true)
-	if err != nil {
-		return nil, err
-	}
-	if length > 0 {
-		_, _ = session.GetByte()
-		for x := 0; x < length; x++ {
-			_, err := session.GetInt(2, true, true)
+		if session.TTCVersion >= 7 {
+			result.RetCode, err = session.GetInt(4, true, true)
 			if err != nil {
 				return nil, err
 			}
-			result.bindErrors[x].errorMsg, err = session.GetClr()
+			result.CurRowNumber, err = session.GetInt(8, true, true)
 			if err != nil {
 				return nil, err
 			}
-			_, _ = session.GetByte()
-			_, _ = session.GetByte()
 		}
 	}
 	if result.RetCode != 0 {
@@ -223,7 +265,6 @@ type WarningObject struct {
 	errorMessage string
 }
 
-// NewWarningObject create new warning object by read data from session
 func NewWarningObject(session *Session) (*WarningObject, error) {
 	result := new(WarningObject)
 	var err error

@@ -7,7 +7,8 @@ import (
 )
 
 type simpleObject struct {
-	session     *network.Session
+	connection *Connection
+	//session     *network.Session
 	operationID uint8
 	data        []byte
 	err         error
@@ -15,57 +16,80 @@ type simpleObject struct {
 
 func (obj *simpleObject) write() *simpleObject {
 	//obj.session.ResetBuffer()
-	obj.session.PutBytes(3, obj.operationID, 0)
-	if obj.data != nil {
-		obj.session.PutBytes(obj.data...)
+	if obj.connection.dBVersion.Number >= 10102 {
+		session := obj.connection.session
+		session.PutBytes(3, obj.operationID, 0)
+		if obj.data != nil {
+			session.PutBytes(obj.data...)
+		}
+		obj.err = session.Write()
 	}
-	obj.err = obj.session.Write()
 	return obj
 }
 
 func (obj *simpleObject) read() error {
-	if obj.err != nil {
-		return obj.err
-	}
-	loop := true
-	for loop {
-		msg, err := obj.session.GetByte()
-		if err != nil {
-			return err
+	if obj.connection.dBVersion.Number >= 10102 {
+		session := obj.connection.session
+		if obj.err != nil {
+			return obj.err
 		}
-		switch msg {
-		case 4:
-			obj.session.Summary, err = network.NewSummary(obj.session)
+		loop := true
+		for loop {
+			msg, err := session.GetByte()
 			if err != nil {
 				return err
 			}
-			loop = false
-		case 9:
-			if obj.session.HasEOSCapability {
-				if obj.session.Summary == nil {
-					obj.session.Summary = new(network.SummaryObject)
-				}
-				obj.session.Summary.EndOfCallStatus, err = obj.session.GetInt(4, true, true)
+			switch msg {
+			case 4:
+				session.Summary, err = network.NewSummary(session)
 				if err != nil {
 					return err
 				}
-			}
-			if obj.session.HasFSAPCapability {
-				if obj.session.Summary == nil {
-					obj.session.Summary = new(network.SummaryObject)
+				loop = false
+			case 9:
+				if session.HasEOSCapability {
+					if session.Summary == nil {
+						session.Summary = new(network.SummaryObject)
+					}
+					session.Summary.EndOfCallStatus, err = session.GetInt(4, true, true)
+					if err != nil {
+						return err
+					}
 				}
-				obj.session.Summary.EndToEndECIDSequence, err = obj.session.GetInt(2, true, true)
+				if session.HasFSAPCapability {
+					if session.Summary == nil {
+						session.Summary = new(network.SummaryObject)
+					}
+					session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
+					if err != nil {
+						return err
+					}
+				}
+				loop = false
+			case 15:
+				warning, err := network.NewWarningObject(session)
 				if err != nil {
 					return err
 				}
+				if warning != nil {
+					fmt.Println(warning)
+				}
+			case 23:
+				//opCode, err := session.GetByte()
+				//if err != nil {
+				//	return err
+				//}
+				//err = obj.connection.getServerNetworkInformation(opCode)
+				//if err != nil {
+				//	return err
+				//}
+			default:
+				return errors.New(fmt.Sprintf("TTC error: received code %d during simple object read", msg))
 			}
-			loop = false
-		default:
-			return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 4, 9", msg))
 		}
-	}
-	if obj.session.HasError() {
-		return errors.New(obj.session.GetError())
+		if session.HasError() {
+			return session.GetError()
+		}
 	}
 	return nil
 }

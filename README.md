@@ -3,7 +3,260 @@
 ### note:
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
+    - I always update the driver fixing issues and add new features so
+      always ensure that you get latest release
     - See examples for more help
+### version 2.5.19: Add Support for Kerberos5 Authentication
+* note that kerberos need an intact dns system
+* to test kerberos you need 3 machine
+  * kerberos server you can use this link to install [i use ubuntu because easy steps](https://ubuntu.com/server/docs/service-kerberos)
+  * oracle server you can configure it from this [link](https://docs.oracle.com/cd/E11882_01/network.112/e40393/asokerb.htm#ASOAG9636)
+  * client which contain our gocode using package [gokrb5](https://github.com/jcmturner/gokrb5)
+* there is an example code for kerberos, but you need to call `kinit user` before using the example
+```golang
+urlOptions := map[string]string{
+    "TRACE FILE": "trace.log",
+    "AUTH TYPE":  "KERBEROS",
+}
+// note empty password
+connStr := go_ora.BuildUrl("server", 1521, "service", "krb_user", "", urlOptions)
+
+type KerberosAuth struct{}
+func (kerb KerberosAuth) Authenticate(server, service string) ([]byte, error) {
+    // see implementation in examples/kerberos
+}
+advanced_nego.SetKerberosAuth(&KerberosAuth{})
+```
+### version 2.5.16: Add Support for cwallet.sso created with -auto_login_local option
+* note that this type of oracle wallets only work on the machine where they were created 
+### version 2.5.14: Failover and wallet update
+* Exec will return error after connection restore
+* add new field _**WALLET PASSWORD**_ to read ewallet.p12 file
+### version 2.5.13: Add Support For Failover (Experimental)
+* to use failover pass it into connection string as follow
+```golang
+urlOptions := map[string]string{
+	"FAILOVER": "5",
+	"TRACE FILE": "trace.log",
+}
+databaseUrl := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
+```
+* FAILOVER value is integer indicate how many times the driver will try to reconnect after lose connection default value = 0
+* failover will activated when stmt receive io.EOF error during read or write
+* FAILOVER work in 3 places:
+    * Query when fail the driver will reconnect and re-query up to failover number.
+    * Exec when fail the driver will reconnect up to failover times then return the error to avoid unintended re-execution.
+    * Fetch when fail the driver will reconnect up to failover times then return the error (whatever failover success or fail)
+
+### version 2.4.28: Binary Double And Float Fix
+- Now you can read binary double and float without error issue#217
+- You can avoid calling cgo function `user.Current()` if you define environmental variable $USER
+### version 2.4.20: Query To Struct
+- you can query to struct that contain basic types (int, float, string, datetime)
+or any types that implement sql.Scanner interface
+- see query to struct example for more information
+### version 2.4.18: Add support for proxy user
+if you need to connect with proxy user pass following connection
+string
+```golang
+oracle://proxy_user:proxy_password@host:port/service?proxy client name=schema_owner
+```
+### version 2.4.8: JDBC connect string
+* Add new function go_ora.BuildJDBC
+```golang
+    // program will extract server, ports and protocol and build
+    // connection table
+    connStr := `(DESCRIPTION=
+    (ADDRESS_LIST=
+    	(LOAD_BALANCE=OFF)
+        (FAILOVER=ON)
+    	(address=(PROTOCOL=tcps)(host=localhost)(PORT=2484))
+    	(address=(protocol=tcp)(host=localhost)(port=1521))
+    )
+    (CONNECT_DATA=
+    	(SERVICE_NAME=service)
+        (SERVER=DEDICATED)
+    )
+    (SOURCE_ROUTE=yes)
+    )`
+    // use urlOption to set other options like:
+    // TRACE FILE = for debug
+    // note SSL automatically set from connStr (address=...
+    // SSL Verify = need to cancel certifiate verification
+    // wallet path
+    databaseUrl := go_ora.BuildJDBC(user, password, connStr, urlOptions)
+    conn, err := sql.Open("oracle", databaseUrl)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+    err = conn.Ping()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+```
+### version 2.4.5: Support BFile
+* connect as sys and create directory object that refer to physical directory
+* `grant read,write on directory 'dirName' to user`
+* put text file in the directory with name = fileName
+```golang
+// create and open connection before use BFile
+conn, err := go_ora.NewConnection(connStr)
+// check for error
+err = conn.Open()
+// check for error
+defer conn.Close()
+
+// Create BFile object
+file, err := go_ora.BFile(conn, dirName, fileName)
+// check for error
+
+// before use BFile it must be opened
+err = file.Open()
+// check for error
+defer file.Close()
+
+// does the file exist
+exists, err := file.Exists()
+// check for error
+
+if exists {
+    length, err := file.GetLength()
+    // check for error
+    
+    // read all data
+    data, err := file.Read()
+    
+    // read at position 2
+    data, err = file.ReadFromPos(2)
+    
+    // read 5 bytes count start at position 2
+    data, err = file.ReadBytesFromPos(2, 5)
+```
+* you can pass BFile object as input parameter or receive it from query or output parameters
+for more detail see example bfile
+### version 2.4.4: Support for unix socket IPC
+you can use this option if server and client on same linux machine
+by specify the following url option
+```golang
+urlOptions := map[string]string{
+	// change the value according to your machine
+	"unix socket": "/usr/tmp/.oracle/sEXTPROC1"
+}
+```
+### version 2.4.3: Input Parameter CLOB and BLOB Accept Large Data Size
+you can pass input CLOB and BLOB with any data size up to
+[data type limit](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/datatype-limits.html#GUID-963C79C9-9303-49FE-8F2D-C8AAF04D3095)
+### version 2.4.1: Add support for connection time out + context read and write
+you can determine connection overall lifetime through url options
+```golang
+// set connection time for 3 second
+urlOptions := map[string]string {
+    "CONNECTION TIMEOUT": "3"
+}
+databaseUrl := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
+```
+see context example for more help about using context
+### version 2.4.0: Add support for Arrays
+* add support for oracle associative array as input and output parameter type
+* add BulkInsert function which dramatically improve performance (> 10x) during insert
+* add support for nullable type in DataSet.Scan function
+* Bug fixes
+* examples (bulk_insert and arrays) contain explanation of use of this 2 major features
+```golang
+// sqlText: sql text with parameters
+// rowNum: number of rows to insert
+// columns: each column contain array of driver.Value size of column should
+//          equal to rowNum
+func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driver.Value) (*QueryResult, error) 
+```
+### version 2.3.5: Add support for OS Auth (Windows) With Password Hash
+now you can pass password hash of the user instead of real password
+#### source of hash:
+* windows registry
+* create the hash by md4(unicode(password))
+passing hash through url option as follow
+```golang
+urlOptions := map[string]string {
+	"OS HASH": "yourpasswordhash"
+	// or
+	"OS PassHash": "yourpasswordhash"
+	// or
+	"OS Password Hash": "yourpasswordhash"
+}
+```
+#### note:
+you can use NTSAuthInterface
+```golang
+type YourCustomNTSManager struct {
+	NTSAuthDefault
+}
+func (nts *NTSAuthHash) ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error) {
+    // password = get (extract) password hash from Windows registry
+	return ntlmssp.ProcessChallengeWithHash(chaMsgData, user, password)
+}
+// now you can pass empty user and password to the driver
+```
+### version 2.3.3: Add support for OS Auth (Windows)
+you can see windows_os_auth example for more detail
+* NTS packets are supplied from the following github package:
+  [go-ntlmssp](https://github.com/Azure/go-ntlmssp)
+* empty username or password will suppose OS Auth by default
+* `AUTH TYPE: "OS"` optional
+* `OS USER` optional if omit the client will use logon user
+* `OS PASS` is obligatory to make OS Auth using NTS
+* `DOMAIN` optional for windows domain
+* `AUTH SERV: "NTS"` optional as NTS is automatically added if the client running on Windows machine
+* `DBA PRIVILEGE: "SYSDBA"` optional if you need a SYSDBA access
+```golang
+urlOptions := map[string]string{
+    // automatically set if you pass an empty oracle user or password
+    // otherwise you need to set it
+    "AUTH TYPE": "OS",
+    // operating system user if empty the driver will use logon user name
+    "OS USER": user,
+    // operating system password needed for os logon
+     "OS PASS": password,
+    // Windows system domain name
+    "DOMAIN": domain,
+    // NTS is the required for Windows os authentication
+    // when you run the program from Windows machine it will be added automatically
+    // otherwise you need to specify it
+    "AUTH SERV": "NTS",
+    // uncomment this option for debugging
+    "TRACE FILE": "trace.log",
+}
+databaseUrl := go_ora.BuildUrl(server, port, service, "", "", urlOptions)
+```
+#### note (Remote OS Auth):
+* you can make OS Auth **on the same machine** (Windows Server) 
+or **different machine** (Windows Server) and (Other Client) and in this situation you need to pass 
+`AUTH SERV: "NTS"` as url parameter
+#### note (advanced users):
+* You can use custom NTS auth manager by implementing the following interface
+```Golang
+type NTSAuthInterface interface {
+	NewNegotiateMessage(domain, machine string) ([]byte, error)
+	ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error)
+}
+```
+* set newNTS auth manager before open the connection
+```golang
+go_ora.SetNTSAuth(newNTSManager)
+```
+* advantage of custom manager: you may not need to provide OS Password. for example using
+.NET or Windows API code as original driver
+```cs
+// CustomStream will take data from NegotiateStream and give it to the driver
+// through NewNegotiateMessage
+// Then take data form the driver (Challenge Message) to NegotiateStream
+// And return back Authentication msg to the driver through ProcessChallenge
+// as you see here CredentialCache.DefaultNetworkCredentials will take auth data
+// (username and password) from logon user
+new NegotiateStream(new YourCustomStream(), true).AuthenticateAsClient(CredentialCache.DefaultNetworkCredentials, "", ProtectionLevel.None, TokenImpersonationLevel.Identification);
+```
+
 ### version 2.3.1: Fix issue related to use ipv6
 now you can define url that contain ipv6
 ```go

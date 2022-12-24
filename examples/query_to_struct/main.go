@@ -9,9 +9,19 @@ import (
 	"time"
 )
 
+type test1 struct {
+	name string
+}
+
+func (t *test1) Scan(src any) error {
+	t.name = fmt.Sprintf("%v", src)
+	return nil
+}
+
 type visit struct {
 	//Id   int64  `db:"name:visit_id"`
-	Name string  `db:"name:name"`
+	// string replaced with new type that implement sql.Scanner interface
+	Name test1   `db:"name:name"`
 	Val  float32 `db:"name:val"`
 	//Date time.Time	`db:"name:visit_date"`
 }

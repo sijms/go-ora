@@ -41,7 +41,8 @@ type AuthObject struct {
 }
 
 // create authentication object through reading data from network
-func newAuthObject(username string, password string, tcpNego *TCPNego, session *network.Session) (*AuthObject, error) {
+func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Connection) (*AuthObject, error) {
+	session := conn.session
 	ret := new(AuthObject)
 	ret.tcpNego = tcpNego
 	ret.usePadding = false
@@ -53,15 +54,15 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, session *
 			return nil, err
 		}
 		switch messageCode {
-		case 4:
-			session.Summary, err = network.NewSummary(session)
-			if err != nil {
-				return nil, err
-			}
-			if session.HasError() {
-				return nil, session.GetError()
-			}
-			loop = false
+		//case 4:
+		//	session.Summary, err = network.NewSummary(session)
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	if session.HasError() {
+		//		return nil, session.GetError()
+		//	}
+		//	loop = false
 		case 8:
 			dictLen, err := session.GetInt(4, true, true)
 			if err != nil {
@@ -119,8 +120,35 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, session *
 					}
 				}
 			}
+		//case 15:
+		//	warning, err := network.NewWarningObject(conn.session)
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	if warning != nil {
+		//		fmt.Println(warning)
+		//	}
+		//case 23:
+		//	opCode, err := conn.session.GetByte()
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	err = conn.getServerNetworkInformation(opCode)
+		//	if err != nil {
+		//		return nil, err
+		//	}
 		default:
-			return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", messageCode))
+			err = conn.readResponse(messageCode)
+			if err != nil {
+				return nil, err
+			}
+			if messageCode == 4 {
+				if session.HasError() {
+					return nil, session.GetError()
+				}
+				loop = false
+			}
+			//return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", messageCode))
 		}
 	}
 	if len(ret.EServerSessKey) != 64 && len(ret.EServerSessKey) != 96 {
@@ -240,15 +268,15 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 		appendKeyVal("AUTH_PBKDF2_SPEEDY_KEY", obj.ESpeedyKey, 0)
 		index++
 	}
-	appendKeyVal("AUTH_TERMINAL", connOption.ClientData.HostName, 0)
+	appendKeyVal("AUTH_TERMINAL", connOption.ClientInfo.HostName, 0)
 	index++
-	appendKeyVal("AUTH_PROGRAM_NM", connOption.ClientData.ProgramName, 0)
+	appendKeyVal("AUTH_PROGRAM_NM", connOption.ClientInfo.ProgramName, 0)
 	index++
-	appendKeyVal("AUTH_MACHINE", connOption.ClientData.HostName, 0)
+	appendKeyVal("AUTH_MACHINE", connOption.ClientInfo.HostName, 0)
 	index++
-	appendKeyVal("AUTH_PID", fmt.Sprintf("%d", connOption.ClientData.PID), 0)
+	appendKeyVal("AUTH_PID", fmt.Sprintf("%d", connOption.ClientInfo.PID), 0)
 	index++
-	appendKeyVal("AUTH_SID", connOption.ClientData.UserName, 0)
+	appendKeyVal("AUTH_SID", connOption.ClientInfo.UserName, 0)
 	index++
 	appendKeyVal("AUTH_CONNECT_STRING", connOption.ConnectionData(), 0)
 	index++
@@ -256,7 +284,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	index++
 	appendKeyVal("SESSION_CLIENT_LIB_TYPE", "0", 0)
 	index++
-	appendKeyVal("SESSION_CLIENT_DRIVER_NAME", connOption.ClientData.DriverName, 0)
+	appendKeyVal("SESSION_CLIENT_DRIVER_NAME", connOption.ClientInfo.DriverName, 0)
 	index++
 	appendKeyVal("SESSION_CLIENT_VERSION", "2.0.0.0", 0)
 	index++
@@ -278,7 +306,10 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	appendKeyVal("AUTH_ALTER_SESSION",
 		fmt.Sprintf("ALTER SESSION SET NLS_LANGUAGE='AMERICAN' NLS_TERRITORY='AMERICA'  TIME_ZONE='%s'\x00", tz), 1)
 	index++
-
+	if len(connOption.ProxyClientName) > 0 {
+		appendKeyVal("PROXY_CLIENT_NAME", connOption.ProxyClientName, 0)
+		index++
+	}
 	session.ResetBuffer()
 	session.PutBytes(3, 0x73, 0)
 	if len(connOption.UserID) > 0 {
@@ -291,7 +322,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	if len(connOption.UserID) > 0 && len(obj.EPassword) > 0 {
 		mode |= UserAndPass
 	}
-	session.PutUint(int(mode), 4, true, true)
+	session.PutUint(int(mode|NoNewPass), 4, true, true)
 	session.PutBytes(1)
 	session.PutUint(index, 4, true, true)
 	session.PutBytes(1, 1)
@@ -306,6 +337,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 }
 
 func generateSpeedyKey(buffer, key []byte, turns int) []byte {
+
 	mac := hmac.New(sha512.New, key)
 	mac.Write(append(buffer, 0, 0, 0, 1))
 	firstHash := mac.Sum(nil)

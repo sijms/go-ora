@@ -20,7 +20,7 @@ type TCPNego struct {
 	ServerRuntimeCaps     []byte
 }
 
-func NewTCPNego(session *network.Session) (*TCPNego, error) {
+func newTCPNego(session *network.Session) (*TCPNego, error) {
 	session.ResetBuffer()
 	session.PutBytes(1, 6, 0)
 	session.PutBytes([]byte("OracleClientGo\x00")...)
@@ -105,4 +105,12 @@ func NewTCPNego(session *network.Session) (*TCPNego, error) {
 		session.HasFSAPCapability = true
 	}
 	return &result, nil
+}
+
+func (nego *TCPNego) hasCompileTimeCaps(pos, val int) bool {
+	result := false
+	if len(nego.ServerCompileTimeCaps) > pos && nego.ServerCompileTimeCaps[pos]&uint8(val) != 0 {
+		result = true
+	}
+	return result
 }

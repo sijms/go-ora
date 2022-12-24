@@ -2,19 +2,25 @@ package network
 
 import (
 	"bytes"
+	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"net"
 	"reflect"
-	"strconv"
 	"strings"
+	"time"
+
+	"github.com/sijms/go-ora/v2/trace"
 
 	"github.com/sijms/go-ora/v2/converters"
 )
+
+var ErrConnectionReset error = errors.New("connection reset")
 
 type Data interface {
 	Write(session *Session) error
@@ -29,6 +35,8 @@ type SessionState struct {
 }
 
 type Session struct {
+	ctx     context.Context
+	oldCtx  context.Context
 	conn    net.Conn
 	sslConn *tls.Conn
 	//connOption        ConnectionOption
@@ -60,8 +68,31 @@ type Session struct {
 	//certificates      []*x509.Certificate
 }
 
-func NewSession(connOption *ConnectionOption) *Session {
+func NewSessionWithInputBufferForDebug(input []byte) *Session {
+	options := &ConnectionOption{
+		AdvNegoSeviceInfo: AdvNegoSeviceInfo{AuthService: nil},
+		SessionInfo: SessionInfo{
+			SessionDataUnitSize:   0xFFFF,
+			TransportDataUnitSize: 0xFFFF,
+		},
+		Tracer: trace.NilTracer(),
+	}
 	return &Session{
+		ctx:      context.Background(),
+		conn:     nil,
+		inBuffer: input,
+		index:    0,
+		//connOption:      *connOption,
+		Context:         NewSessionContext(options),
+		Summary:         nil,
+		UseBigClrChunks: false,
+		ClrChunkSize:    0x40,
+	}
+}
+func NewSession(connOption *ConnectionOption) *Session {
+
+	return &Session{
+		ctx:      context.Background(),
 		conn:     nil,
 		inBuffer: nil,
 		index:    0,
@@ -130,6 +161,50 @@ func (session *Session) ResetBuffer() {
 	session.index = 0
 }
 
+func (session *Session) StartContext(ctx context.Context) {
+	session.oldCtx = session.ctx
+	session.ctx = ctx
+}
+func (session *Session) EndContext() {
+	session.ctx = session.oldCtx
+}
+
+func (session *Session) initRead() error {
+	var err error
+	if deadline, ok := session.ctx.Deadline(); ok {
+		if session.sslConn != nil {
+			err = session.sslConn.SetReadDeadline(deadline)
+		} else {
+			err = session.conn.SetReadDeadline(deadline)
+		}
+	} else {
+		if session.sslConn != nil {
+			err = session.sslConn.SetReadDeadline(time.Time{})
+		} else {
+			err = session.conn.SetReadDeadline(time.Time{})
+		}
+	}
+	return err
+}
+
+func (session *Session) initWrite() error {
+	var err error
+	if deadline, ok := session.ctx.Deadline(); ok {
+		if session.sslConn != nil {
+			err = session.sslConn.SetWriteDeadline(deadline)
+		} else {
+			err = session.conn.SetWriteDeadline(deadline)
+		}
+	} else {
+		if session.sslConn != nil {
+			err = session.sslConn.SetWriteDeadline(time.Time{})
+		} else {
+			err = session.conn.SetWriteDeadline(time.Time{})
+		}
+	}
+	return err
+}
+
 // LoadSSLData load data required for SSL connection like certificate, private keys and
 // certificate requests
 func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
@@ -181,43 +256,83 @@ func (session *Session) negotiate() {
 			session.SSL.roots.AddCert(cert)
 		}
 	}
-	host, _ := connOption.GetActiveServer(false)
+	host := connOption.GetActiveServer(false)
 	config := &tls.Config{
 		Certificates: session.SSL.tlsCertificates,
 		RootCAs:      session.SSL.roots,
-		ServerName:   host,
+		ServerName:   host.Addr,
 	}
 	if !connOption.SSLVerify {
 		config.InsecureSkipVerify = true
 	}
 	session.sslConn = tls.Client(session.conn, config)
-	//session.connOption.Tracer.Print("SSL/TLS HandShake complete")
+}
+
+func (session *Session) BreakConnection() error {
+	tracer := session.Context.ConnOption.Tracer
+	tracer.Print("Break Connection")
+	tempCtx := session.oldCtx
+	session.StartContext(context.Background())
+	defer func() {
+		session.EndContext()
+		session.oldCtx = tempCtx
+	}()
+	marker := newMarkerPacket(1, session.Context)
+	err := session.writePacket(marker)
+	if err != nil {
+		return err
+	}
+	_, err = session.readPacket()
+	if err != nil {
+		return err
+	}
+	_, err = session.readPacket()
+	if err != nil {
+		tracer.Print("Connection Break With Error: ", err)
+	}
+	return nil
 }
 
 // Connect perform network connection on address:port
 // check if the client need to use SSL
 // then send connect packet to the server and
 // receive either accept, redirect or refuse packet
-func (session *Session) Connect() error {
+func (session *Session) Connect(ctx context.Context) error {
+	session.StartContext(ctx)
+	defer session.EndContext()
 	connOption := session.Context.ConnOption
 	session.Disconnect()
 	connOption.Tracer.Print("Connect")
 	var err error
 	var connected = false
-	var host string
-	var port int
+	var host *ServerAddr
 	var loop = true
-	for loop {
-		host, port = connOption.GetActiveServer(false)
-		if port == 0 {
-			return errors.New("no available severs to connect to")
+	dialer := connOption.Dialer
+	if dialer == nil {
+		dialer = &net.Dialer{
+			Timeout: time.Second * session.Context.ConnOption.Timeout,
 		}
-		addr := net.JoinHostPort(host, strconv.Itoa(port))
-		session.conn, err = net.Dial("tcp", addr)
+	}
+	//connOption.serverIndex = 0
+	for loop {
+		host = connOption.GetActiveServer(false)
+		if host == nil {
+			if err != nil {
+				return err
+			}
+			return errors.New("no available servers to connect to")
+		}
+		addr := host.networkAddr()
+		if len(session.Context.ConnOption.UnixAddress) > 0 {
+			session.conn, err = dialer.DialContext(ctx, "unix", session.Context.ConnOption.UnixAddress)
+		} else {
+			session.conn, err = dialer.DialContext(ctx, "tcp", addr)
+		}
+
 		if err != nil {
 			connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
-			host, port = connOption.GetActiveServer(true)
-			if port == 0 {
+			host = connOption.GetActiveServer(true)
+			if host == nil {
 				break
 			}
 			continue
@@ -226,26 +341,13 @@ func (session *Session) Connect() error {
 		connected = true
 		loop = false
 	}
-	//for serverIndex = 0; serverIndex < len(connOption.Servers); serverIndex++ {
-	//	host := connOption.Servers[serverIndex]
-	//	port := connOption.Ports[serverIndex]
-	//
-	//	addr := fmt.Sprintf("%s:%d", host, port)
-	//	session.conn, err = net.Dial("tcp", addr)
-	//	if err != nil {
-	//		connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
-	//		continue
-	//	}
-	//	connOption.Tracer.Printf("using: %s ..... [SUCCEED]", addr)
-	//	connected = true
-	//	//connOption.Host = host
-	//	//connOption.Port = port
-	//	break
-	//}
 	if !connected {
 		return err
 	}
-
+	err = connOption.updateSSL(host)
+	if err != nil {
+		return err
+	}
 	if connOption.SSL {
 		connOption.Tracer.Print("Using SSL/TLS")
 		session.negotiate()
@@ -276,37 +378,32 @@ func (session *Session) Connect() error {
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
 		connOption.Tracer.Print("Redirect")
-		connOption.connData = redirectPacket.reconnectData
-		if len(redirectPacket.protocol()) != 0 {
-			connOption.Protocol = redirectPacket.protocol()
+		//connOption.connData = redirectPacket.reconnectData
+		servers, err := extractServers(redirectPacket.redirectAddr)
+		if err != nil {
+			return err
 		}
-		if len(redirectPacket.host()) != 0 {
-			host = redirectPacket.host()
+		for _, srv := range servers {
+			connOption.AddServer(srv)
 		}
-		if len(redirectPacket.port()) != 0 {
-			port, err = strconv.Atoi(redirectPacket.port())
-			if err != nil {
-				return errors.New("redirect packet with wrong port")
-			}
-		}
-		connOption.AddServer(host, port)
-		host, port = connOption.GetActiveServer(true)
-		return session.Connect()
-
+		host = connOption.GetActiveServer(true)
+		return session.Connect(ctx)
 	}
 	if refusePacket, ok := pck.(*RefusePacket); ok {
 		refusePacket.extractErrCode()
-		connOption.Tracer.Printf("connection to %s:%d refused with error: %s", host, port, refusePacket.Err.Error())
-		host, port = connOption.GetActiveServer(true)
-		if port == 0 {
+		var addr string
+		var port int
+		if host != nil {
+			addr = host.Addr
+			port = host.Port
+		}
+		connOption.Tracer.Printf("connection to %s:%d refused with error: %s", addr, port, refusePacket.Err.Error())
+		host = connOption.GetActiveServer(true)
+		if host == nil {
 			session.Disconnect()
 			return &refusePacket.Err
 		}
-		return session.Connect()
-		//errorMessage := fmt.Sprintf(
-		//	"connection refused by the server. user reason: %d; system reason: %d; error message: %s",
-		//	refusePacket.UserReason, refusePacket.SystemReason, refusePacket.message)
-		//return errors.New(errorMessage)
+		return session.Connect(ctx)
 	}
 	return errors.New("connection refused by the server due to unknown reason")
 }
@@ -333,7 +430,6 @@ func (session *Session) Disconnect() {
 //	//session.index = oldIndex
 //	//}
 //}
-
 //func (session *Session) DumpIn() {
 //	log.Printf("%#v\n", session.InBuffer)
 //}
@@ -341,7 +437,6 @@ func (session *Session) Disconnect() {
 //func (session *Session) DumpOut() {
 //	log.Printf("%#v\n", session.OutBuffer)
 //}
-
 // Write send data store in output buffer through network
 //
 // if data bigger than SessionDataUnit it should be divided into
@@ -392,9 +487,12 @@ func (session *Session) Write() error {
 // Read numBytes of data from input buffer if requested data is larger
 // than input buffer session will get the remaining from network stream
 func (session *Session) read(numBytes int) ([]byte, error) {
-	if session.index+numBytes > len(session.inBuffer) {
+	for session.index+numBytes > len(session.inBuffer) {
 		pck, err := session.readPacket()
 		if err != nil {
+			if e, ok := err.(net.Error); ok && e.Timeout() {
+				_ = session.BreakConnection()
+			}
 			return nil, err
 		}
 		if dataPck, ok := pck.(*DataPacket); ok {
@@ -403,6 +501,8 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 			return nil, errors.New("the packet received is not data packet")
 		}
 	}
+	//ret := make([]byte, numBytes)
+	//copy(ret, session.inBuffer[session.index:session.index+numBytes])
 	ret := session.inBuffer[session.index : session.index+numBytes]
 	session.index += numBytes
 	return ret, nil
@@ -414,7 +514,10 @@ func (session *Session) writePacket(pck PacketInterface) error {
 	tracer := session.Context.ConnOption.Tracer
 	tmp := pck.bytes()
 	tracer.LogPacket("Write packet:", tmp)
-	var err error
+	var err = session.initWrite()
+	if err != nil {
+		return err
+	}
 	if session.sslConn != nil {
 		_, err = session.sslConn.Write(tmp)
 	} else {
@@ -454,6 +557,10 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			trials++
 			head := make([]byte, 8)
 			var err error
+			err = session.initRead()
+			if err != nil {
+				return nil, err
+			}
 			if session.sslConn != nil {
 				_, err = session.sslConn.Read(head)
 			} else {
@@ -475,6 +582,10 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			index := uint32(0)
 			for index < length {
 				var temp int
+				err = session.initRead()
+				if err != nil {
+					return nil, err
+				}
 				if session.sslConn != nil {
 					temp, err = session.sslConn.Read(body[index:])
 				} else {
@@ -497,9 +608,11 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				}
 				for _, pck := range session.sendPcks {
 					//log.Printf("Request: %#v\n\n", pck.bytes())
-					var err error
+					err := session.initWrite()
+					if err != nil {
+						return nil, err
+					}
 					if session.Context.ConnOption.SSL {
-
 						_, err = session.sslConn.Write(pck.bytes())
 					} else {
 						_, err = session.conn.Write(pck.bytes())
@@ -609,31 +722,102 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				return nil, err
 			}
 		}
+		//return nil, ErrConnectionReset
 		packetData, err = readPacketData()
 		if err != nil {
 			return nil, err
 		}
 		dataPck, err := newDataPacketFromData(packetData, session.Context)
+		return dataPck, err
 		if err != nil {
 			return nil, err
 		}
 		if dataPck == nil {
 			return nil, errors.New("connection break")
 		}
+
 		session.inBuffer = dataPck.buffer
 		session.index = 0
-		msg, err := session.GetByte()
-		if err != nil {
-			return nil, err
-		}
-		if msg == 4 {
-			session.Summary, err = NewSummary(session)
+		loop := true
+		for loop {
+			msg, err := session.GetByte()
 			if err != nil {
 				return nil, err
 			}
-			if session.HasError() {
-				return nil, session.GetError()
+			switch msg {
+			case 4:
+				loop = false
+				session.Summary, err = NewSummary(session)
+				if err != nil {
+					return nil, err
+				}
+				if session.HasError() {
+					return nil, session.GetError()
+				}
+			case 8:
+				size, err := session.GetInt(2, true, true)
+				if err != nil {
+					return nil, err
+				}
+				for x := 0; x < 2; x++ {
+					_, err = session.GetInt(4, true, true)
+					if err != nil {
+						return nil, err
+					}
+				}
+				for x := 2; x < size; x++ {
+					_, err = session.GetInt(4, true, true)
+					if err != nil {
+						return nil, err
+					}
+				}
+				_, err = session.GetInt(2, true, true)
+				if err != nil {
+					return nil, err
+				}
+				size, err = session.GetInt(2, true, true)
+				for x := 0; x < size; x++ {
+					_, val, num, err := session.GetKeyVal()
+					if err != nil {
+						return nil, err
+					}
+					if num == 163 {
+						session.TimeZone = val
+					}
+				}
+				if session.TTCVersion >= 4 {
+					// get queryID
+					size, err = session.GetInt(4, true, true)
+					if err != nil {
+						return nil, err
+					}
+					if size > 0 {
+						bty, err := session.GetBytes(size)
+						if err != nil {
+							return nil, err
+						}
+						if len(bty) >= 8 {
+							queryID := binary.LittleEndian.Uint64(bty[size-8:])
+							fmt.Println("query ID: ", queryID)
+						}
+					}
+				}
+				if session.TTCVersion >= 7 {
+					length, err := session.GetInt(4, true, true)
+					if err != nil {
+						return nil, err
+					}
+					for i := 0; i < length; i++ {
+						_, err = session.GetInt(8, true, true)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+			default:
+				return nil, errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
 			}
+
 		}
 		fallthrough
 	default:
@@ -658,7 +842,7 @@ func (session *Session) PutBytes(data ...byte) {
 }
 
 // PutUint write uint number with size entered either use bigEndian or not and use compression or not to
-func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, compress bool) {
+func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compress bool) {
 	var num uint64
 	switch number := number.(type) {
 	case int64:
@@ -936,40 +1120,80 @@ func (session *Session) GetNullTermString(maxSize int) (result string, err error
 
 // GetClr reed variable length bytearray from input buffer
 func (session *Session) GetClr() (output []byte, err error) {
-	var size uint8
-	var rb []byte
-	size, err = session.GetByte()
+	var nb byte
+	nb, err = session.GetByte()
 	if err != nil {
 		return
 	}
-	if size == 0 || size == 0xFF {
+	if nb == 0 || nb == 0xFF {
 		output = nil
 		err = nil
 		return
 	}
-	if size != 0xFE {
-		output, err = session.read(int(size))
-		return
-	}
+	chunkSize := int(nb)
+	var chunk []byte
 	var tempBuffer bytes.Buffer
-	for {
-		var size1 int
-		if session.UseBigClrChunks {
-			size1, err = session.GetInt(4, true, true)
-		} else {
-			size1, err = session.GetInt(1, false, false)
+	if chunkSize == 0xFE {
+		for chunkSize > 0 {
+			if session.UseBigClrChunks {
+				chunkSize, err = session.GetInt(4, true, true)
+			} else {
+				nb, err = session.GetByte()
+				chunkSize = int(nb)
+			}
+			if err != nil {
+				return
+			}
+			chunk, err = session.GetBytes(chunkSize)
+			if err != nil {
+				return
+			}
+			tempBuffer.Write(chunk)
 		}
-		if err != nil || size1 == 0 {
-			break
-		}
-		rb, err = session.read(size1)
+	} else {
+		chunk, err = session.GetBytes(chunkSize)
 		if err != nil {
 			return
 		}
-		tempBuffer.Write(rb)
+		tempBuffer.Write(chunk)
 	}
 	output = tempBuffer.Bytes()
 	return
+	//var size uint8
+	//var rb []byte
+	//size, err = session.GetByte()
+	//if err != nil {
+	//	return
+	//}
+	//if size == 0 || size == 0xFF {
+	//	output = nil
+	//	err = nil
+	//	return
+	//}
+	//if size != 0xFE {
+	//	output, err = session.read(int(size))
+	//	return
+	//}
+	//
+	//for {
+	//	var size1 int
+	//	if session.UseBigClrChunks {
+	//		size1, err = session.GetInt(4, true, true)
+	//	} else {
+	//		size, err = session.GetByte()
+	//		size1 = int(size)
+	//	}
+	//	if err != nil || size1 == 0 {
+	//		break
+	//	}
+	//	rb, err = session.read(size1)
+	//	if err != nil {
+	//		return
+	//	}
+	//	tempBuffer.Write(rb)
+	//}
+	//output = tempBuffer.Bytes()
+	//return
 }
 
 // GetDlc read variable length bytearray from input buffer

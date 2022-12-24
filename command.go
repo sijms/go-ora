@@ -116,7 +116,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutBytes(0, 0, 0, 0, 0)
 	}
 	if parse {
-		session.PutBytes(stmt.connection.strConv.Encode(stmt.text)...)
+		session.PutClr(stmt.connection.strConv.Encode(stmt.text))
 	}
 	if define {
 		session.PutBytes(0)
@@ -276,7 +276,11 @@ func (stmt *Stmt) write(session *network.Session) error {
 		}
 		stmt.parse = false
 		stmt.define = false
-		stmt.reSendParDef = false
+		if stmt.connection.dBVersion.Number >= 10102 {
+			stmt.reSendParDef = false
+		} else {
+			stmt.reSendParDef = true
+		}
 	}
 	//if !stmt.reExec {
 	//exeOp := stmt.getExeOption()
@@ -455,7 +459,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					stmt._hasMoreRows = false
 					stmt.connection.session.Summary = nil
 				} else {
-					return errors.New(stmt.connection.session.GetError())
+					return stmt.connection.session.GetError()
 				}
 
 			}
@@ -948,7 +952,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		lob := &Lob{
 			sourceLocator: data,
 		}
-		session.SaveState()
+		session.SaveState(nil)
 		dataSize, err := lob.getSize(stmt.connection)
 		if err != nil {
 			return err
@@ -993,12 +997,16 @@ func (stmt *defaultStmt) Close() error {
 		session.ResetBuffer()
 		session.PutBytes(17, 105, 0, 1, 1, 1)
 		session.PutInt(stmt.cursorID, 4, true, true)
-		return (&simpleObject{
-			session:     session,
-			operationID: 0x93,
-			data:        nil,
-			err:         nil,
-		}).write().read()
+		if stmt.connection.dBVersion.Number >= 10102 {
+			return (&simpleObject{
+				connection:  stmt.connection,
+				operationID: 0x93,
+				data:        nil,
+				err:         nil,
+			}).write().read()
+		} else {
+			return session.Write()
+		}
 	}
 	return nil
 }

@@ -28,26 +28,7 @@ func NewDataIntegrityService(comm *AdvancedNegoComm) (*dataIntegrityService, err
 			availableServiceIDs:   []int{0, 1, 3, 4, 5, 6},
 		},
 	}
-	str := ""
-	level := ""
-	connOption := comm.session.Context.ConnOption
-	if connOption != nil {
-		snConfig := connOption.SNOConfig
-		if snConfig != nil {
-			var exists bool
-			str, exists = snConfig["sqlnet.crypto_checksum_types_client"]
-			if !exists {
-				str = ""
-			}
-			level, exists = snConfig["sqlnet.crypto_checksum_client"]
-			if !exists {
-				level = ""
-			}
-		}
-	}
-	output.readAdvNegoLevel(level)
-	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
-	err := output.buildServiceList(str, true, true)
+	err := output.buildServiceList([]string{}, true, true)
 	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err
@@ -148,38 +129,28 @@ func (serv *dataIntegrityService) activateAlgorithm() error {
 	serv.comm.session.Context.AdvancedService.SessionKey = serv.sharedKey
 	serv.comm.session.Context.AdvancedService.IV = serv.iV
 	//return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
+	var algo security.OracleNetworkDataIntegrity = nil
 	var err error
 	switch serv.algoID {
 	case 0:
-		serv.comm.session.Context.AdvancedService.HashAlgo = nil
+		algo = nil
 	case 1:
-		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash(md5.New(), serv.sharedKey, serv.iV)
-		if err != nil {
-			return err
-		}
+		algo, err = security.NewOracleNetworkHash(md5.New(), serv.sharedKey, serv.iV)
 	case 3:
-		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash(crypto.SHA1.New(), serv.sharedKey, serv.iV)
-		if err != nil {
-			return err
-		}
+		algo, err = security.NewOracleNetworkHash(crypto.SHA1.New(), serv.sharedKey, serv.iV)
 	case 4:
-		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash2(crypto.SHA512.New(), serv.sharedKey, serv.iV)
-		if err != nil {
-			return err
-		}
+		algo, err = security.NewOracleNetworkHash2(crypto.SHA512.New(), serv.sharedKey, serv.iV)
 	case 5:
-		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash2(crypto.SHA256.New(), serv.sharedKey, serv.iV)
-		if err != nil {
-			return err
-		}
+		algo, err = security.NewOracleNetworkHash2(crypto.SHA256.New(), serv.sharedKey, serv.iV)
 	case 6:
-		serv.comm.session.Context.AdvancedService.HashAlgo, err = security.NewOracleNetworkHash2(crypto.SHA384.New(), serv.sharedKey, serv.iV)
-		if err != nil {
-			return err
-		}
+		algo, err = security.NewOracleNetworkHash2(crypto.SHA384.New(), serv.sharedKey, serv.iV)
 	default:
-		return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
+		err = errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
 	}
+	if err != nil {
+		return err
+	}
+	serv.comm.session.Context.AdvancedService.HashAlgo = algo
 	return nil
 	// you can use also IDs
 }

@@ -1,0 +1,26 @@
+AUTH_SESSKEY = CC22A4B3963665FA
+encryptedSK = [67, 67, 50, 50, 65, 52, 66, 51, 57, 54, 51, 54, 54, 53, 70, 65]
+username = LAB
+password = lab
+get session key return = [95, -14, 76, -31, -73, 123, -96, -87]
+# make password 8 byte length
+if (password.length % 8 > 0) {
+    var18 = (byte)(8 - password.length % 8);
+} else {
+    var18 = 0;
+}
+var35 = new byte[var10.length + var18];
+System.arraycopy(var10, 0, var35, 0, var10.length);
+
+# encrypt password
+byte[] var41 = var38.getEPasswd(session key, var35)
+var41 = [36, -90, -28, -115, -91, 95, -80, -2]
+encrypted password in string = [50, 52, 65, 54, 69, 52, 56, 68, 65, 53, 53, 70, 66, 48, 70, 69, 0]
+[50, 52, 65, 54, 69, 52, 56, 68, 65, 53, 53, 70, 66, 48, 70, 69, 53]
+
+// this function is the function that repsonsible for generation of last variable from encrypted password in string
+// the entry of this function is var18 the above value used to complete password to 8 byte
+public static byte nibbleToHex(byte var0) {
+        var0 = (byte)(var0 & 15);
+        return (byte)(var0 < 10 ? var0 + 48 : var0 - 10 + 65);
+    }

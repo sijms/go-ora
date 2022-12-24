@@ -1,17 +1,10 @@
 package network
 
-//internal static readonly int NSVSNDHS = 311;
-//internal static readonly int NSVSNRDS = 312;
-//internal static readonly int NSVSNRDR = 312;
-//internal static readonly int NSVSNDHO = 312;
-//internal static readonly int NSVSNDHE = 314;
-//internal static readonly int NSVSNIP6 = 314;
-//internal static readonly int NSVSNSRN = 313;
-//internal static readonly int NSVSNPPP = 313;
+import "github.com/sijms/go-ora/network/security"
 
 type SessionContext struct {
 	//conn net.Conn
-	connOption ConnectionOption
+	ConnOption *ConnectionOption
 	//PortNo int
 	//InstanceName string
 	//HostName string
@@ -19,40 +12,39 @@ type SessionContext struct {
 	//Protocol string
 	//ServiceName string
 	SID []byte
-	//internal Stream m_socketStream;
-	//internal Socket m_socket;
-	//internal ReaderStream m_readerStream;
-	//internal WriterStream m_writerStream;
-	//internal ITransportAdapter m_transportAdapter;
 	//ConnectData string
-	Version           uint16
-	LoVersion         uint16
-	Options           uint16
-	NegotiatedOptions uint16
-	OurOne            uint16
-	Histone           uint16
-	ReconAddr         string
-	//internal Ano m_ano;
-	//internal bool m_bAnoEnabled;
+	Version             uint16
+	LoVersion           uint16
+	Options             uint16
+	NegotiatedOptions   uint16
+	OurOne              uint16
+	Histone             uint16
+	ReconAddr           string
+	handshakeComplete   bool
 	ACFL0               uint8
 	ACFL1               uint8
-	SessionDataUnit     uint16
-	TransportDataUnit   uint16
+	SessionDataUnit     uint32
+	TransportDataUnit   uint32
 	UsingAsyncReceivers bool
 	IsNTConnected       bool
 	OnBreakReset        bool
 	GotReset            bool
+	AdvancedService     struct {
+		CryptAlgo  security.OracleNetworkEncryption
+		HashAlgo   security.OracleNetworkDataIntegrity
+		SessionKey []byte
+		IV         []byte
+	}
 }
 
-// NewSessionContext create session context from connection option
-func NewSessionContext(connOption ConnectionOption) *SessionContext {
+func NewSessionContext(connOption *ConnectionOption) *SessionContext {
 	return &SessionContext{
 		SessionDataUnit:   connOption.SessionDataUnitSize,
 		TransportDataUnit: connOption.TransportDataUnitSize,
-		Version:           312,
+		Version:           317,
 		LoVersion:         300,
-		Options:           1 | 1024 | 2048,
+		Options:           1 | 1024 | 2048, /*1024 for urgent data transport*/
 		OurOne:            1,
-		connOption:        connOption,
+		ConnOption:        connOption,
 	}
 }

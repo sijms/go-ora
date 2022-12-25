@@ -195,3 +195,68 @@ func (val *NullTimeStamp) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+func (val NClob) MarshalJSON() ([]byte, error) {
+	if val.Valid {
+		return json.Marshal(val.String)
+	}
+	return json.Marshal(nil)
+}
+func (val *NClob) UnmarshalJSON(data []byte) error {
+	var temp = new(string)
+	err := json.Unmarshal(data, temp)
+	if err != nil {
+		return err
+	}
+	if temp == nil {
+		val.Valid = false
+	} else {
+		val.Valid = true
+		val.String = *temp
+	}
+	return nil
+}
+
+func (val Clob) MarshalJSON() ([]byte, error) {
+	if val.Valid {
+		return json.Marshal(val.String)
+	}
+	return json.Marshal(nil)
+}
+
+func (val *Clob) UnmarshalJSON(data []byte) error {
+	var temp = new(string)
+	err := json.Unmarshal(data, temp)
+	if err != nil {
+		return err
+	}
+	if temp == nil {
+		val.Valid = false
+	} else {
+		val.Valid = true
+		val.String = *temp
+	}
+	return nil
+}
+
+func (val Blob) MarshalJSON() ([]byte, error) {
+	if val.Valid {
+		return json.Marshal(val.Data)
+	}
+	return json.Marshal(nil)
+}
+
+func (val *Blob) UnmarshalJSON(data []byte) error {
+	var temp = new([]byte)
+	err := json.Unmarshal(data, temp)
+	if err != nil {
+		return err
+	}
+	if temp == nil {
+		val.Valid = false
+	} else {
+		val.Valid = true
+		val.Data = *temp
+	}
+	return nil
+}

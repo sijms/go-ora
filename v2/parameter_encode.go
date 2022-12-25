@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
-	"github.com/sijms/go-ora/v2/converters"
 	"reflect"
 	"time"
+
+	"github.com/sijms/go-ora/v2/converters"
 )
 
 func (par *ParameterInfo) setForNull() {
@@ -65,7 +66,7 @@ func (par *ParameterInfo) encodeFloat(value float64) error {
 func (par *ParameterInfo) encodeString(value string, converter converters.IStringConverter, size int) {
 	par.DataType = NCHAR
 	par.ContFlag = 16
-	//par.MaxCharLen = len([]rune(value))
+	par.MaxCharLen = len([]rune(value))
 	if len(value) == 0 {
 		par.BValue = nil
 	} else {

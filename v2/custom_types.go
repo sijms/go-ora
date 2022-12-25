@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"github.com/sijms/go-ora/v2/converters"
 	"time"
@@ -123,3 +124,74 @@ func (val *NullTimeStamp) Scan(value interface{}) error {
 //func (val *NullNVarChar) Value() (driver.Value, error) {
 //	return
 //}
+
+func (val NVarChar) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(val))
+}
+func (val *NVarChar) UnmarshalJSON(data []byte) error {
+	var temp string
+	err := json.Unmarshal(data, &temp)
+	if err != nil {
+		return err
+	}
+	*val = NVarChar(temp)
+	return nil
+}
+
+func (val NullNVarChar) MarshalJSON() ([]byte, error) {
+	if val.Valid {
+		return json.Marshal(string(val.NVarChar))
+	}
+	return json.Marshal(nil)
+}
+
+func (val *NullNVarChar) UnmarshalJSON(data []byte) error {
+	var temp = new(string)
+	err := json.Unmarshal(data, temp)
+	if err != nil {
+		return err
+	}
+	if temp == nil {
+		val.Valid = false
+	} else {
+		val.Valid = true
+		val.NVarChar = NVarChar(*temp)
+	}
+	return nil
+}
+
+func (val TimeStamp) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Time(val))
+}
+
+func (val *TimeStamp) UnmarshalJSON(data []byte) error {
+	var temp time.Time
+	err := json.Unmarshal(data, &temp)
+	if err != nil {
+		return err
+	}
+	*val = TimeStamp(temp)
+	return nil
+}
+
+func (val NullTimeStamp) MarshalJSON() ([]byte, error) {
+	if val.Valid {
+		return json.Marshal(time.Time(val.TimeStamp))
+	}
+	return json.Marshal(nil)
+}
+
+func (val *NullTimeStamp) UnmarshalJSON(data []byte) error {
+	var temp = new(time.Time)
+	err := json.Unmarshal(data, temp)
+	if err != nil {
+		return err
+	}
+	if temp == nil {
+		val.Valid = false
+	} else {
+		val.Valid = true
+		val.TimeStamp = TimeStamp(*temp)
+	}
+	return nil
+}

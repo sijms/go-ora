@@ -577,6 +577,7 @@ func (conn *Connection) Close() (err error) {
 		conn.session.Disconnect()
 		conn.session = nil
 	}
+	conn.State = Closed
 	conn.connOption.Tracer.Print("Connection Closed")
 	_ = conn.connOption.Tracer.Close()
 	return

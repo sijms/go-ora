@@ -62,7 +62,7 @@ func (val *NVarChar) EncodeValue(param *ParameterInfo, connection *Connection) e
 	}
 	return nil
 }
-func (val *TimeStamp) EncodeValue(param *ParameterInfo, connection *Connection) error {
+func (val *TimeStamp) EncodeValue(param *ParameterInfo, _ *Connection) error {
 	param.setForTime()
 	param.DataType = TIMESTAMP
 	param.BValue = converters.EncodeTimeStamp(time.Time(*val))

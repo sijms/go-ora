@@ -1,5 +1,7 @@
 package go_ora
 
+import "github.com/sijms/go-ora/v2/network"
+
 type RefCursor struct {
 	defaultStmt
 	len        uint8
@@ -88,6 +90,9 @@ func (cursor *RefCursor) getExeOptions() int {
 	return 0x8040
 }
 func (cursor *RefCursor) Query() (*DataSet, error) {
+	if cursor.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
 	cursor.connection.connOption.Tracer.Printf("Query RefCursor: %d", cursor.cursorID)
 	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
 	cursor._hasMoreRows = true

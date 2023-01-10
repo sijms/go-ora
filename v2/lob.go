@@ -81,6 +81,7 @@ func (lob *Lob) getSize() (size int64, err error) {
 	lob.connection.connOption.Tracer.Print("Lob Size: ", size)
 	return
 }
+
 func (lob *Lob) getDataWithOffsetSize(offset, count int64) (data []byte, err error) {
 	if offset == 0 && count == 0 {
 		lob.connection.connOption.Tracer.Print("Read Lob Data:")
@@ -111,6 +112,7 @@ func (lob *Lob) getDataWithOffsetSize(offset, count int64) (data []byte, err err
 func (lob *Lob) getData() (data []byte, err error) {
 	return lob.getDataWithOffsetSize(0, 0)
 }
+
 func (lob *Lob) putData(data []byte) error {
 	lob.connection.connOption.Tracer.Printf("Put Lob Data: %d bytes", len(data))
 	lob.initialize()
@@ -127,6 +129,7 @@ func (lob *Lob) putData(data []byte) error {
 	}
 	return lob.read()
 }
+
 func (lob *Lob) putString(data string, charset int) error {
 	lob.connection.connOption.Tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
 	lob.initialize()
@@ -167,47 +170,6 @@ func (lob *Lob) isTemporary() bool {
 	return false
 }
 
-//freeAllTemporary: free temporary lobs defined by all_locators
-//func (lob *Lob) freeAllTemporary(all_locators [][]byte) error {
-//	if len(all_locators) == 0 {
-//		return nil
-//	}
-//	lob.connection.connOption.Tracer.Printf("Free %d Temporary Lobs", len(all_locators))
-//	session := lob.connection.session
-//	freeTemp := func(locators [][]byte) {
-//		totalLen := 0
-//		for _, locator := range locators {
-//			totalLen += len(locator)
-//		}
-//		session.PutBytes(0x11, 0x60, 0, 1)
-//		session.PutUint(totalLen, 4, true, true)
-//		session.PutBytes(0, 0, 0, 0, 0, 0, 0)
-//		session.PutUint(0x80111, 4, true, true)
-//		session.PutBytes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-//		for _, locator := range locators {
-//			session.PutBytes(locator...)
-//		}
-//	}
-//	start := 0
-//	end := 0
-//	session.ResetBuffer()
-//	for start < len(all_locators) {
-//		end = start + 25000
-//		if end > len(all_locators) {
-//			end = len(all_locators)
-//		}
-//		freeTemp(all_locators[start:end])
-//		start += end
-//	}
-//	session.PutBytes(0x3, 0x93, 0x0)
-//	err := session.Write()
-//	if err != nil {
-//		return err
-//	}
-//	return (&simpleObject{
-//		connection: lob.connection,
-//	}).read()
-//}
 func (lob *Lob) freeTemporary() error {
 	lob.initialize()
 	lob.connection.session.ResetBuffer()
@@ -218,6 +180,7 @@ func (lob *Lob) freeTemporary() error {
 	}
 	return lob.read()
 }
+
 func (lob *Lob) createTemporaryBLOB() error {
 	lob.connection.connOption.Tracer.Print("Create Temporary BLob:")
 	lob.sourceLocator = make([]byte, 0x28)
@@ -239,6 +202,7 @@ func (lob *Lob) createTemporaryBLOB() error {
 	}
 	return lob.read()
 }
+
 func (lob *Lob) createTemporaryClob(charset, charsetForm int) error {
 	lob.connection.connOption.Tracer.Print("Create Temporary CLob")
 	lob.sourceLocator = make([]byte, 0x28)
@@ -290,6 +254,7 @@ func (lob *Lob) open(mode, opID int) error {
 		return lob.read()
 	}
 }
+
 func (lob *Lob) close(opID int) error {
 	lob.connection.connOption.Tracer.Print("Close Lob: ")
 	if lob.isTemporary() {
@@ -309,6 +274,7 @@ func (lob *Lob) close(opID int) error {
 		return lob.read()
 	}
 }
+
 func (lob *Lob) writeOp(operationID int) {
 	session := lob.connection.session
 	session.PutBytes(3, 0x60, 0)

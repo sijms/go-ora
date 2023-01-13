@@ -382,8 +382,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			if err != nil {
 				return nil, err
 			}
-			w := &wallet{password: []byte(ret.walletPass)}
-			err = w.readPKCS12(fileData)
+			ret.w = &wallet{password: []byte(ret.walletPass)}
+			err = ret.w.readPKCS12(fileData)
 			if err != nil {
 				return nil, err
 			}

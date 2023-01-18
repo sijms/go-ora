@@ -456,19 +456,22 @@ func (session *Session) Write() error {
 
 	segmentLen := int(session.Context.SessionDataUnit - 20)
 	offset := 0
-
-	for size > segmentLen {
-		pck, err := newDataPacket(outputBytes[offset:offset+segmentLen], session.Context)
-		if err != nil {
-			return err
+	if size > segmentLen {
+		segment := make([]byte, segmentLen)
+		for size > segmentLen {
+			copy(segment, outputBytes[offset:offset+segmentLen])
+			pck, err := newDataPacket(segment, session.Context)
+			if err != nil {
+				return err
+			}
+			err = session.writePacket(pck)
+			if err != nil {
+				session.outBuffer.Reset()
+				return err
+			}
+			size -= segmentLen
+			offset += segmentLen
 		}
-		err = session.writePacket(pck)
-		if err != nil {
-			session.outBuffer.Reset()
-			return err
-		}
-		size -= segmentLen
-		offset += segmentLen
 	}
 	if size != 0 {
 		pck, err := newDataPacket(outputBytes[offset:], session.Context)

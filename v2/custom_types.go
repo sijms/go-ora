@@ -62,12 +62,14 @@ func (val *NVarChar) EncodeValue(param *ParameterInfo, connection *Connection) e
 	}
 	return nil
 }
+
 func (val *TimeStamp) EncodeValue(param *ParameterInfo, _ *Connection) error {
 	param.setForTime()
 	param.DataType = TIMESTAMP
 	param.BValue = converters.EncodeTimeStamp(time.Time(*val))
 	return nil
 }
+
 func (val *TimeStamp) Value() (driver.Value, error) {
 	return driver.Value(time.Time(*val)), nil
 }
@@ -95,6 +97,7 @@ func (val *NullNVarChar) Value() (driver.Value, error) {
 		return nil, nil
 	}
 }
+
 func (val *NullNVarChar) Scan(value interface{}) error {
 	if value == nil {
 		val.Valid = false
@@ -128,6 +131,7 @@ func (val *NullTimeStamp) Scan(value interface{}) error {
 func (val NVarChar) MarshalJSON() ([]byte, error) {
 	return json.Marshal(string(val))
 }
+
 func (val *NVarChar) UnmarshalJSON(data []byte) error {
 	var temp string
 	err := json.Unmarshal(data, &temp)
@@ -202,6 +206,7 @@ func (val NClob) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(nil)
 }
+
 func (val *NClob) UnmarshalJSON(data []byte) error {
 	var temp = new(string)
 	err := json.Unmarshal(data, temp)

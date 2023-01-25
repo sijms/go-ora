@@ -132,6 +132,70 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			return par.encodeArrayValue(val, size, connection)
 		}
 	}
+	if temp, ok := val.(driver.Valuer); ok {
+		tempVal, err := temp.Value()
+		if err != nil {
+			return err
+		}
+		if tempVal == nil {
+			par.BValue = nil
+			switch val.(type) {
+			case sql.NullInt32:
+				par.setForNumber()
+			case sql.NullBool:
+				par.setForNumber()
+			case sql.NullTime:
+				par.setForTime()
+			case sql.NullByte:
+				par.setForNumber()
+			case sql.NullFloat64:
+				par.setForNumber()
+			case sql.NullInt16:
+				par.setForNumber()
+			case sql.NullInt64:
+				par.setForNumber()
+			case sql.NullString:
+				par.encodeString("", nil, size)
+			case NullNVarChar:
+				par.encodeString("", nil, size)
+				par.CharsetForm = 2
+				par.CharsetID = connection.tcpNego.ServernCharset
+			case NullTimeStamp:
+				par.setForTime()
+				par.DataType = TIMESTAMP
+			case *sql.NullInt32:
+				par.setForNumber()
+			case *sql.NullBool:
+				par.setForNumber()
+			case *sql.NullTime:
+				par.setForTime()
+			case *sql.NullByte:
+				par.setForNumber()
+			case *sql.NullFloat64:
+				par.setForNumber()
+			case *sql.NullInt16:
+				par.setForNumber()
+			case *sql.NullInt64:
+				par.setForNumber()
+			case *sql.NullString:
+				par.encodeString("", nil, size)
+			case *NullNVarChar:
+				par.encodeString("", nil, size)
+				par.CharsetForm = 2
+				par.CharsetID = connection.tcpNego.ServernCharset
+			case *NullTimeStamp:
+				par.setForTime()
+				par.DataType = TIMESTAMP
+			}
+			return nil
+		} else {
+			val = tempVal
+		}
+	}
+	//if val == nil {
+	//	par.setForNull()
+	//	return nil
+	//}
 	switch value := val.(type) {
 	case int:
 		par.encodeInt(int64(value))
@@ -241,116 +305,116 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				return err
 			}
 		}
-	case sql.NullByte:
-		if value.Valid {
-			par.encodeInt(int64(value.Byte))
-		} else {
-			par.setForNull()
-		}
-	case sql.NullInt16:
-		if value.Valid {
-			par.encodeInt(int64(value.Int16))
-		} else {
-			par.setForNull()
-		}
-	case sql.NullInt32:
-		if value.Valid {
-			par.encodeInt(int64(value.Int32))
-		} else {
-			par.setForNull()
-		}
-	case sql.NullInt64:
-		if value.Valid {
-			par.encodeInt(value.Int64)
-		} else {
-			par.setForNull()
-		}
-	case *sql.NullByte:
-		if value == nil {
-			par.setForNumber()
-		} else {
-			if value.Valid {
-				par.encodeInt(int64(value.Byte))
-			} else {
-				par.setForNull()
-			}
-		}
-	case *sql.NullInt16:
-		if value == nil {
-			par.setForNumber()
-		} else {
-			if value.Valid {
-				par.encodeInt(int64(value.Int16))
-			} else {
-				par.setForNull()
-			}
-		}
-	case *sql.NullInt32:
-		if value == nil {
-			par.setForNumber()
-		} else {
-			if value.Valid {
-				par.encodeInt(int64(value.Int32))
-			} else {
-				par.setForNull()
-			}
-		}
-	case *sql.NullInt64:
-		if value == nil {
-			par.setForNumber()
-		} else {
-			if value.Valid {
-				par.encodeInt(value.Int64)
-			} else {
-				par.setForNull()
-			}
-		}
-	case sql.NullFloat64:
-		if value.Valid {
-			err = par.encodeFloat(value.Float64)
-			if err != nil {
-				return err
-			}
-		} else {
-			par.setForNull()
-		}
-	case *sql.NullFloat64:
-		if value == nil {
-			par.setForNumber()
-		} else {
-			if value.Valid {
-				err = par.encodeFloat(value.Float64)
-				if err != nil {
-					return err
-				}
-			} else {
-				par.setForNull()
-			}
-		}
-	case sql.NullBool:
-		if value.Valid {
-			var tempVal int64 = 0
-			if value.Bool {
-				tempVal = 1
-			}
-			par.encodeInt(tempVal)
-		} else {
-			par.setForNull()
-		}
-	case *sql.NullBool:
-		if value == nil {
-			par.setForNumber()
-		} else {
-			if value.Valid {
-				var tempVal int64 = 0
-				if value.Bool {
-					tempVal = 1
-				}
-				par.encodeInt(tempVal)
-			} else {
-				par.setForNull()
-			}
-		}
+	//case sql.NullByte:
+	//	if value.Valid {
+	//		par.encodeInt(int64(value.Byte))
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case sql.NullInt16:
+	//	if value.Valid {
+	//		par.encodeInt(int64(value.Int16))
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case sql.NullInt32:
+	//	if value.Valid {
+	//		par.encodeInt(int64(value.Int32))
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case sql.NullInt64:
+	//	if value.Valid {
+	//		par.encodeInt(value.Int64)
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case *sql.NullByte:
+	//	if value == nil {
+	//		par.setForNumber()
+	//	} else {
+	//		if value.Valid {
+	//			par.encodeInt(int64(value.Byte))
+	//		} else {
+	//			par.setForNull()
+	//		}
+	//	}
+	//case *sql.NullInt16:
+	//	if value == nil {
+	//		par.setForNumber()
+	//	} else {
+	//		if value.Valid {
+	//			par.encodeInt(int64(value.Int16))
+	//		} else {
+	//			par.setForNull()
+	//		}
+	//	}
+	//case *sql.NullInt32:
+	//	if value == nil {
+	//		par.setForNumber()
+	//	} else {
+	//		if value.Valid {
+	//			par.encodeInt(int64(value.Int32))
+	//		} else {
+	//			par.setForNull()
+	//		}
+	//	}
+	//case *sql.NullInt64:
+	//	if value == nil {
+	//		par.setForNumber()
+	//	} else {
+	//		if value.Valid {
+	//			par.encodeInt(value.Int64)
+	//		} else {
+	//			par.setForNull()
+	//		}
+	//	}
+	//case sql.NullFloat64:
+	//	if value.Valid {
+	//		err = par.encodeFloat(value.Float64)
+	//		if err != nil {
+	//			return err
+	//		}
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case *sql.NullFloat64:
+	//	if value == nil {
+	//		par.setForNumber()
+	//	} else {
+	//		if value.Valid {
+	//			err = par.encodeFloat(value.Float64)
+	//			if err != nil {
+	//				return err
+	//			}
+	//		} else {
+	//			par.setForNull()
+	//		}
+	//	}
+	//case sql.NullBool:
+	//	if value.Valid {
+	//		var tempVal int64 = 0
+	//		if value.Bool {
+	//			tempVal = 1
+	//		}
+	//		par.encodeInt(tempVal)
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case *sql.NullBool:
+	//	if value == nil {
+	//		par.setForNumber()
+	//	} else {
+	//		if value.Valid {
+	//			var tempVal int64 = 0
+	//			if value.Bool {
+	//				tempVal = 1
+	//			}
+	//			par.encodeInt(tempVal)
+	//		} else {
+	//			par.setForNull()
+	//		}
+	//	}
 	case time.Time:
 		par.encodeTime(value)
 	case *time.Time:
@@ -359,22 +423,23 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		} else {
 			par.encodeTime(*value)
 		}
-	case sql.NullTime:
-		if value.Valid {
-			par.encodeTime(value.Time)
-		} else {
-			par.setForNull()
-		}
-	case *sql.NullTime:
-		if value == nil {
-			par.setForTime()
-		} else {
-			if value.Valid {
-				par.encodeTime(value.Time)
-			} else {
-				par.setForNull()
-			}
-		}
+	//case sql.NullTime:
+	//	if value.Valid {
+	//		par.encodeTime(value.Time)
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case *sql.NullTime:
+	//	if value == nil {
+	//		par.setForTime()
+	//	} else {
+	//		if value.Valid {
+	//			par.encodeTime(value.Time)
+	//		} else {
+	//			par.setForTime()
+	//			par.BValue = nil
+	//		}
+	//	}
 	case TimeStamp:
 		par.encodeTimeStamp(value)
 	case *TimeStamp:
@@ -385,23 +450,23 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			par.encodeTimeStamp(*value)
 		}
 
-	case NullTimeStamp:
-		if value.Valid {
-			par.encodeTimeStamp(value.TimeStamp)
-		} else {
-			par.setForNull()
-		}
-	case *NullTimeStamp:
-		if value == nil {
-			par.setForTime()
-			par.DataType = TIMESTAMP
-		} else {
-			if value.Valid {
-				par.encodeTimeStamp(value.TimeStamp)
-			} else {
-				par.setForNull()
-			}
-		}
+	//case NullTimeStamp:
+	//	if value.Valid {
+	//		par.encodeTimeStamp(value.TimeStamp)
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case *NullTimeStamp:
+	//	if value == nil {
+	//		par.setForTime()
+	//		par.DataType = TIMESTAMP
+	//	} else {
+	//		if value.Valid {
+	//			par.encodeTimeStamp(value.TimeStamp)
+	//		} else {
+	//			par.setForNull()
+	//		}
+	//	}
 	case NClob:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
@@ -598,22 +663,22 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			}
 			par.encodeString(*value, connection.strConv, size)
 		}
-	case sql.NullString:
-		if value.Valid {
-			par.encodeString(value.String, connection.strConv, size)
-		} else {
-			par.setForNull()
-		}
-	case *sql.NullString:
-		if value == nil {
-			par.encodeString("", connection.strConv, size)
-		} else {
-			if value.Valid {
-				par.encodeString(value.String, connection.strConv, size)
-			} else {
-				par.setForNull()
-			}
-		}
+	//case sql.NullString:
+	//	if value.Valid {
+	//		par.encodeString(value.String, connection.strConv, size)
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case *sql.NullString:
+	//	if value == nil {
+	//		par.encodeString("", connection.strConv, size)
+	//	} else {
+	//		if value.Valid {
+	//			par.encodeString(value.String, connection.strConv, size)
+	//		} else {
+	//			par.setForNull()
+	//		}
+	//	}
 	case NVarChar:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
@@ -626,26 +691,26 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		} else {
 			par.encodeString(string(*value), connection.strConv, size)
 		}
-	case NullNVarChar:
-		if value.Valid {
-			par.CharsetForm = 2
-			par.CharsetID = connection.tcpNego.ServernCharset
-			par.encodeString(string(value.NVarChar), connection.strConv, size)
-		} else {
-			par.setForNull()
-		}
-	case *NullNVarChar:
-		par.CharsetForm = 2
-		par.CharsetID = connection.tcpNego.ServernCharset
-		if value == nil {
-			par.encodeString("", connection.strConv, size)
-		} else {
-			if value.Valid {
-				par.encodeString(string(value.NVarChar), connection.strConv, size)
-			} else {
-				par.setForNull()
-			}
-		}
+	//case NullNVarChar:
+	//	if value.Valid {
+	//		par.CharsetForm = 2
+	//		par.CharsetID = connection.tcpNego.ServernCharset
+	//		par.encodeString(string(value.NVarChar), connection.strConv, size)
+	//	} else {
+	//		par.setForNull()
+	//	}
+	//case *NullNVarChar:
+	//	par.CharsetForm = 2
+	//	par.CharsetID = connection.tcpNego.ServernCharset
+	//	if value == nil {
+	//		par.encodeString("", connection.strConv, size)
+	//	} else {
+	//		if value.Valid {
+	//			par.encodeString(string(value.NVarChar), connection.strConv, size)
+	//		} else {
+	//			par.setForNull()
+	//		}
+	//	}
 	default:
 		custVal := reflect.ValueOf(val)
 		if custVal.Kind() == reflect.Ptr {

@@ -140,7 +140,9 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		}
 	}
 	if temp, ok := val.(driver.Valuer); ok {
-		if temp != nil && !reflect.ValueOf(temp).IsNil() {
+		if temp == nil || (reflect.ValueOf(temp).Kind() == reflect.Ptr && reflect.ValueOf(temp).IsNil()) {
+			// bypass nil pointer
+		} else {
 			tempVal, err := temp.Value()
 			if err != nil {
 				return err

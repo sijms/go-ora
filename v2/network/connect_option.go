@@ -55,6 +55,7 @@ type SessionInfo struct {
 	Protocol              string
 	SSL                   bool
 	SSLVerify             bool
+	Wallet                bool
 	Dialer                DialerContext
 }
 type AdvNegoSeviceInfo struct {

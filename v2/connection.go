@@ -377,6 +377,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	conn.session = network.NewSession(conn.connOption)
 	W := conn.conStr.w
 	if conn.connOption.SSL && W != nil {
+		conn.connOption.Wallet = true
 		err := conn.session.LoadSSLData(W.certificates, W.privateKeys, W.certificateRequests)
 		if err != nil {
 			return err

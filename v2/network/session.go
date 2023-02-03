@@ -606,9 +606,6 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			}
 
 			if pckType == RESEND {
-				if session.Context.ConnOption.SSL {
-					session.negotiate()
-				}
 				for _, pck := range session.sendPcks {
 					//log.Printf("Request: %#v\n\n", pck.bytes())
 					err := session.initWrite()

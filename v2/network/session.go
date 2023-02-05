@@ -671,7 +671,11 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return pck, nil
 	case DATA:
-		return newDataPacketFromData(packetData, session.Context)
+		dataPck, err := newDataPacketFromData(packetData, session.Context)
+		if session.Context.ConnOption.SSL && dataPck != nil && dataPck.dataFlag == 0x8000 {
+			session.negotiate()
+		}
+		return dataPck, err
 	case MARKER:
 		pck := newMarkerPacketFromData(packetData, session.Context)
 		breakConnection := false

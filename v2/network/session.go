@@ -574,6 +574,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				return nil, err
 			}
 			pckType := PacketType(head[4])
+			flag := head[5]
 			var length uint32
 			if session.Context.handshakeComplete && session.Context.Version >= 315 {
 				length = binary.BigEndian.Uint32(head)
@@ -606,7 +607,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			}
 
 			if pckType == RESEND {
-				if session.Context.ConnOption.SSL {
+				if session.Context.ConnOption.SSL && flag&8 != 0 {
 					session.negotiate()
 				}
 				for _, pck := range session.sendPcks {

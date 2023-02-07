@@ -195,6 +195,8 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				case *NullTimeStamp:
 					par.setForTime()
 					par.DataType = TIMESTAMP
+				default:
+					par.encodeString("", nil, size)
 				}
 				return nil
 			} else {

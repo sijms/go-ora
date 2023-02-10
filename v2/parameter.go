@@ -900,11 +900,12 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 		case TimeStampTZ_DTY:
 			fallthrough
 		case TIMESTAMP:
-			dateVal, err := converters.DecodeDate(par.BValue)
-			if err != nil {
-				return nil, err
-			}
-			tempVal = TimeStamp(dateVal)
+			//dateVal, err := converters.DecodeDate(par.BValue)
+			//if err != nil {
+			//	return nil, err
+			//}
+			//tempVal = TimeStamp(dateVal)
+			fallthrough
 		case DATE:
 			dateVal, err := converters.DecodeDate(par.BValue)
 			if err != nil {

@@ -20,7 +20,7 @@ import (
 	"github.com/sijms/go-ora/v2/converters"
 )
 
-var ErrConnectionReset error = errors.New("connection reset")
+//var ErrConnectionReset error = errors.New("connection reset")
 
 type Data interface {
 	Write(session *Session) error
@@ -58,6 +58,8 @@ type Session struct {
 	UseBigClrChunks   bool
 	UseBigScn         bool
 	ClrChunkSize      int
+	breakConnection   bool
+	resetConnection   bool
 	SSL               struct {
 		CertificateRequest []*x509.CertificateRequest
 		PrivateKeys        []*rsa.PrivateKey
@@ -277,20 +279,28 @@ func (session *Session) BreakConnection() error {
 		session.EndContext()
 		session.oldCtx = tempCtx
 	}()
+	session.resetConnection = false
 	marker := newMarkerPacket(1, session.Context)
 	err := session.writePacket(marker)
 	if err != nil {
 		return err
 	}
+	// clear buffers
+	for !session.resetConnection && err == nil {
+		_, err = session.readPacket()
+	}
+	return err
+
 	_, err = session.readPacket()
 	if err != nil {
 		return err
 	}
 	_, err = session.readPacket()
-	if err != nil {
-		tracer.Print("Connection Break With Error: ", err)
-	}
-	return nil
+	return err
+	//if err != nil {
+	//tracer.Print("Connection Break With Error: ", err)
+	//}
+	//return nil
 }
 
 // Connect perform network connection on address:port
@@ -421,22 +431,6 @@ func (session *Session) Disconnect() {
 	}
 }
 
-//func (session *Session) Debug() {
-//	//if session.index > 350 && session.index < 370 {
-//	fmt.Println("index: ", session.index)
-//	fmt.Printf("data buffer: %#v\n", session.InBuffer[session.index:session.index+30])
-//	//oldIndex := session.index
-//	//fmt.Println(session.GetClr())
-//	//session.index = oldIndex
-//	//}
-//}
-//func (session *Session) DumpIn() {
-//	log.Printf("%#v\n", session.InBuffer)
-//}
-//
-//func (session *Session) DumpOut() {
-//	log.Printf("%#v\n", session.OutBuffer)
-//}
 // Write send data store in output buffer through network
 //
 // if data bigger than SessionDataUnit it should be divided into
@@ -494,7 +488,10 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 		pck, err := session.readPacket()
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
-				_ = session.BreakConnection()
+				breakErr := session.BreakConnection()
+				if breakErr != nil {
+					session.Context.ConnOption.Tracer.Print("Connection Break With Error: ", breakErr)
+				}
 			}
 			return nil, err
 		}
@@ -550,7 +547,6 @@ func (session *Session) GetError() *OracleError {
 
 // read a packet from network stream
 func (session *Session) readPacket() (PacketInterface, error) {
-
 	readPacketData := func() ([]byte, error) {
 		trials := 0
 		for {
@@ -678,22 +674,22 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		return dataPck, err
 	case MARKER:
 		pck := newMarkerPacketFromData(packetData, session.Context)
-		breakConnection := false
-		resetConnection := false
+		session.breakConnection = false
+		session.resetConnection = false
 		switch pck.markerType {
 		case 0:
-			breakConnection = true
+			session.breakConnection = true
 		case 1:
 			if pck.markerData == 2 {
-				resetConnection = true
+				session.resetConnection = true
 			} else {
-				breakConnection = true
+				session.breakConnection = true
 			}
 		default:
 			return nil, errors.New("unknown marker type")
 		}
 		trials := 1
-		for breakConnection && !resetConnection {
+		for session.breakConnection && !session.resetConnection {
 			if trials > 3 {
 				return nil, errors.New("connection break")
 			}
@@ -707,12 +703,12 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			}
 			switch pck.markerType {
 			case 0:
-				breakConnection = true
+				session.breakConnection = true
 			case 1:
 				if pck.markerData == 2 {
-					resetConnection = true
+					session.resetConnection = true
 				} else {
-					breakConnection = true
+					session.breakConnection = true
 				}
 			default:
 				return nil, errors.New("unknown marker type")
@@ -724,7 +720,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		if err != nil {
 			return nil, err
 		}
-		if resetConnection && session.Context.AdvancedService.HashAlgo != nil {
+		if session.resetConnection && session.Context.AdvancedService.HashAlgo != nil {
 			err = session.Context.AdvancedService.HashAlgo.Init()
 			if err != nil {
 				return nil, err

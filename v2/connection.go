@@ -364,6 +364,10 @@ func (conn *Connection) restore() error {
 
 // OpenWithContext open the connection with timeout context
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
+
+	converters.Mutex.Lock()
+	defer converters.Mutex.Lock()
+
 	tracer := conn.connOption.Tracer
 	switch conn.conStr.DBAPrivilege {
 	case SYSDBA:

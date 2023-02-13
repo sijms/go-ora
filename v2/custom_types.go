@@ -4,8 +4,9 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"github.com/sijms/go-ora/v2/converters"
 	"time"
+
+	"github.com/sijms/go-ora/v2/converters"
 )
 
 type ValueEncoder interface {
@@ -35,6 +36,9 @@ func (val *NVarChar) Scan(value interface{}) error {
 //}
 
 func (val *NVarChar) EncodeValue(param *ParameterInfo, connection *Connection) error {
+	converters.Mutex.Lock()
+	defer converters.Mutex.Unlock()
+
 	strVal := string(*val)
 	param.DataType = NCHAR
 	param.CharsetForm = 2

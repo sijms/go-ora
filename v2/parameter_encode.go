@@ -130,6 +130,9 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	par.CharsetForm = 1
 	par.BValue = nil
 
+	converters.Mutex.Lock()
+	defer converters.Mutex.Lock()
+
 	tempType := reflect.TypeOf(val)
 	if tempType.Kind() == reflect.Ptr {
 		tempType = tempType.Elem()

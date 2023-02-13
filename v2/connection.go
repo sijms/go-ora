@@ -366,7 +366,7 @@ func (conn *Connection) restore() error {
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
 
 	converters.Mutex.Lock()
-	defer converters.Mutex.Lock()
+	defer converters.Mutex.Unlock()
 
 	tracer := conn.connOption.Tracer
 	switch conn.conStr.DBAPrivilege {

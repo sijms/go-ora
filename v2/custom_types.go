@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"github.com/sijms/go-ora/v2/converters"
 	"time"
 )
 
@@ -34,41 +33,41 @@ func (val *NVarChar) Scan(value interface{}) error {
 //
 //}
 
-func (val *NVarChar) EncodeValue(param *ParameterInfo, connection *Connection) error {
-	strVal := string(*val)
-	param.DataType = NCHAR
-	param.CharsetForm = 2
-	param.ContFlag = 0x10
-	param.CharsetID = connection.tcpNego.ServernCharset
-	param.MaxCharLen = len([]rune(strVal))
-	if len(string(*val)) == 0 {
-		param.BValue = nil
-	}
-	if param.CharsetID != connection.strConv.GetLangID() {
-		tempCharset := connection.strConv.SetLangID(param.CharsetID)
-		defer connection.strConv.SetLangID(tempCharset)
-		param.BValue = connection.strConv.Encode(strVal)
-	} else {
-		param.BValue = connection.strConv.Encode(strVal)
-	}
-	if param.MaxLen < len(param.BValue) {
-		param.MaxLen = len(param.BValue)
-	}
-	if param.BValue == nil && param.MaxLen == 0 {
-		param.MaxLen = 1
-	}
-	if (param.Direction == Output && param.MaxLen == 0) || param.MaxLen > converters.MAX_LEN_NVARCHAR2 {
-		param.MaxLen = converters.MAX_LEN_NVARCHAR2
-	}
-	return nil
-}
+//func (val *NVarChar) EncodeValue(param *ParameterInfo, connection *Connection) error {
+//	strVal := string(*val)
+//	param.DataType = NCHAR
+//	param.CharsetForm = 2
+//	param.ContFlag = 0x10
+//	param.CharsetID = connection.tcpNego.ServernCharset
+//	param.MaxCharLen = len([]rune(strVal))
+//	if len(string(*val)) == 0 {
+//		param.BValue = nil
+//	}
+//	if param.CharsetID != connection.strConv.GetLangID() {
+//		tempCharset := connection.strConv.SetLangID(param.CharsetID)
+//		defer connection.strConv.SetLangID(tempCharset)
+//		param.BValue = connection.strConv.Encode(strVal)
+//	} else {
+//		param.BValue = connection.strConv.Encode(strVal)
+//	}
+//	if param.MaxLen < len(param.BValue) {
+//		param.MaxLen = len(param.BValue)
+//	}
+//	if param.BValue == nil && param.MaxLen == 0 {
+//		param.MaxLen = 1
+//	}
+//	if (param.Direction == Output && param.MaxLen == 0) || param.MaxLen > converters.MAX_LEN_NVARCHAR2 {
+//		param.MaxLen = converters.MAX_LEN_NVARCHAR2
+//	}
+//	return nil
+//}
 
-func (val *TimeStamp) EncodeValue(param *ParameterInfo, _ *Connection) error {
-	param.setForTime()
-	param.DataType = TIMESTAMP
-	param.BValue = converters.EncodeTimeStamp(time.Time(*val))
-	return nil
-}
+//func (val *TimeStamp) EncodeValue(param *ParameterInfo, _ *Connection) error {
+//	param.setForTime()
+//	param.DataType = TIMESTAMP
+//	param.BValue = converters.EncodeTimeStamp(time.Time(*val))
+//	return nil
+//}
 
 func (val *TimeStamp) Value() (driver.Value, error) {
 	return driver.Value(time.Time(*val)), nil

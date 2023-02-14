@@ -74,6 +74,14 @@ type Connection struct {
 	strConv           converters.IStringConverter
 	NLSData           NLSData
 	cusTyp            map[string]customType
+	maxLen            struct {
+		varchar   int
+		nvarchar  int
+		raw       int
+		number    int
+		date      int
+		timestamp int
+	}
 }
 
 //type OracleDriverContext struct {
@@ -436,13 +444,13 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	tracer.Print("TTC Version: ", conn.session.TTCVersion)
 	if len(conn.tcpNego.ServerRuntimeCaps) > 6 && conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
-		converters.MAX_LEN_VARCHAR2 = 0x7FFF
-		converters.MAX_LEN_NVARCHAR2 = 0x7FFF
-		converters.MAX_LEN_RAW = 0x7FFF
+		conn.maxLen.varchar = 0x7FFF
+		conn.maxLen.nvarchar = 0x7FFF
+		conn.maxLen.raw = 0x7FFF
 	} else {
-		converters.MAX_LEN_VARCHAR2 = 0xFA0
-		converters.MAX_LEN_NVARCHAR2 = 0xFA0
-		converters.MAX_LEN_RAW = 0xFA0
+		conn.maxLen.varchar = 0xFA0
+		conn.maxLen.nvarchar = 0xFA0
+		conn.maxLen.raw = 0xFA0
 	}
 	//this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
 	//this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
@@ -513,50 +521,6 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	//userName := ""
-	//User, err := user.Current()
-	//if err == nil {
-	//	userName = User.Username
-	//}
-	//fmt.Println(userName)
-	//idx := strings.Index(userName, "\\")
-	//if idx >= 0 {
-	//	userName = userName[idx+1:]
-	//}
-	//hostName, _ := os.Hostname()
-	//indexOfSlash := strings.LastIndex(os.Args[0], "/")
-	//indexOfSlash += 1
-	//if indexOfSlash < 0 {
-	//	indexOfSlash = 0
-	//}
-
-	//connOption := &network.ConnectionOption{
-	//	//Port:                  conStr.Port,
-	//	Servers:               conStr.Servers,
-	//	Ports:                 conStr.Ports,
-	//	TransportConnectTo:    0xFFFF,
-	//	SSLVersion:            "",
-	//	WalletDict:            "",
-	//	TransportDataUnitSize: 0xFFFF,
-	//	SessionDataUnitSize:   0xFFFF,
-	//	Protocol:              "tcp",
-	//	UserID: conStr.UserID, 		"",
-	//	SID: conStr.SID,
-	//	ServiceName:  conStr.ServiceName,
-	//	InstanceName: conStr.InstanceName,
-	//	PrefetchRows: conStr.PrefetchRows,
-	//	ClientData: network.ClientInfo{
-	//		ProgramPath: os.Args[0],
-	//		ProgramName: os.Args[0][indexOfSlash:],
-	//		UserName:    userName,
-	//		HostName:    hostName,
-	//		DriverName:  "OracleClientGo",
-	//		PID:         os.Getpid(),
-	//	},
-	//	SSL:       conStr.SSL,
-	//	SSLVerify: conStr.SSLVerify,
-	//	//InAddrAny:             false,
-	//}
 
 	return &Connection{
 		State:      Closed,
@@ -565,6 +529,14 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 		autoCommit: true,
 		//w:          conStr.w,
 		cusTyp: map[string]customType{},
+		maxLen: struct {
+			varchar   int
+			nvarchar  int
+			raw       int
+			number    int
+			date      int
+			timestamp int
+		}{varchar: 0x7FFF, nvarchar: 0x7FFF, raw: 0x7FFF, number: 0x16, date: 0xB, timestamp: 0xB},
 	}, nil
 }
 

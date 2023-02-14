@@ -333,7 +333,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
 		} else {
-			if par.MaxLen >= converters.MAX_LEN_NVARCHAR2 {
+			if par.MaxLen >= connection.maxLen.nvarchar {
 				par.DataType = OCIClobLocator
 				lob := newLob(connection)
 				err = lob.createTemporaryClob(connection.tcpNego.ServernCharset, 2)
@@ -356,7 +356,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
 		} else {
-			if par.MaxLen >= converters.MAX_LEN_NVARCHAR2 {
+			if par.MaxLen >= connection.maxLen.nvarchar {
 				par.DataType = OCIClobLocator
 				lob := newLob(connection)
 				err = lob.createTemporaryClob(connection.tcpNego.ServernCharset, 2)
@@ -376,7 +376,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
 		} else {
-			if par.MaxLen >= converters.MAX_LEN_VARCHAR2 {
+			if par.MaxLen >= connection.maxLen.varchar {
 				// here we need to use clob
 				par.DataType = OCIClobLocator
 				lob := newLob(connection)
@@ -402,7 +402,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
 		} else {
-			if par.MaxLen >= converters.MAX_LEN_VARCHAR2 {
+			if par.MaxLen >= connection.maxLen.varchar {
 				par.DataType = OCIClobLocator
 				lob := newLob(connection)
 				err = lob.createTemporaryClob(connection.tcpNego.ServerCharset, 1)
@@ -449,7 +449,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if par.Direction == Output {
 			par.DataType = OCIBlobLocator
 		} else {
-			if len(value.Data) >= converters.MAX_LEN_RAW {
+			if len(value.Data) >= connection.maxLen.raw {
 				par.DataType = OCIBlobLocator
 				lob := newLob(connection)
 				err = lob.createTemporaryBLOB()
@@ -477,7 +477,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if par.Direction == Output {
 			par.DataType = OCIBlobLocator
 		} else {
-			if len(value.Data) >= converters.MAX_LEN_RAW {
+			if len(value.Data) >= connection.maxLen.raw {
 				par.DataType = OCIBlobLocator
 				lob := newLob(connection)
 				err = lob.createTemporaryBLOB()
@@ -493,7 +493,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			}
 		}
 	case []byte:
-		if len(value) > converters.MAX_LEN_RAW && par.Direction == Input {
+		if len(value) > connection.maxLen.raw && par.Direction == Input {
 			return par.encodeValue(Blob{Valid: true, Data: value}, size, connection)
 		}
 		par.encodeRaw(value, size)
@@ -501,7 +501,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if value == nil {
 			par.encodeRaw(nil, size)
 		} else {
-			if len(*value) > converters.MAX_LEN_RAW && par.Direction == Input {
+			if len(*value) > connection.maxLen.raw && par.Direction == Input {
 				return par.encodeValue(&Blob{Valid: true, Data: *value}, size, connection)
 			}
 			par.encodeRaw(*value, size)
@@ -509,7 +509,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	case RefCursor, *RefCursor:
 		par.setForRefCursor()
 	case string:
-		if len(value) > converters.MAX_LEN_NVARCHAR2 && par.Direction == Input {
+		if len(value) > connection.maxLen.nvarchar && par.Direction == Input {
 			return par.encodeValue(Clob{Valid: true, String: value}, size, connection)
 		}
 		par.encodeString(value, connection.strConv, size)
@@ -517,7 +517,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if value == nil {
 			par.encodeString("", connection.strConv, size)
 		} else {
-			if len(*value) > converters.MAX_LEN_NVARCHAR2 && par.Direction == Input {
+			if len(*value) > connection.maxLen.nvarchar && par.Direction == Input {
 				return par.encodeValue(&Clob{Valid: true, String: *value}, size, connection)
 			}
 			par.encodeString(*value, connection.strConv, size)

@@ -384,7 +384,6 @@ func (lob *Lob) read() error {
 		//		}
 		//	}
 		//	loop = false
-
 		case 8:
 			// read rpa message
 			if len(lob.sourceLocator) != 0 {
@@ -487,6 +486,14 @@ func (lob *Lob) read() error {
 				loop = false
 			}
 			//return errors.New(fmt.Sprintf("TTC error: received code %d during LOB reading", msg))
+		}
+	}
+	if session.IsBreak() {
+		err := (&simpleObject{
+			connection: lob.connection,
+		}).read()
+		if err != nil {
+			return err
 		}
 	}
 	return nil

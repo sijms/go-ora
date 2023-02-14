@@ -270,7 +270,13 @@ func (session *Session) negotiate() {
 	session.sslConn = tls.Client(session.conn, config)
 }
 
-func (session *Session) BreakConnection() error {
+// IsBreak tell if the connection break elicit
+func (session *Session) IsBreak() bool {
+	return session.breakConnection
+}
+
+// BreakConnection elicit connetion break to cancel the current operation
+func (session *Session) BreakConnection() (PacketInterface, error) {
 	tracer := session.Context.ConnOption.Tracer
 	tracer.Print("Break Connection")
 	tempCtx := session.oldCtx
@@ -279,28 +285,15 @@ func (session *Session) BreakConnection() error {
 		session.EndContext()
 		session.oldCtx = tempCtx
 	}()
+	session.breakConnection = true
 	session.resetConnection = false
 	marker := newMarkerPacket(1, session.Context)
+	session.ResetBuffer()
 	err := session.writePacket(marker)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	// clear buffers
-	for !session.resetConnection && err == nil {
-		_, err = session.readPacket()
-	}
-	return err
-
-	_, err = session.readPacket()
-	if err != nil {
-		return err
-	}
-	_, err = session.readPacket()
-	return err
-	//if err != nil {
-	//tracer.Print("Connection Break With Error: ", err)
-	//}
-	//return nil
+	return session.readPacket()
 }
 
 // Connect perform network connection on address:port
@@ -488,12 +481,16 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 		pck, err := session.readPacket()
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
-				breakErr := session.BreakConnection()
+				session.Context.ConnOption.Tracer.Print("Read Timeout")
+				var breakErr error
+				pck, breakErr = session.BreakConnection()
 				if breakErr != nil {
 					session.Context.ConnOption.Tracer.Print("Connection Break With Error: ", breakErr)
 				}
+			} else {
+				return nil, err
 			}
-			return nil, err
+
 		}
 		if dataPck, ok := pck.(*DataPacket); ok {
 			session.inBuffer = append(session.inBuffer, dataPck.buffer...)
@@ -501,8 +498,6 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 			return nil, errors.New("the packet received is not data packet")
 		}
 	}
-	//ret := make([]byte, numBytes)
-	//copy(ret, session.inBuffer[session.index:session.index+numBytes])
 	ret := session.inBuffer[session.index : session.index+numBytes]
 	session.index += numBytes
 	return ret, nil
@@ -674,8 +669,6 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		return dataPck, err
 	case MARKER:
 		pck := newMarkerPacketFromData(packetData, session.Context)
-		session.breakConnection = false
-		session.resetConnection = false
 		switch pck.markerType {
 		case 0:
 			session.breakConnection = true
@@ -726,6 +719,8 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				return nil, err
 			}
 		}
+		session.breakConnection = false
+		session.resetConnection = false
 		//return nil, ErrConnectionReset
 		packetData, err = readPacketData()
 		if err != nil {

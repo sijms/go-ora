@@ -809,6 +809,14 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			//return errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
 		}
 	}
+	if session.IsBreak() {
+		err := (&simpleObject{
+			connection: stmt.connection,
+		}).read()
+		if err != nil {
+			return err
+		}
+	}
 	if stmt.connection.connOption.Tracer.IsOn() {
 		dataSet.Trace(stmt.connection.connOption.Tracer)
 	}
@@ -1580,7 +1588,7 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	if stmt.connection.State != Opened {
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
-	stmt.connection.connOption.Tracer.Printf("Query With Context:", stmt.text)
+	stmt.connection.connOption.Tracer.Print("Query With Context:", stmt.text)
 	args := make([]driver.Value, len(namedArgs))
 	for x := 0; x < len(args); x++ {
 		args[x] = namedArgs[x].Value

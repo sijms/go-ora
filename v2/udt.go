@@ -132,7 +132,7 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 			param.MaxCharLen = 0
 			param.CharsetForm = 0
 		default:
-			return fmt.Errorf("unsupported attribute type: %s", attTypeName)
+			return fmt.Errorf("unsupported attribute type: %s", attTypeName.String)
 		}
 	}
 	//for {

@@ -1242,6 +1242,15 @@ func (conn *Connection) readResponse(msgCode uint8) error {
 				session.Summary.EndOfCallStatus = temp
 			}
 		}
+		if session.HasFSAPCapability {
+			if session.Summary == nil {
+				session.Summary = new(network.SummaryObject)
+			}
+			session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
+			if err != nil {
+				return err
+			}
+		}
 	case 15:
 		warning, err := network.NewWarningObject(session)
 		if err != nil {

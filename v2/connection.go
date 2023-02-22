@@ -1050,7 +1050,6 @@ func (conn *Connection) StructsInsert(sqlText string, values []interface{}) (*Qu
 			db := _type.Field(j).Tag.Get("db")
 			if db != "" {
 				if v, ok := fieldsMap[strings.ToLower(db)]; ok {
-					fmt.Println(_value.Field(j))
 					if !_value.Field(j).IsValid() {
 						result[v][i] = nil
 					} else {

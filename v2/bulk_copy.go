@@ -20,18 +20,19 @@ type BulkCopy struct {
 	SchemaName    string
 	PartitionName string
 	ColumnNames   []string
-	BatchSize     int
-	columns       []ParameterInfo
-	tableCursor   int64
-	sdbaBits      int64
-	dbaBits       int64
+	data          bytes.Buffer
+	//BatchSize     int
+	columns     []ParameterInfo
+	tableCursor int64
+	sdbaBits    int64
+	dbaBits     int64
 }
 
 func NewBulkCopy(conn *Connection, tableName string) *BulkCopy {
 	ret := &BulkCopy{
 		conn:      conn,
 		TableName: tableName,
-		BatchSize: 30,
+		data:      bytes.Buffer{},
 	}
 	return ret
 }
@@ -63,12 +64,61 @@ func (bulk *BulkCopy) AddRow(values ...interface{}) error {
 	var flag uint8 = 0x3C
 	length := data.Len() + 4
 	session := bulk.conn.session
-	session.PutBytes(flag)
-	session.PutInt(length, 2, true, false)
-	session.PutBytes(uint8(len(bulk.columns)))
-	session.PutBytes(data.Bytes()...)
+	//session.WriteBytes(&bulk.data, flag)
+	bulk.data.WriteByte(flag)
+	session.WriteInt(&bulk.data, length, 2, true, false)
+	bulk.data.WriteByte(uint8(len(bulk.columns)))
+	_, err := data.WriteTo(&bulk.data)
+	if err != nil {
+		return err
+	}
+	if bulk.data.Len() > 0x20000 {
+		err = bulk.EndStream()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+	//session.PutBytes(flag)
+	//session.PutInt(length, 2, true, false)
+	//session.PutBytes(uint8(len(bulk.columns)))
+	//session.PutBytes(data.Bytes()...)
+	//return nil
+}
+
+func (bulk *BulkCopy) StartStream() error {
+	err := bulk.prepareDirectPath()
+	if err != nil {
+		return err
+	}
 	return nil
 }
+func (bulk *BulkCopy) EndStream() error {
+	defer bulk.data.Reset()
+	err := bulk.writeStreamMessage()
+	if err != nil {
+		return err
+	}
+	return bulk.readStreamResponse()
+}
+
+func (bulk *BulkCopy) writeStreamMessage() error {
+	session := bulk.conn.session
+	session.ResetBuffer()
+	session.PutBytes(0x3, 0x81, 0)
+	session.PutInt(bulk.tableCursor, 2, true, true)
+	if bulk.data.Len() > 0 {
+		session.PutBytes(1)
+		session.PutInt(bulk.data.Len(), 4, true, true)
+	} else {
+		session.PutBytes(0, 0)
+	}
+	session.PutInt(400, 4, true, true)
+	session.PutBytes(0, 0, 1, 1)
+	session.PutBytes(bulk.data.Bytes()...)
+	return session.Write()
+}
+
 func (bulk *BulkCopy) readStreamResponse() error {
 	loop := true
 	session := bulk.conn.session
@@ -108,114 +158,6 @@ func (bulk *BulkCopy) readStreamResponse() error {
 			return session.GetError()
 		}
 	}
-	return nil
-}
-func (bulk *BulkCopy) StartStream() error {
-	err := bulk.prepareDirectPath()
-	if err != nil {
-		return err
-	}
-	err = bulk.writeStreamMessage()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-func (bulk *BulkCopy) EndStream() error {
-	err := bulk.conn.session.Write()
-	if err != nil {
-		return err
-	}
-	return bulk.readStreamResponse()
-}
-
-func (bulk *BulkCopy) Commit() error {
-	err := bulk.writeFinalMessage(2)
-	if err != nil {
-		return err
-	}
-	return bulk.readFinalResponse()
-}
-
-func (bulk *BulkCopy) Abort() error {
-	err := bulk.writeFinalMessage(1)
-	if err != nil {
-		return err
-	}
-	return bulk.readFinalResponse()
-}
-
-func (bulk *BulkCopy) writeFinalMessage(code int) error {
-	session := bulk.conn.session
-	session.ResetBuffer()
-	session.PutBytes(0x3, 0x82, 0)
-	session.PutInt(code, 4, true, true)
-	session.PutInt(bulk.tableCursor, 2, true, true)
-	session.PutBytes(0, 0, 1, 1)
-	return session.Write()
-}
-
-func (bulk *BulkCopy) readFinalResponse() error {
-	loop := true
-	session := bulk.conn.session
-	for loop {
-		msg, err := session.GetByte()
-		if err != nil {
-			return err
-		}
-		switch msg {
-		case 8:
-			length, err := session.GetInt(2, true, true)
-			if err != nil {
-				return err
-			}
-			for x := 0; x < length; x++ {
-				_, err = session.GetInt(4, true, true)
-				if err != nil {
-					return err
-				}
-			}
-		default:
-			err = bulk.conn.readResponse(msg)
-			if err != nil {
-				return err
-			}
-			if msg == 4 || msg == 9 {
-				loop = false
-			}
-		}
-	}
-	if session.HasError() {
-		if session.Summary.RetCode == 1403 {
-			session.Summary = nil
-		} else {
-			return session.GetError()
-		}
-	}
-	return nil
-}
-
-func (bulk *BulkCopy) writeStreamMessage() error {
-
-	session := bulk.conn.session
-	session.ResetBuffer()
-	session.PutBytes(0x3, 0x81, 0)
-	session.PutInt(bulk.tableCursor, 2, true, true)
-	//if (streamSize > 0L)
-	//{
-	//	this.m_marshallingEngine.MarshalPointer();
-	//	this.m_marshallingEngine.MarshalUB4(streamSize);
-	//}
-	//else
-	//{
-	//	this.m_marshallingEngine.MarshalNullPointer();
-	//	this.m_marshallingEngine.MarshalUB4(0L);
-	//}
-	session.PutBytes(1)
-	session.PutInt(bulk.BatchSize, 4, true, true)
-
-	session.PutInt(400, 4, true, true)
-	session.PutBytes(0, 0, 1, 1)
 	return nil
 }
 
@@ -351,6 +293,72 @@ func (bulk *BulkCopy) readPrepareResponse() error {
 				bulk.dbaBits = tempArray[8]
 			} else {
 				bulk.dbaBits = 0
+			}
+		default:
+			err = bulk.conn.readResponse(msg)
+			if err != nil {
+				return err
+			}
+			if msg == 4 || msg == 9 {
+				loop = false
+			}
+		}
+	}
+	if session.HasError() {
+		if session.Summary.RetCode == 1403 {
+			session.Summary = nil
+		} else {
+			return session.GetError()
+		}
+	}
+	return nil
+}
+
+func (bulk *BulkCopy) Commit() error {
+	err := bulk.writeFinalMessage(2)
+	if err != nil {
+		return err
+	}
+	return bulk.readFinalResponse()
+}
+
+func (bulk *BulkCopy) Abort() error {
+	err := bulk.writeFinalMessage(1)
+	if err != nil {
+		return err
+	}
+	return bulk.readFinalResponse()
+}
+
+func (bulk *BulkCopy) writeFinalMessage(code int) error {
+	session := bulk.conn.session
+	session.ResetBuffer()
+	session.PutBytes(0x3, 0x82, 0)
+	session.PutInt(code, 4, true, true)
+	session.PutInt(bulk.tableCursor, 2, true, true)
+	session.PutBytes(0, 0, 1, 1)
+	return session.Write()
+}
+
+func (bulk *BulkCopy) readFinalResponse() error {
+	loop := true
+	session := bulk.conn.session
+	for loop {
+		msg, err := session.GetByte()
+		if err != nil {
+			return err
+		}
+		switch msg {
+		case 8:
+			length, err := session.GetInt(2, true, true)
+			if err != nil {
+				return err
+			}
+			for x := 0; x < length; x++ {
+				_, err = session.GetInt(4, true, true)
+				if err != nil {
+					return err
+				}
 			}
 		default:
 			err = bulk.conn.readResponse(msg)

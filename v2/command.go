@@ -805,6 +805,8 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 
 				}
 				loop = false
+			} else if msg == 9 {
+				loop = false
 			}
 			//return errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
 		}

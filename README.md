@@ -6,6 +6,14 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
+### version 2.5.31: Add BulkCopy using DirectPath (experimental)
+* it is a way to insert large amount of rows in table or view
+* this feature use oracle [direct path](https://docs.oracle.com/database/121/ODPNT/featBulkCopy.htm#ODPNT212)
+* this feature still not implemented for the following types:
+  * LONG
+  * CLOB
+  * BLOB
+* for more help about using this feature return to bulk_copy example
 ### version 2.5.19: Add Support for Kerberos5 Authentication
 * note that kerberos need an intact dns system
 * to test kerberos you need 3 machine

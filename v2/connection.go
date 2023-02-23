@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -84,8 +86,8 @@ type Connection struct {
 	}
 }
 
-//type OracleDriverContext struct {
-//}
+// type OracleDriverContext struct {
+// }
 type OracleConnector struct {
 	drv           *OracleDriver
 	connectString string
@@ -544,6 +546,7 @@ func (conn *Connection) Close() (err error) {
 	return
 }
 
+// doAuth a login step that occur during open connection
 func (conn *Connection) doAuth() error {
 	conn.connOption.Tracer.Print("doAuth")
 	if len(conn.connOption.UserID) > 0 && len(conn.conStr.password) > 0 {
@@ -883,6 +886,57 @@ func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, 
 
 func SetNTSAuth(newNTSManager advanced_nego.NTSAuthInterface) {
 	advanced_nego.NTSAuth = newNTSManager
+}
+
+// StructsInsert support interface{} array
+func (conn *Connection) StructsInsert(sqlText string, values []interface{}) (*QueryResult, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	rgx := regexp.MustCompile(`\((.*?)\)`)
+	matchArray := rgx.FindStringSubmatch(sqlText)
+	if len(matchArray) < 2 {
+		return nil, fmt.Errorf("invalid sql must be like: insert into a (name,age) values (:1,:2)")
+	}
+	fields := strings.Split(matchArray[1], ",")
+	fieldsMap := make(map[string]int)
+	for i, field := range fields {
+		fieldsMap[strings.TrimSpace(strings.ToLower(field))] = i
+	}
+	_type := reflect.TypeOf(values[0])
+	result := make([][]driver.Value, _type.NumField())
+	idx := 0
+	for i := 0; i < _type.NumField(); i++ {
+		db := _type.Field(i).Tag.Get("db")
+		db = strings.TrimSpace(strings.ToLower(db))
+		if db != "" {
+			if _, ok := fieldsMap[db]; ok {
+				f := make([]driver.Value, len(values))
+				result[idx] = f
+				idx++
+			}
+		}
+	}
+	if idx != len(fieldsMap) {
+		return nil, &network.OracleError{ErrCode: 947, ErrMsg: "ORA-00947: Not enough values"}
+	}
+	for i, item := range values {
+		_value := reflect.ValueOf(item)
+		for j := 0; j < _type.NumField(); j++ {
+			db := _type.Field(j).Tag.Get("db")
+			if db != "" {
+				if v, ok := fieldsMap[strings.ToLower(db)]; ok {
+					if !_value.Field(j).IsValid() {
+						result[v][i] = nil
+					} else {
+						result[v][i] = _value.Field(j).Interface()
+					}
+				}
+			}
+
+		}
+	}
+	return conn.BulkInsert(sqlText, len(values), result...)
 }
 
 // BulkInsert mass insert column values into a table

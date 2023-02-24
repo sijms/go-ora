@@ -39,6 +39,10 @@ func NewBulkCopy(conn *Connection, tableName string) *BulkCopy {
 func (bulk *BulkCopy) AddRow(values ...interface{}) error {
 	data := bytes.Buffer{}
 	for _, val := range values {
+		if val == nil {
+			data.WriteByte(0xFF)
+			continue
+		}
 		par := &ParameterInfo{
 			Direction:   Input,
 			Flag:        3,

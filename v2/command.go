@@ -761,6 +761,14 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			if session.TTCVersion >= 5 {
 				_, err = session.GetDlc()
 			}
+		case 19:
+			session.ResetBuffer()
+			session.PutBytes(19)
+			err = session.Write()
+			if err != nil {
+				return err
+			}
+			continue
 		case 21:
 			_, err := session.GetInt(2, true, true) // noOfColumnSent
 			if err != nil {

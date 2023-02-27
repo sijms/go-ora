@@ -39,6 +39,7 @@ const (
 	Normal   AuthType = 0
 	OS       AuthType = 1
 	Kerberos AuthType = 2
+	TCPS     AuthType = 3
 )
 const defaultPort int = 1521
 
@@ -244,6 +245,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 					ret.authType = OS
 				} else if strings.ToUpper(val[0]) == "KERBEROS" {
 					ret.authType = Kerberos
+				} else if strings.ToUpper(val[0]) == "TCPS" {
+					ret.authType = TCPS
 				} else {
 					ret.authType = Normal
 				}
@@ -373,7 +376,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	if len(ret.connOption.Servers) == 0 {
 		return nil, errors.New("empty connection servers")
 	}
-	if len(ret.WalletPath) > 0 && len(ret.connOption.UserID) > 0 {
+	if len(ret.WalletPath) > 0 {
 		if len(ret.connOption.ServiceName) == 0 {
 			return nil, errors.New("you should specify server/service if you will use wallet")
 		}
@@ -394,19 +397,21 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			}
 		}
 
-		if len(ret.password) == 0 {
-			serv := ret.connOption.Servers[0]
-			cred, err := ret.w.getCredential(serv.Addr, serv.Port, ret.connOption.ServiceName, ret.connOption.UserID)
-			if err != nil {
-				return nil, err
+		if len(ret.connOption.UserID) > 0 {
+			if len(ret.password) == 0 {
+				serv := ret.connOption.Servers[0]
+				cred, err := ret.w.getCredential(serv.Addr, serv.Port, ret.connOption.ServiceName, ret.connOption.UserID)
+				if err != nil {
+					return nil, err
+				}
+				if cred == nil {
+					return nil, errors.New(
+						fmt.Sprintf("cannot find credentials for server: %s:%d, service: %s,  username: %s",
+							serv.Addr, serv.Port, ret.connOption.ServiceName, ret.connOption.UserID))
+				}
+				ret.connOption.UserID = cred.username
+				ret.password = cred.password
 			}
-			if cred == nil {
-				return nil, errors.New(
-					fmt.Sprintf("cannot find credentials for server: %s:%d, service: %s,  username: %s",
-						serv.Addr, serv.Port, ret.connOption.ServiceName, ret.connOption.UserID))
-			}
-			ret.connOption.UserID = cred.username
-			ret.password = cred.password
 		}
 	}
 	return ret, ret.validate()
@@ -431,6 +436,12 @@ func (connStr *ConnectionString) validate() error {
 	if len(connStr.connOption.SID) == 0 && len(connStr.connOption.ServiceName) == 0 {
 		return errors.New("empty SID and service name")
 	}
+	if connStr.authType == Kerberos {
+		connStr.connOption.AuthService = append(connStr.connOption.AuthService, "KERBEROS5")
+	}
+	if connStr.authType == TCPS {
+		connStr.connOption.AuthService = append(connStr.connOption.AuthService, "TCPS")
+	}
 	if len(connStr.connOption.UserID) == 0 || len(connStr.password) == 0 && connStr.authType == Normal {
 		connStr.authType = OS
 	}
@@ -439,9 +450,7 @@ func (connStr *ConnectionString) validate() error {
 			connStr.connOption.AuthService = append(connStr.connOption.AuthService, "NTS")
 		}
 	}
-	if connStr.authType == Kerberos {
-		connStr.connOption.AuthService = append(connStr.connOption.AuthService, "KERBEROS5")
-	}
+
 	if connStr.connOption.SSL {
 		connStr.connOption.Protocol = "tcps"
 	}

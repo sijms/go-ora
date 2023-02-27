@@ -6,6 +6,28 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
+### version 2.5.33: Add Support for Client Authentication
+* you should have server and client certificate store in wallets + working TCPS communication
+* create oracle user as follows:
+```sql
+CREATE USER "SSLCLIENT" IDENTIFIED EXTERNALLY AS 'CN=ORCLCLIENT';
+```
+* configure sqlnet.ora in the server to use client authentication
+```sql
+SQLNET.AUTHENTICATION_SERVICES=(TCPS,NTS)
+SSL_CLIENT_AUTHENTICATION=TRUE
+```
+* now connect 
+```golang
+urlOptions := map[string]string {
+  "TRACE FILE": "trace.log",
+  "AUTH TYPE":  "TCPS",
+  "SSL": "TRUE",
+  "SSL VERIFY": "FALSE",
+  "WALLET": "PATH TO WALLET"
+}
+connStr := go_ora.BuildUrl("server", 2484, "service", "", "", urlOptions)
+```
 ### version 2.5.31: Add BulkCopy using DirectPath (experimental)
 * it is a way to insert large amount of rows in table or view
 * this feature use oracle [direct path](https://docs.oracle.com/database/121/ODPNT/featBulkCopy.htm#ODPNT212)

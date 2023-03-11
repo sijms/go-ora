@@ -132,6 +132,10 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 
 	tempType := reflect.TypeOf(val)
 	if tempType.Kind() == reflect.Ptr {
+		if reflect.ValueOf(val).IsNil() && par.Direction == Input {
+			par.setForNull()
+			return nil
+		}
 		tempType = tempType.Elem()
 	}
 	if tempType != reflect.TypeOf([]byte{}) {
@@ -139,6 +143,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			return par.encodeArrayValue(val, size, connection)
 		}
 	}
+
 	if temp, ok := val.(driver.Valuer); ok {
 		if temp == nil || (reflect.ValueOf(temp).Kind() == reflect.Ptr && reflect.ValueOf(temp).IsNil()) {
 			// bypass nil pointer

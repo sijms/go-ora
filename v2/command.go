@@ -213,21 +213,57 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutUint(al8i4[x], 4, true, true)
 	}
 	if define {
-		//session.PutBytes(0)
-		for x := 0; x < len(stmt.columns); x++ {
-			stmt.columns[x].Flag = 3
-			stmt.columns[x].CharsetForm = 1
-
-			stmt.columns[x].setForDefine()
-			err := stmt.columns[x].write(session)
-			if err != nil {
-				return err
-			}
-			//session.PutBytes(0)
+		err := stmt.writeDefine()
+		if err != nil {
+			return err
 		}
+		//session.PutBytes(0)
+		//for x := 0; x < len(stmt.columns); x++ {
+		//	stmt.columns[x].Flag = 3
+		//	stmt.columns[x].CharsetForm = 1
+		//
+		//	stmt.columns[x].setForDefine()
+		//	err := stmt.columns[x].write(session)
+		//	if err != nil {
+		//		return err
+		//	}
+		//	//session.PutBytes(0)
+		//}
 	}
 	for _, par := range stmt.Pars {
 		_ = par.write(session)
+	}
+	return nil
+}
+
+func (stmt *defaultStmt) writeDefine() error {
+	session := stmt.connection.session
+	num := 0x7FFFFFFF
+	for _, col := range stmt.columns {
+		temp := new(ParameterInfo)
+		*temp = col
+
+		if temp.DataType == OCIBlobLocator || temp.DataType == OCIClobLocator {
+			num = 0
+			temp.ContFlag |= 0x2000000
+			if stmt.connection.connOption.Lob != 0 {
+				num = 0x7FFFFFFF
+				temp.MaxCharLen = 0
+				if temp.DataType == OCIBlobLocator {
+					temp.DataType = RAW
+				} else {
+					temp.DataType = NCHAR
+				}
+			} else {
+				temp.MaxCharLen = 0x8000
+			}
+		}
+		temp.Flag = 3
+		temp.MaxLen = num
+		err := temp.write(session)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -502,7 +538,10 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	}
 
 	// reading lobs
-	return stmt.readLobs(dataSet)
+	if stmt.connection.connOption.Lob > 0 {
+		return stmt.readLobs(dataSet)
+	}
+	return nil
 	//return err
 }
 func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
@@ -528,6 +567,10 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 	if err != nil {
 		return err
 	}
+	//err = stmt.writePars()
+	//if err != nil {
+	//	return err
+	//}
 	err = stmt.connection.session.Write()
 	if err != nil {
 		return err
@@ -1721,26 +1764,24 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 			return nil, err
 		}
 		// deal with lobs
-		if stmt.connection.connOption.Lob == 0 {
-			stmt.define = true
-			stmt.execute = false
-			stmt.parse = false
-			stmt.reSendParDef = false
-			err = stmt.queryLobPrefetch(stmt.getExeOption(), dataSet)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			err = stmt.readLobs(dataSet)
-			if err != nil {
-				return nil, err
+		if stmt._hasBLOB {
+			if stmt.connection.connOption.Lob == 0 {
+				stmt.define = true
+				stmt.execute = false
+				stmt.parse = false
+				stmt.reSendParDef = false
+				err = stmt.queryLobPrefetch(stmt.getExeOption(), dataSet)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				err = stmt.readLobs(dataSet)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 
-		//err = stmt.writePars()
-		//if err != nil {
-		//	return nil, err
-		//}
 		break
 	}
 	return dataSet, err

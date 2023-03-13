@@ -121,7 +121,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutUint(0x7FFFFFFF, 4, true, true)
 	}
 
-	if len(stmt.Pars) > 0 {
+	if len(stmt.Pars) > 0 && !define {
 		session.PutBytes(1)
 		session.PutUint(len(stmt.Pars), 2, true, true)
 	} else {
@@ -229,9 +229,10 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		//	}
 		//	//session.PutBytes(0)
 		//}
-	}
-	for _, par := range stmt.Pars {
-		_ = par.write(session)
+	} else {
+		for _, par := range stmt.Pars {
+			_ = par.write(session)
+		}
 	}
 	return nil
 }
@@ -473,7 +474,7 @@ func (stmt *Stmt) getExeOption() int {
 	if !stmt.parse && !stmt.execute {
 		op |= 0x40
 	}
-	if len(stmt.Pars) > 0 {
+	if len(stmt.Pars) > 0 && !stmt.define {
 		op |= 0x8
 		if stmt.stmtType == PLSQL || stmt._hasReturnClause {
 			op |= 0x400

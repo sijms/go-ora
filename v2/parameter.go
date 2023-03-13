@@ -125,6 +125,22 @@ type ParameterInfo struct {
 	cusType              *customType
 }
 
+func (par *ParameterInfo) setForDefine() {
+	par.Flag = 3
+	par.CharsetForm = 1
+	switch par.DataType {
+	case NUMBER:
+		par.MaxLen = 0x7FFFFFFF
+	case OCIClobLocator:
+		fallthrough
+	case OCIBlobLocator:
+		par.ContFlag = 0x2000000
+		par.MaxCharLen = 0x8000
+		par.MaxLen = 0
+		par.oaccollid = 0
+	}
+}
+
 // load get parameter information form network session
 func (par *ParameterInfo) load(conn *Connection) error {
 	session := conn.session

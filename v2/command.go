@@ -217,16 +217,8 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		for x := 0; x < len(stmt.columns); x++ {
 			stmt.columns[x].Flag = 3
 			stmt.columns[x].CharsetForm = 1
-			if stmt.columns[x].DataType == NUMBER {
-				stmt.columns[x].MaxLen = 0x7FFFFFFF
-			}
-			if stmt.columns[x].DataType == OCIClobLocator || stmt.columns[x].DataType == OCIBlobLocator {
-				stmt.columns[x].ContFlag = 0x2000000
-				stmt.columns[x].MaxCharLen = 0x8000
-				stmt.columns[x].MaxLen = 0
-				stmt.columns[x].oaccollid = 0
-			}
-			//stmt.columns[x].MaxLen = 0x7fffffff
+
+			stmt.columns[x].setForDefine()
 			err := stmt.columns[x].write(session)
 			if err != nil {
 				return err
@@ -512,6 +504,35 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	// reading lobs
 	return stmt.readLobs(dataSet)
 	//return err
+}
+func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
+	if stmt._noOfRowsToFetch == 25 {
+		//m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
+		maxRowSize := 0
+		for _, col := range dataSet.Cols {
+			if col.DataType == OCIClobLocator || col.DataType == OCIBlobLocator {
+				maxRowSize += 86
+			} else if col.DataType == LONG || col.DataType == LongRaw {
+				maxRowSize += 2
+			} else if col.DataType == OCIFileLocator {
+				maxRowSize += 86
+			} else {
+				maxRowSize += col.MaxLen
+			}
+		}
+		stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
+		stmt.connection.connOption.Tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
+	}
+	stmt.connection.session.ResetBuffer()
+	err := stmt.basicWrite(exeOp, false, true)
+	if err != nil {
+		return err
+	}
+	err = stmt.connection.session.Write()
+	if err != nil {
+		return err
+	}
+	return stmt.read(dataSet)
 }
 
 // read this is common read for stmt it read many information related to
@@ -1705,33 +1726,7 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 			stmt.execute = false
 			stmt.parse = false
 			stmt.reSendParDef = false
-			if stmt._noOfRowsToFetch == 25 {
-				//m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
-				maxRowSize := 0
-				for _, col := range dataSet.Cols {
-					if col.DataType == OCIClobLocator || col.DataType == OCIBlobLocator {
-						maxRowSize += 86
-					} else if col.DataType == LONG || col.DataType == LongRaw {
-						maxRowSize += 2
-					} else if col.DataType == OCIFileLocator {
-						maxRowSize += 86
-					} else {
-						maxRowSize += col.MaxLen
-					}
-				}
-				stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
-				stmt.connection.connOption.Tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
-			}
-			stmt.connection.session.ResetBuffer()
-			err := stmt.basicWrite(stmt.getExeOption(), false, true)
-			if err != nil {
-				return nil, err
-			}
-			err = stmt.connection.session.Write()
-			if err != nil {
-				return nil, err
-			}
-			err = stmt.read(dataSet)
+			err = stmt.queryLobPrefetch(stmt.getExeOption(), dataSet)
 			if err != nil {
 				return nil, err
 			}

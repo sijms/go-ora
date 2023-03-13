@@ -837,6 +837,91 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 		par.BValue = nil
 		return nil, nil
 	}
+	if connection.connOption.Lob == 0 && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
+		maxSize, err := session.GetInt(4, true, true)
+		if err != nil {
+			return nil, err
+		}
+		if maxSize > 0 {
+			/*size*/ _, err = session.GetInt(8, true, true)
+			if err != nil {
+				return nil, err
+			}
+			/*chunkSize*/ _, err := session.GetInt(4, true, true)
+			if err != nil {
+				return nil, err
+			}
+			if par.DataType == OCIClobLocator {
+				flag, err := session.GetByte()
+				if err != nil {
+					return nil, err
+				}
+				par.CharsetID = 0
+				if flag == 1 {
+					par.CharsetID, err = session.GetInt(2, true, true)
+					if err != nil {
+						return nil, err
+					}
+				}
+				tempByte, err := session.GetByte()
+				if err != nil {
+					return nil, err
+				}
+				par.CharsetForm = int(tempByte)
+				if par.CharsetID == 0 {
+					if par.CharsetForm == 1 {
+						par.CharsetID = connection.tcpNego.ServerCharset
+					} else {
+						par.CharsetID = connection.tcpNego.ServernCharset
+					}
+				}
+			}
+
+			par.BValue, err = session.GetClr()
+			if par.DataType == OCIClobLocator {
+				var tempString string
+				if connection.strConv.GetLangID() != par.CharsetID {
+					tempCharset := connection.strConv.SetLangID(par.CharsetID)
+					tempString = connection.strConv.Decode(par.BValue)
+					connection.strConv.SetLangID(tempCharset)
+				} else {
+					tempString = connection.strConv.Decode(par.BValue)
+				}
+				tempVal = tempString
+			} else {
+				tempVal = par.BValue
+			}
+
+			_ /*locator*/, err = session.GetClr()
+			if err != nil {
+				return nil, err
+			}
+			//if par.DataType == OCIClobLocator {
+			//	if par.CharsetForm == 1 {
+			//		tempVal = Clob{locator: locator, String: tempString}
+			//	} else {
+			//		tempVal = NClob{locator: locator, String: tempString}
+			//	}
+			//} else {
+			//	tempVal = Blob{locator: locator, Valid: true, Data: par.BValue}
+			//}
+		} else {
+			tempVal = nil
+			//switch par.DataType {
+			//case OCIClobLocator:
+			//	if par.CharsetForm == 1 {
+			//		tempVal = Clob{locator: nil, Valid: false}
+			//	} else {
+			//		tempVal = NClob{locator: nil, Valid: false}
+			//	}
+			//case OCIBlobLocator:
+			//	tempVal = Blob{locator: nil, Valid: false}
+			//default:
+			//	tempVal = nil
+			//}
+		}
+		return tempVal, nil
+	}
 	par.BValue, err = session.GetClr()
 	if err != nil {
 		return nil, err

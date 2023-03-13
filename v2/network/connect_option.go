@@ -68,6 +68,7 @@ type ConnectionOption struct {
 	Tracer       trace.Tracer
 	PrefetchRows int
 	Failover     int
+	Lob          int
 }
 
 func extractServers(connStr string) ([]ServerAddr, error) {

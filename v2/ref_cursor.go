@@ -110,6 +110,15 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	if err != nil {
 		return nil, err
 	}
+	// read lobs
+	if cursor.connection.connOption.Lob == 0 {
+
+	} else {
+		err = cursor.readLobs(dataSet)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return dataSet, nil
 }
 

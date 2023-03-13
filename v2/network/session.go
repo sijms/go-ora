@@ -867,13 +867,13 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compr
 	default:
 		panic("you need to pass an integer to this function")
 	}
+	// if the size is one byte no compression occur only one byte written
 	if size == 1 {
 		session.outBuffer.WriteByte(uint8(num))
 		//session.OutBuffer = append(session.OutBuffer, uint8(num))
 		return
 	}
 	if compress {
-		// if the size is one byte no compression occur only one byte written
 		temp := make([]byte, 8)
 		binary.BigEndian.PutUint64(temp, num)
 		temp = bytes.TrimLeft(temp, "\x00")

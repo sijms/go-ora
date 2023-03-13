@@ -1009,7 +1009,7 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 				return nil, err
 			}
 		}
-		err = stmt.writePars(session)
+		err = stmt.writePars()
 		if err != nil {
 			return nil, err
 		}

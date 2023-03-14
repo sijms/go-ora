@@ -298,17 +298,22 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				if err != nil {
 					ret.connOption.Failover = 0
 				}
-			case "LOB":
+			case "LOB FETCH":
 				tempVal := strings.ToUpper(val[0])
-				if tempVal == "PREFETCH" {
+				if tempVal == "PRE" {
 					ret.connOption.Lob = 0
-				} else if tempVal == "IMPLICIT" || tempVal == "AUTO" {
+				} else if tempVal == "POST" {
 					ret.connOption.Lob = 1
-				} else if tempVal == "EXPLICIT" || tempVal == "MANUAL" {
-					ret.connOption.Lob = 2
 				} else {
-					return nil, errors.New("LOB value should be: Prefetch, Implicit(AUTO) or Explicit(manual)")
+					return nil, errors.New("LOB FETCH value should be: PRE(default) or POST")
 				}
+				//else if tempVal == "IMPLICIT" || tempVal == "AUTO" {
+				//	ret.connOption.Lob = 1
+				//} else if tempVal == "EXPLICIT" || tempVal == "MANUAL" {
+				//	ret.connOption.Lob = 2
+				//} else {
+				//	return nil, errors.New("LOB value should be: Prefetch, Implicit(AUTO) or Explicit(manual)")
+				//}
 				//case "ENLIST":
 				//	ret.EnList = EnListFromString(val[0])
 				//case "INC POOL SIZE":

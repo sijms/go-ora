@@ -44,6 +44,9 @@ func (cursor *RefCursor) load() error {
 			if err != nil {
 				return err
 			}
+			if cursor.columns[x].DataType == OCIClobLocator || cursor.columns[x].DataType == OCIBlobLocator {
+				cursor._hasBLOB = true
+			}
 		}
 	}
 	_, err = session.GetDlc()
@@ -87,7 +90,11 @@ func (cursor *RefCursor) load() error {
 	return nil
 }
 func (cursor *RefCursor) getExeOptions() int {
-	return 0x8040
+	if cursor.connection.connOption.Lob == 0 {
+		return 0x8050
+	} else {
+		return 0x8040
+	}
 }
 func (cursor *RefCursor) Query() (*DataSet, error) {
 	if cursor.connection.State != Opened {
@@ -111,24 +118,21 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 		return nil, err
 	}
 	// read lobs
-	if cursor._hasBLOB {
-		if cursor.connection.connOption.Lob == 0 {
-			err = cursor.queryLobPrefetch(cursor.getExeOptions(), dataSet)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			err = cursor.readLobs(dataSet)
-			if err != nil {
-				return nil, err
-			}
+	if cursor.connection.connOption.Lob != 0 {
+		err = cursor.readLobs(dataSet)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return dataSet, nil
 }
 
 func (cursor *RefCursor) write() error {
-	err := cursor.basicWrite(cursor.getExeOptions(), false, false)
+	var define = false
+	if cursor.connection.connOption.Lob == 0 {
+		define = true
+	}
+	err := cursor.basicWrite(cursor.getExeOptions(), false, define)
 	if err != nil {
 		return err
 	}

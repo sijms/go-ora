@@ -217,18 +217,6 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		if err != nil {
 			return err
 		}
-		//session.PutBytes(0)
-		//for x := 0; x < len(stmt.columns); x++ {
-		//	stmt.columns[x].Flag = 3
-		//	stmt.columns[x].CharsetForm = 1
-		//
-		//	stmt.columns[x].setForDefine()
-		//	err := stmt.columns[x].write(session)
-		//	if err != nil {
-		//		return err
-		//	}
-		//	//session.PutBytes(0)
-		//}
 	} else {
 		for _, par := range stmt.Pars {
 			_ = par.write(session)

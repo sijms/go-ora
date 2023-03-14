@@ -111,12 +111,17 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 		return nil, err
 	}
 	// read lobs
-	if cursor.connection.connOption.Lob == 0 {
-
-	} else {
-		err = cursor.readLobs(dataSet)
-		if err != nil {
-			return nil, err
+	if cursor._hasBLOB {
+		if cursor.connection.connOption.Lob == 0 {
+			err = cursor.queryLobPrefetch(cursor.getExeOptions(), dataSet)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			err = cursor.readLobs(dataSet)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	return dataSet, nil

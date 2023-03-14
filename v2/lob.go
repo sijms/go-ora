@@ -3,6 +3,7 @@ package go_ora
 import (
 	"bytes"
 	"errors"
+	"go/types"
 )
 
 type Clob struct {
@@ -595,10 +596,12 @@ func (lob *Lob) readData() error {
 	////}
 	//return nil
 }
+
 func (lob *Lob) GetLobId(locator []byte) []byte {
 	//BitConverter.ToString(lobLocator, 10, 10);
 	return locator[10 : 10+10]
 }
+
 func (lob *Lob) append(dest []byte) error {
 	lob.initialize()
 	lob.destLocator = dest
@@ -629,4 +632,78 @@ func (lob *Lob) copy(srcLocator, dstLocator []byte, srcOffset, dstOffset, length
 		return err
 	}
 	return lob.read()
+}
+
+func (val *Clob) Scan(value interface{}) error {
+	val.Valid = true
+	if value == nil {
+		val.Valid = false
+		val.String = ""
+	}
+	switch temp := value.(type) {
+	case Clob:
+		*val = temp
+	case *Clob:
+		*val = *temp
+	case NClob:
+		*val = Clob(temp)
+	case *NClob:
+		*val = Clob(*temp)
+	case string:
+		val.String = temp
+	case types.Nil:
+		val.String = ""
+		val.Valid = false
+	default:
+		return errors.New("go-ora: Clob column type require Clob or string values")
+	}
+	return nil
+}
+
+func (val *Blob) Scan(value interface{}) error {
+	val.Valid = true
+	if value == nil {
+		val.Valid = false
+		val.Data = nil
+	}
+	switch temp := value.(type) {
+	case Blob:
+		*val = temp
+	case *Blob:
+		*val = *temp
+	case []byte:
+		val.Data = temp
+	case types.Nil:
+		val.Data = nil
+		val.Valid = false
+	default:
+		return errors.New("go-ora: Blob column type require Blob or []byte values")
+	}
+	return nil
+}
+
+func (val *NClob) Scan(value interface{}) error {
+	val.Valid = true
+	if value == nil {
+		val.Valid = false
+		val.String = ""
+	}
+	switch temp := value.(type) {
+	case Clob:
+		*val = NClob(temp)
+	case *Clob:
+		*val = NClob(*temp)
+	case NClob:
+		*val = temp
+	case *NClob:
+		*val = *temp
+	case string:
+		val.String = temp
+	case types.Nil:
+		val.String = ""
+		val.Valid = false
+	default:
+		return errors.New("go-ora: Clob column type require Clob or string values")
+	}
+	return nil
 }

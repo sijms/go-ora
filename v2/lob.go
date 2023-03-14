@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"bytes"
+	"database/sql/driver"
 	"errors"
 	"go/types"
 )
@@ -706,4 +707,28 @@ func (val *NClob) Scan(value interface{}) error {
 		return errors.New("go-ora: Clob column type require Clob or string values")
 	}
 	return nil
+}
+
+func (val *Clob) Value() (driver.Value, error) {
+	if val.Valid {
+		return val.String, nil
+	} else {
+		return nil, nil
+	}
+}
+
+func (val *NClob) Value() (driver.Value, error) {
+	if val.Valid {
+		return val.String, nil
+	} else {
+		return nil, nil
+	}
+}
+
+func (val *Blob) Value() (driver.Value, error) {
+	if val.Valid {
+		return val.Data, nil
+	} else {
+		return nil, nil
+	}
 }

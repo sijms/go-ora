@@ -231,7 +231,10 @@ func (stmt *defaultStmt) writeDefine() error {
 	for _, col := range stmt.columns {
 		temp := new(ParameterInfo)
 		*temp = col
-
+		temp.oaccollid = 0
+		temp.Precision = 0
+		temp.Scale = 0
+		temp.MaxCharLen = 0
 		if temp.DataType == OCIBlobLocator || temp.DataType == OCIClobLocator {
 			num = 0
 			temp.ContFlag |= 0x2000000
@@ -350,43 +353,44 @@ func (stmt *Stmt) writePars() error {
 			if !stmt.parse && par.Direction == Output && stmt.stmtType != PLSQL {
 				continue
 			}
-			if par.DataType != RAW {
-				if par.DataType == REFCURSOR {
-					session.PutBytes(1, 0)
-				} else if par.Direction == Input &&
-					(par.DataType == OCIClobLocator || par.DataType == OCIBlobLocator || par.DataType == OCIFileLocator) {
-					session.PutUint(len(par.BValue), 2, true, true)
-					session.PutClr(par.BValue)
+			if par.DataType == REFCURSOR {
+				session.PutBytes(1, 0)
+			} else if par.Direction == Input &&
+				(par.DataType == OCIClobLocator || par.DataType == OCIBlobLocator || par.DataType == OCIFileLocator) {
+				session.PutUint(len(par.BValue), 2, true, true)
+				session.PutClr(par.BValue)
+			} else {
+				if par.cusType != nil {
+					size := len(par.BValue) + 7
+					session.PutBytes(0, 0, 0, 0)
+					session.PutUint(size, 4, true, true)
+					session.PutBytes(1, 1)
+					tempBuffer := bytes.Buffer{}
+					tempBuffer.Write([]byte{0x84, 0x1, 0xfe})
+					session.WriteUint(&tempBuffer, size, 4, true, false)
+					tempBuffer.Write(par.BValue)
+					session.PutClr(tempBuffer.Bytes())
 				} else {
-					if par.cusType != nil {
-						size := len(par.BValue) + 7
-						session.PutBytes(0, 0, 0, 0)
-						session.PutUint(size, 4, true, true)
-						session.PutBytes(1, 1)
-						tempBuffer := bytes.Buffer{}
-						tempBuffer.Write([]byte{0x84, 0x1, 0xfe})
-						session.WriteUint(&tempBuffer, size, 4, true, false)
-						tempBuffer.Write(par.BValue)
-						session.PutClr(tempBuffer.Bytes())
-					} else {
-						if par.MaxNoOfArrayElements > 0 {
-							if par.BValue == nil {
-								session.PutBytes(0)
-							} else {
-								session.PutBytes(par.BValue...)
-							}
+					if par.MaxNoOfArrayElements > 0 {
+						if par.BValue == nil {
+							session.PutBytes(0)
 						} else {
-							session.PutClr(par.BValue)
+							session.PutBytes(par.BValue...)
 						}
+					} else {
+						session.PutClr(par.BValue)
 					}
 				}
 			}
+			//if par.DataType != RAW {
+			//
+			//}
 		}
-		for _, par := range stmt.Pars {
-			if par.DataType == RAW {
-				session.PutClr(par.BValue)
-			}
-		}
+		//for _, par := range stmt.Pars {
+		//	if par.DataType == RAW {
+		//		session.PutClr(par.BValue)
+		//	}
+		//}
 	}
 	return nil
 }

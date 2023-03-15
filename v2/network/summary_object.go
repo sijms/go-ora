@@ -83,7 +83,7 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 	if err != nil {
 		return nil, err
 	}
-	if session.TTCVersion >= 7 {
+	if session.TTCVersion >= 6 {
 		result.Flags, err = session.GetInt(2, true, true)
 		if err != nil {
 			return nil, err

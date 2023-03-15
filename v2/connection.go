@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -73,13 +76,22 @@ type Connection struct {
 	strConv           converters.IStringConverter
 	NLSData           NLSData
 	cusTyp            map[string]customType
+	maxLen            struct {
+		varchar   int
+		nvarchar  int
+		raw       int
+		number    int
+		date      int
+		timestamp int
+	}
 }
 
-//type OracleDriverContext struct {
-//}
+// type OracleDriverContext struct {
+// }
 type OracleConnector struct {
 	drv           *OracleDriver
 	connectString string
+	dialer        network.DialerContext
 }
 type OracleDriver struct {
 	//m         sync.Mutex
@@ -109,6 +121,7 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	if err != nil {
 		return nil, err
 	}
+	conn.connOption.Dialer = connector.dialer
 	err = conn.OpenWithContext(ctx)
 	if err != nil {
 		return nil, err
@@ -120,23 +133,16 @@ func (connector *OracleConnector) Driver() driver.Driver {
 	return connector.drv
 }
 
+func (connector *OracleConnector) Dialer(dialer network.DialerContext) {
+	connector.dialer = dialer
+}
+
 // Open return a new open connection
 func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 	conn, err := NewConnection(name)
 	if err != nil {
 		return nil, err
 	}
-	//drv.m.Lock()
-	//drv.Conn = conn
-	//drv.SessionId = conn.sessionID
-	//drv.SerialNum = conn.serialID
-	//drv.Instance = conn.connOption.InstanceName
-	//drv.Server = conn.connOption.Host
-	//drv.Port = conn.connOption.Port
-	//drv.Service = conn.connOption.ServiceName
-	//drv.UserId = conn.connOption.UserID
-	//drv.DBName = conn.connOption.DBName
-	//drv.m.Unlock()
 	err = conn.Open()
 	if err != nil {
 		return nil, err
@@ -339,6 +345,22 @@ func (conn *Connection) Open() error {
 	return conn.OpenWithContext(context.Background())
 }
 
+func (conn *Connection) restore() error {
+	tracer := conn.connOption.Tracer
+	failOver := conn.connOption.Failover
+	var err error
+	for trial := 0; trial < failOver; trial++ {
+		tracer.Print("reconnect trial #", trial+1)
+		err = conn.Open()
+		if err != nil {
+			tracer.Print("Error: ", err)
+			continue
+		}
+		break
+	}
+	return err
+}
+
 // OpenWithContext open the connection with timeout context
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	tracer := conn.connOption.Tracer
@@ -350,7 +372,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	default:
 		conn.LogonMode = 0
 	}
-
+	conn.connOption.ResetServerIndex()
 	conn.session = network.NewSession(conn.connOption)
 	W := conn.conStr.w
 	if conn.connOption.SSL && W != nil {
@@ -413,13 +435,13 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	tracer.Print("TTC Version: ", conn.session.TTCVersion)
 	if len(conn.tcpNego.ServerRuntimeCaps) > 6 && conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
-		converters.MAX_LEN_VARCHAR2 = 0x7FFF
-		converters.MAX_LEN_NVARCHAR2 = 0x7FFF
-		converters.MAX_LEN_RAW = 0x7FFF
+		conn.maxLen.varchar = 0x7FFF
+		conn.maxLen.nvarchar = 0x7FFF
+		conn.maxLen.raw = 0x7FFF
 	} else {
-		converters.MAX_LEN_VARCHAR2 = 0xFA0
-		converters.MAX_LEN_NVARCHAR2 = 0xFA0
-		converters.MAX_LEN_RAW = 0xFA0
+		conn.maxLen.varchar = 0xFA0
+		conn.maxLen.nvarchar = 0xFA0
+		conn.maxLen.raw = 0xFA0
 	}
 	//this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
 	//this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
@@ -490,50 +512,6 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	//userName := ""
-	//User, err := user.Current()
-	//if err == nil {
-	//	userName = User.Username
-	//}
-	//fmt.Println(userName)
-	//idx := strings.Index(userName, "\\")
-	//if idx >= 0 {
-	//	userName = userName[idx+1:]
-	//}
-	//hostName, _ := os.Hostname()
-	//indexOfSlash := strings.LastIndex(os.Args[0], "/")
-	//indexOfSlash += 1
-	//if indexOfSlash < 0 {
-	//	indexOfSlash = 0
-	//}
-
-	//connOption := &network.ConnectionOption{
-	//	//Port:                  conStr.Port,
-	//	Servers:               conStr.Servers,
-	//	Ports:                 conStr.Ports,
-	//	TransportConnectTo:    0xFFFF,
-	//	SSLVersion:            "",
-	//	WalletDict:            "",
-	//	TransportDataUnitSize: 0xFFFF,
-	//	SessionDataUnitSize:   0xFFFF,
-	//	Protocol:              "tcp",
-	//	UserID: conStr.UserID, 		"",
-	//	SID: conStr.SID,
-	//	ServiceName:  conStr.ServiceName,
-	//	InstanceName: conStr.InstanceName,
-	//	PrefetchRows: conStr.PrefetchRows,
-	//	ClientData: network.ClientInfo{
-	//		ProgramPath: os.Args[0],
-	//		ProgramName: os.Args[0][indexOfSlash:],
-	//		UserName:    userName,
-	//		HostName:    hostName,
-	//		DriverName:  "OracleClientGo",
-	//		PID:         os.Getpid(),
-	//	},
-	//	SSL:       conStr.SSL,
-	//	SSLVerify: conStr.SSLVerify,
-	//	//InAddrAny:             false,
-	//}
 
 	return &Connection{
 		State:      Closed,
@@ -542,6 +520,14 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 		autoCommit: true,
 		//w:          conStr.w,
 		cusTyp: map[string]customType{},
+		maxLen: struct {
+			varchar   int
+			nvarchar  int
+			raw       int
+			number    int
+			date      int
+			timestamp int
+		}{varchar: 0x7FFF, nvarchar: 0x7FFF, raw: 0x7FFF, number: 0x16, date: 0xB, timestamp: 0xB},
 	}, nil
 }
 
@@ -554,122 +540,12 @@ func (conn *Connection) Close() (err error) {
 		conn.session.Disconnect()
 		conn.session = nil
 	}
+	conn.State = Closed
 	conn.connOption.Tracer.Print("Connection Closed")
 	_ = conn.connOption.Tracer.Close()
 	return
 }
 
-// doOsAuth a login step that use os authentication
-//func (conn *Connection) doOsAuth() error {
-//	conn.connOption.Tracer.Print("doOsAuth")
-//	conn.session.ResetBuffer()
-//	conn.session.PutBytes(3, 0x73, 0)
-//	if len(conn.connOption.UserID) > 0 {
-//		conn.session.PutBytes(1)
-//		conn.session.PutUint(len(conn.connOption.UserID), 4, true, true)
-//	} else {
-//		conn.session.PutBytes(0, 0)
-//	}
-//	if len(conn.connOption.UserID) > 0 && len(conn.conStr.password) > 0 {
-//		conn.LogonMode |= 0x100
-//	}
-//	conn.LogonMode = conn.LogonMode | NoNewPass
-//	conn.session.PutUint(int(conn.LogonMode), 4, true, true)
-//	conn.session.PutBytes(1)
-//	conn.session.PutBytes(1, 12, 1, 1)
-//	if len(conn.connOption.UserID) > 0 {
-//		conn.session.PutString(conn.connOption.UserID)
-//	}
-//	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.HostName, 0)
-//	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ProgramName, 0)
-//	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.HostName, 0)
-//	conn.session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", conn.connOption.PID), 0)
-//	conn.session.PutKeyValString("AUTH_SID", conn.connOption.ClientInfo.UserName, 0)
-//	conn.session.PutKeyValString("AUTH_CONNECT_STRING", conn.connOption.ConnectionData(), 0)
-//	conn.session.PutKeyValString("SESSION_CLIENT_CHARSET", strconv.Itoa(conn.tcpNego.ServerCharset), 0)
-//	conn.session.PutKeyValString("SESSION_CLIENT_LIB_TYPE", "0", 0)
-//	conn.session.PutKeyValString("SESSION_CLIENT_DRIVER_NAME", "OracleClientGo", 0)
-//	conn.session.PutKeyValString("SESSION_CLIENT_VERSION", "0", 0)
-//	conn.session.PutKeyValString("SESSION_CLIENT_LOBATTR", "1", 0)
-//	//conn.session.PutKeyValString("AUTH_ACL", "8800", 0)
-//	alterSess := "ALTER SESSION SET NLS_LANGUAGE='AMERICAN' NLS_TERRITORY='AMERICA' TIME_ZONE='Africa/Cairo'\x00"
-//	conn.session.PutKeyValString("AUTH_ALTER_SESSION", alterSess, 1)
-//	err := conn.session.Write()
-//	if err != nil {
-//		return err
-//	}
-//
-//	conn.authObject, err = newAuthObject(conn.connOption.UserID, conn.conStr.password, conn.tcpNego, conn.session)
-//	if err != nil {
-//		return err
-//	}
-//	// if proxyAuth ==> mode |= PROXY
-//	err = conn.authObject.Write(conn.connOption, conn.LogonMode, conn.session)
-//	if err != nil {
-//		return err
-//	}
-//	stop := false
-//	for !stop {
-//		msg, err := conn.session.GetByte()
-//		if err != nil {
-//			return err
-//		}
-//		switch msg {
-//		case 4:
-//			conn.session.Summary, err = network.NewSummary(conn.session)
-//			if err != nil {
-//				return err
-//			}
-//			if conn.session.HasError() {
-//				return conn.session.GetError()
-//			}
-//			stop = true
-//		case 8:
-//			dictLen, err := conn.session.GetInt(2, true, true)
-//			if err != nil {
-//				return err
-//			}
-//			conn.SessionProperties = make(map[string]string, dictLen)
-//			for x := 0; x < dictLen; x++ {
-//				key, val, _, err := conn.session.GetKeyVal()
-//				if err != nil {
-//					return err
-//				}
-//				conn.SessionProperties[string(key)] = string(val)
-//			}
-//		case 15:
-//			warning, err := network.NewWarningObject(conn.session)
-//			if err != nil {
-//				return err
-//			}
-//			if warning != nil {
-//				fmt.Println(warning)
-//			}
-//		case 23:
-//			opCode, err := conn.session.GetByte()
-//			if err != nil {
-//				return err
-//			}
-//			if opCode == 5 {
-//				err = conn.loadNLSData()
-//				if err != nil {
-//					return err
-//				}
-//			} else {
-//				err = conn.getServerNetworkInformation(opCode)
-//				if err != nil {
-//					return err
-//				}
-//			}
-//		default:
-//			return errors.New(fmt.Sprintf("message code error: received code %d", msg))
-//		}
-//	}
-//
-//	// if verifyResponse == true
-//	// conn.authObject.VerifyResponse(conn.SessionProperties["AUTH_SVR_RESPONSE"])
-//	return nil
-//}
 // doAuth a login step that occur during open connection
 func (conn *Connection) doAuth() error {
 	conn.connOption.Tracer.Print("doAuth")
@@ -1012,6 +888,58 @@ func SetNTSAuth(newNTSManager advanced_nego.NTSAuthInterface) {
 	advanced_nego.NTSAuth = newNTSManager
 }
 
+// StructsInsert support interface{} array
+func (conn *Connection) StructsInsert(sqlText string, values []interface{}) (*QueryResult, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	rgx := regexp.MustCompile(`\((.*?)\)`)
+	matchArray := rgx.FindStringSubmatch(sqlText)
+	if len(matchArray) < 2 {
+		return nil, fmt.Errorf("invalid sql must be like: insert into a (name,age) values (:1,:2)")
+	}
+	fields := strings.Split(matchArray[1], ",")
+	fieldsMap := make(map[string]int)
+	for i, field := range fields {
+		fieldsMap[strings.TrimSpace(strings.ToLower(field))] = i
+	}
+	_type := reflect.TypeOf(values[0])
+	result := make([][]driver.Value, _type.NumField())
+	idx := 0
+	for i := 0; i < _type.NumField(); i++ {
+		db := _type.Field(i).Tag.Get("db")
+		db = strings.TrimSpace(strings.ToLower(db))
+		if db != "" {
+			if _, ok := fieldsMap[db]; ok {
+				f := make([]driver.Value, len(values))
+				result[idx] = f
+				idx++
+			}
+		}
+	}
+	if idx != len(fieldsMap) {
+		return nil, &network.OracleError{ErrCode: 947, ErrMsg: "ORA-00947: Not enough values"}
+	}
+	for i, item := range values {
+		_value := reflect.ValueOf(item)
+		for j := 0; j < _type.NumField(); j++ {
+			db := _type.Field(j).Tag.Get("db")
+			if db != "" {
+				if v, ok := fieldsMap[strings.ToLower(db)]; ok {
+					if !_value.Field(j).IsValid() {
+						result[v][i] = nil
+					} else {
+						result[v][i] = _value.Field(j).Interface()
+					}
+				}
+			}
+
+		}
+	}
+	return conn.BulkInsert(sqlText, len(values), result...)
+}
+
+// BulkInsert mass insert column values into a table
 // all columns should pass as an array of values
 func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driver.Value) (*QueryResult, error) {
 	if conn.State != Opened {
@@ -1081,7 +1009,7 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 				return nil, err
 			}
 		}
-		err = stmt.writePars(session)
+		err = stmt.writePars()
 		if err != nil {
 			return nil, err
 		}
@@ -1118,7 +1046,11 @@ func (conn *Connection) CheckNamedValue(named *driver.NamedValue) error {
 func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
-	return stmt.QueryContext(ctx, args)
+	rows, err := stmt.QueryContext(ctx, args)
+	if err != nil {
+		_ = stmt.Close()
+	}
+	return rows, err
 }
 
 func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
@@ -1129,4 +1061,126 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 	conn.session.StartContext(ctx)
 	defer conn.session.EndContext()
 	return NewStmt(query, conn), nil
+}
+
+func (conn *Connection) readResponse(msgCode uint8) error {
+	session := conn.session
+	tracer := conn.connOption.Tracer
+	var err error
+	switch msgCode {
+	case 4:
+		conn.session.Summary, err = network.NewSummary(session)
+		if err != nil {
+			return err
+		}
+		tracer.Printf("Summary: RetCode:%d, Error Message:%q", session.Summary.RetCode, string(session.Summary.ErrorMessage))
+	case 8:
+		size, err := session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+		for x := 0; x < size; x++ {
+			_, err = session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+		}
+		//for x := 0; x < 2; x++ {
+		//	_, err = session.GetInt(4, true, true)
+		//	if err != nil {
+		//		return err
+		//	}
+		//}
+		//for x := 2; x < size; x++ {
+		//	_, err = session.GetInt(4, true, true)
+		//	if err != nil {
+		//		return err
+		//	}
+		//}
+		_, err = session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+		size, err = session.GetInt(2, true, true)
+		for x := 0; x < size; x++ {
+			_, val, num, err := session.GetKeyVal()
+			if err != nil {
+				return err
+			}
+			//fmt.Println(key, val, num)
+			if num == 163 {
+				session.TimeZone = val
+				//fmt.Println("session time zone", session.TimeZone)
+			}
+		}
+		if session.TTCVersion >= 4 {
+			// get queryID
+			size, err = session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+			if size > 0 {
+				bty, err := session.GetBytes(size)
+				if err != nil {
+					return err
+				}
+				if len(bty) >= 8 {
+					queryID := binary.LittleEndian.Uint64(bty[size-8:])
+					fmt.Println("query ID: ", queryID)
+				}
+			}
+		}
+		if session.TTCVersion >= 7 {
+			length, err := session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+			for i := 0; i < length; i++ {
+				_, err = session.GetInt(8, true, true)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	case 9:
+		if session.HasEOSCapability {
+			temp, err := session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+			if session.Summary != nil {
+				session.Summary.EndOfCallStatus = temp
+			}
+		}
+		if session.HasFSAPCapability {
+			if session.Summary == nil {
+				session.Summary = new(network.SummaryObject)
+			}
+			session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
+			if err != nil {
+				return err
+			}
+		}
+	case 15:
+		warning, err := network.NewWarningObject(session)
+		if err != nil {
+			return err
+		}
+		if warning != nil {
+			fmt.Println(warning)
+		}
+	case 23:
+		opCode, err := session.GetByte()
+		if err != nil {
+			return err
+		}
+		err = conn.getServerNetworkInformation(opCode)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New(fmt.Sprintf("TTC error: received code %d during response reading", msgCode))
+	}
+	return nil
+	// cancel loop if = 4 or 9
 }

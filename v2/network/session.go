@@ -10,14 +10,17 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/trace"
 	"net"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/sijms/go-ora/v2/trace"
+
 	"github.com/sijms/go-ora/v2/converters"
 )
+
+//var ErrConnectionReset error = errors.New("connection reset")
 
 type Data interface {
 	Write(session *Session) error
@@ -55,6 +58,8 @@ type Session struct {
 	UseBigClrChunks   bool
 	UseBigScn         bool
 	ClrChunkSize      int
+	breakConnection   bool
+	resetConnection   bool
 	SSL               struct {
 		CertificateRequest []*x509.CertificateRequest
 		PrivateKeys        []*rsa.PrivateKey
@@ -89,6 +94,7 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 func NewSession(connOption *ConnectionOption) *Session {
 
 	return &Session{
+		ctx:      context.Background(),
 		conn:     nil,
 		inBuffer: nil,
 		index:    0,
@@ -264,12 +270,39 @@ func (session *Session) negotiate() {
 	session.sslConn = tls.Client(session.conn, config)
 }
 
+// IsBreak tell if the connection break elicit
+func (session *Session) IsBreak() bool {
+	return session.breakConnection
+}
+
+// BreakConnection elicit connetion break to cancel the current operation
+func (session *Session) BreakConnection() (PacketInterface, error) {
+	tracer := session.Context.ConnOption.Tracer
+	tracer.Print("Break Connection")
+	tempCtx := session.oldCtx
+	session.StartContext(context.Background())
+	defer func() {
+		session.EndContext()
+		session.oldCtx = tempCtx
+	}()
+	session.breakConnection = true
+	session.resetConnection = false
+	marker := newMarkerPacket(1, session.Context)
+	session.ResetBuffer()
+	err := session.writePacket(marker)
+	if err != nil {
+		return nil, err
+	}
+	return session.readPacket()
+}
+
 // Connect perform network connection on address:port
 // check if the client need to use SSL
 // then send connect packet to the server and
 // receive either accept, redirect or refuse packet
 func (session *Session) Connect(ctx context.Context) error {
-	session.ctx = ctx
+	session.StartContext(ctx)
+	defer session.EndContext()
 	connOption := session.Context.ConnOption
 	session.Disconnect()
 	connOption.Tracer.Print("Connect")
@@ -277,12 +310,19 @@ func (session *Session) Connect(ctx context.Context) error {
 	var connected = false
 	var host *ServerAddr
 	var loop = true
-	dialer := net.Dialer{
-		Timeout: time.Second * session.Context.ConnOption.Timeout,
+	dialer := connOption.Dialer
+	if dialer == nil {
+		dialer = &net.Dialer{
+			Timeout: time.Second * session.Context.ConnOption.Timeout,
+		}
 	}
+	//connOption.serverIndex = 0
 	for loop {
 		host = connOption.GetActiveServer(false)
 		if host == nil {
+			if err != nil {
+				return err
+			}
 			return errors.New("no available servers to connect to")
 		}
 		addr := host.networkAddr()
@@ -362,7 +402,7 @@ func (session *Session) Connect(ctx context.Context) error {
 		}
 		connOption.Tracer.Printf("connection to %s:%d refused with error: %s", addr, port, refusePacket.Err.Error())
 		host = connOption.GetActiveServer(true)
-		if port == 0 {
+		if host == nil {
 			session.Disconnect()
 			return &refusePacket.Err
 		}
@@ -384,22 +424,6 @@ func (session *Session) Disconnect() {
 	}
 }
 
-//func (session *Session) Debug() {
-//	//if session.index > 350 && session.index < 370 {
-//	fmt.Println("index: ", session.index)
-//	fmt.Printf("data buffer: %#v\n", session.InBuffer[session.index:session.index+30])
-//	//oldIndex := session.index
-//	//fmt.Println(session.GetClr())
-//	//session.index = oldIndex
-//	//}
-//}
-//func (session *Session) DumpIn() {
-//	log.Printf("%#v\n", session.InBuffer)
-//}
-//
-//func (session *Session) DumpOut() {
-//	log.Printf("%#v\n", session.OutBuffer)
-//}
 // Write send data store in output buffer through network
 //
 // if data bigger than SessionDataUnit it should be divided into
@@ -419,19 +443,22 @@ func (session *Session) Write() error {
 
 	segmentLen := int(session.Context.SessionDataUnit - 20)
 	offset := 0
-
-	for size > segmentLen {
-		pck, err := newDataPacket(outputBytes[offset:offset+segmentLen], session.Context)
-		if err != nil {
-			return err
+	if size > segmentLen {
+		segment := make([]byte, segmentLen)
+		for size > segmentLen {
+			copy(segment, outputBytes[offset:offset+segmentLen])
+			pck, err := newDataPacket(segment, session.Context)
+			if err != nil {
+				return err
+			}
+			err = session.writePacket(pck)
+			if err != nil {
+				session.outBuffer.Reset()
+				return err
+			}
+			size -= segmentLen
+			offset += segmentLen
 		}
-		err = session.writePacket(pck)
-		if err != nil {
-			session.outBuffer.Reset()
-			return err
-		}
-		size -= segmentLen
-		offset += segmentLen
 	}
 	if size != 0 {
 		pck, err := newDataPacket(outputBytes[offset:], session.Context)
@@ -453,7 +480,17 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 	for session.index+numBytes > len(session.inBuffer) {
 		pck, err := session.readPacket()
 		if err != nil {
-			return nil, err
+			if e, ok := err.(net.Error); ok && e.Timeout() {
+				session.Context.ConnOption.Tracer.Print("Read Timeout")
+				var breakErr error
+				pck, breakErr = session.BreakConnection()
+				if breakErr != nil {
+					session.Context.ConnOption.Tracer.Print("Connection Break With Error: ", breakErr)
+				}
+			} else {
+				return nil, err
+			}
+
 		}
 		if dataPck, ok := pck.(*DataPacket); ok {
 			session.inBuffer = append(session.inBuffer, dataPck.buffer...)
@@ -505,7 +542,6 @@ func (session *Session) GetError() *OracleError {
 
 // read a packet from network stream
 func (session *Session) readPacket() (PacketInterface, error) {
-
 	readPacketData := func() ([]byte, error) {
 		trials := 0
 		for {
@@ -529,6 +565,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				return nil, err
 			}
 			pckType := PacketType(head[4])
+			flag := head[5]
 			var length uint32
 			if session.Context.handshakeComplete && session.Context.Version >= 315 {
 				length = binary.BigEndian.Uint32(head)
@@ -561,7 +598,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			}
 
 			if pckType == RESEND {
-				if session.Context.ConnOption.SSL {
+				if session.Context.ConnOption.SSL && flag&8 != 0 {
 					session.negotiate()
 				}
 				for _, pck := range session.sendPcks {
@@ -625,25 +662,27 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return pck, nil
 	case DATA:
-		return newDataPacketFromData(packetData, session.Context)
+		dataPck, err := newDataPacketFromData(packetData, session.Context)
+		if session.Context.ConnOption.SSL && dataPck != nil && dataPck.dataFlag == 0x8000 {
+			session.negotiate()
+		}
+		return dataPck, err
 	case MARKER:
 		pck := newMarkerPacketFromData(packetData, session.Context)
-		breakConnection := false
-		resetConnection := false
 		switch pck.markerType {
 		case 0:
-			breakConnection = true
+			session.breakConnection = true
 		case 1:
 			if pck.markerData == 2 {
-				resetConnection = true
+				session.resetConnection = true
 			} else {
-				breakConnection = true
+				session.breakConnection = true
 			}
 		default:
 			return nil, errors.New("unknown marker type")
 		}
 		trials := 1
-		for breakConnection && !resetConnection {
+		for session.breakConnection && !session.resetConnection {
 			if trials > 3 {
 				return nil, errors.New("connection break")
 			}
@@ -657,12 +696,12 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			}
 			switch pck.markerType {
 			case 0:
-				breakConnection = true
+				session.breakConnection = true
 			case 1:
 				if pck.markerData == 2 {
-					resetConnection = true
+					session.resetConnection = true
 				} else {
-					breakConnection = true
+					session.breakConnection = true
 				}
 			default:
 				return nil, errors.New("unknown marker type")
@@ -674,23 +713,28 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		if err != nil {
 			return nil, err
 		}
-		if resetConnection && session.Context.AdvancedService.HashAlgo != nil {
+		if session.resetConnection && session.Context.AdvancedService.HashAlgo != nil {
 			err = session.Context.AdvancedService.HashAlgo.Init()
 			if err != nil {
 				return nil, err
 			}
 		}
+		session.breakConnection = false
+		session.resetConnection = false
+		//return nil, ErrConnectionReset
 		packetData, err = readPacketData()
 		if err != nil {
 			return nil, err
 		}
 		dataPck, err := newDataPacketFromData(packetData, session.Context)
+		return dataPck, err
 		if err != nil {
 			return nil, err
 		}
 		if dataPck == nil {
 			return nil, errors.New("connection break")
 		}
+
 		session.inBuffer = dataPck.buffer
 		session.index = 0
 		loop := true
@@ -823,13 +867,13 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compr
 	default:
 		panic("you need to pass an integer to this function")
 	}
+	// if the size is one byte no compression occur only one byte written
 	if size == 1 {
 		session.outBuffer.WriteByte(uint8(num))
 		//session.OutBuffer = append(session.OutBuffer, uint8(num))
 		return
 	}
 	if compress {
-		// if the size is one byte no compression occur only one byte written
 		temp := make([]byte, 8)
 		binary.BigEndian.PutUint64(temp, num)
 		temp = bytes.TrimLeft(temp, "\x00")
@@ -1075,40 +1119,80 @@ func (session *Session) GetNullTermString(maxSize int) (result string, err error
 
 // GetClr reed variable length bytearray from input buffer
 func (session *Session) GetClr() (output []byte, err error) {
-	var size uint8
-	var rb []byte
-	size, err = session.GetByte()
+	var nb byte
+	nb, err = session.GetByte()
 	if err != nil {
 		return
 	}
-	if size == 0 || size == 0xFF {
+	if nb == 0 || nb == 0xFF {
 		output = nil
 		err = nil
 		return
 	}
-	if size != 0xFE {
-		output, err = session.read(int(size))
-		return
-	}
+	chunkSize := int(nb)
+	var chunk []byte
 	var tempBuffer bytes.Buffer
-	for {
-		var size1 int
-		if session.UseBigClrChunks {
-			size1, err = session.GetInt(4, true, true)
-		} else {
-			size1, err = session.GetInt(1, false, false)
+	if chunkSize == 0xFE {
+		for chunkSize > 0 {
+			if session.UseBigClrChunks {
+				chunkSize, err = session.GetInt(4, true, true)
+			} else {
+				nb, err = session.GetByte()
+				chunkSize = int(nb)
+			}
+			if err != nil {
+				return
+			}
+			chunk, err = session.GetBytes(chunkSize)
+			if err != nil {
+				return
+			}
+			tempBuffer.Write(chunk)
 		}
-		if err != nil || size1 == 0 {
-			break
-		}
-		rb, err = session.read(size1)
+	} else {
+		chunk, err = session.GetBytes(chunkSize)
 		if err != nil {
 			return
 		}
-		tempBuffer.Write(rb)
+		tempBuffer.Write(chunk)
 	}
 	output = tempBuffer.Bytes()
 	return
+	//var size uint8
+	//var rb []byte
+	//size, err = session.GetByte()
+	//if err != nil {
+	//	return
+	//}
+	//if size == 0 || size == 0xFF {
+	//	output = nil
+	//	err = nil
+	//	return
+	//}
+	//if size != 0xFE {
+	//	output, err = session.read(int(size))
+	//	return
+	//}
+	//
+	//for {
+	//	var size1 int
+	//	if session.UseBigClrChunks {
+	//		size1, err = session.GetInt(4, true, true)
+	//	} else {
+	//		size, err = session.GetByte()
+	//		size1 = int(size)
+	//	}
+	//	if err != nil || size1 == 0 {
+	//		break
+	//	}
+	//	rb, err = session.read(size1)
+	//	if err != nil {
+	//		return
+	//	}
+	//	tempBuffer.Write(rb)
+	//}
+	//output = tempBuffer.Bytes()
+	//return
 }
 
 // GetDlc read variable length bytearray from input buffer

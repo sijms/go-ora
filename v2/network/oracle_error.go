@@ -1,11 +1,16 @@
 package network
 
+import "strconv"
+
 type OracleError struct {
 	ErrCode int
 	ErrMsg  string
 }
 
 func (err *OracleError) Error() string {
+	if len(err.ErrMsg) == 0 {
+		err.translate()
+	}
 	return err.ErrMsg
 }
 
@@ -29,11 +34,13 @@ func (err *OracleError) translate() {
 		err.ErrMsg = "ORA-00906: Missing left parenthesis"
 	case 907:
 		err.ErrMsg = "ORA-00907: Missing right parenthesis"
+	case 12631:
+		err.ErrMsg = "ORA-12631: Username retrieval failed"
 	case 12564:
 		err.ErrMsg = "ORA-12564: TNS connection refused"
 	case 12514:
 		err.ErrMsg = "ORA-12514: TNS:listener does not currently know of service requested in connect descriptor"
 	default:
-		err.ErrMsg = ""
+		err.ErrMsg = "ORA-" + strconv.Itoa(err.ErrCode)
 	}
 }

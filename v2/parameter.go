@@ -15,9 +15,9 @@ import (
 type OracleType int
 type ParameterDirection int
 
-//func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
+// func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
 //	return driver.Value(string(*n)), nil
-//}
+// }
 
 const (
 	Input  ParameterDirection = 1
@@ -29,14 +29,15 @@ const (
 type Out struct {
 	Dest driver.Value
 	Size int
+	In   bool
 }
 
-//internal enum BindDirection
-//{
-//Output = 16,
-//Input = 32,
-//InputOutput = 48,
-//}
+// internal enum BindDirection
+// {
+// Output = 16,
+// Input = 32,
+// InputOutput = 48,
+// }
 
 //go:generate stringer -type=OracleType
 
@@ -124,6 +125,48 @@ type ParameterInfo struct {
 	cusType              *customType
 }
 
+//func (par *ParameterInfo) clone() *ParameterInfo {
+//	out := new(ParameterInfo)
+//	*out = *par
+//out.Name = par.Name
+//out.Direction = par.Direction
+//out.DataType = par.DataType
+//out.TypeName = par.TypeName
+//out.AllowNull = par.AllowNull
+//out.ColAlias = par.ColAlias
+//out.IsNull = par.IsNull
+//out.IsXmlType = par.IsXmlType
+//out.Flag = par.Flag
+//out.Precision = par.Precision
+//out.Scale = par.Scale
+//out.MaxLen = par.MaxLen
+//out.MaxCharLen = par.MaxCharLen
+//out.MaxNoOfArrayElements = par.MaxNoOfArrayElements
+//out.ContFlag = par.ContFlag
+//out.ToID = par.ToID
+//out.Version = par.Version
+//out.CharsetID = par.CharsetID
+//out.CharsetForm = par.CharsetForm
+//out.getDataFromServer = par.getDataFromServer
+//out.oaccollid = par.oaccollid
+//	return out
+//}
+//func (par *ParameterInfo) setForDefine() {
+//	par.Flag = 3
+//	par.CharsetForm = 1
+//	switch par.DataType {
+//	case NUMBER:
+//		par.MaxLen = 0x7FFFFFFF
+//	case OCIClobLocator:
+//		fallthrough
+//	case OCIBlobLocator:
+//		par.ContFlag = 0x2000000
+//		par.MaxCharLen = 0x8000
+//		par.MaxLen = 0
+//		par.oaccollid = 0
+//	}
+//}
+
 // load get parameter information form network session
 func (par *ParameterInfo) load(conn *Connection) error {
 	session := conn.session
@@ -138,8 +181,8 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.Precision, err = session.GetByte()
-	//precision, err := session.GetInt(1, false, false)
-	//var scale int
+	// precision, err := session.GetInt(1, false, false)
+	// var scale int
 	switch par.DataType {
 	case NUMBER:
 		fallthrough
@@ -170,18 +213,18 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		}
 	default:
 		par.Scale, err = session.GetByte()
-		//scale, err = session.GetInt(1, false, false)
+		// scale, err = session.GetInt(1, false, false)
 	}
-	//if par.Scale == uint8(-127) {
+	// if par.Scale == uint8(-127) {
 	//
-	//}
+	// }
 	if par.DataType == NUMBER && par.Precision == 0 && (par.Scale == 0 || par.Scale == 0xFF) {
 		par.Precision = 38
 		par.Scale = 0xFF
 	}
 
-	//par.Scale = uint16(scale)
-	//par.Precision = uint16(precision)
+	// par.Scale = uint16(scale)
+	// par.Precision = uint16(precision)
 	par.MaxLen, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err
@@ -292,7 +335,7 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	}
 	if par.ToID == nil {
 		session.PutBytes(0)
-		//session.PutInt(0, 1, false, false)
+		// session.PutInt(0, 1, false, false)
 	} else {
 		session.PutInt(len(par.ToID), 4, true, true)
 		session.PutClr(par.ToID)
@@ -300,7 +343,7 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	session.PutUint(par.Version, 2, true, true)
 	session.PutUint(par.CharsetID, 2, true, true)
 	session.PutBytes(uint8(par.CharsetForm))
-	//session.PutUint(par.CharsetForm, 1, false, false)
+	// session.PutUint(par.CharsetForm, 1, false, false)
 	session.PutUint(par.MaxCharLen, 4, true, true)
 	if session.TTCVersion >= 8 {
 		session.PutInt(par.oaccollid, 4, true, true)
@@ -312,6 +355,12 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 	if par.Value == nil {
 		par.Value = newValue
 		return nil
+	}
+
+	if temp, ok := par.Value.(sql.Scanner); ok {
+		if temp != nil && !reflect.ValueOf(temp).IsNil() {
+			return temp.Scan(newValue)
+		}
 	}
 	switch value := par.Value.(type) {
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
@@ -390,6 +439,125 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 			return err
 		}
 		*value = temp
+	case time.Time:
+		if tempNewVal, ok := newValue.(time.Time); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("time.Time col/par need time.Time value")
+		}
+	case *time.Time:
+		if tempNewVal, ok := newValue.(time.Time); ok {
+			*value = tempNewVal
+		} else {
+			return errors.New("*time.Time col/par need time.Time value")
+		}
+	case TimeStamp:
+		if tempNewVal, ok := newValue.(TimeStamp); ok {
+			par.Value = tempNewVal
+		} else if tempNewVal, ok := newValue.(time.Time); ok {
+			par.Value = TimeStamp(tempNewVal)
+		} else {
+			return errors.New("TimeStamp col/par need TimeStamp or time.Time value")
+		}
+	case *TimeStamp:
+		if tempNewVal, ok := newValue.(TimeStamp); ok {
+			*value = tempNewVal
+		} else if tempNewVal, ok := newValue.(time.Time); ok {
+			*value = TimeStamp(tempNewVal)
+		} else {
+			return errors.New("*TimeStamp col/par need TimeStamp or time.Time value")
+		}
+	case BFile:
+		if tempNewVal, ok := newValue.(BFile); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("BFile col/par requires BFile value")
+		}
+	case *BFile:
+		var tempVal BFile
+		if tempNewVal, ok := newValue.(BFile); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*BFile col/par requires BFile value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case Clob:
+		if tempNewVal, ok := newValue.(Clob); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("Clob col/par requires Clob value")
+		}
+
+	case *Clob:
+		var tempVal Clob
+		if tempNewVal, ok := newValue.(Clob); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*Clob col/par requires Clob value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case NClob:
+		if tempNewVal, ok := newValue.(NClob); ok {
+			par.Value = tempNewVal
+		} else {
+			errors.New("NClob col/par requires NClob value")
+		}
+	case *NClob:
+		var tempVal NClob
+		if tempNewVal, ok := newValue.(NClob); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*NClob col/par requires NClob value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case Blob:
+		if tempNewVal, ok := newValue.(Blob); ok {
+			par.Value = tempNewVal
+		} else {
+			return errors.New("Blob clo/par requires Blob value")
+		}
+	case *Blob:
+		var tempVal Blob
+		if tempNewVal, ok := newValue.(Blob); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("*Blob col/par requires Blob value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case *[]byte:
+		var tempVal []byte
+		if tempNewVal, ok := newValue.([]byte); ok {
+			tempVal = tempNewVal
+		} else {
+			return errors.New("[]byte col/par requires []byte or nil value")
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
+	case *string:
+		*value = getString(newValue)
+	case NVarChar:
+		par.Value = NVarChar(getString(newValue))
+	case *NVarChar:
+		*value = NVarChar(getString(newValue))
 	case sql.NullByte:
 		if newValue == nil {
 			value.Valid = false
@@ -564,18 +732,6 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		} else {
 			*value = tempValue
 		}
-	case time.Time:
-		if tempNewVal, ok := newValue.(time.Time); ok {
-			par.Value = tempNewVal
-		} else {
-			return errors.New("time.Time col/par need time.Time value")
-		}
-	case *time.Time:
-		if tempNewVal, ok := newValue.(time.Time); ok {
-			*value = tempNewVal
-		} else {
-			return errors.New("*time.Time col/par need time.Time value")
-		}
 	case sql.NullTime:
 		if newValue == nil {
 			value.Valid = false
@@ -604,22 +760,6 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 			par.Value = &tempVal
 		} else {
 			*value = tempVal
-		}
-	case TimeStamp:
-		if tempNewVal, ok := newValue.(TimeStamp); ok {
-			par.Value = tempNewVal
-		} else if tempNewVal, ok := newValue.(time.Time); ok {
-			par.Value = TimeStamp(tempNewVal)
-		} else {
-			return errors.New("TimeStamp col/par need TimeStamp or time.Time value")
-		}
-	case *TimeStamp:
-		if tempNewVal, ok := newValue.(TimeStamp); ok {
-			*value = tempNewVal
-		} else if tempNewVal, ok := newValue.(time.Time); ok {
-			*value = TimeStamp(tempNewVal)
-		} else {
-			return errors.New("*TimeStamp col/par need TimeStamp or time.Time value")
 		}
 	case NullTimeStamp:
 		if newValue == nil {
@@ -654,77 +794,6 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		} else {
 			*value = tempVal
 		}
-	case BFile:
-		if tempNewVal, ok := newValue.(BFile); ok {
-			par.Value = tempNewVal
-		} else {
-			return errors.New("BFile col/par requires BFile value")
-		}
-	case *BFile:
-		var tempVal BFile
-		if tempNewVal, ok := newValue.(BFile); ok {
-			tempVal = tempNewVal
-		} else {
-			return errors.New("*BFile col/par requires BFile value")
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case Clob:
-		if tempNewVal, ok := newValue.(Clob); ok {
-			par.Value = tempNewVal
-		} else {
-			return errors.New("Clob col/par requires Clob value")
-		}
-
-	case *Clob:
-		var tempVal Clob
-		if tempNewVal, ok := newValue.(Clob); ok {
-			tempVal = tempNewVal
-		} else {
-			return errors.New("*Clob col/par requires Clob value")
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case Blob:
-		if tempNewVal, ok := newValue.(Blob); ok {
-			par.Value = tempNewVal
-		} else {
-			return errors.New("Blob clo/par requires Blob value")
-		}
-	case *Blob:
-		var tempVal Blob
-		if tempNewVal, ok := newValue.(Blob); ok {
-			tempVal = tempNewVal
-		} else {
-			return errors.New("*Blob col/par requires Blob value")
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case *[]byte:
-		var tempVal []byte
-		if tempNewVal, ok := newValue.([]byte); ok {
-			tempVal = tempNewVal
-		} else {
-			return errors.New("[]byte col/par requires []byte or nil value")
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	//case RefCursor:
-	//case *RefCursor:
-	case *string:
-		*value = getString(newValue)
 	case sql.NullString:
 		if newValue == nil {
 			value.Valid = false
@@ -746,10 +815,6 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		} else {
 			*value = tempVal
 		}
-	case NVarChar:
-		par.Value = NVarChar(getString(newValue))
-	case *NVarChar:
-		*value = NVarChar(getString(newValue))
 	case NullNVarChar:
 		if newValue == nil {
 			value.Valid = false
@@ -794,6 +859,18 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 		}
 		return tempVal, nil
 	}
+	if par.DataType == UROWID {
+		rowid, err := newURowID(session)
+		if err != nil {
+			return nil, err
+		}
+		if rowid == nil {
+			tempVal = nil
+		} else {
+			tempVal = string(rowid.getBytes())
+		}
+		return tempVal, nil
+	}
 	if (par.DataType == NCHAR || par.DataType == CHAR) && par.MaxCharLen == 0 {
 		par.BValue = nil
 		return nil, nil
@@ -809,7 +886,11 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 	if par.BValue == nil {
 		switch par.DataType {
 		case OCIClobLocator:
-			tempVal = Clob{locator: nil, Valid: false}
+			if par.CharsetForm == 1 {
+				tempVal = Clob{locator: nil, Valid: false}
+			} else {
+				tempVal = NClob{locator: nil, Valid: false}
+			}
 		case OCIBlobLocator:
 			tempVal = Blob{locator: nil, Valid: false}
 		case OCIFileLocator:
@@ -830,7 +911,26 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 				tempVal = connection.strConv.Decode(par.BValue)
 			}
 		case NUMBER:
-			tempVal = converters.DecodeNumber(par.BValue)
+			// Scale = 0 and Precision <18 --> int64
+			if par.Scale == 0 && par.Precision <= 18 {
+				tempVal, err = converters.NumberToInt64(par.BValue)
+				if err != nil {
+					return nil, err
+				}
+			} else if par.Scale == 0 && (converters.CompareBytes(par.BValue, converters.Int64MaxByte) > 0 &&
+				converters.CompareBytes(par.BValue, converters.Uint64MaxByte) < 0) {
+				tempVal, err = converters.NumberToUInt64(par.BValue)
+				if err != nil {
+					return tempVal, err
+				}
+			} else if par.Scale > 0 {
+				tempVal, err = converters.NumberToString(par.BValue)
+				if err != nil {
+					return tempVal, err
+				}
+			} else {
+				tempVal = converters.DecodeNumber(par.BValue)
+			}
 		case TimeStampDTY:
 			fallthrough
 		case TimeStampeLTZ:
@@ -842,11 +942,12 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 		case TimeStampTZ_DTY:
 			fallthrough
 		case TIMESTAMP:
-			dateVal, err := converters.DecodeDate(par.BValue)
-			if err != nil {
-				return nil, err
-			}
-			tempVal = TimeStamp(dateVal)
+			//dateVal, err := converters.DecodeDate(par.BValue)
+			//if err != nil {
+			//	return nil, err
+			//}
+			//tempVal = TimeStamp(dateVal)
+			fallthrough
 		case DATE:
 			dateVal, err := converters.DecodeDate(par.BValue)
 			if err != nil {
@@ -859,7 +960,11 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 				return nil, err
 			}
 			if par.DataType == OCIClobLocator {
-				tempVal = Clob{locator: locator}
+				if par.CharsetForm == 1 {
+					tempVal = Clob{locator: locator}
+				} else {
+					tempVal = NClob{locator: locator}
+				}
 			} else {
 				tempVal = Blob{locator: locator}
 			}
@@ -901,6 +1006,69 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
 
 func (par *ParameterInfo) decodeColumnValue(connection *Connection) error {
 	var err error
+	if connection.connOption.Lob == 0 && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
+		session := connection.session
+		maxSize, err := session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
+		if maxSize > 0 {
+			/*size*/ _, err = session.GetInt(8, true, true)
+			if err != nil {
+				return err
+			}
+			/*chunkSize*/ _, err := session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+			if par.DataType == OCIClobLocator {
+				flag, err := session.GetByte()
+				if err != nil {
+					return err
+				}
+				par.CharsetID = 0
+				if flag == 1 {
+					par.CharsetID, err = session.GetInt(2, true, true)
+					if err != nil {
+						return err
+					}
+				}
+				tempByte, err := session.GetByte()
+				if err != nil {
+					return err
+				}
+				par.CharsetForm = int(tempByte)
+				if par.CharsetID == 0 {
+					if par.CharsetForm == 1 {
+						par.CharsetID = connection.tcpNego.ServerCharset
+					} else {
+						par.CharsetID = connection.tcpNego.ServernCharset
+					}
+				}
+			}
+			par.BValue, err = session.GetClr()
+			if par.DataType == OCIClobLocator {
+				var tempString string
+				if connection.strConv.GetLangID() != par.CharsetID {
+					tempCharset := connection.strConv.SetLangID(par.CharsetID)
+					tempString = connection.strConv.Decode(par.BValue)
+					connection.strConv.SetLangID(tempCharset)
+				} else {
+					tempString = connection.strConv.Decode(par.BValue)
+				}
+				par.Value = tempString
+			} else {
+				par.Value = par.BValue
+			}
+			_ /*locator*/, err = session.GetClr()
+			if err != nil {
+				return err
+			}
+		} else {
+			par.Value = nil
+		}
+		return nil
+	}
 	par.Value, err = par.decodeValue(connection)
 	return err
 }

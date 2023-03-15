@@ -491,7 +491,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
 	if len(conn.NLSData.Language) == 0 {
-		_, err = conn.GetNLS()
+		//_, err = conn.GetNLS()
 		if err != nil {
 			return err
 		}

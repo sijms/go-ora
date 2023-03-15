@@ -63,7 +63,7 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 
 	//if (!this.connection.enableDataInLocator) {
 	//	var10000 = this.jdbcThinCompileTimeCapabilities;
-	//	var10000[23] &= -5;
+	//	var10000[23] &= -5; 0xFB
 	//}
 	//
 	//if (var4) {
@@ -73,7 +73,7 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	//
 	//if (var2 == null || var2.length < 1 || (var2[1] & 1) != 1) {
 	//	var10000 = this.jdbcThinRuntimeCapabilities;
-	//	var10000[1] &= -2;
+	//	var10000[1] &= -2; 0xFE
 	//}
 
 	if len(result.Server.ServerCompileTimeCaps) <= 27 || result.Server.ServerCompileTimeCaps[27] == 0 {
@@ -83,7 +83,7 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 		result.CompileTimeCaps[4] = 0
 	}
 	if !result.Server.hasCompileTimeCaps(4, 32) {
-		result.CompileTimeCaps[4] &= 223
+		result.CompileTimeCaps[4] &= 223 // 0xDF
 		//this.connection.isO7L_MRExposed = false;
 	}
 

@@ -222,10 +222,11 @@ func (par *ParameterInfo) encodeArrayTime(session *network.Session, value []time
 	}
 }
 
-func (par *ParameterInfo) encodeArrayNullNVarchar(session *network.Session, converter converters.IStringConverter, value []NullNVarChar) {
+func (par *ParameterInfo) encodeArrayNullNVarchar(conn *Connection, value []NullNVarChar) {
 	par.DataType = NCHAR
 	par.ContFlag = 16
 	par.Flag = 0x43
+	session := conn.session
 	par.MaxNoOfArrayElements = len(value)
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
@@ -235,17 +236,17 @@ func (par *ParameterInfo) encodeArrayNullNVarchar(session *network.Session, conv
 				session.WriteClr(&arrayBuffer, nil)
 				continue
 			}
-			tempLen := len([]rune(string(tempVal.NVarChar)))
+			tempLen := len([]rune(tempVal.NVarChar))
 			if par.MaxCharLen < tempLen {
 				par.MaxCharLen = tempLen
 			}
 			var tempBytes []byte
-			if converter.GetLangID() != par.CharsetID {
-				tempCharset := converter.SetLangID(par.CharsetForm)
-				tempBytes = converter.Encode(string(tempVal.NVarChar))
-				converter.SetLangID(tempCharset)
+			if conn.strConv.GetLangID() != par.CharsetID {
+				tempCharset := conn.strConv.SetLangID(par.CharsetForm)
+				tempBytes = conn.strConv.Encode(string(tempVal.NVarChar))
+				conn.strConv.SetLangID(tempCharset)
 			} else {
-				tempBytes = converter.Encode(string(tempVal.NVarChar))
+				tempBytes = conn.strConv.Encode(string(tempVal.NVarChar))
 			}
 			session.WriteClr(&arrayBuffer, tempBytes)
 			if par.MaxLen < len(tempBytes) {
@@ -254,15 +255,16 @@ func (par *ParameterInfo) encodeArrayNullNVarchar(session *network.Session, conv
 		}
 		par.BValue = arrayBuffer.Bytes()
 	} else {
-		par.MaxLen = converters.MAX_LEN_NVARCHAR2
+		par.MaxLen = conn.maxLen.nvarchar
 		par.MaxCharLen = par.MaxLen / converters.MaxBytePerChar(par.CharsetID)
 	}
 }
-func (par *ParameterInfo) encodeArrayNullString(session *network.Session, converter converters.IStringConverter, value []sql.NullString) {
+func (par *ParameterInfo) encodeArrayNullString(conn *Connection, value []sql.NullString) {
 	par.DataType = NCHAR
 	par.ContFlag = 16
 	par.Flag = 0x43
 	par.MaxNoOfArrayElements = len(value)
+	session := conn.session
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -276,12 +278,12 @@ func (par *ParameterInfo) encodeArrayNullString(session *network.Session, conver
 				par.MaxCharLen = tempLen
 			}
 			var tempBytes []byte
-			if converter.GetLangID() != par.CharsetID {
-				tempCharset := converter.SetLangID(par.CharsetForm)
-				tempBytes = converter.Encode(tempVal.String)
-				converter.SetLangID(tempCharset)
+			if conn.strConv.GetLangID() != par.CharsetID {
+				tempCharset := conn.strConv.SetLangID(par.CharsetForm)
+				tempBytes = conn.strConv.Encode(tempVal.String)
+				conn.strConv.SetLangID(tempCharset)
 			} else {
-				tempBytes = converter.Encode(tempVal.String)
+				tempBytes = conn.strConv.Encode(tempVal.String)
 			}
 			session.WriteClr(&arrayBuffer, tempBytes)
 			if par.MaxLen < len(tempBytes) {
@@ -290,15 +292,16 @@ func (par *ParameterInfo) encodeArrayNullString(session *network.Session, conver
 		}
 		par.BValue = arrayBuffer.Bytes()
 	} else {
-		par.MaxLen = converters.MAX_LEN_VARCHAR2
+		par.MaxLen = conn.maxLen.varchar
 		par.MaxCharLen = par.MaxLen / converters.MaxBytePerChar(par.CharsetID)
 	}
 }
-func (par *ParameterInfo) encodeArrayString(session *network.Session, converter converters.IStringConverter, value []string) {
+func (par *ParameterInfo) encodeArrayString(conn *Connection, value []string) {
 	par.DataType = NCHAR
 	par.ContFlag = 16
 	par.Flag = 0x43
 	par.MaxNoOfArrayElements = len(value)
+	session := conn.session
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -308,12 +311,12 @@ func (par *ParameterInfo) encodeArrayString(session *network.Session, converter 
 				par.MaxCharLen = tempLen
 			}
 			var tempBytes []byte
-			if converter.GetLangID() != par.CharsetID {
-				tempCharset := converter.SetLangID(par.CharsetForm)
-				tempBytes = converter.Encode(tempVal)
-				converter.SetLangID(tempCharset)
+			if conn.strConv.GetLangID() != par.CharsetID {
+				tempCharset := conn.strConv.SetLangID(par.CharsetForm)
+				tempBytes = conn.strConv.Encode(tempVal)
+				conn.strConv.SetLangID(tempCharset)
 			} else {
-				tempBytes = converter.Encode(tempVal)
+				tempBytes = conn.strConv.Encode(tempVal)
 			}
 			session.WriteClr(&arrayBuffer, tempBytes)
 			if par.MaxLen < len(tempBytes) {
@@ -322,7 +325,7 @@ func (par *ParameterInfo) encodeArrayString(session *network.Session, converter 
 		}
 		par.BValue = arrayBuffer.Bytes()
 	} else {
-		par.MaxLen = converters.MAX_LEN_VARCHAR2
+		par.MaxLen = conn.maxLen.varchar
 		par.MaxCharLen = par.MaxLen / converters.MaxBytePerChar(par.CharsetID)
 	}
 }
@@ -347,13 +350,13 @@ func (par *ParameterInfo) encodeArrayValue(val driver.Value, size int, connectio
 	case []NullTimeStamp:
 		par.encodeArrayNullTimeStamp(connection.session, value)
 	case *[]string:
-		par.encodeArrayString(connection.session, connection.strConv, *value)
+		par.encodeArrayString(connection, *value)
 	case []string:
-		par.encodeArrayString(connection.session, connection.strConv, value)
+		par.encodeArrayString(connection, value)
 	case []sql.NullString:
-		par.encodeArrayNullString(connection.session, connection.strConv, value)
+		par.encodeArrayNullString(connection, value)
 	case *[]sql.NullString:
-		par.encodeArrayNullString(connection.session, connection.strConv, *value)
+		par.encodeArrayNullString(connection, *value)
 	case []NVarChar:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
@@ -361,7 +364,7 @@ func (par *ParameterInfo) encodeArrayValue(val driver.Value, size int, connectio
 		for _, tempItem := range value {
 			tempArray = append(tempArray, string(tempItem))
 		}
-		par.encodeArrayString(connection.session, connection.strConv, tempArray)
+		par.encodeArrayString(connection, tempArray)
 	case *[]NVarChar:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
@@ -369,15 +372,15 @@ func (par *ParameterInfo) encodeArrayValue(val driver.Value, size int, connectio
 		for _, tempItem := range *value {
 			tempArray = append(tempArray, string(tempItem))
 		}
-		par.encodeArrayString(connection.session, connection.strConv, tempArray)
+		par.encodeArrayString(connection, tempArray)
 	case []NullNVarChar:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
-		par.encodeArrayNullNVarchar(connection.session, connection.strConv, value)
+		par.encodeArrayNullNVarchar(connection, value)
 	case *[]NullNVarChar:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
-		par.encodeArrayNullNVarchar(connection.session, connection.strConv, *value)
+		par.encodeArrayNullNVarchar(connection, *value)
 	case []int:
 		tempArray := make([]int64, len(value))
 		for idx, tempItem := range value {

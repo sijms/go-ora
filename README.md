@@ -6,6 +6,90 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
+### version 2.6.0: Add Support for Lob Prefetch
+* now you can control how you need to get lob data
+  * **pre-fetch (default)** = lob data is sent from the server before send lob locator
+  * **post-fetch** = lob data is sent from the server after send lob locator (need network call)
+* you can do this using url options
+```golang
+urlOptions := map[string]string {
+  "TRACE FILE": "trace.log",
+  "LOB FETCH": "PRE", // other value "POST"
+}
+connStr := go_ora.BuildUrl("server", 1521, "service", "", "", urlOptions)
+```
+### version 2.5.33: Add Support for Client Authentication
+* you should have server and client certificate store in wallets + working TCPS communication
+* create oracle user as follows:
+```sql
+CREATE USER "SSLCLIENT" IDENTIFIED EXTERNALLY AS 'CN=ORCLCLIENT';
+```
+* configure sqlnet.ora in the server to use client authentication
+```sql
+SQLNET.AUTHENTICATION_SERVICES=(TCPS,NTS)
+SSL_CLIENT_AUTHENTICATION=TRUE
+```
+* now connect 
+```golang
+urlOptions := map[string]string {
+  "TRACE FILE": "trace.log",
+  "AUTH TYPE":  "TCPS",
+  "SSL": "TRUE",
+  "SSL VERIFY": "FALSE",
+  "WALLET": "PATH TO WALLET"
+}
+connStr := go_ora.BuildUrl("server", 2484, "service", "", "", urlOptions)
+```
+### version 2.5.31: Add BulkCopy using DirectPath (experimental)
+* it is a way to insert large amount of rows in table or view
+* this feature use oracle [direct path](https://docs.oracle.com/database/121/ODPNT/featBulkCopy.htm#ODPNT212)
+* this feature still not implemented for the following types:
+  * LONG
+  * CLOB
+  * BLOB
+* for more help about using this feature return to bulk_copy example
+### version 2.5.19: Add Support for Kerberos5 Authentication
+* note that kerberos need an intact dns system
+* to test kerberos you need 3 machine
+  * kerberos server you can use this link to install [i use ubuntu because easy steps](https://ubuntu.com/server/docs/service-kerberos)
+  * oracle server you can configure it from this [link](https://docs.oracle.com/cd/E11882_01/network.112/e40393/asokerb.htm#ASOAG9636)
+  * client which contain our gocode using package [gokrb5](https://github.com/jcmturner/gokrb5)
+* there is an example code for kerberos, but you need to call `kinit user` before using the example
+```golang
+urlOptions := map[string]string{
+    "TRACE FILE": "trace.log",
+    "AUTH TYPE":  "KERBEROS",
+}
+// note empty password
+connStr := go_ora.BuildUrl("server", 1521, "service", "krb_user", "", urlOptions)
+
+type KerberosAuth struct{}
+func (kerb KerberosAuth) Authenticate(server, service string) ([]byte, error) {
+    // see implementation in examples/kerberos
+}
+advanced_nego.SetKerberosAuth(&KerberosAuth{})
+```
+### version 2.5.16: Add Support for cwallet.sso created with -auto_login_local option
+* note that this type of oracle wallets only work on the machine where they were created 
+### version 2.5.14: Failover and wallet update
+* Exec will return error after connection restore
+* add new field _**WALLET PASSWORD**_ to read ewallet.p12 file
+### version 2.5.13: Add Support For Failover (Experimental)
+* to use failover pass it into connection string as follow
+```golang
+urlOptions := map[string]string{
+	"FAILOVER": "5",
+	"TRACE FILE": "trace.log",
+}
+databaseUrl := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
+```
+* FAILOVER value is integer indicate how many times the driver will try to reconnect after lose connection default value = 0
+* failover will activated when stmt receive io.EOF error during read or write
+* FAILOVER work in 3 places:
+    * Query when fail the driver will reconnect and re-query up to failover number.
+    * Exec when fail the driver will reconnect up to failover times then return the error to avoid unintended re-execution.
+    * Fetch when fail the driver will reconnect up to failover times then return the error (whatever failover success or fail)
+
 ### version 2.4.28: Binary Double And Float Fix
 - Now you can read binary double and float without error issue#217
 - You can avoid calling cgo function `user.Current()` if you define environmental variable $USER

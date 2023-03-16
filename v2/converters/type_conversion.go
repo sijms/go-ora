@@ -195,6 +195,7 @@ var zoneid = map[int]string{
 	245:  "Asia/Thimbu",
 	267:  "Asia/Tokyo",
 	262:  "Asia/Ujung_Pandang",
+	772:  "Asia/Kolkata",
 	793:  "Asia/Ulan_Bator",
 	276:  "Asia/Vientiane",
 	309:  "Asia/Vladivostok",

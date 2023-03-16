@@ -6,7 +6,7 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
-### version 2.6.0: Add Support for Lob Prefetch
+### version 2.6.2: Add Support for Lob Prefetch
 * now you can control how you need to get lob data
   * **pre-fetch (default)** = lob data is sent from the server before send lob locator
   * **post-fetch** = lob data is sent from the server after send lob locator (need network call)

@@ -496,7 +496,7 @@ func (nego *DataTypeNego) write(session *network.Session) error {
 	if nego.RuntimeCap[1]&1 == 1 {
 		session.PutBytes(TZBytes()...)
 		if nego.CompileTimeCaps[37]&2 == 2 {
-			session.PutBytes(0, 0, 0, 21)
+			session.PutBytes(0, 0, 0, 0x20)
 		}
 	}
 	session.PutInt(nego.Server.ServernCharset, 2, false, false)

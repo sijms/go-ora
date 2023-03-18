@@ -48,7 +48,7 @@ func _() {
 	_ = x[IntervalDS_DTY-183]
 	_ = x[TimeTZ-186]
 	_ = x[TIMESTAMP-187]
-	_ = x[TimeStampTZ-188]
+	_ = x[TIMESTAMPTZ-188]
 	_ = x[IntervalYM-189]
 	_ = x[IntervalDS-190]
 	_ = x[UROWID-208]

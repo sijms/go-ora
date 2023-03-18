@@ -202,7 +202,7 @@ func (par *ParameterInfo) encodeArrayTimeStamp(session *network.Session, value [
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
 		for _, tempVal := range value {
-			session.WriteClr(&arrayBuffer, converters.EncodeTimeStamp(time.Time(tempVal)))
+			session.WriteClr(&arrayBuffer, converters.EncodeTimeStamp(time.Time(tempVal), false))
 		}
 		par.BValue = arrayBuffer.Bytes()
 	}

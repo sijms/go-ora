@@ -82,7 +82,7 @@ const (
 	IntervalDS_DTY   OracleType = 183
 	TimeTZ           OracleType = 186
 	TIMESTAMP        OracleType = 187
-	TimeStampTZ      OracleType = 188
+	TIMESTAMPTZ      OracleType = 188
 	IntervalYM       OracleType = 189
 	IntervalDS       OracleType = 190
 	UROWID           OracleType = 208
@@ -194,7 +194,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		fallthrough
 	case TIMESTAMP:
 		fallthrough
-	case TimeStampTZ:
+	case TIMESTAMPTZ:
 		fallthrough
 	case IntervalDS:
 		fallthrough
@@ -937,7 +937,7 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 			fallthrough
 		case TimeStampLTZ_DTY:
 			fallthrough
-		case TimeStampTZ:
+		case TIMESTAMPTZ:
 			fallthrough
 		case TimeStampTZ_DTY:
 			fallthrough

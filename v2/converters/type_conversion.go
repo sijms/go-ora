@@ -530,8 +530,13 @@ func EncodeDate(ti time.Time) []byte {
 	return ret
 }
 
-func EncodeTimeStamp(ti time.Time) []byte {
-	ret := make([]byte, 11)
+func EncodeTimeStamp(ti time.Time, withTZ bool) []byte {
+	var ret []byte
+	if withTZ {
+		ret = make([]byte, 13)
+	} else {
+		ret = make([]byte, 11)
+	}
 	ret[0] = uint8(ti.Year()/100 + 100)
 	ret[1] = uint8(ti.Year()%100 + 100)
 	ret[2] = uint8(ti.Month())
@@ -540,6 +545,11 @@ func EncodeTimeStamp(ti time.Time) []byte {
 	ret[5] = uint8(ti.Minute() + 1)
 	ret[6] = uint8(ti.Second() + 1)
 	binary.BigEndian.PutUint32(ret[7:11], uint32(ti.Nanosecond()))
+	if withTZ {
+		_, offset := ti.Zone()
+		ret[11] = uint8(offset/3600) + 20
+		ret[12] = uint8(offset%3600) + 60
+	}
 	return ret
 
 }

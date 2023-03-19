@@ -389,17 +389,23 @@ func getFloat(col interface{}) (float64, error) {
 
 // try to get int64 value from the row field
 func getInt(col interface{}) (int64, error) {
-	if temp, ok := col.(int64); ok {
-		return temp, nil
-	} else if temp, ok := col.(float64); ok {
-		return int64(temp), nil
-	} else if temp, ok := col.(string); ok {
-		tempInt, err := strconv.ParseInt(temp, 10, 64)
+	switch col := col.(type) {
+	case int64:
+		return col, nil
+	case float64:
+		return int64(col), nil
+	case string:
+		tempInt, err := strconv.ParseInt(col, 10, 64)
 		if err != nil {
 			return 0, err
 		}
 		return tempInt, nil
-	} else {
+	case bool:
+		if col {
+			return 1, nil
+		}
+		return 0, nil
+	default:
 		return 0, errors.New("unkown type")
 	}
 }

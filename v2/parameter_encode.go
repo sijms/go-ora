@@ -102,7 +102,7 @@ func (par *ParameterInfo) encodeTimeStampTZ(value TimeStampTZ) {
 	par.setForTime()
 	par.DataType = TimeStampTZ_DTY
 	par.MaxLen = 0xD
-	par.BValue = converters.EncodeTimeStamp(time.Time(value), true)
+	par.BValue = converters.EncodeTimeStamp(value.Time, true)
 }
 func (par *ParameterInfo) encodeTimeStamp(value TimeStamp) {
 	par.setForTime()
@@ -183,8 +183,8 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				case NullTimeStamp:
 					par.setForTime()
 					par.DataType = TIMESTAMP
-				case NullTimeStampTZ:
-					par.setForTime()
+					//case NullTimeStampTZ:
+					//	par.setForTime()
 					par.DataType = TimeStampTZ_DTY
 					par.MaxLen = 0xD
 				case *sql.NullInt32:
@@ -210,10 +210,10 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				case *NullTimeStamp:
 					par.setForTime()
 					par.DataType = TIMESTAMP
-				case *NullTimeStampTZ:
-					par.setForTime()
-					par.DataType = TimeStampTZ_DTY
-					par.MaxLen = 0xD
+				//case *NullTimeStampTZ:
+				//	par.setForTime()
+				//	par.DataType = TimeStampTZ_DTY
+				//	par.MaxLen = 0xD
 				default:
 					par.encodeString("", nil, size)
 				}
@@ -586,10 +586,10 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	case *NullTimeStamp:
 		par.setForTime()
 		par.DataType = TIMESTAMP
-	case *NullTimeStampTZ:
-		par.setForTime()
-		par.DataType = TimeStampTZ_DTY
-		par.MaxLen = 0xD
+	//case *NullTimeStampTZ:
+	//	par.setForTime()
+	//	par.DataType = TimeStampTZ_DTY
+	//	par.MaxLen = 0xD
 	default:
 		custVal := reflect.ValueOf(val)
 		if custVal.Kind() == reflect.Ptr {

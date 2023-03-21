@@ -4,6 +4,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"github.com/sijms/go-ora/v2/converters"
+	"strings"
 	"time"
 )
 
@@ -12,7 +14,11 @@ type ValueEncoder interface {
 }
 type NVarChar string
 type TimeStamp time.Time
-type TimeStampTZ time.Time
+type TimeStampTZ struct {
+	Valid  bool
+	Time   time.Time
+	zoneID int
+}
 
 type NullNVarChar struct {
 	Valid    bool
@@ -24,11 +30,20 @@ type NullTimeStamp struct {
 	TimeStamp TimeStamp
 }
 
-type NullTimeStampTZ struct {
-	Valid       bool
-	TimeStampTZ TimeStampTZ
+func NewTimeStampTZ(localTime time.Time, zone string) (*TimeStampTZ, error) {
+	upperZone := strings.ToUpper(zone)
+	for key, val := range converters.OracleZones {
+		if strings.ToUpper(val) == upperZone {
+			zoneLoc, _ := time.LoadLocation(val)
+			return &TimeStampTZ{
+				Valid:  true,
+				Time:   localTime.In(zoneLoc),
+				zoneID: key,
+			}, nil
+		}
+	}
+	return nil, errors.New("unknown zone")
 }
-
 func (val *NVarChar) Value() (driver.Value, error) {
 	return driver.Value(string(*val)), nil
 }
@@ -40,7 +55,6 @@ func (val *NVarChar) Scan(value interface{}) error {
 //func (val *NVarChar) ValueDecoder(buffer []byte) error {
 //
 //}
-
 //func (val *NVarChar) EncodeValue(param *ParameterInfo, connection *Connection) error {
 //	strVal := string(*val)
 //	param.DataType = NCHAR
@@ -69,7 +83,6 @@ func (val *NVarChar) Scan(value interface{}) error {
 //	}
 //	return nil
 //}
-
 //func (val *TimeStamp) EncodeValue(param *ParameterInfo, _ *Connection) error {
 //	param.setForTime()
 //	param.DataType = TIMESTAMP
@@ -97,20 +110,28 @@ func (val *TimeStamp) Scan(value interface{}) error {
 	return nil
 }
 
-func (val *TimeStampTZ) Value() (driver.Value, error) {
-	return driver.Value(time.Time(*val)), nil
-}
+//func (val *TimeStampTZ) Value() (driver.Value, error) {
+//	return driver.Value(time.Time(*val)), nil
+//}
 
 func (val *TimeStampTZ) Scan(value interface{}) error {
+	if value == nil {
+		val.Valid = false
+		return nil
+	}
 	switch temp := value.(type) {
 	case TimeStampTZ:
 		*val = temp
 	case *TimeStampTZ:
 		*val = *temp
 	case time.Time:
-		*val = TimeStampTZ(temp)
+		val.Time = temp
+		val.Valid = true
+		val.zoneID = 0
 	case *time.Time:
-		*val = TimeStampTZ(*temp)
+		val.Time = *temp
+		val.Valid = true
+		val.zoneID = 0
 	default:
 		return errors.New("go-ora: TimeStamp column type require time.Time value")
 	}
@@ -149,23 +170,6 @@ func (val *NullTimeStamp) Scan(value interface{}) error {
 	}
 	val.Valid = true
 	return val.TimeStamp.Scan(value)
-}
-
-func (val *NullTimeStampTZ) Value() (driver.Value, error) {
-	if val.Valid {
-		return val.TimeStampTZ.Value()
-	} else {
-		return nil, nil
-	}
-}
-
-func (val *NullTimeStampTZ) Scan(value interface{}) error {
-	if value == nil {
-		val.Valid = false
-		return nil
-	}
-	val.Valid = true
-	return val.TimeStampTZ.Scan(value)
 }
 
 //func (val *NullNVarChar) Value() (driver.Value, error) {
@@ -208,19 +212,19 @@ func (val *NullNVarChar) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (val TimeStampTZ) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Time(val))
-}
-
-func (val *TimeStampTZ) UnmarshalJSON(data []byte) error {
-	var temp time.Time
-	err := json.Unmarshal(data, &temp)
-	if err != nil {
-		return err
-	}
-	*val = TimeStampTZ(temp)
-	return nil
-}
+//func (val TimeStampTZ) MarshalJSON() ([]byte, error) {
+//	return json.Marshal(time.Time(val))
+//}
+//
+//func (val *TimeStampTZ) UnmarshalJSON(data []byte) error {
+//	var temp time.Time
+//	err := json.Unmarshal(data, &temp)
+//	if err != nil {
+//		return err
+//	}
+//	*val = TimeStampTZ(temp)
+//	return nil
+//}
 
 func (val TimeStamp) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Time(val))
@@ -258,27 +262,27 @@ func (val *NullTimeStamp) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (val NullTimeStampTZ) MarshalJSON() ([]byte, error) {
-	if val.Valid {
-		return json.Marshal(time.Time(val.TimeStampTZ))
-	}
-	return json.Marshal(nil)
-}
+//func (val TimeStampTZ) MarshalJSON() ([]byte, error) {
+//	if val.Valid {
+//		return json.Marshal(time.Time(val.TimeStampTZ))
+//	}
+//	return json.Marshal(nil)
+//}
 
-func (val *NullTimeStampTZ) UnmarshalJSON(data []byte) error {
-	var temp = new(time.Time)
-	err := json.Unmarshal(data, temp)
-	if err != nil {
-		return err
-	}
-	if temp == nil {
-		val.Valid = false
-	} else {
-		val.Valid = true
-		val.TimeStampTZ = TimeStampTZ(*temp)
-	}
-	return nil
-}
+//func (val *NullTimeStampTZ) UnmarshalJSON(data []byte) error {
+//	var temp = new(time.Time)
+//	err := json.Unmarshal(data, temp)
+//	if err != nil {
+//		return err
+//	}
+//	if temp == nil {
+//		val.Valid = false
+//	} else {
+//		val.Valid = true
+//		val.TimeStampTZ = TimeStampTZ(*temp)
+//	}
+//	return nil
+//}
 
 func (val NClob) MarshalJSON() ([]byte, error) {
 	if val.Valid {

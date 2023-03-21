@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/bits"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,7 +17,7 @@ const (
 	maxConvertibleNegInt = (1 << 63)
 )
 
-var OracleZones = map[int]string{
+var oracleZones = map[int]string{
 	42:   "Africa/Abidjan",
 	50:   "Africa/Accra",
 	47:   "Africa/Addis_Ababa",
@@ -1126,12 +1127,7 @@ func EncodeDate(ti time.Time) []byte {
 }
 
 func EncodeTimeStamp(ti time.Time, withTZ bool) []byte {
-	var ret []byte
-	if withTZ {
-		ret = make([]byte, 13)
-	} else {
-		ret = make([]byte, 11)
-	}
+	ret := make([]byte, 11)
 	ret[0] = uint8(ti.Year()/100 + 100)
 	ret[1] = uint8(ti.Year()%100 + 100)
 	ret[2] = uint8(ti.Month())
@@ -1141,11 +1137,19 @@ func EncodeTimeStamp(ti time.Time, withTZ bool) []byte {
 	ret[6] = uint8(ti.Second() + 1)
 	binary.BigEndian.PutUint32(ret[7:11], uint32(ti.Nanosecond()))
 	if withTZ {
-		//_, offset := ti.Zone()
-		//ret[11] = uint8(offset/3600) + 20
-		//ret[12] = uint8((offset/60)%60) + 60
-		ret[11] = 0x84
-		ret[12] = 0x81
+		zoneLoc := ti.Location()
+		zoneID := 0
+		for key, val := range oracleZones {
+			if strings.EqualFold(zoneLoc.String(), val) {
+				zoneID = key
+				break
+			}
+		}
+		if zoneID > 0 {
+			zone1 := uint8((zoneID&0x1FC0)>>6) | 0x80
+			zone2 := uint8(zoneID&0x3F) << 2
+			ret = append(ret, zone1, zone2)
+		}
 	}
 	return ret
 }
@@ -1178,7 +1182,7 @@ func DecodeDate(data []byte) (time.Time, error) {
 	if data[11]&0x80 != 0 {
 		var regionCode = (int(data[11]) & 0x7F) << 6
 		regionCode += (int(data[12]) & 0xFC) >> 2
-		name, found := OracleZones[regionCode]
+		name, found := oracleZones[regionCode]
 		if found {
 			zone, _ = time.LoadLocation(name)
 			//if err == nil {

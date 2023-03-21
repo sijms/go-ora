@@ -5,13 +5,14 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/network"
-	"github.com/sijms/go-ora/v2/trace"
 	"io"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/trace"
 )
 
 // Compile time Sentinels for implemented Interfaces.
@@ -19,8 +20,8 @@ var _ = driver.Rows((*DataSet)(nil))
 var _ = driver.RowsColumnTypeDatabaseTypeName((*DataSet)(nil))
 var _ = driver.RowsColumnTypeLength((*DataSet)(nil))
 var _ = driver.RowsColumnTypeNullable((*DataSet)(nil))
+var _ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
 
-// var _ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
 // var _ = driver.RowsColumnTypeScanType((*DataSet)(nil))
 // var _ = driver.RowsNextResultSet((*DataSet)(nil))
 
@@ -498,21 +499,24 @@ func (dataSet DataSet) ColumnTypeDatabaseTypeName(index int) string {
 }
 
 // ColumnTypeLength return length of column type
-func (dataSet DataSet) ColumnTypeLength(index int) (length int64, ok bool) {
-	length = int64(len(dataSet.Cols[index].BValue))
-	ok = true
-	return
-	//switch dataSet.Cols[index].DataType {
-	//case NCHAR, CHAR:
-	//	return int64(dataSet.Cols[index].MaxCharLen), true
-	//case NUMBER:
-	//	return int64(dataSet.Cols[index].Precision), true
-	//}
-	//return int64(0), false
-
+func (dataSet DataSet) ColumnTypeLength(index int) (int64, bool) {
+	switch dataSet.Cols[index].DataType {
+	case NCHAR, CHAR:
+		return int64(dataSet.Cols[index].MaxCharLen), true
+	}
+	return int64(0), false
 }
 
 // ColumnTypeNullable return if column allow null or not
 func (dataSet DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {
 	return dataSet.Cols[index].AllowNull, true
+}
+
+// ColumnTypePrecisionScale return the precision and scale for numeric types
+func (dataSet DataSet) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
+	switch dataSet.Cols[index].DataType {
+	case NUMBER:
+		return int64(dataSet.Cols[index].Precision), int64(dataSet.Cols[index].Scale), true
+	}
+	return int64(0), int64(0), false
 }

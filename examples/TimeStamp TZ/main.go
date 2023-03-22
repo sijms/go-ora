@@ -51,6 +51,21 @@ func insertData(conn *sql.DB, loc string) error {
 	return nil
 }
 
+func queryOutputPar(conn *sql.DB) error {
+	t := time.Now()
+	//var data sql.NullTime
+	var data go_ora.NullTimeStampTZ
+	//var data go_ora.TimeStampTZ
+	_, err := conn.Exec(`BEGIN SELECT DATA INTO :1 FROM TEMP_TABLE_322 WHERE ID=1; END;`, go_ora.Out{Dest: &data})
+	if err != nil {
+		return err
+	}
+	//fmt.Println(data, "\tLocation: ", data.Time.Location())
+	//fmt.Println(time.Time(data), "\tLocation: ", time.Time(data).Location())
+	fmt.Println(time.Time(data.TimeStampTZ), "\tLocation: ", time.Time(data.TimeStampTZ).Location())
+	fmt.Println("Finish query data: ", time.Now().Sub(t))
+	return nil
+}
 func queryData(conn *sql.DB) error {
 	t := time.Now()
 	var data time.Time
@@ -108,6 +123,11 @@ func main() {
 	err = queryData(conn)
 	if err != nil {
 		fmt.Println("can't query data: ", err)
+		return
+	}
+	err = queryOutputPar(conn)
+	if err != nil {
+		fmt.Println("can't query output: ", err)
 		return
 	}
 }

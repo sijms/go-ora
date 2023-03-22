@@ -29,21 +29,6 @@ type NullTimeStampTZ struct {
 	TimeStampTZ TimeStampTZ
 }
 
-//func NewTimeStampTZ(localTime time.Time, zone string) (*TimeStampTZ, error) {
-//	upperZone := strings.ToUpper(zone)
-//	for key, val := range converters.OracleZones {
-//		if strings.ToUpper(val) == upperZone {
-//			zoneLoc, _ := time.LoadLocation(val)
-//			return &TimeStampTZ{
-//				Valid:  true,
-//				Time:   localTime.In(zoneLoc),
-//				zoneID: key,
-//			}, nil
-//		}
-//	}
-//	return nil, errors.New("unknown zone")
-//}
-
 func (val *NVarChar) Value() (driver.Value, error) {
 	return driver.Value(string(*val)), nil
 }

@@ -1157,10 +1157,7 @@ func EncodeTimeStamp(ti time.Time, withTZ bool) []byte {
 			zone1 := uint8((zoneID&0x1FC0)>>6) | 0x80
 			zone2 := uint8((zoneID & 0x3F) << 2)
 			ret = append(ret, zone1, zone2)
-			ret[12] = ret[12] | 1
-			if ti.IsDST() {
-				ret[12] = ret[12] | 2
-			}
+
 		} else {
 			_, offset := ti.Zone()
 			zone1 := uint8(offset/3600) + 20

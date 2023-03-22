@@ -19,6 +19,8 @@ type DataTypeNego struct {
 	DBTimeZone             []byte
 	b32kTypeSupported      bool
 	supportSessionStateOps bool
+	serverTZVersion        int
+	clientTZVersion        int
 }
 
 const (
@@ -72,6 +74,7 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 		RuntimeCap:             []byte{2, 1, 0, 0, 0, 0, 0},
 		b32kTypeSupported:      false,
 		supportSessionStateOps: false,
+		clientTZVersion:        0x20,
 	}
 	if len(result.Server.ServerCompileTimeCaps) <= 27 || result.Server.ServerCompileTimeCaps[27] == 0 {
 		result.CompileTimeCaps[27] = 0
@@ -466,7 +469,7 @@ func (nego *DataTypeNego) read(session *network.Session) error {
 			return err
 		}
 		if nego.CompileTimeCaps[37]&2 == 2 {
-			_, _ = session.GetInt(4, false, false)
+			nego.serverTZVersion, _ = session.GetInt(4, false, true)
 		}
 	}
 	level := 0
@@ -511,7 +514,8 @@ func (nego *DataTypeNego) write(session *network.Session) error {
 	if nego.RuntimeCap[1]&1 == 1 {
 		session.PutBytes(TZBytes()...)
 		if nego.CompileTimeCaps[37]&2 == 2 {
-			session.PutBytes(0, 0, 0, 0x20)
+			session.PutInt(nego.clientTZVersion, 4, true, false)
+			//session.PutBytes(0, 0, 0, uint8(nego.clientTZVersion))
 		}
 	}
 	session.PutInt(nego.Server.ServernCharset, 2, false, false)

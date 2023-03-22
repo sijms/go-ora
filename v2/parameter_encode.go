@@ -98,11 +98,22 @@ func (par *ParameterInfo) encodeTime(value time.Time) {
 	par.BValue = converters.EncodeDate(value)
 }
 
-func (par *ParameterInfo) encodeTimeStampTZ(value TimeStampTZ) {
+func (par *ParameterInfo) encodeTimeStampTZ(value TimeStampTZ, conn *Connection) {
 	par.setForTime()
 	par.DataType = TimeStampTZ_DTY
 	par.MaxLen = 0xD
-	par.BValue = converters.EncodeTimeStamp(time.Time(value), true)
+	temp := converters.EncodeTimeStamp(time.Time(value), true)
+	if conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion {
+		if temp[11]&0x80 != 0 {
+			temp[12] |= 1
+			if time.Time(value).IsDST() {
+				temp[12] |= 2
+			}
+		} else {
+			temp[11] |= 0x40
+		}
+	}
+	par.BValue = temp
 }
 func (par *ParameterInfo) encodeTimeStamp(value TimeStamp) {
 	par.setForTime()
@@ -346,14 +357,14 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			par.encodeTimeStamp(*value)
 		}
 	case TimeStampTZ:
-		par.encodeTimeStampTZ(value)
+		par.encodeTimeStampTZ(value, connection)
 	case *TimeStampTZ:
 		if value == nil {
 			par.setForTime()
 			par.MaxLen = 0xD
 			par.DataType = TimeStampTZ_DTY
 		} else {
-			par.encodeTimeStampTZ(*value)
+			par.encodeTimeStampTZ(*value, connection)
 		}
 	case NClob:
 		par.CharsetForm = 2

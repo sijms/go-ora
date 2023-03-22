@@ -101,7 +101,7 @@ func (par *ParameterInfo) encodeTime(value time.Time) {
 func (par *ParameterInfo) encodeTimeStampTZ(value TimeStampTZ, conn *Connection) {
 	par.setForTime()
 	par.DataType = TimeStampTZ_DTY
-	par.MaxLen = 0xD
+	par.MaxLen = converters.MAX_LEN_TIMESTAMP
 	temp := converters.EncodeTimeStamp(time.Time(value), true)
 	if conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion {
 		if temp[11]&0x80 != 0 {
@@ -197,7 +197,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				case NullTimeStampTZ:
 					par.setForTime()
 					par.DataType = TimeStampTZ_DTY
-					par.MaxLen = 0xD
+					par.MaxLen = converters.MAX_LEN_TIMESTAMP
 				case *sql.NullInt32:
 					par.setForNumber()
 				case *sql.NullBool:
@@ -224,7 +224,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				case *NullTimeStampTZ:
 					par.setForTime()
 					par.DataType = TimeStampTZ_DTY
-					par.MaxLen = 0xD
+					par.MaxLen = converters.MAX_LEN_TIMESTAMP
 				default:
 					par.encodeString("", nil, size)
 				}
@@ -361,7 +361,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	case *TimeStampTZ:
 		if value == nil {
 			par.setForTime()
-			par.MaxLen = 0xD
+			par.MaxLen = converters.MAX_LEN_TIMESTAMP
 			par.DataType = TimeStampTZ_DTY
 		} else {
 			par.encodeTimeStampTZ(*value, connection)
@@ -600,7 +600,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	case *NullTimeStampTZ:
 		par.setForTime()
 		par.DataType = TimeStampTZ_DTY
-		par.MaxLen = 0xD
+		par.MaxLen = converters.MAX_LEN_TIMESTAMP
 	default:
 		custVal := reflect.ValueOf(val)
 		if custVal.Kind() == reflect.Ptr {

@@ -4,12 +4,13 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
-	"github.com/sijms/go-ora/v2/converters"
-	"github.com/sijms/go-ora/v2/network"
 	"math"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/v2/converters"
+	"github.com/sijms/go-ora/v2/network"
 )
 
 type OracleType int
@@ -367,6 +368,12 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		par.Value = newValue
 	case float32, float64, string, []byte:
 		par.Value = newValue
+	case bool:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		par.Value = temp != 0
 	case *int:
 		temp, err := getInt(newValue)
 		if err != nil {
@@ -508,7 +515,7 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		if tempNewVal, ok := newValue.(NClob); ok {
 			par.Value = tempNewVal
 		} else {
-			errors.New("NClob col/par requires NClob value")
+			return errors.New("NClob col/par requires NClob value")
 		}
 	case *NClob:
 		var tempVal NClob
@@ -554,6 +561,12 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		}
 	case *string:
 		*value = getString(newValue)
+	case *bool:
+		temp, err := getInt(newValue)
+		if err != nil {
+			return err
+		}
+		*value = temp != 0
 	case NVarChar:
 		par.Value = NVarChar(getString(newValue))
 	case *NVarChar:

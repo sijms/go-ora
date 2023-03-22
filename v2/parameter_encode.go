@@ -235,6 +235,12 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		}
 	}
 	switch value := val.(type) {
+	case bool:
+		if value {
+			par.encodeInt(1)
+		} else {
+			par.encodeInt(0)
+		}
 	case int:
 		par.encodeInt(int64(value))
 	case int8:
@@ -245,6 +251,17 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		par.encodeInt(int64(value))
 	case int64:
 		par.encodeInt(value)
+	case *bool:
+		if value == nil {
+			par.setForNumber()
+		} else {
+			if *value {
+				par.encodeInt(1)
+			} else {
+				par.encodeInt(0)
+			}
+		}
+
 	case *int:
 		if value == nil {
 			par.setForNumber()

@@ -28,6 +28,8 @@ type ClientInfo struct {
 	DriverName  string
 	PID         int
 	UseKerberos bool
+	Language    string
+	Territory   string
 }
 type DatabaseInfo struct {
 	UserID          string

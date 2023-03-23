@@ -170,6 +170,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			DatabaseInfo: network.DatabaseInfo{
 				Servers: make([]network.ServerAddr, 0, 3),
 			},
+			ClientInfo: network.ClientInfo{Territory: "AMERICA", Language: "AMERICAN"},
 		},
 		Port:         defaultPort,
 		DBAPrivilege: NONE,
@@ -307,6 +308,10 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				} else {
 					return nil, errors.New("LOB FETCH value should be: PRE(default) or POST")
 				}
+			case "LANGUAGE":
+				ret.connOption.Language = val[0]
+			case "TERRITORY":
+				ret.connOption.Territory = val[0]
 				//else if tempVal == "IMPLICIT" || tempVal == "AUTO" {
 				//	ret.connOption.Lob = 1
 				//} else if tempVal == "EXPLICIT" || tempVal == "MANUAL" {

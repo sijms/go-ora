@@ -6,6 +6,15 @@
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
+### version 2.6.5: Add New Url Options (Language and Territory)
+* this will control the language of the server messages
+```golang
+urlOptions := map[string]string {
+"language": "PORTUGUESE",
+"territory": "BRAZILIAN",
+}
+url := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
+```
 ### version 2.6.4: Add Support for TimeStamp with timezone
 * now you can use TimeStampTZ as input/output parameters to manage timestamp with timezone 
 * see code in examples/TimeStamp TZ

@@ -304,7 +304,8 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 		tz = fmt.Sprintf("%+03d:%02d", hours, minutes)
 	}
 	appendKeyVal("AUTH_ALTER_SESSION",
-		fmt.Sprintf("ALTER SESSION SET NLS_LANGUAGE='AMERICAN' NLS_TERRITORY='AMERICA'  TIME_ZONE='%s'\x00", tz), 1)
+		fmt.Sprintf("ALTER SESSION SET NLS_LANGUAGE='%s' NLS_TERRITORY='%s'  TIME_ZONE='%s'\x00",
+			connOption.Language, connOption.Territory, tz), 1)
 	index++
 	if len(connOption.ProxyClientName) > 0 {
 		appendKeyVal("PROXY_CLIENT_NAME", connOption.ProxyClientName, 0)

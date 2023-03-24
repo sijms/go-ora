@@ -2,7 +2,7 @@
 ## Pure go oracle client
 
 ### note:
-###### the original oracle drivers is very complex and contain many features which are difficult to add them at one time
+###### the original oracle drivers are very complex and contain many features which are difficult to add them at one time
 ###### your feedbacks are very important for this project to proceed
 ```
     - Use version 2 you will need to import github.com/sijms/go-ora/v2

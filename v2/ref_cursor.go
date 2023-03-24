@@ -47,6 +47,9 @@ func (cursor *RefCursor) load() error {
 			if cursor.columns[x].DataType == OCIClobLocator || cursor.columns[x].DataType == OCIBlobLocator {
 				cursor._hasBLOB = true
 			}
+			if cursor.columns[x].DataType == LONG || cursor.columns[x].DataType == LongRaw {
+				cursor._hasLONG = true
+			}
 		}
 	}
 	_, err = session.GetDlc()

@@ -1,11 +1,17 @@
 # go-ora
 ## Pure go oracle client
+
 ### note:
+###### the original oracle drivers is very complex and contain many features which are difficult to add them at one time
+###### your feedbacks are very important for this project to proceed
+```
     - Use version 2 you will need to import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
+```
+    
 ### version 2.6.5: Add New Url Options (Language and Territory)
 * this will control the language of the server messages
 ```golang

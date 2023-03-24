@@ -1757,7 +1757,7 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 			return nil, err
 		}
 		// deal with lobs
-		if stmt._hasBLOB {
+		if stmt._hasBLOB || stmt._hasLONG {
 			if stmt.connection.connOption.Lob == 0 {
 				stmt.define = true
 				stmt.execute = false

@@ -12,7 +12,7 @@
     - See examples for more help
 ```
 ### version 2.6.8: Fix return long data type with lob prefetch option:
-* know you can return up to 0x3FFFFFFF of data from long coumn type
+* now you can return up to 0x3FFFFFFF of data from long coumn type
 * examples/long insert 0x3FFF bytes of data into long column and query it again
 * for large data size better use `lob fetch=post`
 ### version 2.6.5: Add New Url Options (Language and Territory)

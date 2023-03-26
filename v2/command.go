@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"syscall"
 )
 
 type StmtType int
@@ -1735,7 +1736,7 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 		stmt.connection.session.ResetBuffer()
 		err = stmt.write()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE) {
 				tracer.Print("reconnect trial #", writeTrials+1)
 				stmt.connection.State = Closed
 				err = stmt.connection.Open()
@@ -1749,7 +1750,7 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 		dataSet = new(DataSet)
 		err = stmt.read(dataSet)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE) {
 				stmt.connection.connOption.Tracer.Print("reconnect trial #", writeTrials+1)
 				stmt.connection.State = Closed
 				err = stmt.connection.Open()

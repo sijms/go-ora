@@ -116,7 +116,8 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	//}
 	// we use here int.MaxValue
 	if stmt.connection.connOption.Lob == 0 {
-		session.PutInt(1, 4, true, true)
+		session.PutInt(0x3FFFFFFF, 4, true, true)
+		//session.PutUint(0, 4, true, true)
 	} else {
 		session.PutUint(0x7FFFFFFF, 4, true, true)
 	}
@@ -250,6 +251,9 @@ func (stmt *defaultStmt) writeDefine() error {
 				temp.MaxCharLen = 0x8000
 			}
 		}
+		//if temp.DataType == LONG || temp.DataType == LongRaw {
+		//	temp.MaxCharLen = 0x4000
+		//}
 		temp.Flag = 3
 		temp.MaxLen = num
 		err := temp.write(session)
@@ -1757,7 +1761,7 @@ func (stmt *Stmt) _query() (driver.Rows, error) {
 			return nil, err
 		}
 		// deal with lobs
-		if stmt._hasBLOB || stmt._hasLONG {
+		if stmt._hasBLOB {
 			if stmt.connection.connOption.Lob == 0 {
 				stmt.define = true
 				stmt.execute = false

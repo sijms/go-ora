@@ -255,106 +255,6 @@ func (dataSet DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, er
 			} else {
 				return false, fmt.Errorf("go-ora: column %d require type []byte", colIndex)
 			}
-		//case reflect.TypeOf(sql.NullTime{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(sql.NullTime{Valid: false}))
-		//	} else {
-		//		switch tempField := field.(type) {
-		//		case time.Time:
-		//			obj.Set(reflect.ValueOf(sql.NullTime{Valid: true, Time: tempField}))
-		//		case TimeStamp:
-		//			obj.Set(reflect.ValueOf(sql.NullTime{Valid: true, Time: time.Time(tempField)}))
-		//		default:
-		//			return false, fmt.Errorf("go-ora: column %d require type time.Time or null", colIndex)
-		//		}
-		//	}
-		//case reflect.TypeOf(NullTimeStamp{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(NullTimeStamp{Valid: false}))
-		//	} else {
-		//		switch tempField := field.(type) {
-		//		case time.Time:
-		//			obj.Set(reflect.ValueOf(NullTimeStamp{Valid: true, TimeStamp: TimeStamp(tempField)}))
-		//		case TimeStamp:
-		//			obj.Set(reflect.ValueOf(NullTimeStamp{Valid: true, TimeStamp: tempField}))
-		//		default:
-		//			return false, fmt.Errorf("go-ora: column %d require type time.Time or null", colIndex)
-		//		}
-		//	}
-		//case reflect.TypeOf(sql.NullString{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(sql.NullString{Valid: false}))
-		//	} else {
-		//		obj.Set(reflect.ValueOf(sql.NullString{Valid: true, String: getString(field)}))
-		//	}
-		//case reflect.TypeOf(NullNVarChar{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(NullNVarChar{Valid: false}))
-		//	} else {
-		//		obj.Set(reflect.ValueOf(NullNVarChar{Valid: true, NVarChar: NVarChar(getString(field))}))
-		//	}
-		//case reflect.TypeOf(sql.NullBool{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(sql.NullBool{Valid: false}))
-		//	} else {
-		//		tempInt, err := getInt(field)
-		//		if err != nil {
-		//			return false, err
-		//		}
-		//		obj.Set(reflect.ValueOf(sql.NullBool{Valid: true, Bool: tempInt != 0}))
-		//	}
-		//case reflect.TypeOf(sql.NullFloat64{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(sql.NullFloat64{Valid: false}))
-		//	} else {
-		//		tempFloat, err := getFloat(field)
-		//		if err != nil {
-		//			return false, err
-		//		}
-		//		obj.Set(reflect.ValueOf(sql.NullFloat64{Valid: true, Float64: tempFloat}))
-		//	}
-		//case reflect.TypeOf(sql.NullInt64{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(sql.NullInt64{Valid: false}))
-		//	} else {
-		//		tempInt, err := getInt(field)
-		//		if err != nil {
-		//			return false, err
-		//		}
-		//		obj.Set(reflect.ValueOf(sql.NullInt64{Valid: true, Int64: tempInt}))
-		//	}
-		//case reflect.TypeOf(sql.NullInt32{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(sql.NullInt32{Valid: false}))
-		//	} else {
-		//		tempInt, err := getInt(field)
-		//		if err != nil {
-		//			return false, err
-		//		}
-		//		obj.Set(reflect.ValueOf(sql.NullInt32{Valid: true, Int32: int32(tempInt)}))
-		//	}
-		//case reflect.TypeOf(sql.NullInt16{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(sql.NullInt16{Valid: false}))
-		//	} else {
-		//		tempInt, err := getInt(field)
-		//		if err != nil {
-		//			return false, err
-		//		}
-		//		obj.Set(reflect.ValueOf(sql.NullInt16{Valid: true, Int16: int16(tempInt)}))
-		//	}
-		//case reflect.TypeOf(sql.NullByte{}):
-		//	if field == nil {
-		//		obj.Set(reflect.ValueOf(sql.NullByte{Valid: false}))
-		//	} else {
-		//		tempInt, err := getInt(field)
-		//		if err != nil {
-		//			return false, err
-		//		}
-		//		obj.Set(reflect.ValueOf(sql.NullByte{Valid: true, Byte: uint8(tempInt)}))
-		//	}
-		//case reflect.TypeOf(BFile{}):
-		//	obj.Set(reflect.ValueOf(field))
 		default:
 			return false, nil
 		}
@@ -419,13 +319,20 @@ func (dataSet *DataSet) Err() error {
 func (dataSet *DataSet) Next(dest []driver.Value) error {
 	hasMoreRows := dataSet.parent.hasMoreRows()
 	noOfRowsToFetch := len(dataSet.rows) // dataSet.parent.noOfRowsToFetch()
-	if noOfRowsToFetch == 0 {
-		return io.EOF
-	}
-	//hasBLOB := dataSet.parent.hasBLOB()
-	//hasLONG := dataSet.parent.hasLONG()
+	//if noOfRowsToFetch == 0 {
+	//	return io.EOF
+	//}
+	hasBLOB := dataSet.parent.hasBLOB()
+	hasLONG := dataSet.parent.hasLONG()
 	if !hasMoreRows && noOfRowsToFetch == 0 {
 		return io.EOF
+	}
+	if hasMoreRows && (hasBLOB || hasLONG) && dataSet.index == 0 {
+		//dataSet.rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
+		if err := dataSet.parent.fetch(dataSet); err != nil {
+			return err
+		}
+		noOfRowsToFetch = len(dataSet.rows)
 	}
 	if dataSet.index > 0 && dataSet.index%len(dataSet.rows) == 0 {
 		if hasMoreRows {
@@ -444,12 +351,7 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 			return io.EOF
 		}
 	}
-	//if hasMoreRows && (hasBLOB || hasLONG) && dataSet.index == 0 {
-	//	//dataSet.rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
-	//	if err := dataSet.parent.fetch(dataSet); err != nil {
-	//		return err
-	//	}
-	//}
+
 	if dataSet.index%noOfRowsToFetch < len(dataSet.rows) {
 		for x := 0; x < len(dataSet.rows[dataSet.index%noOfRowsToFetch]); x++ {
 			dest[x] = dataSet.rows[dataSet.index%noOfRowsToFetch][x]

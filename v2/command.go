@@ -249,10 +249,9 @@ func (stmt *defaultStmt) writeDefine() error {
 			} else {
 				temp.MaxCharLen = 0x8000
 			}
+		} else {
+			temp.ContFlag = 0
 		}
-		//if temp.DataType == LONG || temp.DataType == LongRaw {
-		//	temp.MaxCharLen = 0x4000
-		//}
 		temp.Flag = 3
 		temp.MaxLen = num
 		err := temp.write(session)

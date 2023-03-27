@@ -9,11 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sijms/go-ora/v2/network"
-	"io"
 	"reflect"
 	"regexp"
 	"strings"
-	"syscall"
 )
 
 type StmtType int
@@ -513,6 +511,54 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 		stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
 		stmt.connection.connOption.Tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
 	}
+
+	tracer := stmt.connection.connOption.Tracer
+	failOver := stmt.connection.connOption.Failover
+	if failOver == 0 {
+		failOver = 1
+	}
+
+	// if fetch fail cannot re-fetch only reconnect and return error
+	var err = stmt._fetch(dataSet)
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = stmt.connection.reConnect(err, writeTrials)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return err
+			}
+			continue
+		}
+		break
+	}
+	if reconnect {
+		return &network.OracleError{ErrCode: 3135}
+	}
+	return err
+	//if err != nil {
+	//	if errors.Is(err, io.EOF) {
+	//		stmt.connection.State = Closed
+	//		_ = stmt.connection.restore()
+	//	}
+	//	return err
+	//}
+
+	//if err != nil {
+	//	if errors.Is(err, io.EOF) {
+	//		stmt.connection.State = Closed
+	//		_ = stmt.connection.restore()
+	//	}
+	//	return err
+	//}
+
+	// reading lobs
+
+	//return nil
+	//return err
+}
+
+func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 	session := stmt.connection.session
 	session.ResetBuffer()
 	session.PutBytes(3, 5, 0)
@@ -520,27 +566,16 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	session.PutInt(stmt._noOfRowsToFetch, 2, true, true)
 	err := session.Write()
 	if err != nil {
-		if errors.Is(err, io.EOF) {
-			stmt.connection.State = Closed
-			_ = stmt.connection.restore()
-		}
 		return err
 	}
 	err = stmt.read(dataSet)
 	if err != nil {
-		if errors.Is(err, io.EOF) {
-			stmt.connection.State = Closed
-			_ = stmt.connection.restore()
-		}
 		return err
 	}
-
-	// reading lobs
 	if stmt.connection.connOption.Lob > 0 {
 		return stmt.readLobs(dataSet)
 	}
 	return nil
-	//return err
 }
 func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 	if stmt._noOfRowsToFetch == 25 {
@@ -1492,7 +1527,7 @@ func (stmt *defaultStmt) Close() error {
 			operationID: 0x93,
 			data:        nil,
 			err:         nil,
-		}).write().read()
+		}).exec()
 	}
 	return nil
 }
@@ -1511,14 +1546,8 @@ func (stmt *Stmt) ExecContext(ctx context.Context, namedArgs []driver.NamedValue
 	return stmt.Exec(args)
 }
 
-// Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
-func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	if stmt.connection.State != Opened {
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
-	}
-	stmt.connection.connOption.Tracer.Printf("Exec:\n%s", stmt.text)
+func (stmt *Stmt) _exec(args []driver.Value) (*QueryResult, error) {
 	var err error
-
 	for x := 0; x < len(args); x++ {
 		var par *ParameterInfo
 		switch tempOut := args[x].(type) {
@@ -1578,32 +1607,14 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		_ = stmt.freeTemporaryLobs()
 	}()
 	session := stmt.connection.session
-	//if len(args) > 0 {
-	//	stmt.Pars = nil
-	//}
-	//for x := 0; x < len(args); x++ {
-	//	stmt.AddParam("", args[x], 0, Input)
-	//}
-	//_, err = stmt._query()
-	//if err != nil {
-	//	return nil, err
-	//}
 	session.ResetBuffer()
 	err = stmt.write()
 	if err != nil {
-		if errors.Is(err, io.EOF) {
-			stmt.connection.State = Closed
-			_ = stmt.connection.restore()
-		}
 		return nil, err
 	}
 	dataSet := new(DataSet)
 	err = stmt.read(dataSet)
 	if err != nil {
-		if errors.Is(err, io.EOF) {
-			stmt.connection.State = Closed
-			_ = stmt.connection.restore()
-		}
 		return nil, err
 	}
 	// need to deal with lobs
@@ -1616,6 +1627,36 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		result.rowsAffected = int64(session.Summary.CurRowNumber)
 	}
 	return result, nil
+}
+
+// Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
+func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
+	if stmt.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
+	tracer := stmt.connection.connOption.Tracer
+	failOver := stmt.connection.connOption.Failover
+	if failOver == 0 {
+		failOver = 1
+	}
+	tracer.Printf("Exec:\n%s", stmt.text)
+	result, err := stmt._exec(args)
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = stmt.connection.reConnect(err, writeTrials)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+			continue
+		}
+		break
+	}
+	if reconnect {
+		return nil, &network.OracleError{ErrCode: 3135}
+	}
+	return result, err
 }
 
 func (stmt *Stmt) CheckNamedValue(_ *driver.NamedValue) error {
@@ -1715,73 +1756,81 @@ func (stmt *Stmt) reset() {
 	stmt.arrayBindCount = 0
 }
 
-func (stmt *Stmt) _query() (driver.Rows, error) {
+func (stmt *Stmt) _query() (*DataSet, error) {
 	var err error
 	var dataSet *DataSet
-	tracer := stmt.connection.connOption.Tracer
-	failOver := stmt.connection.connOption.Failover
-	if failOver == 0 {
-		failOver = 1
+	stmt.connection.session.ResetBuffer()
+	err = stmt.write()
+	if err != nil {
+		return nil, err
 	}
-	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-		if stmt.connection.State != Opened {
-			tracer.Print("reconnect trial #", writeTrials+1)
-			err = stmt.connection.Open()
+	dataSet = new(DataSet)
+	err = stmt.read(dataSet)
+	if err != nil {
+		return nil, err
+	}
+	// deal with lobs
+	if stmt._hasBLOB {
+		if stmt.connection.connOption.Lob == 0 {
+			stmt.define = true
+			stmt.execute = false
+			stmt.parse = false
+			stmt.reSendParDef = false
+			err = stmt.queryLobPrefetch(stmt.getExeOption(), dataSet)
 			if err != nil {
-				tracer.Print("Error: ", err)
+				return nil, err
 			}
-			continue
-		}
-		//stmt.reset()
-		stmt.connection.session.ResetBuffer()
-		err = stmt.write()
-		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE) {
-				tracer.Print("reconnect trial #", writeTrials+1)
-				stmt.connection.State = Closed
-				err = stmt.connection.Open()
-				if err != nil {
-					tracer.Print("Error: ", err)
-				}
-				continue
-			}
-			return nil, err
-		}
-		dataSet = new(DataSet)
-		err = stmt.read(dataSet)
-		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE) {
-				stmt.connection.connOption.Tracer.Print("reconnect trial #", writeTrials+1)
-				stmt.connection.State = Closed
-				err = stmt.connection.Open()
-				if err != nil {
-					tracer.Print("Error: ", err)
-				}
-				continue
-			}
-			return nil, err
-		}
-		// deal with lobs
-		if stmt._hasBLOB {
-			if stmt.connection.connOption.Lob == 0 {
-				stmt.define = true
-				stmt.execute = false
-				stmt.parse = false
-				stmt.reSendParDef = false
-				err = stmt.queryLobPrefetch(stmt.getExeOption(), dataSet)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				err = stmt.readLobs(dataSet)
-				if err != nil {
-					return nil, err
-				}
+		} else {
+			err = stmt.readLobs(dataSet)
+			if err != nil {
+				return nil, err
 			}
 		}
-
-		break
 	}
+
+	//tracer := stmt.connection.connOption.Tracer
+	//failOver := stmt.connection.connOption.Failover
+	//if failOver == 0 {
+	//	failOver = 1
+	//}
+	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+	//	if stmt.connection.State != Opened {
+	//		tracer.Print("reconnect trial #", writeTrials+1)
+	//		err = stmt.connection.Open()
+	//		if err != nil {
+	//			tracer.Print("Error: ", err)
+	//		}
+	//		continue
+	//	}
+	//	//stmt.reset()
+	//
+	//	if err != nil {
+	//		if errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE) {
+	//			tracer.Print("reconnect trial #", writeTrials+1)
+	//			stmt.connection.State = Closed
+	//			err = stmt.connection.Open()
+	//			if err != nil {
+	//				tracer.Print("Error: ", err)
+	//			}
+	//			continue
+	//		}
+	//		return nil, err
+	//	}
+	//
+	//	if err != nil {
+	//		if errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE) {
+	//			stmt.connection.connOption.Tracer.Print("reconnect trial #", writeTrials+1)
+	//			stmt.connection.State = Closed
+	//			err = stmt.connection.Open()
+	//			if err != nil {
+	//				tracer.Print("Error: ", err)
+	//			}
+	//			continue
+	//		}
+	//		return nil, err
+	//	}
+	//	break
+	//}
 	return dataSet, err
 }
 
@@ -1792,10 +1841,9 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
-
-	stmt.connection.connOption.Tracer.Printf("Query:\n%s", stmt.text)
+	tracer := stmt.connection.connOption.Tracer
+	tracer.Printf("Query:\n%s", stmt.text)
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
-	//stmt._noOfRowsToFetch = 25
 	stmt._hasMoreRows = true
 	for x := 0; x < len(args); x++ {
 		par, err := stmt.NewParam("", args[x], 0, Input)
@@ -1805,7 +1853,40 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 		stmt.setParam(x, *par)
 	}
 
-	return stmt._query()
+	// if the connection lost
+	failOver := stmt.connection.connOption.Failover
+	if failOver == 0 {
+		failOver = 1
+	}
+	var dataSet *DataSet
+	var err error
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+			continue
+		}
+		// reset statement
+		stmt.reset()
+		// call query
+		dataSet, err = stmt._query()
+		if err == nil {
+			break
+		}
+		reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+		}
+	}
+	return dataSet, err
+	//return stmt._query()
 }
 
 func (stmt *Stmt) NumInput() int {

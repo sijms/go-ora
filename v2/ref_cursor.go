@@ -99,16 +99,7 @@ func (cursor *RefCursor) getExeOptions() int {
 		return 0x8040
 	}
 }
-func (cursor *RefCursor) Query() (*DataSet, error) {
-	if cursor.connection.State != Opened {
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
-	}
-	cursor.connection.connOption.Tracer.Printf("Query RefCursor: %d", cursor.cursorID)
-	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
-	cursor._hasMoreRows = true
-	if len(cursor.parent.scnForSnapshot) > 0 {
-		copy(cursor.scnForSnapshot, cursor.parent.scnForSnapshot)
-	}
+func (cursor *RefCursor) _query() (*DataSet, error) {
 	session := cursor.connection.session
 	session.ResetBuffer()
 	err := cursor.write()
@@ -129,7 +120,49 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	}
 	return dataSet, nil
 }
+func (cursor *RefCursor) Query() (*DataSet, error) {
+	if cursor.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
+	tracer := cursor.connection.connOption.Tracer
+	tracer.Printf("Query RefCursor: %d", cursor.cursorID)
+	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
+	cursor._hasMoreRows = true
+	if len(cursor.parent.scnForSnapshot) > 0 {
+		copy(cursor.scnForSnapshot, cursor.parent.scnForSnapshot)
+	}
 
+	failOver := cursor.connection.connOption.Failover
+	if failOver == 0 {
+		failOver = 1
+	}
+	var dataSet *DataSet
+	var err error
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = cursor.connection.reConnect(nil, writeTrials+1)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+			continue
+		}
+		// call query
+		dataSet, err = cursor._query()
+		if err == nil {
+			break
+		}
+		reconnect, err = cursor.connection.reConnect(err, writeTrials+1)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+		}
+	}
+	return dataSet, nil
+}
 func (cursor *RefCursor) write() error {
 	var define = false
 	if cursor.connection.connOption.Lob == 0 {

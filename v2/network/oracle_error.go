@@ -40,6 +40,8 @@ func (err *OracleError) translate() {
 		err.ErrMsg = "ORA-12564: TNS connection refused"
 	case 12514:
 		err.ErrMsg = "ORA-12514: TNS:listener does not currently know of service requested in connect descriptor"
+	case 3135:
+		err.ErrMsg = "ORA-03135: connection lost contact"
 	default:
 		err.ErrMsg = "ORA-" + strconv.Itoa(err.ErrCode)
 	}

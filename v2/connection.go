@@ -7,10 +7,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/sijms/go-ora/v2/advanced_nego"
 	"github.com/sijms/go-ora/v2/converters"
@@ -284,7 +286,25 @@ func (conn *Connection) Ping(ctx context.Context) error {
 		connection:  conn,
 		operationID: 0x93,
 		data:        nil,
-	}).write().read()
+	}).exec()
+}
+
+func (conn *Connection) reConnect(errReceived error, trial int) (bool, error) {
+	tracer := conn.connOption.Tracer
+	if conn.State != Opened {
+		tracer.Print("reconnect trial #", trial)
+		err := conn.Open()
+		return true, err
+	}
+	if errReceived != nil {
+		if errors.Is(errReceived, io.EOF) || errors.Is(errReceived, syscall.EPIPE) {
+			tracer.Print("reconnect trial #", trial)
+			conn.State = Closed
+			err := conn.Open()
+			return true, err
+		}
+	}
+	return false, errReceived
 }
 
 //func (conn *Connection) Logoff() error {

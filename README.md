@@ -23,7 +23,7 @@
   * Commit
   * Rollback
   * RefCursor Query
-* Failover will try to reconnect before returning error in case of query failover will restart query again
+* In all situation Failover will try to reconnect before returning error except in case of Query failover will reconnect + requery
 ### version 2.6.8: Fix return long data type with lob prefetch option:
 * now you can return up to 0x3FFFFFFF of data from long coumn type
 * examples/long insert 0x3FFF bytes of data into long column and query it again

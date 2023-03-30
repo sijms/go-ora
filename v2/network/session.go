@@ -279,12 +279,12 @@ func (session *Session) IsBreak() bool {
 func (session *Session) BreakConnection() (PacketInterface, error) {
 	tracer := session.Context.ConnOption.Tracer
 	tracer.Print("Break Connection")
-	tempCtx := session.oldCtx
-	session.StartContext(context.Background())
-	defer func() {
-		session.EndContext()
-		session.oldCtx = tempCtx
-	}()
+	//tempCtx := session.oldCtx
+	//session.StartContext(context.Background())
+	//defer func() {
+	//	session.EndContext()
+	//	session.oldCtx = tempCtx
+	//}()
 	session.breakConnection = true
 	session.resetConnection = false
 	marker := newMarkerPacket(1, session.Context)
@@ -482,10 +482,11 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
 				session.Context.ConnOption.Tracer.Print("Read Timeout")
-				var breakErr error
-				pck, breakErr = session.BreakConnection()
-				if breakErr != nil {
-					session.Context.ConnOption.Tracer.Print("Connection Break With Error: ", breakErr)
+				//var breakErr error
+				pck, err = session.BreakConnection()
+				if err != nil {
+					return nil, err
+					//session.Context.ConnOption.Tracer.Print("Connection Break With Error: ", breakErr)
 				}
 			} else {
 				return nil, err

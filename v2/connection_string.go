@@ -299,6 +299,11 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				if err != nil {
 					ret.connOption.Failover = 0
 				}
+			case "RETRYTIME":
+				ret.connOption.RetryTime, err = strconv.Atoi(val[0])
+				if err != nil {
+					ret.connOption.RetryTime = 0
+				}
 			case "LOB FETCH":
 				tempVal := strings.ToUpper(val[0])
 				if tempVal == "PRE" {

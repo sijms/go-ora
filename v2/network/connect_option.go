@@ -70,6 +70,7 @@ type ConnectionOption struct {
 	Tracer       trace.Tracer
 	PrefetchRows int
 	Failover     int
+	RetryTime    int
 	Lob          int
 }
 

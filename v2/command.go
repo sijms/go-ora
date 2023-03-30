@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type StmtType int
@@ -1854,6 +1855,7 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 
 	// if the connection lost
 	failOver := stmt.connection.connOption.Failover
+	retryTime := stmt.connection.connOption.RetryTime
 	if failOver == 0 {
 		failOver = 1
 	}
@@ -1869,8 +1871,10 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 			}
 			continue
 		}
-		// reset statement
-		stmt.reset()
+		// reset statement if connection break and reconnect
+		if writeTrials > 0 {
+			stmt.reset()
+		}
 		// call query
 		dataSet, err = stmt._query()
 		if err == nil {
@@ -1882,6 +1886,9 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 			if !reconnect {
 				return nil, err
 			}
+		}
+		if retryTime > 0 {
+			time.Sleep(time.Duration(retryTime) * time.Second)
 		}
 	}
 	return dataSet, err

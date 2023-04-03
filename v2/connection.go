@@ -75,7 +75,9 @@ type Connection struct {
 	sessionID         int
 	serialID          int
 	transactionID     []byte
-	strConv           converters.IStringConverter
+	sStrConv          converters.IStringConverter
+	nStrConv          converters.IStringConverter
+	cStrConv          converters.IStringConverter
 	NLSData           NLSData
 	cusTyp            map[string]customType
 	maxLen            struct {
@@ -88,8 +90,6 @@ type Connection struct {
 	}
 }
 
-// type OracleDriverContext struct {
-// }
 type OracleConnector struct {
 	drv           *OracleDriver
 	connectString string

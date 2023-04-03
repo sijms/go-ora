@@ -87,7 +87,9 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutBytes(0)
 	}
 	if parse {
-		session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
+		conn := stmt.connection
+		session.PutUint(len(conn.encodeString(stmt.text)), 4, true, true)
+		//session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
 		session.PutBytes(1)
 	} else {
 		session.PutBytes(0, 1)
@@ -157,7 +159,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutBytes(0, 0)
 	}
 	if parse {
-		session.PutClr(stmt.connection.strConv.Encode(stmt.text))
+		session.PutClr(stmt.connection.encodeString(stmt.text))
 	}
 	al8i4 := make([]int, 13)
 	if exeOp&1 <= 0 {
@@ -1051,26 +1053,28 @@ func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Valu
 		return nil, err
 	}
 	if col.DataType == OCIBlobLocator {
-		//if !lob.isValid() {
-		//
-		//}
 		if dataSize != int64(len(lobData)) {
 			return nil, errors.New("error reading lob data: data size mismatching")
 		}
 		return lobData, nil
 	} else {
-		tempCharset := stmt.connection.strConv.GetLangID()
+		conn := stmt.connection
+		tempCharset := conn.strConv.GetLangID()
 		if lob.variableWidthChar() {
-			if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
-				stmt.connection.strConv.SetLangID(2002)
+			if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
+				conn.strConv.SetLangID(2002)
 			} else {
-				stmt.connection.strConv.SetLangID(2000)
+				conn.strConv.SetLangID(2000)
 			}
 		} else {
-			stmt.connection.strConv.SetLangID(col.CharsetID)
+			if conn.connOption.CharsetID != 0 && col.CharsetForm == 1 {
+				conn.strConv.SetLangID(conn.connOption.CharsetID)
+			} else {
+				conn.strConv.SetLangID(col.CharsetID)
+			}
 		}
-		resultClobString := stmt.connection.strConv.Decode(lobData)
-		stmt.connection.strConv.SetLangID(tempCharset)
+		resultClobString := conn.strConv.Decode(lobData)
+		conn.strConv.SetLangID(tempCharset)
 		//if dataSize != int64(len([]rune(resultClobString))) {
 		//	return nil, errors.New("error reading clob data")
 		//}

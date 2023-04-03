@@ -278,13 +278,20 @@ func (par *ParameterInfo) encodeArrayNullString(conn *Connection, value []sql.Nu
 				par.MaxCharLen = tempLen
 			}
 			var tempBytes []byte
-			if conn.strConv.GetLangID() != par.CharsetID {
-				tempCharset := conn.strConv.SetLangID(par.CharsetForm)
+			if conn.connOption.CharsetID != 0 && conn.connOption.CharsetID != conn.strConv.GetLangID() {
+				tempCharset := conn.strConv.SetLangID(conn.connOption.CharsetID)
 				tempBytes = conn.strConv.Encode(tempVal.String)
 				conn.strConv.SetLangID(tempCharset)
 			} else {
-				tempBytes = conn.strConv.Encode(tempVal.String)
+				if conn.strConv.GetLangID() != par.CharsetID {
+					tempCharset := conn.strConv.SetLangID(par.CharsetForm)
+					tempBytes = conn.strConv.Encode(tempVal.String)
+					conn.strConv.SetLangID(tempCharset)
+				} else {
+					tempBytes = conn.strConv.Encode(tempVal.String)
+				}
 			}
+
 			session.WriteClr(&arrayBuffer, tempBytes)
 			if par.MaxLen < len(tempBytes) {
 				par.MaxLen = len(tempBytes)
@@ -311,12 +318,18 @@ func (par *ParameterInfo) encodeArrayString(conn *Connection, value []string) {
 				par.MaxCharLen = tempLen
 			}
 			var tempBytes []byte
-			if conn.strConv.GetLangID() != par.CharsetID {
-				tempCharset := conn.strConv.SetLangID(par.CharsetForm)
+			if conn.connOption.CharsetID != 0 && conn.connOption.CharsetID != conn.strConv.GetLangID() {
+				tempCharset := conn.strConv.SetLangID(conn.connOption.CharsetID)
 				tempBytes = conn.strConv.Encode(tempVal)
 				conn.strConv.SetLangID(tempCharset)
 			} else {
-				tempBytes = conn.strConv.Encode(tempVal)
+				if conn.strConv.GetLangID() != par.CharsetID {
+					tempCharset := conn.strConv.SetLangID(par.CharsetForm)
+					tempBytes = conn.strConv.Encode(tempVal)
+					conn.strConv.SetLangID(tempCharset)
+				} else {
+					tempBytes = conn.strConv.Encode(tempVal)
+				}
 			}
 			session.WriteClr(&arrayBuffer, tempBytes)
 			if par.MaxLen < len(tempBytes) {

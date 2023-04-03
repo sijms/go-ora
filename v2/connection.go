@@ -307,6 +307,15 @@ func (conn *Connection) reConnect(errReceived error, trial int) (bool, error) {
 	return false, errReceived
 }
 
+func (conn *Connection) encodeString(text string) []byte {
+	oldLangID := 0
+	if conn.connOption.CharsetID != 0 && conn.connOption.CharsetID != conn.strConv.GetLangID() {
+		oldLangID = conn.strConv.SetLangID(conn.connOption.CharsetID)
+		defer conn.strConv.SetLangID(oldLangID)
+	}
+	return conn.strConv.Encode(text)
+}
+
 //func (conn *Connection) Logoff() error {
 //	conn.connOption.Tracer.Print("Logoff")
 //	session := conn.session

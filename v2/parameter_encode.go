@@ -429,7 +429,13 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			}
 		}
 	case Clob:
-		par.encodeString(value.String, connection.strConv, size)
+		if connection.connOption.CharsetID != 0 && connection.connOption.CharsetID != connection.strConv.GetLangID() {
+			par.CharsetID = connection.connOption.CharsetID
+			par.encodeString(value.String, connection.strConv, size)
+			par.CharsetID = connection.tcpNego.ServerCharset
+		} else {
+			par.encodeString(value.String, connection.strConv, size)
+		}
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
 		} else {
@@ -441,7 +447,12 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				if err != nil {
 					return err
 				}
-				err = lob.putString(value.String, connection.tcpNego.ServerCharset)
+				if connection.connOption.CharsetID != 0 {
+					err = lob.putString(value.String, connection.connOption.CharsetID)
+					lob.charsetID = connection.tcpNego.ServerCharset
+				} else {
+					err = lob.putString(value.String, connection.tcpNego.ServerCharset)
+				}
 				if err != nil {
 					return err
 				}
@@ -454,7 +465,13 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if value == nil {
 			par.encodeString("", connection.strConv, size)
 		} else {
-			par.encodeString(value.String, connection.strConv, size)
+			if connection.connOption.CharsetID != 0 && connection.connOption.CharsetID != connection.strConv.GetLangID() {
+				par.CharsetID = connection.connOption.CharsetID
+				par.encodeString(value.String, connection.strConv, size)
+				par.CharsetID = connection.tcpNego.ServerCharset
+			} else {
+				par.encodeString(value.String, connection.strConv, size)
+			}
 		}
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
@@ -466,7 +483,12 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				if err != nil {
 					return err
 				}
-				err = lob.putString(value.String, connection.tcpNego.ServerCharset)
+				if connection.connOption.CharsetID != 0 {
+					err = lob.putString(value.String, connection.connOption.CharsetID)
+					lob.charsetID = connection.tcpNego.ServerCharset
+				} else {
+					err = lob.putString(value.String, connection.tcpNego.ServerCharset)
+				}
 				if err != nil {
 					return err
 				}
@@ -569,7 +591,14 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if len(value) > connection.maxLen.nvarchar && par.Direction == Input {
 			return par.encodeValue(Clob{Valid: true, String: value}, size, connection)
 		}
-		par.encodeString(value, connection.strConv, size)
+		if connection.connOption.CharsetID != 0 && connection.connOption.CharsetID != connection.strConv.GetLangID() {
+			par.CharsetID = connection.connOption.CharsetID
+			par.encodeString(value, connection.strConv, size)
+			par.CharsetID = connection.tcpNego.ServerCharset
+		} else {
+			par.encodeString(value, connection.strConv, size)
+		}
+
 	case *string:
 		if value == nil {
 			par.encodeString("", connection.strConv, size)
@@ -577,7 +606,13 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			if len(*value) > connection.maxLen.nvarchar && par.Direction == Input {
 				return par.encodeValue(&Clob{Valid: true, String: *value}, size, connection)
 			}
-			par.encodeString(*value, connection.strConv, size)
+			if connection.connOption.CharsetID != 0 && connection.connOption.CharsetID != connection.strConv.GetLangID() {
+				par.CharsetID = connection.connOption.CharsetID
+				par.encodeString(*value, connection.strConv, size)
+				par.CharsetID = connection.tcpNego.ServerCharset
+			} else {
+				par.encodeString(*value, connection.strConv, size)
+			}
 		}
 	case NVarChar:
 		par.CharsetForm = 2

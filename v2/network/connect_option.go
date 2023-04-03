@@ -30,6 +30,7 @@ type ClientInfo struct {
 	UseKerberos bool
 	Language    string
 	Territory   string
+	CharsetID   int
 }
 type DatabaseInfo struct {
 	UserID          string

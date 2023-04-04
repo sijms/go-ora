@@ -25192,7 +25192,7 @@ func NewStringConverter(langID int) *StringConverter {
 		fallthrough
 	case 0x368:
 		fallthrough
-	case 0x7D):
+	case 0x7D0:
 		fallthrough
 	case 0x7D2:
 		return &StringConverter{

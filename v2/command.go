@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
 	"reflect"
 	"regexp"
@@ -77,6 +78,7 @@ func (stmt *defaultStmt) hasBLOB() bool {
 // through it the stmt data will send to network stream
 func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	session := stmt.connection.session
+	strConv, _ := stmt.connection.getStrConv(stmt.connection.tcpNego.ServerCharset)
 	session.PutBytes(3, 0x5E, 0)
 	session.PutUint(exeOp, 4, true, true)
 	session.PutUint(stmt.cursorID, 2, true, true)
@@ -87,8 +89,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutBytes(0)
 	}
 	if parse {
-		conn := stmt.connection
-		session.PutUint(len(conn.encodeString(stmt.text)), 4, true, true)
+		session.PutUint(len(strConv.Encode(stmt.text)), 4, true, true)
 		//session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
 		session.PutBytes(1)
 	} else {
@@ -159,7 +160,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutBytes(0, 0)
 	}
 	if parse {
-		session.PutClr(stmt.connection.encodeString(stmt.text))
+		session.PutClr(strConv.Encode(stmt.text))
 	}
 	al8i4 := make([]int, 13)
 	if exeOp&1 <= 0 {
@@ -1059,22 +1060,29 @@ func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Valu
 		return lobData, nil
 	} else {
 		conn := stmt.connection
-		tempCharset := conn.strConv.GetLangID()
+		var strConv converters.IStringConverter
+		//tempCharset := conn.strConv.GetLangID()
 		if lob.variableWidthChar() {
 			if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
-				conn.strConv.SetLangID(2002)
+				strConv, _ = conn.getStrConv(2002)
+				//conn.strConv.SetLangID(2002)
 			} else {
-				conn.strConv.SetLangID(2000)
+				strConv, _ = conn.getStrConv(2000)
+				//conn.strConv.SetLangID(2000)
 			}
 		} else {
-			if conn.connOption.CharsetID != 0 && col.CharsetForm == 1 {
-				conn.strConv.SetLangID(conn.connOption.CharsetID)
-			} else {
-				conn.strConv.SetLangID(col.CharsetID)
+			strConv, err = conn.getStrConv(col.CharsetID)
+			if err != nil {
+				return nil, err
 			}
+			//if conn.connOption.CharsetID != 0 && col.CharsetForm == 1 {
+			//	conn.strConv.SetLangID(conn.connOption.CharsetID)
+			//} else {
+			//	conn.strConv.SetLangID(col.CharsetID)
+			//}
 		}
-		resultClobString := conn.strConv.Decode(lobData)
-		conn.strConv.SetLangID(tempCharset)
+		resultClobString := strConv.Decode(lobData)
+		//conn.strConv.SetLangID(tempCharset)
 		//if dataSize != int64(len([]rune(resultClobString))) {
 		//	return nil, errors.New("error reading clob data")
 		//}
@@ -1299,10 +1307,10 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	//session.PutBytes(2)
 	session.PutInt(len(stmt.connection.connOption.UserID), 4, true, true)
 	//session.PutBytes(0, 0, 0)
-	session.PutClr(stmt.connection.strConv.Encode(stmt.connection.connOption.UserID))
+	session.PutClr(stmt.connection.sStrConv.Encode(stmt.connection.connOption.UserID))
 	session.PutInt(len(typeName), 4, true, true)
 	//session.PutBytes(0, 0, 0)
-	session.PutClr(stmt.connection.strConv.Encode(typeName))
+	session.PutClr(stmt.connection.sStrConv.Encode(typeName))
 	//session.PutBytes(0, 0, 0)
 	//if session.TTCVersion >= 4 {
 	//	session.PutBytes(0, 0, 1)

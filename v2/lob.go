@@ -3,6 +3,7 @@ package go_ora
 import (
 	"bytes"
 	"errors"
+	"github.com/sijms/go-ora/v2/converters"
 	"go/types"
 )
 
@@ -132,21 +133,25 @@ func (lob *Lob) putData(data []byte) error {
 }
 
 func (lob *Lob) putString(data string, charset int) error {
-	lob.connection.connOption.Tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
+	conn := lob.connection
+	conn.connOption.Tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
 	lob.initialize()
 	lob.charsetID = charset
-	tempCharset := lob.connection.strConv.GetLangID()
+	var strConv converters.IStringConverter
 	if lob.variableWidthChar() {
-		if lob.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
-			lob.connection.strConv.SetLangID(2002)
+		if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
+			strConv, _ = conn.getStrConv(2002)
 		} else {
-			lob.connection.strConv.SetLangID(2000)
+			strConv, _ = conn.getStrConv(2000)
 		}
 	} else {
-		lob.connection.strConv.SetLangID(lob.charsetID)
+		var err error
+		strConv, err = conn.getStrConv(lob.charsetID)
+		if err != nil {
+			return err
+		}
 	}
-	lobData := lob.connection.strConv.Encode(data)
-	lob.connection.strConv.SetLangID(tempCharset)
+	lobData := strConv.Encode(data)
 	// lob.size = int64(len([]rune(data)))
 	// lob.sendSize = true
 	lob.sourceOffset = 1

@@ -916,21 +916,11 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 		case ROWID:
 
 		case NCHAR, CHAR, LONG:
-			if connection.connOption.CharsetID != 0 &&
-				connection.connOption.CharsetID != connection.strConv.GetLangID() &&
-				par.CharsetForm == 1 {
-				tempCharset := connection.strConv.SetLangID(connection.connOption.CharsetID)
-				tempVal = connection.strConv.Decode(par.BValue)
-				connection.strConv.SetLangID(tempCharset)
-			} else {
-				if connection.strConv.GetLangID() != par.CharsetID {
-					tempCharset := connection.strConv.SetLangID(par.CharsetID)
-					tempVal = connection.strConv.Decode(par.BValue)
-					connection.strConv.SetLangID(tempCharset)
-				} else {
-					tempVal = connection.strConv.Decode(par.BValue)
-				}
+			strConv, err := connection.getStrConv(par.CharsetID)
+			if err != nil {
+				return nil, err
 			}
+			tempVal = strConv.Decode(par.BValue)
 		case NUMBER:
 			// Scale = 0 and Precision <18 --> int64
 			if par.Scale == 0 && par.Precision <= 18 {
@@ -1070,13 +1060,11 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection) error {
 			par.BValue, err = session.GetClr()
 			if par.DataType == OCIClobLocator {
 				var tempString string
-				if connection.strConv.GetLangID() != par.CharsetID {
-					tempCharset := connection.strConv.SetLangID(par.CharsetID)
-					tempString = connection.strConv.Decode(par.BValue)
-					connection.strConv.SetLangID(tempCharset)
-				} else {
-					tempString = connection.strConv.Decode(par.BValue)
+				strConv, err := connection.getStrConv(par.CharsetID)
+				if err != nil {
+					return err
 				}
+				tempString = strConv.Decode(par.BValue)
 				par.Value = tempString
 			} else {
 				par.Value = par.BValue

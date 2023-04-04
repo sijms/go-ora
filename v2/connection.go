@@ -156,7 +156,7 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 // SetStringConverter this function is used to set a custom string converter interface
 // that will used to encode and decode strings and bytearrays
 func (conn *Connection) SetStringConverter(converter converters.IStringConverter) {
-	conn.strConv = converter
+	conn.sStrConv = converter
 	conn.session.StrConv = converter
 }
 
@@ -220,19 +220,19 @@ DECLARE
 	}
 
 	if len(stmt.Pars) >= 10 {
-		conn.NLSData.Calender = conn.strConv.Decode(stmt.Pars[0].BValue)
-		conn.NLSData.Comp = conn.strConv.Decode(stmt.Pars[1].BValue)
-		conn.NLSData.LengthSemantics = conn.strConv.Decode(stmt.Pars[2].BValue)
-		conn.NLSData.NCharConvExcep = conn.strConv.Decode(stmt.Pars[3].BValue)
-		conn.NLSData.DateLang = conn.strConv.Decode(stmt.Pars[4].BValue)
-		conn.NLSData.Sort = conn.strConv.Decode(stmt.Pars[5].BValue)
-		conn.NLSData.Currency = conn.strConv.Decode(stmt.Pars[6].BValue)
-		conn.NLSData.DateFormat = conn.strConv.Decode(stmt.Pars[7].BValue)
-		conn.NLSData.IsoCurrency = conn.strConv.Decode(stmt.Pars[8].BValue)
-		conn.NLSData.NumericChars = conn.strConv.Decode(stmt.Pars[9].BValue)
-		conn.NLSData.DualCurrency = conn.strConv.Decode(stmt.Pars[10].BValue)
-		conn.NLSData.Timestamp = conn.strConv.Decode(stmt.Pars[11].BValue)
-		conn.NLSData.TimestampTZ = conn.strConv.Decode(stmt.Pars[12].BValue)
+		conn.NLSData.Calender = conn.sStrConv.Decode(stmt.Pars[0].BValue)
+		conn.NLSData.Comp = conn.sStrConv.Decode(stmt.Pars[1].BValue)
+		conn.NLSData.LengthSemantics = conn.sStrConv.Decode(stmt.Pars[2].BValue)
+		conn.NLSData.NCharConvExcep = conn.sStrConv.Decode(stmt.Pars[3].BValue)
+		conn.NLSData.DateLang = conn.sStrConv.Decode(stmt.Pars[4].BValue)
+		conn.NLSData.Sort = conn.sStrConv.Decode(stmt.Pars[5].BValue)
+		conn.NLSData.Currency = conn.sStrConv.Decode(stmt.Pars[6].BValue)
+		conn.NLSData.DateFormat = conn.sStrConv.Decode(stmt.Pars[7].BValue)
+		conn.NLSData.IsoCurrency = conn.sStrConv.Decode(stmt.Pars[8].BValue)
+		conn.NLSData.NumericChars = conn.sStrConv.Decode(stmt.Pars[9].BValue)
+		conn.NLSData.DualCurrency = conn.sStrConv.Decode(stmt.Pars[10].BValue)
+		conn.NLSData.Timestamp = conn.sStrConv.Decode(stmt.Pars[11].BValue)
+		conn.NLSData.TimestampTZ = conn.sStrConv.Decode(stmt.Pars[12].BValue)
 	}
 
 	/*
@@ -307,14 +307,32 @@ func (conn *Connection) reConnect(errReceived error, trial int) (bool, error) {
 	return false, errReceived
 }
 
-func (conn *Connection) encodeString(text string) []byte {
-	oldLangID := 0
-	if conn.connOption.CharsetID != 0 && conn.connOption.CharsetID != conn.strConv.GetLangID() {
-		oldLangID = conn.strConv.SetLangID(conn.connOption.CharsetID)
-		defer conn.strConv.SetLangID(oldLangID)
+func (conn *Connection) getStrConv(charsetID int) (converters.IStringConverter, error) {
+	switch charsetID {
+	case conn.sStrConv.GetLangID():
+		if conn.cStrConv != nil {
+			return conn.cStrConv, nil
+		}
+		return conn.sStrConv, nil
+	case conn.nStrConv.GetLangID():
+		return conn.nStrConv, nil
+	default:
+		temp := converters.NewStringConverter(charsetID)
+		if temp == nil {
+			return temp, fmt.Errorf("server requested charset id: %d which is not supported by the driver", charsetID)
+		}
+		return temp, nil
 	}
-	return conn.strConv.Encode(text)
 }
+
+//func (conn *Connection) encodeString(text string) []byte {
+//	oldLangID := 0
+//	if conn.connOption.CharsetID != 0 && conn.connOption.CharsetID != conn.strConv.GetLangID() {
+//		oldLangID = conn.strConv.SetLangID(conn.connOption.CharsetID)
+//		defer conn.strConv.SetLangID(oldLangID)
+//	}
+//	return conn.strConv.Encode(text)
+//}
 
 //func (conn *Connection) Logoff() error {
 //	conn.connOption.Tracer.Print("Logoff")
@@ -444,8 +462,15 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	tracer.Print("Server Charset: ", conn.tcpNego.ServerCharset)
 	tracer.Print("Server National Charset: ", conn.tcpNego.ServernCharset)
 	// create string converter object
-	conn.strConv = converters.NewStringConverter(conn.tcpNego.ServerCharset)
-	conn.session.StrConv = conn.strConv
+	conn.sStrConv = converters.NewStringConverter(conn.tcpNego.ServerCharset)
+	if conn.sStrConv == nil {
+		return fmt.Errorf("the server use charset with id: %d which is not supported by the driver", conn.tcpNego.ServerCharset)
+	}
+	conn.session.StrConv = conn.sStrConv
+	conn.nStrConv = converters.NewStringConverter(conn.tcpNego.ServernCharset)
+	if conn.nStrConv == nil {
+		return fmt.Errorf("the server use ncharset with id: %d which is not supported by the driver", conn.tcpNego.ServernCharset)
+	}
 	conn.tcpNego.ServerFlags |= 2
 	tracer.Print("Data Type Negotiation")
 	conn.dataNego = buildTypeNego(conn.tcpNego, conn.session)
@@ -546,6 +571,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 		State:      Closed,
 		conStr:     conStr,
 		connOption: &conStr.connOption,
+		cStrConv:   converters.NewStringConverter(conStr.connOption.CharsetID),
 		autoCommit: true,
 		//w:          conStr.w,
 		cusTyp: map[string]customType{},

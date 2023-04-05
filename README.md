@@ -11,6 +11,15 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### version 2.6.12: Add Client Charset option
+* this option will allow controlling string encoding and decoding at client level
+* so using this option you can define a charset for the client that is different from the server 
+* client charset will work in the following situation
+  * encoding sql text
+  * decoding varchar column
+  * encoding and decoding varchar parameters
+  * encoding and decoding CLOB
+* nvarchar, nclob and server messages are excluded from client charset
 ### version 2.6.9: Re-Code Failover
 * now failover start when receive the following error:
   * io.EOF

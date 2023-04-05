@@ -1,6 +1,6 @@
 package converters
 
-func NewStringConverter(langID int) *StringConverter {
+func NewStringConverter(langID int) IStringConverter {
 	switch langID {
 	case 0x1: // 1
 		return &StringConverter{
@@ -25191,6 +25191,8 @@ func NewStringConverter(langID int) *StringConverter {
 	case 0x367:
 		fallthrough
 	case 0x368:
+		fallthrough
+	case 0x369:
 		fallthrough
 	case 0x7D0:
 		fallthrough

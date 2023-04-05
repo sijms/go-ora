@@ -20,6 +20,16 @@
   * encoding and decoding varchar parameters
   * encoding and decoding CLOB
 * nvarchar, nclob and server messages are excluded from client charset
+* code
+```golang
+urlOptions := map[string]string {
+	// you can use also 
+	//"charset": "ZHS16GBK",
+	"client charset": "ZHS16GBK",
+	"trace file": "trace.log",
+}
+connStr := go_ora.BuildUrl("server", 1521, "service", "", "", urlOptions)
+```
 ### version 2.6.9: Re-Code Failover
 * now failover start when receive the following error:
   * io.EOF

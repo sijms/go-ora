@@ -200,7 +200,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 // set object value using currentRow[colIndex] return true if succeed or false
 // for non-supported type
 // error means error occur during operation
-func (dataSet DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, error) {
+func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, error) {
 	field := dataSet.currentRow[colIndex]
 	col := dataSet.Cols[colIndex]
 	if col.cusType != nil && col.cusType.typ == obj.Type() {
@@ -389,7 +389,7 @@ func (dataSet *DataSet) Columns() []string {
 	return ret
 }
 
-func (dataSet DataSet) Trace(t trace.Tracer) {
+func (dataSet *DataSet) Trace(t trace.Tracer) {
 	for r, row := range dataSet.rows {
 		if r > 25 {
 			break
@@ -402,12 +402,12 @@ func (dataSet DataSet) Trace(t trace.Tracer) {
 }
 
 // ColumnTypeDatabaseTypeName return Col DataType name
-func (dataSet DataSet) ColumnTypeDatabaseTypeName(index int) string {
+func (dataSet *DataSet) ColumnTypeDatabaseTypeName(index int) string {
 	return dataSet.Cols[index].DataType.String()
 }
 
 // ColumnTypeLength return length of column type
-func (dataSet DataSet) ColumnTypeLength(index int) (int64, bool) {
+func (dataSet *DataSet) ColumnTypeLength(index int) (int64, bool) {
 	switch dataSet.Cols[index].DataType {
 	case NCHAR, CHAR:
 		return int64(dataSet.Cols[index].MaxCharLen), true
@@ -416,15 +416,53 @@ func (dataSet DataSet) ColumnTypeLength(index int) (int64, bool) {
 }
 
 // ColumnTypeNullable return if column allow null or not
-func (dataSet DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {
+func (dataSet *DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {
 	return dataSet.Cols[index].AllowNull, true
 }
 
 // ColumnTypePrecisionScale return the precision and scale for numeric types
-func (dataSet DataSet) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
+func (dataSet *DataSet) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
 	switch dataSet.Cols[index].DataType {
 	case NUMBER:
 		return int64(dataSet.Cols[index].Precision), int64(dataSet.Cols[index].Scale), true
 	}
 	return int64(0), int64(0), false
+}
+
+func (dataSet *DataSet) ColumnTypeScanType(index int) reflect.Type {
+	col := dataSet.Cols[index]
+	switch col.DataType {
+	case NUMBER:
+		if col.Precision > 0 {
+			return reflect.TypeOf(float64(0.0))
+		} else {
+			return reflect.TypeOf(int64(0))
+		}
+	case ROWID, UROWID:
+		fallthrough
+	case CHAR, NCHAR:
+		fallthrough
+	case OCIClobLocator:
+		return reflect.TypeOf("")
+	case RAW:
+		fallthrough
+	case OCIBlobLocator, OCIFileLocator:
+		return reflect.TypeOf([]byte{})
+	case DATE, TIMESTAMP:
+		fallthrough
+	case TimeStampDTY:
+		fallthrough
+	case TimeStampeLTZ, TimeStampLTZ_DTY:
+		fallthrough
+	case TIMESTAMPTZ, TimeStampTZ_DTY:
+		return reflect.TypeOf(time.Time{})
+	case IBFloat:
+		return reflect.TypeOf(float32(0.0))
+	case IBDouble:
+		return reflect.TypeOf(float64(0.0))
+	case IntervalDS_DTY, IntervalYM_DTY:
+		return reflect.TypeOf("")
+	default:
+		return nil
+	}
 }

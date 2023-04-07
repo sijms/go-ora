@@ -272,10 +272,10 @@ func (par *ParameterInfo) encodeArrayNullString(conn *Connection, value []sql.Nu
 				session.WriteClr(&arrayBuffer, nil)
 				continue
 			}
-			tempLen := len([]rune(tempVal.String))
-			if par.MaxCharLen < tempLen {
-				par.MaxCharLen = tempLen
-			}
+			//tempLen := len([]rune(tempVal.String))
+			//if par.MaxCharLen < tempLen {
+			//	par.MaxCharLen = tempLen
+			//}
 			strConv, _ := conn.getStrConv(par.CharsetID)
 			tempBytes := strConv.Encode(tempVal.String)
 			session.WriteClr(&arrayBuffer, tempBytes)
@@ -283,6 +283,7 @@ func (par *ParameterInfo) encodeArrayNullString(conn *Connection, value []sql.Nu
 				par.MaxLen = len(tempBytes)
 			}
 		}
+		par.MaxCharLen = par.MaxLen
 		par.BValue = arrayBuffer.Bytes()
 	} else {
 		par.MaxLen = conn.maxLen.varchar
@@ -300,10 +301,10 @@ func (par *ParameterInfo) encodeArrayString(conn *Connection, value []string) {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
 		for _, tempVal := range value {
-			tempLen := len([]rune(tempVal))
-			if par.MaxCharLen < tempLen {
-				par.MaxCharLen = tempLen
-			}
+			//tempLen := len([]rune(tempVal))
+			//if par.MaxCharLen < tempLen {
+			//	par.MaxCharLen = tempLen
+			//}
 			strConv, _ := conn.getStrConv(par.CharsetID)
 			tempBytes := strConv.Encode(tempVal)
 			session.WriteClr(&arrayBuffer, tempBytes)
@@ -311,6 +312,7 @@ func (par *ParameterInfo) encodeArrayString(conn *Connection, value []string) {
 				par.MaxLen = len(tempBytes)
 			}
 		}
+		par.MaxCharLen = par.MaxLen
 		par.BValue = arrayBuffer.Bytes()
 	} else {
 		par.MaxLen = conn.maxLen.varchar

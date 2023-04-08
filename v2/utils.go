@@ -19,13 +19,6 @@ func parseSqlText(text string) []string {
 			if index+1 < length && text[index+1] == '*' {
 				index += 1
 				skip = true
-				// for ; index < length && text[index] != '*'; x++ {
-				// 	continue
-				// }
-				// if index + 1 < length && text[index + 1] == '/' {
-				// 	index += 1
-				// 	continue
-				// }
 			}
 		case '*':
 			if index+1 < length && text[index+1] == '/' {
@@ -34,11 +27,6 @@ func parseSqlText(text string) []string {
 			}
 		case '\'':
 			skip = !skip
-			// if skip {
-			// 	skip = false
-			// } else {
-			// 	skip = true
-			// }
 		case '"':
 			skip = !skip
 		case '-':
@@ -66,7 +54,7 @@ func parseSqlText(text string) []string {
 	pars := make([]string, 0, 10)
 	words := strings.FieldsFunc(refinedSql, split)
 	for _, word := range words {
-		if word[0] == ':' {
+		if len(word) > 1 && word[0] == ':' {
 			pars = append(pars, word[1:])
 		}
 	}

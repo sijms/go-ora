@@ -223,9 +223,6 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		}
 	} else {
 		for _, par := range stmt.Pars {
-			//if par.bypassDef {
-			//	continue
-			//}
 			_ = par.write(session)
 		}
 	}
@@ -359,7 +356,7 @@ func (stmt *Stmt) writePars() error {
 		session := stmt.connection.session
 		session.PutBytes(7)
 		for _, par := range stmt.Pars {
-			if par.bypassValue {
+			if par.Flag == 0x80 {
 				continue
 			}
 			if !stmt.parse && par.Direction == Output && stmt.stmtType != PLSQL {
@@ -1642,56 +1639,19 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		if len(par.Name) == 0 && useNamedPars {
 			useNamedPars = false
 		}
-		if x < len(stmt.Pars) {
-			if par.MaxLen > stmt.Pars[x].MaxLen {
-				stmt.reSendParDef = true
-			}
-			stmt.Pars[x] = *par
-		} else {
-			stmt.Pars = append(stmt.Pars, *par)
-		}
+		stmt.setParam(x, *par)
+		//if x < len(stmt.Pars) {
+		//	if par.MaxLen > stmt.Pars[x].MaxLen {
+		//		stmt.reSendParDef = true
+		//	}
+		//	stmt.Pars[x] = *par
+		//} else {
+		//	stmt.Pars = append(stmt.Pars, *par)
+		//}
 		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
 	}
 	if useNamedPars {
-		//type namedPar struct {
-		//	name        string
-		//	bypassValue bool
-		//	bypassDef   bool
-		//	value       ParameterInfo
-		//}
-		names := parseSqlText(stmt.text)
-		var parCollection = make([]ParameterInfo, 0, len(names))
-		//var parameters = make([]namedPar, len(names))
-		for x := 0; x < len(names); x++ {
-			// first find the parameter that has same name from parameter list
-			found := false
-			for _, par := range stmt.Pars {
-				if par.Name == names[x] {
-					parCollection = append(parCollection, par)
-					found = true
-					break
-				}
-			}
-			if !found {
-				return nil, fmt.Errorf("parameter %s is not defined in parameter list", names[x])
-			}
-			for y := x - 1; y >= 0; y-- {
-				if names[y] == names[x] {
-					//parCollection[y].bypassDef = true
-					parCollection[x].bypassValue = true
-					parCollection[x].Flag = 0x80
-					break
-				}
-			}
-		}
-		stmt.Pars = parCollection
-		// parse sql text to extract parameters
-		// pars definition should be arranged according to
-		// its arrangment in sql
-		// when a par repeated should be reported and use last definition
-		// when passing values arrangement use first definition
-		// []pars = {par1, par2, par3, par2}
-		// should be par1, par3, par2
+		stmt.useNamedParameters()
 	}
 	defer func() {
 		_ = stmt.freeTemporaryLobs()
@@ -1717,6 +1677,33 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		result.rowsAffected = int64(session.Summary.CurRowNumber)
 	}
 	return result, nil
+}
+
+// useNamedParameters: re-arrange parameters according parameter defined in sql text
+func (stmt *Stmt) useNamedParameters() error {
+	names := parseSqlText(stmt.text)
+	var parCollection = make([]ParameterInfo, 0, len(names))
+	for x := 0; x < len(names); x++ {
+		found := false
+		for _, par := range stmt.Pars {
+			if par.Name == names[x] {
+				parCollection = append(parCollection, par)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("parameter %s is not defined in parameter list", names[x])
+		}
+		for y := x - 1; y >= 0; y-- {
+			if names[y] == names[x] {
+				parCollection[x].Flag = 0x80
+				break
+			}
+		}
+	}
+	stmt.Pars = parCollection
+	return nil
 }
 
 // Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
@@ -1817,32 +1804,89 @@ func (stmt *Stmt) AddRefCursorParam(name string) {
 // Query_ execute a query command and return oracle dataset object
 //
 // args is an array of values that corresponding to parameters in sql
-func (stmt *Stmt) Query_(args []driver.Value) (*DataSet, error) {
+func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	if stmt.connection.State != Opened {
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
-	result, err := stmt.Query(args)
-	if err != nil {
-		return nil, err
+	tracer := stmt.connection.connOption.Tracer
+	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
+	stmt._hasMoreRows = true
+	var useNamedPars = true
+	for x := 0; x < len(namedArgs); x++ {
+		par, err := stmt.NewParam(namedArgs[x].Name, namedArgs[x].Value, 0, Input)
+		if err != nil {
+			return nil, err
+		}
+		if len(par.Name) == 0 && useNamedPars {
+			useNamedPars = false
+		}
+		stmt.setParam(x, *par)
+		tracer.Printf("    %d:\n%v", x, namedArgs[x])
 	}
-	if dataSet, ok := result.(*DataSet); ok {
-		return dataSet, nil
+
+	if useNamedPars {
+		stmt.useNamedParameters()
 	}
-	return nil, errors.New("the returned driver.rows is not an oracle DataSet")
+
+	failOver := stmt.connection.connOption.Failover
+	retryTime := stmt.connection.connOption.RetryTime
+	if failOver == 0 {
+		failOver = 1
+	}
+	var dataSet *DataSet
+	var err error
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+			continue
+		}
+		// reset statement if connection break and reconnect
+		if writeTrials > 0 {
+			stmt.reset()
+		}
+		// call query
+		dataSet, err = stmt._query()
+		if err == nil {
+			break
+		}
+		reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+		}
+		if retryTime > 0 {
+			time.Sleep(time.Duration(retryTime) * time.Second)
+		}
+	}
+	return dataSet, err
+
+	//result, err := stmt.Query(args)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if dataSet, ok := result.(*DataSet); ok {
+	//	return dataSet, nil
+	//}
+	//return nil, errors.New("the returned driver.rows is not an oracle DataSet")
 }
 
 func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
-	stmt.connection.connOption.Tracer.Print("Query With Context:", stmt.text)
-	args := make([]driver.Value, len(namedArgs))
-	for x := 0; x < len(args); x++ {
-		args[x] = namedArgs[x].Value
-	}
+	tracer := stmt.connection.connOption.Tracer
+	tracer.Print("Query With Context:", stmt.text)
+
 	stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext()
-	return stmt.Query(args)
+	return stmt.Query_(namedArgs)
 }
 
 func (stmt *Stmt) reset() {
@@ -1943,55 +1987,67 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	}
 	tracer := stmt.connection.connOption.Tracer
 	tracer.Printf("Query:\n%s", stmt.text)
-	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
-	stmt._hasMoreRows = true
-	for x := 0; x < len(args); x++ {
-		par, err := stmt.NewParam("", args[x], 0, Input)
-		if err != nil {
-			return nil, err
-		}
-		stmt.setParam(x, *par)
-	}
-
-	// if the connection lost
-	failOver := stmt.connection.connOption.Failover
-	retryTime := stmt.connection.connOption.RetryTime
-	if failOver == 0 {
-		failOver = 1
-	}
 	var dataSet *DataSet
 	var err error
-	var reconnect bool
-	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-		reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
-		if err != nil {
-			tracer.Print("Error: ", err)
-			if !reconnect {
-				return nil, err
-			}
-			continue
+	if len(args) == 0 {
+		dataSet, err = stmt.Query_(nil)
+	} else {
+		var namedArgs = make([]driver.NamedValue, len(args))
+		for x := 0; x < len(args); x++ {
+			namedArgs[x].Value = args[x]
 		}
-		// reset statement if connection break and reconnect
-		if writeTrials > 0 {
-			stmt.reset()
-		}
-		// call query
-		dataSet, err = stmt._query()
-		if err == nil {
-			break
-		}
-		reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
-		if err != nil {
-			tracer.Print("Error: ", err)
-			if !reconnect {
-				return nil, err
-			}
-		}
-		if retryTime > 0 {
-			time.Sleep(time.Duration(retryTime) * time.Second)
-		}
+		dataSet, err = stmt.Query_(namedArgs)
 	}
 	return dataSet, err
+	//stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
+	//stmt._hasMoreRows = true
+	//for x := 0; x < len(args); x++ {
+	//	par, err := stmt.NewParam("", args[x], 0, Input)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	stmt.setParam(x, *par)
+	//}
+	//
+	//// if the connection lost
+	//failOver := stmt.connection.connOption.Failover
+	//retryTime := stmt.connection.connOption.RetryTime
+	//if failOver == 0 {
+	//	failOver = 1
+	//}
+	//var dataSet *DataSet
+	//var err error
+	//var reconnect bool
+	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+	//	reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
+	//	if err != nil {
+	//		tracer.Print("Error: ", err)
+	//		if !reconnect {
+	//			return nil, err
+	//		}
+	//		continue
+	//	}
+	//	// reset statement if connection break and reconnect
+	//	if writeTrials > 0 {
+	//		stmt.reset()
+	//	}
+	//	// call query
+	//	dataSet, err = stmt._query()
+	//	if err == nil {
+	//		break
+	//	}
+	//	reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
+	//	if err != nil {
+	//		tracer.Print("Error: ", err)
+	//		if !reconnect {
+	//			return nil, err
+	//		}
+	//	}
+	//	if retryTime > 0 {
+	//		time.Sleep(time.Duration(retryTime) * time.Second)
+	//	}
+	//}
+	//return dataSet, err
 	//return stmt._query()
 }
 

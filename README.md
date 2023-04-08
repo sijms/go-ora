@@ -11,6 +11,17 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### version 2.6.14: Add Support for Named Parameters
+* to switch on named parameter mode simply pass all 
+your parameter to `Query` or `Exec` as `sql.Named("name", Value)`
+* if one of the parameter doesn't contain **name** the driver automatically switch to
+positional mode
+* parameter name in sql will be for example `:pr1` 
+and its value will be `sql.Named("pr1", 1)`
+* when using named parameters the order of the parameters is not important as 
+the driver will re-arrange the parameter according to declaration in
+sql text
+* See `examples/named pars/main.go` for example code
 ### version 2.6.12: Add Client Charset option
 * this option will allow controlling string encoding and decoding at client level
 * so using this option you can define a charset for the client that is different from the server 
@@ -24,8 +35,8 @@
 ```golang
 urlOptions := map[string]string {
 	// you can use also 
-	//"charset": "ZHS16GBK",
-	"client charset": "ZHS16GBK",
+	//"charset": "UTF8",
+	"client charset": "UTF8",
 	"trace file": "trace.log",
 }
 connStr := go_ora.BuildUrl("server", 1521, "service", "", "", urlOptions)

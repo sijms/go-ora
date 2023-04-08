@@ -124,6 +124,8 @@ type ParameterInfo struct {
 	getDataFromServer    bool
 	oaccollid            int
 	cusType              *customType
+	//bypassDef            bool
+	bypassValue bool
 }
 
 // load get parameter information form network session

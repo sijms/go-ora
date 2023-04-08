@@ -223,6 +223,9 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		}
 	} else {
 		for _, par := range stmt.Pars {
+			//if par.bypassDef {
+			//	continue
+			//}
 			_ = par.write(session)
 		}
 	}
@@ -356,6 +359,9 @@ func (stmt *Stmt) writePars() error {
 		session := stmt.connection.session
 		session.PutBytes(7)
 		for _, par := range stmt.Pars {
+			if par.bypassValue {
+				continue
+			}
 			if !stmt.parse && par.Direction == Output && stmt.stmtType != PLSQL {
 				continue
 			}
@@ -1544,31 +1550,59 @@ func (stmt *defaultStmt) Close() error {
 	return nil
 }
 
-func (stmt *Stmt) ExecContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Result, error) {
+func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	if stmt.connection.State != Opened {
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	stmt.connection.connOption.Tracer.Printf("Exec With Context:")
-	args := make([]driver.Value, len(namedArgs))
-	for x := 0; x < len(args); x++ {
-		args[x] = namedArgs[x].Value
-	}
+	//args := make([]driver.Value, len(namedArgs))
+	//for x := 0; x < len(args); x++ {
+	//	args[x] = namedArgs[x].Value
+	//}
 	stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext()
-	return stmt.Exec(args)
+
+	if stmt.connection.State != Opened {
+		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+	}
+	tracer := stmt.connection.connOption.Tracer
+	failOver := stmt.connection.connOption.Failover
+	if failOver == 0 {
+		failOver = 1
+	}
+	tracer.Printf("Exec:\n%s", stmt.text)
+	result, err := stmt._exec(args)
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = stmt.connection.reConnect(err, writeTrials)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+			continue
+		}
+		break
+	}
+	if reconnect {
+		return nil, &network.OracleError{ErrCode: 3135}
+	}
+	return result, err
+	//return stmt.Exec(args)
 }
 
-func (stmt *Stmt) _exec(args []driver.Value) (*QueryResult, error) {
+func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	var err error
+	var useNamedPars = true
 	for x := 0; x < len(args); x++ {
 		var par *ParameterInfo
-		switch tempOut := args[x].(type) {
+		switch tempOut := args[x].Value.(type) {
 		case sql.Out:
 			direction := Output
 			if tempOut.In {
 				direction = InOut
 			}
-			par, err = stmt.NewParam("", tempOut.Dest, 0, direction)
+			par, err = stmt.NewParam(args[x].Name, tempOut.Dest, 0, direction)
 			if err != nil {
 				return nil, err
 			}
@@ -1577,7 +1611,7 @@ func (stmt *Stmt) _exec(args []driver.Value) (*QueryResult, error) {
 			if tempOut.In {
 				direction = InOut
 			}
-			par, err = stmt.NewParam("", tempOut.Dest, 0, direction)
+			par, err = stmt.NewParam(args[x].Name, tempOut.Dest, 0, direction)
 			if err != nil {
 				return nil, err
 			}
@@ -1586,7 +1620,7 @@ func (stmt *Stmt) _exec(args []driver.Value) (*QueryResult, error) {
 			if tempOut.In {
 				direction = InOut
 			}
-			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, direction)
+			par, err = stmt.NewParam(args[x].Name, tempOut.Dest, tempOut.Size, direction)
 			if err != nil {
 				return nil, err
 			}
@@ -1595,15 +1629,18 @@ func (stmt *Stmt) _exec(args []driver.Value) (*QueryResult, error) {
 			if tempOut.In {
 				direction = InOut
 			}
-			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, direction)
+			par, err = stmt.NewParam(args[x].Name, tempOut.Dest, tempOut.Size, direction)
 			if err != nil {
 				return nil, err
 			}
 		default:
-			par, err = stmt.NewParam("", args[x], 0, Input)
+			par, err = stmt.NewParam(args[x].Name, args[x].Value, 0, Input)
 			if err != nil {
 				return nil, err
 			}
+		}
+		if len(par.Name) == 0 && useNamedPars {
+			useNamedPars = false
 		}
 		if x < len(stmt.Pars) {
 			if par.MaxLen > stmt.Pars[x].MaxLen {
@@ -1614,6 +1651,47 @@ func (stmt *Stmt) _exec(args []driver.Value) (*QueryResult, error) {
 			stmt.Pars = append(stmt.Pars, *par)
 		}
 		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
+	}
+	if useNamedPars {
+		//type namedPar struct {
+		//	name        string
+		//	bypassValue bool
+		//	bypassDef   bool
+		//	value       ParameterInfo
+		//}
+		names := parseSqlText(stmt.text)
+		var parCollection = make([]ParameterInfo, 0, len(names))
+		//var parameters = make([]namedPar, len(names))
+		for x := 0; x < len(names); x++ {
+			// first find the parameter that has same name from parameter list
+			found := false
+			for _, par := range stmt.Pars {
+				if par.Name == names[x] {
+					parCollection = append(parCollection, par)
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("parameter %s is not defined in parameter list", names[x])
+			}
+			for y := x - 1; y >= 0; y-- {
+				if names[y] == names[x] {
+					//parCollection[y].bypassDef = true
+					parCollection[x].bypassValue = true
+					parCollection[x].Flag = 0x80
+					break
+				}
+			}
+		}
+		stmt.Pars = parCollection
+		// parse sql text to extract parameters
+		// pars definition should be arranged according to
+		// its arrangment in sql
+		// when a par repeated should be reported and use last definition
+		// when passing values arrangement use first definition
+		// []pars = {par1, par2, par3, par2}
+		// should be par1, par3, par2
 	}
 	defer func() {
 		_ = stmt.freeTemporaryLobs()
@@ -1652,7 +1730,17 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		failOver = 1
 	}
 	tracer.Printf("Exec:\n%s", stmt.text)
-	result, err := stmt._exec(args)
+	var result *QueryResult
+	var err error
+	if len(args) == 0 {
+		result, err = stmt._exec(nil)
+	} else {
+		var namedArgs = make([]driver.NamedValue, len(args))
+		for x := 0; x < len(args); x++ {
+			namedArgs[x].Value = args[x]
+		}
+		result, err = stmt._exec(namedArgs)
+	}
 	var reconnect bool
 	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
 		reconnect, err = stmt.connection.reConnect(err, writeTrials)

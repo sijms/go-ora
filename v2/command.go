@@ -687,6 +687,12 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 									if err != nil {
 										return err
 									}
+									if stmt.stmtType == PLSQL {
+										_, err = session.GetInt(2, true, true)
+										if err != nil {
+											return err
+										}
+									}
 								} else {
 									return errors.New("RefCursor parameter should contain pointer to  RefCursor struct")
 								}
@@ -1341,6 +1347,12 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 		err := cursor.load()
 		if err != nil {
 			return err
+		}
+		if stmt.stmtType == PLSQL {
+			_, err = session.GetInt(2, true, true)
+			if err != nil {
+				return err
+			}
 		}
 		col.Value = cursor
 		return nil

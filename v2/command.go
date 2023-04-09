@@ -683,6 +683,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 								if cursor, ok := stmt.Pars[x].Value.(*RefCursor); ok {
 									cursor.connection = stmt.connection
 									cursor.parent = stmt
+									cursor.autoClose = true
 									err = cursor.load()
 									if err != nil {
 										return err
@@ -1344,6 +1345,7 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 		var cursor = new(RefCursor)
 		cursor.connection = stmt.connection
 		cursor.parent = stmt
+		cursor.autoClose = true
 		err := cursor.load()
 		if err != nil {
 			return err
@@ -1921,14 +1923,13 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	// deal with ref cursor
 	for colIndex, col := range dataSet.Cols {
 		if col.DataType == REFCURSOR {
-			if len(dataSet.rows) == 1 {
-				if cursor, ok := dataSet.rows[0][colIndex].(*RefCursor); ok {
-					dataSet.rows[0][colIndex], err = cursor.Query()
+			for rowIndex, row := range dataSet.rows {
+				if cursor, ok := row[colIndex].(*RefCursor); ok {
+					dataSet.rows[rowIndex][colIndex], err = cursor.Query()
 					if err != nil {
 						return nil, err
 					}
 				}
-
 			}
 		}
 	}

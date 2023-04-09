@@ -11,6 +11,45 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### version 2.6.15: Map RefCursor to sql.Rows
+* mapping RefCursor to sql.Rows will work with select/scan.
+```golang
+// TEMP_FUNC_316 is sql function that return RefCursor
+sqlText := `SELECT TEMP_FUNC_316(10) from dual`
+
+// use Query and don't use QueryRow
+rows, err := conn.Query(sqlText)
+if err != nil {
+	return err
+}
+
+// closing the parent rows will automatically close cursor
+defer rows.Close()
+
+for rows.Next() {
+    var cursor sql.Rows
+	err = rows.Scan(&cursor)
+	if err != nil {
+		return err
+	}
+	var (
+        id   int64
+        name string
+        val  float64
+        date time.Time
+    )
+	
+    // reading operation should be inside rows.Next
+    for cursor.Next() {
+        err = cursor.Scan(&id, &name, &val, &date)
+        if err != nil {
+            return err
+        }
+        fmt.Println("ID: ", id, "\tName: ", name, "\tval: ", val, "\tDate: ", date)
+    }
+}
+```
+* complete code is present in `examples/refcursor to Rows/main.go`
 ### version 2.6.14: Add Support for Named Parameters
 * to switch on named parameter mode simply pass all 
 your parameter to `Query` or `Exec` as `sql.Named("name", Value)`

@@ -86,10 +86,10 @@ func (cursor *RefCursor) load() error {
 	if err != nil {
 		return err
 	}
-	_, err = session.GetInt(2, true, true)
-	if err != nil {
-		return err
-	}
+	//_, err = session.GetInt(2, true, true)
+	//if err != nil {
+	//	return err
+	//}
 	return nil
 }
 func (cursor *RefCursor) getExeOptions() int {

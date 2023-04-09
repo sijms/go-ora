@@ -1,8 +1,11 @@
 package go_ora
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
-func parseSqlText(text string) []string {
+func parseSqlText(text string) ([]string, error) {
 	index := 0
 	length := len(text)
 	skip := false
@@ -46,17 +49,9 @@ func parseSqlText(text string) []string {
 		}
 	}
 	refinedSql := strings.TrimSpace(string(output))
-	split := func(r rune) bool {
-		return r == ' ' || r == '\t' || r == ',' || r == '+' || r == '-' ||
-			r == '*' || r == '/' || r == '<' || r == '>' ||
-			r == '=' || r == '|' || r == '(' || r == ')'
+	reg, err := regexp.Compile(`:\w+`)
+	if err != nil {
+		return nil, err
 	}
-	pars := make([]string, 0, 10)
-	words := strings.FieldsFunc(refinedSql, split)
-	for _, word := range words {
-		if len(word) > 1 && word[0] == ':' {
-			pars = append(pars, word[1:])
-		}
-	}
-	return pars
+	return reg.FindAllString(refinedSql, -1), nil
 }

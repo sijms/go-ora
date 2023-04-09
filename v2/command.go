@@ -634,25 +634,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			return err
 		}
 		switch msg {
-		//case 4:
-		//	stmt.connection.session.Summary, err = network.NewSummary(session)
-		//	if err != nil {
-		//		return err
-		//	}
-		//	stmt.connection.connOption.Tracer.Printf("Summary: RetCode:%d, Error Message:%q", stmt.connection.session.Summary.RetCode, string(stmt.connection.session.Summary.ErrorMessage))
-		//
-		//	stmt.cursorID = stmt.connection.session.Summary.CursorID
-		//	stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0
-		//	if stmt.connection.session.HasError() {
-		//		if stmt.connection.session.Summary.RetCode == 1403 {
-		//			stmt._hasMoreRows = false
-		//			stmt.connection.session.Summary = nil
-		//		} else {
-		//			return stmt.connection.session.GetError()
-		//		}
-		//
-		//	}
-		//	loop = false
 		case 6:
 			//_, err = session.GetByte()
 			err = dataSet.load(session)
@@ -918,15 +899,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				}
 			}
 			dataSet.setBitVector(bitVector)
-		//case 23:
-		//	opCode, err := session.GetByte()
-		//	if err != nil {
-		//		return err
-		//	}
-		//	err = stmt.connection.getServerNetworkInformation(opCode)
-		//	if err != nil {
-		//		return err
-		//	}
 		default:
 			err = stmt.connection.readResponse(msg)
 			if err != nil {
@@ -1362,6 +1334,17 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 	//if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
 	//	stmt._hasBLOB = true
 	//}
+	if col.DataType == REFCURSOR {
+		var cursor = new(RefCursor)
+		cursor.connection = stmt.connection
+		cursor.parent = stmt
+		err := cursor.load()
+		if err != nil {
+			return err
+		}
+		col.Value = cursor
+		return nil
+	}
 	if col.DataType == XMLType {
 		if col.TypeName == "XMLTYPE" {
 			return errors.New("unsupported data type: XMLTYPE")
@@ -1424,6 +1407,7 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 		}
 		return nil
 	}
+
 	return col.decodeColumnValue(stmt.connection)
 }
 
@@ -1651,7 +1635,10 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
 	}
 	if useNamedPars {
-		stmt.useNamedParameters()
+		err = stmt.useNamedParameters()
+		if err != nil {
+			return nil, err
+		}
 	}
 	defer func() {
 		_ = stmt.freeTemporaryLobs()
@@ -1681,7 +1668,10 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 
 // useNamedParameters: re-arrange parameters according parameter defined in sql text
 func (stmt *Stmt) useNamedParameters() error {
-	names := parseSqlText(stmt.text)
+	names, err := parseSqlText(stmt.text)
+	if err != nil {
+		return err
+	}
 	var parCollection = make([]ParameterInfo, 0, len(names))
 	for x := 0; x < len(names); x++ {
 		found := false
@@ -1825,7 +1815,10 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	}
 
 	if useNamedPars {
-		stmt.useNamedParameters()
+		err := stmt.useNamedParameters()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	failOver := stmt.connection.connOption.Failover
@@ -1912,6 +1905,20 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	err = stmt.read(dataSet)
 	if err != nil {
 		return nil, err
+	}
+	// deal with ref cursor
+	for colIndex, col := range dataSet.Cols {
+		if col.DataType == REFCURSOR {
+			if len(dataSet.rows) == 1 {
+				if cursor, ok := dataSet.rows[0][colIndex].(*RefCursor); ok {
+					dataSet.rows[0][colIndex], err = cursor.Query()
+					if err != nil {
+						return nil, err
+					}
+				}
+
+			}
+		}
 	}
 	// deal with lobs
 	if stmt._hasBLOB {

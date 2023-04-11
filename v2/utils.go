@@ -10,7 +10,7 @@ func parseSqlText(text string) ([]string, error) {
 	length := len(text)
 	skip := false
 	lineComment := false
-	output := make([]byte, 0, len(text))
+	textBuffer := make([]byte, 0, len(text))
 	for ; index < length; index++ {
 		ch := text[index]
 		switch ch {
@@ -45,13 +45,20 @@ func parseSqlText(text string) ([]string, error) {
 			if skip || lineComment {
 				continue
 			}
-			output = append(output, text[index])
+			textBuffer = append(textBuffer, text[index])
 		}
 	}
-	refinedSql := strings.TrimSpace(string(output))
-	reg, err := regexp.Compile(`:\w+`)
+	refinedSql := strings.TrimSpace(string(textBuffer))
+	reg, err := regexp.Compile(`:(\w+)`)
 	if err != nil {
 		return nil, err
 	}
-	return reg.FindAllString(refinedSql, -1), nil
+	names := make([]string, 0, 10)
+	matches := reg.FindAllStringSubmatch(refinedSql, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			names = append(names, match[1])
+		}
+	}
+	return names, nil
 }

@@ -49,7 +49,7 @@ for rows.Next() {
     }
 }
 ```
-* complete code is present in `examples/refcursor to Rows/main.go`
+* complete code is present in `examples/refcursor_to_rows/main.go`
 ### version 2.6.14: Add Support for Named Parameters
 * to switch on named parameter mode simply pass all 
 your parameter to `Query` or `Exec` as `sql.Named("name", Value)`
@@ -60,7 +60,7 @@ and its value will be `sql.Named("pr1", 1)`
 * when using named parameters the order of the parameters is not important as 
 the driver will re-arrange the parameter according to declaration in
 sql text
-* See `examples/named pars/main.go` for example code
+* See `examples/named_pars/main.go` for example code
 ### version 2.6.12: Add Client Charset option
 * this option will allow controlling string encoding and decoding at client level
 * so using this option you can define a charset for the client that is different from the server 
@@ -108,7 +108,7 @@ url := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
 ```
 ### version 2.6.4: Add Support for TimeStamp with timezone
 * now you can use TimeStampTZ as input/output parameters to manage timestamp with timezone 
-* see code in examples/TimeStamp TZ
+* see code in examples/timestamp_tz
 ### version 2.6.2: Add Support for Lob Prefetch
 * now you can control how you need to get lob data
   * **pre-fetch (default)** = lob data is sent from the server before send lob locator

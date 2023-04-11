@@ -11,7 +11,7 @@
       always ensure that you get latest release
     - See examples for more help
 ```
-### version 2.6.15: Map RefCursor to sql.Rows
+### version 2.6.16: Map RefCursor to sql.Rows
 * mapping RefCursor to sql.Rows will work with select/scan.
 ```golang
 // TEMP_FUNC_316 is sql function that return RefCursor

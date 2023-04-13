@@ -301,10 +301,6 @@ func (par *ParameterInfo) encodeArrayString(conn *Connection, value []string) {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
 		for _, tempVal := range value {
-			//tempLen := len([]rune(tempVal))
-			//if par.MaxCharLen < tempLen {
-			//	par.MaxCharLen = tempLen
-			//}
 			strConv, _ := conn.getStrConv(par.CharsetID)
 			tempBytes := strConv.Encode(tempVal)
 			session.WriteClr(&arrayBuffer, tempBytes)

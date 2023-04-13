@@ -446,7 +446,14 @@ func (stmt *Stmt) write() error {
 		if err != nil {
 			return err
 		}
-		err = stmt.writePars()
+		if stmt.bulkExec {
+			for x := 0; x < stmt.arrayBindCount; x++ {
+
+			}
+		} else {
+			err = stmt.writePars()
+		}
+
 		if err != nil {
 			return err
 		}
@@ -1633,15 +1640,58 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				return nil, err
 			}
 		default:
-			// check the array type
-			// get the array length
-			// save minimal length in stmt.arrayCount -->  valTemp.Len()
-			// pass element at position 0 to NewParam -->  valTemp.Index(0).Interface()
-			//
-			par, err = stmt.NewParam(args[x].Name, args[x].Value, 0, Input)
-			if err != nil {
-				return nil, err
+			if stmt.bulkExec {
+				tempType := reflect.TypeOf(args[x].Value)
+				if tempType != reflect.TypeOf([]byte{}) && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
+					tempVal := reflect.ValueOf(args[x].Value)
+					if stmt.arrayBindCount == 0 {
+						stmt.arrayBindCount = tempVal.Len()
+					} else {
+						if stmt.arrayBindCount > tempVal.Len() {
+							stmt.arrayBindCount = tempVal.Len()
+						}
+					}
+					par, err = stmt.NewParam(args[x].Name, tempVal.Index(0).Interface(), 0, Input)
+					if err != nil {
+						return nil, err
+					}
+					maxLen := par.MaxLen
+					maxCharLen := par.MaxCharLen
+					dataType := par.DataType
+					for x := 1; x < stmt.arrayBindCount; x++ {
+						err = par.encodeValue(tempVal.Index(x).Interface(), 0, stmt.connection)
+						if err != nil {
+							return nil, err
+						}
+						if maxLen < par.MaxLen {
+							maxLen = par.MaxLen
+						}
+						if maxCharLen < par.MaxCharLen {
+							maxCharLen = par.MaxCharLen
+						}
+						if par.DataType != dataType && par.DataType != NCHAR {
+							dataType = par.DataType
+						}
+						// after all par.Value should contain the array value
+					}
+					_ = par.encodeValue(tempVal.Index(0).Interface(), 0, stmt.connection)
+					par.MaxLen = maxLen
+					par.MaxCharLen = maxCharLen
+					par.DataType = dataType
+				} else {
+					if stmt.arrayBindCount > 0 {
+						return nil, errors.New("to activate bulk insert/merge all parameters should be arrays")
+					}
+					stmt.bulkExec = false
+				}
 			}
+			if par == nil {
+				par, err = stmt.NewParam(args[x].Name, args[x].Value, 0, Input)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 		}
 		if len(par.Name) == 0 && useNamedPars {
 			useNamedPars = false

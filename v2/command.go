@@ -55,7 +55,7 @@ type defaultStmt struct {
 	autoClose          bool
 }
 
-func (stmt defaultStmt) CanAutoClose() bool {
+func (stmt *defaultStmt) CanAutoClose() bool {
 	return stmt.autoClose
 }
 func (stmt *defaultStmt) hasMoreRows() bool {
@@ -273,7 +273,7 @@ type Stmt struct {
 	parse        bool // means parse the command in the server this occurs if the stmt is not cached
 	execute      bool
 	define       bool
-
+	bulkExec     bool
 	//noOfDefCols        int
 }
 
@@ -330,16 +330,20 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	}
 	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
 		ret.stmtType = SELECT
+	} else if strings.HasPrefix(uCmdText, "INSERT") {
+		ret.stmtType = DML
+		ret.bulkExec = true
 	} else if strings.HasPrefix(uCmdText, "UPDATE") ||
-		strings.HasPrefix(uCmdText, "INSERT") ||
 		strings.HasPrefix(uCmdText, "DELETE") {
 		ret.stmtType = DML
 	} else if strings.HasPrefix(uCmdText, "DECLARE") || strings.HasPrefix(uCmdText, "BEGIN") {
 		ret.stmtType = PLSQL
+	} else if strings.HasPrefix(uCmdText, "MERGE") {
+		ret.bulkExec = true
+		ret.stmtType = OTHERS
 	} else {
 		ret.stmtType = OTHERS
 	}
-
 	// returning clause
 	var err error
 	if ret.stmtType != PLSQL {
@@ -1629,6 +1633,11 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				return nil, err
 			}
 		default:
+			// check the array type
+			// get the array length
+			// save minimal length in stmt.arrayCount -->  valTemp.Len()
+			// pass element at position 0 to NewParam -->  valTemp.Index(0).Interface()
+			//
 			par, err = stmt.NewParam(args[x].Name, args[x].Value, 0, Input)
 			if err != nil {
 				return nil, err
@@ -1638,14 +1647,6 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			useNamedPars = false
 		}
 		stmt.setParam(x, *par)
-		//if x < len(stmt.Pars) {
-		//	if par.MaxLen > stmt.Pars[x].MaxLen {
-		//		stmt.reSendParDef = true
-		//	}
-		//	stmt.Pars[x] = *par
-		//} else {
-		//	stmt.Pars = append(stmt.Pars, *par)
-		//}
 		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
 	}
 	if useNamedPars {
@@ -1657,6 +1658,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	defer func() {
 		_ = stmt.freeTemporaryLobs()
 	}()
+
 	session := stmt.connection.session
 	session.ResetBuffer()
 	err = stmt.write()

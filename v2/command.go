@@ -330,7 +330,8 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	}
 	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
 		ret.stmtType = SELECT
-	} else if strings.HasPrefix(uCmdText, "INSERT") {
+	} else if strings.HasPrefix(uCmdText, "INSERT") ||
+		strings.HasPrefix(uCmdText, "MERGE") {
 		ret.stmtType = DML
 		ret.bulkExec = true
 	} else if strings.HasPrefix(uCmdText, "UPDATE") ||
@@ -338,9 +339,6 @@ func NewStmt(text string, conn *Connection) *Stmt {
 		ret.stmtType = DML
 	} else if strings.HasPrefix(uCmdText, "DECLARE") || strings.HasPrefix(uCmdText, "BEGIN") {
 		ret.stmtType = PLSQL
-	} else if strings.HasPrefix(uCmdText, "MERGE") {
-		ret.bulkExec = true
-		ret.stmtType = OTHERS
 	} else {
 		ret.stmtType = OTHERS
 	}
@@ -436,9 +434,34 @@ func (stmt *Stmt) write() error {
 		session.PutUint(count, 2, true, true)
 		session.PutUint(exeOf, 2, true, true)
 		session.PutUint(execFlag, 2, true, true)
-		err := stmt.writePars()
-		if err != nil {
-			return err
+		//err := stmt.writePars()
+		//if err != nil {
+		//	return err
+		//}
+		var err error
+		if stmt.bulkExec {
+			arrayValues := make([]driver.Value, len(stmt.Pars))
+			for x := 0; x < len(stmt.Pars); x++ {
+				arrayValues[x] = stmt.Pars[x].Value
+			}
+			for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
+				for parIndex, arrayValue := range arrayValues {
+					tempVal := reflect.ValueOf(arrayValue)
+					err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
+					if err != nil {
+						return err
+					}
+				}
+				err = stmt.writePars()
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			err = stmt.writePars()
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		//stmt.reExec = true
@@ -447,15 +470,34 @@ func (stmt *Stmt) write() error {
 			return err
 		}
 		if stmt.bulkExec {
-			for x := 0; x < stmt.arrayBindCount; x++ {
-
+			arrayValues := make([]driver.Value, len(stmt.Pars))
+			for x := 0; x < len(stmt.Pars); x++ {
+				if stmt.Pars[x].Flag == 0x80 {
+					continue
+				}
+				arrayValues[x] = stmt.Pars[x].Value
+			}
+			for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
+				for parIndex, arrayValue := range arrayValues {
+					if stmt.Pars[parIndex].Flag == 0x80 {
+						continue
+					}
+					tempVal := reflect.ValueOf(arrayValue)
+					err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
+					if err != nil {
+						return err
+					}
+				}
+				err = stmt.writePars()
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			err = stmt.writePars()
-		}
-
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
 		stmt.parse = false
 		stmt.define = false
@@ -1658,8 +1700,8 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 					maxLen := par.MaxLen
 					maxCharLen := par.MaxCharLen
 					dataType := par.DataType
-					for x := 1; x < stmt.arrayBindCount; x++ {
-						err = par.encodeValue(tempVal.Index(x).Interface(), 0, stmt.connection)
+					for y := 1; y < stmt.arrayBindCount; y++ {
+						err = par.encodeValue(tempVal.Index(y).Interface(), 0, stmt.connection)
 						if err != nil {
 							return nil, err
 						}
@@ -1672,12 +1714,12 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						if par.DataType != dataType && par.DataType != NCHAR {
 							dataType = par.DataType
 						}
-						// after all par.Value should contain the array value
 					}
 					_ = par.encodeValue(tempVal.Index(0).Interface(), 0, stmt.connection)
 					par.MaxLen = maxLen
 					par.MaxCharLen = maxCharLen
 					par.DataType = dataType
+					par.Value = args[x].Value
 				} else {
 					if stmt.arrayBindCount > 0 {
 						return nil, errors.New("to activate bulk insert/merge all parameters should be arrays")
@@ -1955,6 +1997,7 @@ func (stmt *Stmt) reset() {
 	stmt.define = false
 	stmt._hasBLOB = false
 	stmt._hasLONG = false
+	stmt.bulkExec = false
 	stmt.disableCompression = true
 	stmt.arrayBindCount = 0
 }

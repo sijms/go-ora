@@ -1641,7 +1641,7 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 
 func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	var err error
-	var useNamedPars = true
+	var useNamedPars = len(args) > 0
 	for x := 0; x < len(args); x++ {
 		var par *ParameterInfo
 		switch tempOut := args[x].Value.(type) {
@@ -1909,7 +1909,7 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	tracer := stmt.connection.connOption.Tracer
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	stmt._hasMoreRows = true
-	var useNamedPars = true
+	var useNamedPars = len(namedArgs) > 0
 	for x := 0; x < len(namedArgs); x++ {
 		par, err := stmt.NewParam(namedArgs[x].Name, namedArgs[x].Value, 0, Input)
 		if err != nil {

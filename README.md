@@ -11,6 +11,13 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### version 2.6.17: Implement Bulk(Insert/Merge) in ExecContext
+* now you can make bulk (insert/merge) with sql driver Exec as follows:
+  * declare sql text with Insert or Merge
+  * pass all parameter as array
+  * number of rows inserted will equal to the least array size
+* Named parameter is also supported
+* full code is present in examples/merge
 ### version 2.6.16: Map RefCursor to sql.Rows
 * mapping RefCursor to sql.Rows will work with select/scan.
 ```golang

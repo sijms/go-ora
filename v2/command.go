@@ -1642,6 +1642,7 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	var err error
 	var useNamedPars = len(args) > 0
+	parIndex := 0
 	for x := 0; x < len(args); x++ {
 		var par *ParameterInfo
 		switch tempOut := args[x].Value.(type) {
@@ -1682,8 +1683,25 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				return nil, err
 			}
 		default:
+			tempType := reflect.TypeOf(args[x].Value)
+			if tempType.Kind() == reflect.Struct {
+				stmt.bulkExec = false
+				for i := 0; i < tempType.NumField(); i++ {
+					db := tempType.Field(i).Tag.Get("db")
+					db = strings.TrimSpace(db)
+					if db != "" {
+						tempPar, err := stmt.NewParam(db, reflect.ValueOf(args[x].Value).Field(i).Interface(), 0, Input)
+						if err != nil {
+							return nil, err
+						}
+						stmt.setParam(parIndex, *tempPar)
+						parIndex++
+					}
+				}
+				stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
+				continue
+			}
 			if stmt.bulkExec {
-				tempType := reflect.TypeOf(args[x].Value)
 				if tempType != reflect.TypeOf([]byte{}) && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
 					tempVal := reflect.ValueOf(args[x].Value)
 					if stmt.arrayBindCount == 0 {
@@ -1738,7 +1756,8 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		if len(par.Name) == 0 && useNamedPars {
 			useNamedPars = false
 		}
-		stmt.setParam(x, *par)
+		stmt.setParam(parIndex, *par)
+		parIndex++
 		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
 	}
 	if useNamedPars {

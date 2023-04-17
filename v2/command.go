@@ -1684,13 +1684,18 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			}
 		default:
 			tempType := reflect.TypeOf(args[x].Value)
-			if tempType.Kind() == reflect.Struct {
-				stmt.bulkExec = false
-				for i := 0; i < tempType.NumField(); i++ {
+			tempVal := reflect.ValueOf(args[x].Value)
+			if args[x].Value != nil && tempType.Kind() == reflect.Struct {
+				structFieldCount := tempType.NumField()
+				tagFound := false
+				for i := 0; i < structFieldCount; i++ {
 					db := tempType.Field(i).Tag.Get("db")
 					db = strings.TrimSpace(db)
 					if db != "" {
-						tempPar, err := stmt.NewParam(db, reflect.ValueOf(args[x].Value).Field(i).Interface(), 0, Input)
+						if !tagFound {
+							tagFound = true
+						}
+						tempPar, err := stmt.NewParam(db, tempVal.Field(i).Interface(), 0, Input)
 						if err != nil {
 							return nil, err
 						}
@@ -1698,12 +1703,15 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						parIndex++
 					}
 				}
-				stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
-				continue
+				if tagFound {
+					stmt.bulkExec = false
+					stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
+					continue
+				}
 			}
 			if stmt.bulkExec {
 				if tempType != reflect.TypeOf([]byte{}) && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
-					tempVal := reflect.ValueOf(args[x].Value)
+					// setup array count
 					if stmt.arrayBindCount == 0 {
 						stmt.arrayBindCount = tempVal.Len()
 					} else {
@@ -1711,10 +1719,31 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 							stmt.arrayBindCount = tempVal.Len()
 						}
 					}
-					par, err = stmt.NewParam(args[x].Name, tempVal.Index(0).Interface(), 0, Input)
+					// see if first item is struct
+					firstItem := tempVal.Index(0)
+					if firstItem.Kind() == reflect.Struct {
+						fieldCount := firstItem.NumField()
+						structArrayAsNamedPars := make([]driver.NamedValue, 0, fieldCount)
+						for i := 0; i < fieldCount; i++ {
+							db := firstItem.Type().Field(i).Tag.Get("db")
+							db = strings.TrimSpace(db)
+							if db != "" {
+								arrayValues := make([]driver.Value, stmt.arrayBindCount)
+								for x := 0; x < stmt.arrayBindCount; x++ {
+									arrayValues[x] = tempVal.Index(x).Field(i).Interface()
+								}
+								structArrayAsNamedPars = append(structArrayAsNamedPars, driver.NamedValue{Name: db, Value: arrayValues})
+							}
+						}
+						if len(structArrayAsNamedPars) > 0 {
+							return stmt._exec(structArrayAsNamedPars)
+						}
+					}
+					par, err = stmt.NewParam(args[x].Name, firstItem.Interface(), 0, Input)
 					if err != nil {
 						return nil, err
 					}
+					// calculate maxLen, maxCharLen and DataType
 					maxLen := par.MaxLen
 					maxCharLen := par.MaxCharLen
 					dataType := par.DataType

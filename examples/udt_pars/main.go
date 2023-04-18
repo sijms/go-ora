@@ -11,12 +11,12 @@ import (
 )
 
 type test1 struct {
-	Id    int64           `oracle:"name:test_id"`
-	Name  *sql.NullString `oracle:"name:test_name"`
-	Data1 string          `oracle:"name:test_data1"`
-	Data2 string          `oracle:"name:test_data2"`
-	Data3 string          `oracle:"name:test_data3"`
-	Date  time.Time       `oracle:"name:test_date"`
+	Id    int64           `udt:"test_id"`
+	Name  *sql.NullString `udt:"test_name"`
+	Data1 string          `udt:"test_data1"`
+	Data2 string          `udt:"test_data2"`
+	Data3 string          `udt:"test_data3"`
+	Date  time.Time       `udt:"test_date"`
 }
 
 func createTable(conn *go_ora.Connection) error {

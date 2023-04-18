@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -61,4 +62,33 @@ func parseSqlText(text string) ([]string, error) {
 		}
 	}
 	return names, nil
+}
+
+func extractTag(tag string) (name, _type string, size int, direction ParameterDirection) {
+	tag = strings.TrimSpace(tag)
+	if len(tag) == 0 {
+		return
+	}
+	tagFields := strings.Split(tag, ",")
+	if len(tagFields) > 0 {
+		name = tagFields[0]
+	}
+	if len(tagFields) > 1 {
+		_type = tagFields[1]
+	}
+	if len(tagFields) > 2 {
+		temp, _ := strconv.ParseInt(tagFields[2], 10, 32)
+		size = int(temp)
+	}
+	if len(tagFields) > 3 {
+		dir := strings.ToLower(tagFields[3])
+		if dir == "in" || dir == "input" {
+			direction = Input
+		} else if dir == "out" || dir == "output" {
+			direction = Output
+		} else if dir == "inout" {
+			direction = InOut
+		}
+	}
+	return
 }

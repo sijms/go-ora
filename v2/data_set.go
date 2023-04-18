@@ -157,36 +157,52 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 			}
 			//col := dataSet.currentRow[srcIndex + processedFields]
 			f := destTyp.Elem().Field(x)
-			tag := f.Tag.Get("db")
-			if len(tag) == 0 {
+			fieldID, _, _, _ := extractTag(f.Tag.Get("db"))
+			if len(fieldID) == 0 {
 				continue
 			}
-			tag = strings.Trim(tag, "\"")
-			parts := strings.Split(tag, ",")
-			for _, part := range parts {
-				subs := strings.Split(part, ":")
-				if len(subs) != 2 {
-					continue
-				}
-				if strings.TrimSpace(strings.ToLower(subs[0])) == "name" {
-					fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
-					colInfo := dataSet.Cols[srcIndex+processedFields]
-					if strings.ToUpper(colInfo.Name) != fieldID {
-						continue
-						//return fmt.Errorf(
-						//	"go-ora: column %d name %s is mismatching with tag name %s of structure field",
-						//	srcIndex+processedFields, colInfo.Name, fieldID)
-					}
-					result, err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), srcIndex+processedFields)
-					if err != nil {
-						return err
-					}
-					if !result {
-						return errors.New("only basic types are allowed inside struct object")
-					}
-					processedFields++
-				}
+			colInfo := dataSet.Cols[srcIndex+processedFields]
+			if strings.ToUpper(colInfo.Name) != strings.ToUpper(fieldID) {
+				continue
 			}
+			result, err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), srcIndex+processedFields)
+			if err != nil {
+				return err
+			}
+			if !result {
+				return errors.New("only basic types are allowed inside struct object")
+			}
+			processedFields++
+			//tag := f.Tag.Get("db")
+			//if len(tag) == 0 {
+			//	continue
+			//}
+			//tag = strings.Trim(tag, "\"")
+			//parts := strings.Split(tag, ",")
+			//for _, part := range parts {
+			//	subs := strings.Split(part, ":")
+			//	if len(subs) != 2 {
+			//		continue
+			//	}
+			//	if strings.TrimSpace(strings.ToLower(subs[0])) == "name" {
+			//		fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
+			//		colInfo := dataSet.Cols[srcIndex+processedFields]
+			//		if strings.ToUpper(colInfo.Name) != fieldID {
+			//			continue
+			//			//return fmt.Errorf(
+			//			//	"go-ora: column %d name %s is mismatching with tag name %s of structure field",
+			//			//	srcIndex+processedFields, colInfo.Name, fieldID)
+			//		}
+			//		result, err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), srcIndex+processedFields)
+			//		if err != nil {
+			//			return err
+			//		}
+			//		if !result {
+			//			return errors.New("only basic types are allowed inside struct object")
+			//		}
+			//		processedFields++
+			//	}
+			//}
 		}
 		if processedFields == 0 {
 			return errors.New("passing struct to scan without matching tags")

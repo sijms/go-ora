@@ -1685,12 +1685,12 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		default:
 			tempType := reflect.TypeOf(args[x].Value)
 			tempVal := reflect.ValueOf(args[x].Value)
+			// deal with struct types
 			if args[x].Value != nil && tempType.Kind() == reflect.Struct {
 				structFieldCount := tempType.NumField()
 				tagFound := false
 				for i := 0; i < structFieldCount; i++ {
-					db := tempType.Field(i).Tag.Get("db")
-					db = strings.TrimSpace(db)
+					db, _, _, _ := extractTag(tempType.Field(i).Tag.Get("db"))
 					if db != "" {
 						if !tagFound {
 							tagFound = true
@@ -1725,8 +1725,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						fieldCount := firstItem.NumField()
 						structArrayAsNamedPars := make([]driver.NamedValue, 0, fieldCount)
 						for i := 0; i < fieldCount; i++ {
-							db := firstItem.Type().Field(i).Tag.Get("db")
-							db = strings.TrimSpace(db)
+							db, _, _, _ := extractTag(firstItem.Type().Field(i).Tag.Get("db"))
 							if db != "" {
 								arrayValues := make([]driver.Value, stmt.arrayBindCount)
 								for x := 0; x < stmt.arrayBindCount; x++ {

@@ -527,9 +527,13 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 					ret.connOption.AuthService, _ = uniqueAppendString(ret.connOption.AuthService, strings.ToUpper(strings.TrimSpace(tempVal)), false)
 				}
 			case "SSL":
-				ret.connOption.SSL = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
+				ret.connOption.SSL = strings.ToUpper(val[0]) == "TRUE" ||
+					strings.ToUpper(val[0]) == "ENABLE" ||
+					strings.ToUpper(val[0]) == "ENABLED"
 			case "SSL VERIFY":
-				ret.connOption.SSLVerify = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
+				ret.connOption.SSLVerify = strings.ToUpper(val[0]) == "TRUE" ||
+					strings.ToUpper(val[0]) == "ENABLE" ||
+					strings.ToUpper(val[0]) == "ENABLED"
 			case "DBA PRIVILEGE":
 				ret.DBAPrivilege = DBAPrivilegeFromString(val[0])
 			case "CONNECT TIMEOUT":

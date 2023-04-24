@@ -9,8 +9,8 @@ import (
 )
 
 type test1 struct {
-	Id   int64  `oracle:"name:test_id"`
-	Name string `oracle:"name:test_name"`
+	Id   int64  `udt:"test_id"`
+	Name string `udt:"test_name"`
 }
 
 func createUDT(conn *go_ora.Connection) error {

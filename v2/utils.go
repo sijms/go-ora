@@ -96,6 +96,8 @@ func extractTag(tag string) (name, _type string, size int, direction ParameterDi
 		case "size":
 			tempSize, _ := strconv.ParseInt(value, 10, 32)
 			size = int(tempSize)
+		case "dir":
+			fallthrough
 		case "direction":
 			switch value {
 			case "in", "input":

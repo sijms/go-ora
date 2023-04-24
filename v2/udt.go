@@ -342,25 +342,31 @@ func (cust *customType) loadFieldMap() {
 	typ := cust.typ
 	for x := 0; x < typ.NumField(); x++ {
 		f := typ.Field(x)
-		tag := f.Tag.Get("oracle")
-		if len(tag) == 0 {
+		fieldID, _, _, _ := extractTag(f.Tag.Get("udt"))
+		if len(fieldID) == 0 {
 			continue
 		}
-		tag = strings.Trim(tag, "\"")
-		parts := strings.Split(tag, ",")
-		for _, part := range parts {
-			subs := strings.Split(part, ":")
-			if len(subs) == 0 {
-				continue
-			}
-			if strings.TrimSpace(strings.ToLower(subs[0])) == "name" {
-				if len(subs) == 1 {
-					continue
-				}
-				fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
-				cust.filedMap[fieldID] = x
-			}
-		}
+		fieldID = strings.ToUpper(fieldID)
+		cust.filedMap[fieldID] = x
+		//tag := f.Tag.Get("oracle")
+		//if len(tag) == 0 {
+		//	continue
+		//}
+		//tag = strings.Trim(tag, "\"")
+		//parts := strings.Split(tag, ",")
+		//for _, part := range parts {
+		//	subs := strings.Split(part, ":")
+		//	if len(subs) == 0 {
+		//		continue
+		//	}
+		//	if strings.TrimSpace(strings.ToLower(subs[0])) == "name" {
+		//		if len(subs) == 1 {
+		//			continue
+		//		}
+		//		fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
+		//		cust.filedMap[fieldID] = x
+		//	}
+		//}
 	}
 }
 

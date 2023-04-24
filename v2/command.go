@@ -1642,6 +1642,7 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars int, err error) {
 	tempType := reflect.TypeOf(parValue)
 	tempVal := reflect.ValueOf(parValue)
+	// deal with Ptr struct types
 
 	// deal with struct types
 	if parValue != nil && tempType.Kind() == reflect.Struct {
@@ -1672,9 +1673,10 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 					}
 					typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(i).Name, _type)
 					// primitive values
-					if fieldValue == nil {
+					if tempPar == nil && fieldValue == nil {
 						tempPar, err = stmt.NewParam(name, fieldValue, 0, Input)
-					} else {
+					}
+					if tempPar == nil {
 						switch _type {
 						case "number": // can be int or float, bool, string, nullint, nullfloat, nullbool, nullstring
 							var fieldVal float64

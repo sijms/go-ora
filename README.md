@@ -11,6 +11,47 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### version 2.7.0: Use golang structure as an oracle (input) parameters
+* by define structure tag `db` now you can pass information to sql.Exec
+* data in `db` tag can be recognized by its position or as key=value 
+```golang
+type TEMP_TABLE struct {
+	// tag by position: db:"name,type,size,direction"
+	Id    int      `db:"ID,number"`
+	// tag as key=value: db:"size=size,name=name,dir=directiontype=type"
+	Name  string   `db:"type=varchar,name=NAME"`
+}
+```
+* you should pass at least the name of the parameter to use this feature
+* input parameters need only name and type. if you omit type driver will
+use field value directly as input parameter. type is used to make 
+some flexibility
+example use time.Time field and pass type=timestamp in this
+case timestamp will be used instead of default value for time.Time which is date
+* type can be one of the following: 
+```
+number      mapped to golang types integer, float, string, bool
+varchar     mapped to any golang types that can converted to string
+nvarchar    mapped to any golang types that can converted to string
+date        mapped to golang types time.Time and string
+timestamp   mapped to golang types time.Time and string
+timestamptz mapped to golang types time.Time and string
+raw         mapped to golang types []byte and string
+blob        mapped to golang types []byte and string
+clob        mapped to any golang types that can converted to string
+nclob       mapped to any golang types that can converted to string
+```
+* other features:
+  * tag for user defined type UDT changed from `oracle` to `udt`
+  * add 2 url options give the client control weather to use encryption, data integrity or not
+  ```golang
+  urlOptions := map[string]string {
+    // values can be "required", "accepted", "requested", and rejected"
+    "encryption": "required",
+    "data integrity": "rejected",
+  }
+  ```
+  * fix issue #350
 ### version 2.6.17: Implement Bulk(Insert/Merge) in ExecContext
 * now you can make bulk (insert/merge) with sql driver Exec as follows:
   * declare sql text with Insert or Merge

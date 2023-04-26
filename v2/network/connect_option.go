@@ -61,7 +61,9 @@ type SessionInfo struct {
 	Dialer                DialerContext
 }
 type AdvNegoSeviceInfo struct {
-	AuthService []string
+	AuthService     []string
+	EncServiceLevel int
+	IntServiceLevel int
 }
 type ConnectionOption struct {
 	ClientInfo

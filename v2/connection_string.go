@@ -526,6 +526,32 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				for _, tempVal := range val {
 					ret.connOption.AuthService, _ = uniqueAppendString(ret.connOption.AuthService, strings.ToUpper(strings.TrimSpace(tempVal)), false)
 				}
+			case "ENCRYPTION":
+				switch strings.ToUpper(val[0]) {
+				case "ACCEPTED":
+					ret.connOption.EncServiceLevel = 0
+				case "REJECTED":
+					ret.connOption.EncServiceLevel = 1
+				case "REQUESTED":
+					ret.connOption.EncServiceLevel = 2
+				case "REQUIRED":
+					ret.connOption.EncServiceLevel = 3
+				default:
+					return nil, fmt.Errorf("unknown encryption service level: %s", val[0])
+				}
+			case "DATA INTEGRITY":
+				switch strings.ToUpper(val[0]) {
+				case "ACCEPTED":
+					ret.connOption.IntServiceLevel = 0
+				case "REJECTED":
+					ret.connOption.IntServiceLevel = 1
+				case "REQUESTED":
+					ret.connOption.IntServiceLevel = 2
+				case "REQUIRED":
+					ret.connOption.IntServiceLevel = 3
+				default:
+					return nil, fmt.Errorf("unknown data integrity service level: %s", val[0])
+				}
 			case "SSL":
 				ret.connOption.SSL = strings.ToUpper(val[0]) == "TRUE" ||
 					strings.ToUpper(val[0]) == "ENABLE" ||
@@ -589,6 +615,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				if err != nil {
 					return nil, err
 				}
+			default:
+				return nil, fmt.Errorf("unknown URL option: %s", key)
 				//else if tempVal == "IMPLICIT" || tempVal == "AUTO" {
 				//	ret.connOption.Lob = 1
 				//} else if tempVal == "EXPLICIT" || tempVal == "MANUAL" {

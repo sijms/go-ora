@@ -1642,8 +1642,190 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars int, err error) {
 	tempType := reflect.TypeOf(parValue)
 	tempVal := reflect.ValueOf(parValue)
-	// deal with Ptr struct types
+	addOutputField := func(name, _type string, size int, dir ParameterDirection, fieldIndex int) (tempPar *ParameterInfo, err error) {
+		if len(_type) > 0 {
+			//var fieldValue = tempVal.Field(fieldIndex).Interface()
+			switch _type {
+			case "number":
+				tempPar, err = stmt.NewParam(name, sql.NullFloat64{}, size, dir)
+				//var fieldVal float64
+				//fieldVal, err = getFloat(fieldValue)
+				//if err != nil {
+				//	err = typeErr
+				//	return
+				//}
+				//tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+			case "varchar":
+				tempPar, err = stmt.NewParam(name, sql.NullString{}, size, dir)
+				//fieldVal := getString(fieldValue)
+				//tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+			case "nvarchar":
+				tempPar, err = stmt.NewParam(name, NullNVarChar{}, size, dir)
+				//fieldVal := getString(fieldValue)
+				//tempPar, err = stmt.NewParam(name, NVarChar(fieldVal), 0, Input)
+			case "date":
+				tempPar, err = stmt.NewParam(name, sql.NullTime{}, size, dir)
+				//var fieldVal time.Time
+				//fieldVal, err = getDate(fieldValue)
+				//if err != nil {
+				//	err = typeErr
+				//	return
+				//}
+				//tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+			case "timestamp":
+				tempPar, err = stmt.NewParam(name, NullTimeStamp{}, size, dir)
+				//var fieldVal time.Time
+				//fieldVal, err = getDate(fieldValue)
+				//if err != nil {
+				//	err = typeErr
+				//	return
+				//}
+				//tempPar, err = stmt.NewParam(name, TimeStamp(fieldVal), 0, Input)
+			case "timestamptz":
+				tempPar, err = stmt.NewParam(name, NullTimeStampTZ{}, size, dir)
+				//var fieldVal time.Time
+				//fieldVal, err = getDate(fieldValue)
+				//if err != nil {
+				//	err = typeErr
+				//	return
+				//}
+				//tempPar, err = stmt.NewParam(name, TimeStampTZ(fieldVal), 0, Input)
+			case "raw":
+				tempPar, err = stmt.NewParam(name, []byte{}, size, dir)
+				//var fieldVal []byte
+				//fieldVal, err = getBytes(fieldValue)
+				//if err != nil {
+				//	err = typeErr
+				//	return
+				//}
+				//tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+			case "clob":
+				//fieldVal := getString(fieldValue)
+				tempPar, err = stmt.NewParam(name, Clob{}, size, dir)
+			case "nclob":
+				//fieldVal := getString(fieldValue)
+				tempPar, err = stmt.NewParam(name, NClob{}, size, dir)
+			case "blob":
+				//var fieldVal []byte
+				//fieldVal, err = getBytes(fieldValue)
+				//if err != nil {
+				//	err = typeErr
+				//	return
+				//}
+				tempPar, err = stmt.NewParam(name, Blob{}, size, Input)
+			}
 
+			//if tempType.Field(fieldIndex).Type.Kind() == reflect.Ptr {
+			//	if tempVal.Field(fieldIndex).IsNil() {
+			//		tempPar, err = stmt.NewParam(name, nil, 0, Input)
+			//	} else {
+			//		fieldValue = tempVal.Field(fieldIndex).Elem().Interface()
+			//	}
+			//}
+			//// value support valuer interface
+			//if temp, ok := fieldValue.(driver.Valuer); ok {
+			//	fieldValue, err = temp.Value()
+			//	if err != nil {
+			//		return
+			//	}
+			//}
+			//typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
+		}
+		return
+	}
+	addInputField := func(name, _type string, fieldIndex int) (tempPar *ParameterInfo, err error) {
+		// check type
+		if len(_type) > 0 {
+			var fieldValue = tempVal.Field(fieldIndex).Interface()
+			// value is pointer
+			if tempType.Field(fieldIndex).Type.Kind() == reflect.Ptr {
+				if tempVal.Field(fieldIndex).IsNil() {
+					tempPar, err = stmt.NewParam(name, nil, 0, Input)
+				} else {
+					fieldValue = tempVal.Field(fieldIndex).Elem().Interface()
+				}
+			}
+			// value support valuer interface
+			if temp, ok := fieldValue.(driver.Valuer); ok {
+				fieldValue, err = temp.Value()
+				if err != nil {
+					return
+				}
+			}
+			typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
+			// primitive values
+			if tempPar == nil && fieldValue == nil {
+				tempPar, err = stmt.NewParam(name, fieldValue, 0, Input)
+			}
+			if tempPar == nil {
+				switch _type {
+				case "number":
+					var fieldVal float64
+					fieldVal, err = getFloat(fieldValue)
+					if err != nil {
+						err = typeErr
+						return
+					}
+					tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+				case "varchar":
+					fieldVal := getString(fieldValue)
+					tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+				case "nvarchar":
+					fieldVal := getString(fieldValue)
+					tempPar, err = stmt.NewParam(name, NVarChar(fieldVal), 0, Input)
+				case "date":
+					var fieldVal time.Time
+					fieldVal, err = getDate(fieldValue)
+					if err != nil {
+						err = typeErr
+						return
+					}
+					tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+				case "timestamp":
+					var fieldVal time.Time
+					fieldVal, err = getDate(fieldValue)
+					if err != nil {
+						err = typeErr
+						return
+					}
+					tempPar, err = stmt.NewParam(name, TimeStamp(fieldVal), 0, Input)
+				case "timestamptz":
+					var fieldVal time.Time
+					fieldVal, err = getDate(fieldValue)
+					if err != nil {
+						err = typeErr
+						return
+					}
+					tempPar, err = stmt.NewParam(name, TimeStampTZ(fieldVal), 0, Input)
+				case "raw":
+					var fieldVal []byte
+					fieldVal, err = getBytes(fieldValue)
+					if err != nil {
+						err = typeErr
+						return
+					}
+					tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+				case "clob":
+					fieldVal := getString(fieldValue)
+					tempPar, err = stmt.NewParam(name, Clob{String: fieldVal, Valid: true}, 0, Input)
+				case "nclob":
+					fieldVal := getString(fieldValue)
+					tempPar, err = stmt.NewParam(name, NClob{String: fieldVal, Valid: true}, 0, Input)
+				case "blob":
+					var fieldVal []byte
+					fieldVal, err = getBytes(fieldValue)
+					if err != nil {
+						err = typeErr
+						return
+					}
+					tempPar, err = stmt.NewParam(name, Blob{Data: fieldVal, Valid: true}, 0, Input)
+				}
+			}
+		} else {
+			tempPar, err = stmt.NewParam(name, tempVal.Field(fieldIndex).Interface(), 0, Input)
+		}
+		return
+	}
 	// deal with struct types
 	if parValue != nil && tempType.Kind() == reflect.Struct {
 		structFieldCount := tempType.NumField()
@@ -1652,96 +1834,30 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			name, _type, _, _ := extractTag(tempType.Field(i).Tag.Get("db"))
 			if name != "" {
 				var tempPar *ParameterInfo
-				// check type
-				if len(_type) > 0 {
-					var fieldValue = tempVal.Field(i).Interface()
-					// value is pointer
-					if tempType.Field(i).Type.Kind() == reflect.Ptr {
-						if tempVal.Field(i).IsNil() {
-							tempPar, err = stmt.NewParam(name, nil, 0, Input)
-						} else {
-							fieldValue = tempVal.Field(i).Elem().Interface()
-						}
-					}
-					// check for tempPar is not have value continue
-					// value support valuer interface
-					if temp, ok := fieldValue.(driver.Valuer); ok {
-						fieldValue, err = temp.Value()
-						if err != nil {
-							return 0, err
-						}
-					}
-					typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(i).Name, _type)
-					// primitive values
-					if tempPar == nil && fieldValue == nil {
-						tempPar, err = stmt.NewParam(name, fieldValue, 0, Input)
-					}
-					if tempPar == nil {
-						switch _type {
-						case "number": // can be int or float, bool, string, nullint, nullfloat, nullbool, nullstring
-							var fieldVal float64
-							fieldVal, err = getFloat(fieldValue)
-							if err != nil {
-								err = typeErr
-								return
-							}
-							tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-						case "varchar":
-							fieldVal := getString(fieldValue)
-							tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-						case "nvarchar":
-							fieldVal := getString(fieldValue)
-							tempPar, err = stmt.NewParam(name, NVarChar(fieldVal), 0, Input)
-						case "date":
-							var fieldVal time.Time
-							fieldVal, err = getDate(fieldValue)
-							if err != nil {
-								err = typeErr
-								return
-							}
-							tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-						case "timestamp":
-							var fieldVal time.Time
-							fieldVal, err = getDate(fieldValue)
-							if err != nil {
-								err = typeErr
-								return
-							}
-							tempPar, err = stmt.NewParam(name, TimeStamp(fieldVal), 0, Input)
-						case "timestamptz":
-							var fieldVal time.Time
-							fieldVal, err = getDate(fieldValue)
-							if err != nil {
-								err = typeErr
-								return
-							}
-							tempPar, err = stmt.NewParam(name, TimeStampTZ(fieldVal), 0, Input)
-						case "raw":
-							var fieldVal []byte
-							fieldVal, err = getBytes(fieldValue)
-							if err != nil {
-								err = typeErr
-								return
-							}
-							tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-						case "clob":
-							fieldVal := getString(fieldValue)
-							tempPar, err = stmt.NewParam(name, Clob{String: fieldVal, Valid: true}, 0, Input)
-						case "nclob":
-							fieldVal := getString(fieldValue)
-							tempPar, err = stmt.NewParam(name, NClob{String: fieldVal, Valid: true}, 0, Input)
-						case "blob":
-							var fieldVal []byte
-							fieldVal, err = getBytes(fieldValue)
-							if err != nil {
-								err = typeErr
-								return
-							}
-							tempPar, err = stmt.NewParam(name, Blob{Data: fieldVal, Valid: true}, 0, Input)
-						}
-					}
+				tempPar, err = addInputField(name, _type, i)
+				if err != nil {
+					return
+				}
+				stmt.setParam(parIndex, *tempPar)
+				processedPars++
+				parIndex++
+			}
+		}
+	}
+
+	// deal with Ptr struct types
+	if parValue != nil && tempType.Kind() == reflect.Ptr && tempVal.Elem().Kind() == reflect.Struct {
+		tempType = tempType.Elem()
+		tempVal = tempVal.Elem()
+		structFieldCount := tempType.NumField()
+		for i := 0; i < structFieldCount; i++ {
+			name, _type, size, dir := extractTag(tempType.Field(i).Tag.Get("db"))
+			if name != "" {
+				var tempPar *ParameterInfo
+				if dir == Input {
+					tempPar, err = addInputField(name, _type, i)
 				} else {
-					tempPar, err = stmt.NewParam(name, tempVal.Field(i).Interface(), 0, Input)
+					tempPar, err = addOutputField(name, _type, size, dir, i)
 				}
 				if err != nil {
 					return

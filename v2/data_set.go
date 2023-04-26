@@ -299,6 +299,10 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 			return err
 		}
 		noOfRowsToFetch = len(dataSet.rows)
+		hasMoreRows = dataSet.parent.hasMoreRows()
+		if !hasMoreRows && noOfRowsToFetch == 0 {
+			return io.EOF
+		}
 	}
 	if dataSet.index > 0 && dataSet.index%len(dataSet.rows) == 0 {
 		if hasMoreRows {

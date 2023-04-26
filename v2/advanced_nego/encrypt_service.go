@@ -15,6 +15,7 @@ func NewEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
 	output := &encryptService{
 		defaultService: defaultService{
 			comm:        comm,
+			level:       comm.session.Context.ConnOption.EncServiceLevel,
 			serviceType: 2,
 			version:     0xB200200,
 			availableServiceNames: []string{"", "RC4_40", "RC4_56", "RC4_128", "RC4_256",

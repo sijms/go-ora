@@ -1644,33 +1644,66 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 	tempVal := reflect.ValueOf(parValue)
 	addOutputField := func(name, _type string, size int, dir ParameterDirection, fieldIndex int) (tempPar *ParameterInfo, err error) {
 		if len(_type) > 0 {
+			fieldValue := tempVal.Field(fieldIndex).Interface()
+			//rFieldType := tempType.Field(fieldIndex).Type
+			hasNullValue := false
+
+			if tempType.Field(fieldIndex).Type.Kind() == reflect.Ptr {
+				if tempVal.Field(fieldIndex).IsNil() {
+					hasNullValue = true
+				}
+				fieldValue = tempVal.Field(fieldIndex).Elem().Interface()
+
+			}
+			if _, ok := fieldValue.(driver.Valuer); ok {
+				if _, ok = fieldValue.(sql.Scanner); ok {
+					tempPar, err = stmt.NewParam(name, fieldValue, size, dir)
+					return
+				}
+			}
 			//var fieldValue = tempVal.Field(fieldIndex).Interface()
+			typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
 			switch _type {
 			case "number":
-				tempPar, err = stmt.NewParam(name, sql.NullFloat64{}, size, dir)
-				//var fieldVal float64
-				//fieldVal, err = getFloat(fieldValue)
-				//if err != nil {
-				//	err = typeErr
-				//	return
-				//}
-				//tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+				var fieldVal float64
+				fieldVal, err = getFloat(fieldValue)
+				if err != nil {
+					err = typeErr
+					return
+				}
+				if hasNullValue {
+					tempPar, err = stmt.NewParam(name, sql.NullFloat64{}, size, dir)
+				} else {
+					tempPar, err = stmt.NewParam(name, sql.NullFloat64{Float64: fieldVal, Valid: true}, size, dir)
+				}
+				return
 			case "varchar":
-				tempPar, err = stmt.NewParam(name, sql.NullString{}, size, dir)
-				//fieldVal := getString(fieldValue)
-				//tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
+				if hasNullValue {
+					tempPar, err = stmt.NewParam(name, sql.NullFloat64{}, size, dir)
+				} else {
+					fieldVal := getString(fieldValue)
+					tempPar, err = stmt.NewParam(name, sql.NullString{String: fieldVal, Valid: true}, size, dir)
+				}
 			case "nvarchar":
-				tempPar, err = stmt.NewParam(name, NullNVarChar{}, size, dir)
-				//fieldVal := getString(fieldValue)
-				//tempPar, err = stmt.NewParam(name, NVarChar(fieldVal), 0, Input)
+				if hasNullValue {
+					tempPar, err = stmt.NewParam(name, NullNVarChar{}, size, dir)
+				} else {
+					fieldVal := NVarChar(getString(fieldValue))
+					tempPar, err = stmt.NewParam(name, NullNVarChar{NVarChar: fieldVal, Valid: true}, size, dir)
+				}
 			case "date":
-				tempPar, err = stmt.NewParam(name, sql.NullTime{}, size, dir)
-				//var fieldVal time.Time
-				//fieldVal, err = getDate(fieldValue)
-				//if err != nil {
-				//	err = typeErr
-				//	return
-				//}
+				if hasNullValue {
+					tempPar, err = stmt.NewParam(name, sql.NullTime{}, size, dir)
+				} else {
+					var fieldVal time.Time
+					fieldVal, err = getDate(fieldValue)
+					if err != nil {
+						err = typeErr
+						return
+					}
+					tempPar, err = stmt.NewParam(name, sql.NullTime{Time: fieldVal, Valid: true}, size, dir)
+				}
+
 				//tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
 			case "timestamp":
 				tempPar, err = stmt.NewParam(name, NullTimeStamp{}, size, dir)

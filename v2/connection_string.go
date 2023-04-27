@@ -517,6 +517,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			case "OS HASH":
 				fallthrough
 			case "OS PASSHASH":
+				fallthrough
 			case "OS PASSWORD HASH":
 				ret.connOption.ClientInfo.Password = val[0]
 				SetNTSAuth(&advanced_nego.NTSAuthHash{})
@@ -537,7 +538,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				case "REQUIRED":
 					ret.connOption.EncServiceLevel = 3
 				default:
-					return nil, fmt.Errorf("unknown encryption service level: %s", val[0])
+					return nil, fmt.Errorf("unknown encryption service level: %s use one of the following [ACCEPTED, REJECTED, REQUESTED, REQUIRED]", val[0])
 				}
 			case "DATA INTEGRITY":
 				switch strings.ToUpper(val[0]) {
@@ -550,7 +551,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				case "REQUIRED":
 					ret.connOption.IntServiceLevel = 3
 				default:
-					return nil, fmt.Errorf("unknown data integrity service level: %s", val[0])
+					return nil, fmt.Errorf("unknown data integrity service level: %s use one of the following [ACCEPTED, REJECTED, REQUESTED, REQUIRED]", val[0])
 				}
 			case "SSL":
 				ret.connOption.SSL = strings.ToUpper(val[0]) == "TRUE" ||

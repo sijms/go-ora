@@ -1,0 +1,47 @@
+name: PR check
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    name: basic check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ '1.19.x','1.20.x' ]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+      
+      - name: check format
+        run: go fmt ./...
+
+      - name: build
+        run: go build ./...
+
+      - name: test
+        run: go test
+
+  # https://github.com/golangci/golangci-lint-action
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.20.x'
+
+      - uses: actions/checkout@v3
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          only-new-issues: true
+

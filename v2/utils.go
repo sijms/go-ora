@@ -129,6 +129,32 @@ func extractTag(tag string) (name, _type string, size int, direction ParameterDi
 	return
 }
 
+func tSigned(input reflect.Type) bool {
+	switch input.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return true
+	default:
+		return false
+	}
+}
+func tUnsigned(input reflect.Type) bool {
+	switch input.Kind() {
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return true
+	default:
+		return false
+	}
+}
+func tInteger(input reflect.Type) bool {
+	return tSigned(input) || tUnsigned(input)
+}
+func tFloat(input reflect.Type) bool {
+	return input.Kind() == reflect.Float32 || input.Kind() == reflect.Float64
+}
+func tNumber(input reflect.Type) bool {
+	return tInteger(input) || tFloat(input)
+}
+
 // try to get string data from row field
 func getString(col interface{}) string {
 	if temp, ok := col.(string); ok {
@@ -142,13 +168,13 @@ func getString(col interface{}) string {
 func getFloat(col interface{}) (float64, error) {
 	rType := reflect.TypeOf(col)
 	rValue := reflect.ValueOf(col)
-	switch rType.Kind() {
-	case reflect.Float32, reflect.Float64:
-		return rValue.Float(), nil
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		fallthrough
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+	if tInteger(rType) {
 		return float64(rValue.Int()), nil
+	}
+	if tFloat(rType) {
+		return rValue.Float(), nil
+	}
+	switch rType.Kind() {
 	case reflect.String:
 		tempFloat, err := strconv.ParseFloat(rValue.String(), 64)
 		if err != nil {
@@ -164,13 +190,13 @@ func getFloat(col interface{}) (float64, error) {
 func getInt(col interface{}) (int64, error) {
 	rType := reflect.TypeOf(col)
 	rValue := reflect.ValueOf(col)
-	switch rType.Kind() {
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		fallthrough
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+	if tInteger(rType) {
 		return rValue.Int(), nil
-	case reflect.Float32, reflect.Float64:
+	}
+	if tFloat(rType) {
 		return int64(rValue.Float()), nil
+	}
+	switch rType.Kind() {
 	case reflect.String:
 		tempInt, err := strconv.ParseInt(rValue.String(), 10, 64)
 		if err != nil {
@@ -207,5 +233,62 @@ func getBytes(col interface{}) ([]byte, error) {
 		return []byte(val), nil
 	default:
 		return nil, errors.New("conversion of unsupported type to []byte")
+	}
+}
+
+func setTime(value reflect.Value, input time.Time) error {
+	switch value.Type() {
+	case reflect.TypeOf(time.Time{}):
+		value.Set(reflect.ValueOf(input))
+	case reflect.TypeOf(TimeStamp{}):
+		value.Set(reflect.ValueOf(TimeStamp(input)))
+	case reflect.TypeOf(TimeStampTZ{}):
+		value.Set(reflect.ValueOf(TimeStampTZ(input)))
+	default:
+		return fmt.Errorf("can not assign time to type: %v", value.Type())
+	}
+	return nil
+}
+func setString(value reflect.Value, input string) error {
+	switch value.Kind() {
+	case reflect.String:
+		value.SetString(input)
+	default:
+		switch value.Type() {
+		case reflect.TypeOf(NVarChar("")):
+			value.Set(reflect.ValueOf(NVarChar(input)))
+		default:
+			return fmt.Errorf("can not assign string to type: %v", value.Type())
+		}
+	}
+	return nil
+}
+
+func setNumber(value reflect.Value, input float64) error {
+	if tSigned(value.Type()) {
+		value.SetInt(int64(input))
+		return nil
+	}
+	if tUnsigned(value.Type()) {
+		value.SetUint(uint64(input))
+		return nil
+	}
+	if tFloat(value.Type()) {
+		value.SetFloat(input)
+		return nil
+	}
+	switch value.Kind() {
+	case reflect.Bool:
+		if input == 0 {
+			value.SetBool(false)
+		} else {
+			value.SetBool(true)
+		}
+		return nil
+	case reflect.String:
+		value.SetString(fmt.Sprintf("%v", input))
+		return nil
+	default:
+		return fmt.Errorf("can not assign number to type: %v", value.Type())
 	}
 }

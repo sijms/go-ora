@@ -4,6 +4,7 @@ import (
 	"math"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // Some documentation:
@@ -130,14 +131,29 @@ func TestEncodeDouble(t *testing.T) {
 	}
 }
 
-//
-// func TestEncodeDate(t *testing.T) {
-// 	ti := time.Date(2006, 01, 02, 15, 04, 06, 0, time.UTC)
+func TestEncodeDate(t *testing.T) {
+	// TODO: Probably worth testing different locations as well.
+	testCases := []time.Time{
+		time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		time.Date(2006, 0, 0, 0, 0, 0, 0, time.UTC),
+		time.Date(2006, 1, 0, 0, 0, 0, 0, time.UTC),
+		time.Date(2006, 1, 2, 0, 0, 0, 0, time.UTC),
+		time.Date(2006, 1, 2, 15, 0, 0, 0, time.UTC),
+		time.Date(2006, 1, 2, 15, 4, 0, 0, time.UTC),
+		time.Date(2006, 1, 2, 15, 4, 5, 0, time.UTC),
+		time.Date(2006, 1, 2, 15, 4, 5, 7, time.UTC),
+	}
 
-// 	got := EncodeDate(ti)
-// 	want := []byte{214, 7, 1, 2, 15, 4, 5, 0}
-
-// 	if !reflect.DeepEqual(got, want) {
-// 		t.Errorf("EncodeDate(%v) = %v, want %v", ti, got, want)
-// 	}
-// }
+	for _, tc := range testCases {
+		t.Run(tc.String(), func(t *testing.T) {
+			encoded := EncodeDate(tc)
+			decoded, err := DecodeDate(encoded)
+			if err != nil {
+				t.Error(err)
+			}
+			if !tc.Equal(decoded) {
+				t.Errorf("Original Date (%v) does not equal encoded then decoded date (%v)", tc, decoded)
+			}
+		})
+	}
+}

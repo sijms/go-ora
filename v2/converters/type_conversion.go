@@ -1115,6 +1115,9 @@ var oracleZones = map[int]string{
 
 // EncodeDate convert time.Time into oracle representation
 func EncodeDate(ti time.Time) []byte {
+	if ti.Nanosecond() > 0 {
+		return EncodeTimeStamp(ti, false)
+	}
 	ret := make([]byte, 7)
 	ret[0] = uint8(ti.Year()/100 + 100)
 	ret[1] = uint8(ti.Year()%100 + 100)
@@ -1249,7 +1252,9 @@ func addDigitToMantissa(mantissaIn uint64, d byte) (mantissaOut uint64, carryOut
 //
 //		https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
 //	 https://www.orafaq.com/wiki/Number
-func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int, mantissaDigits int, err error) {
+func FromNumber(
+	inputData []byte,
+) (mantissa uint64, negative bool, exponent int, mantissaDigits int, err error) {
 	if len(inputData) == 0 {
 		return 0, false, 0, 0, fmt.Errorf("Invalid NUMBER")
 	}

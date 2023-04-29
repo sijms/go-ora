@@ -11,7 +11,30 @@
       always ensure that you get latest release
     - See examples for more help
 ```
-### version 2.7.0: Use golang structure as an oracle (input) parameters
+### version 2.7.2: Use golang structure as an oracle (output) parameters
+all rules used for input will be required for output plus:
+* structure should be passed as a pointer
+* tag direction is required to be output or inout. size is used with 
+some types like strings
+* each field will be translated to a parameter as follows
+```
+number      mapped to sql.NullFloat64
+varchar     mapped to sql.NullString
+nvarchar    mapped to sql.NullNVarchar
+date        mapped to sql.NullTime
+timestamp   mapped to NullTimeStamp
+timestamptz mapped to NullTimeStampTZ
+raw         mapped to []byte
+clob        mapped to Clob
+nclob       mapped to NClob
+blob        mapped to Blob
+```
+all fields that support driver.Valuer interface will be passed as it is
+* data assigned back to structure fields after exec finish when a null 
+value read then field value will set to `reflect.Zero`
+* `examples/struct_pars/main.go` contain full example for reading and
+writing struct pars
+### version 2.7.1: Use golang structure as an oracle (input) parameters
 * by define structure tag `db` now you can pass information to sql.Exec
 * data in `db` tag can be recognized by its position or as key=value 
 ```golang

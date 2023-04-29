@@ -235,7 +235,19 @@ func getBytes(col interface{}) ([]byte, error) {
 		return nil, errors.New("conversion of unsupported type to []byte")
 	}
 }
-
+func setBytes(value reflect.Value, input []byte) error {
+	switch value.Type() {
+	case reflect.TypeOf([]byte{}):
+		value.SetBytes(input)
+	case reflect.TypeOf(Blob{}):
+		value.Set(reflect.ValueOf(Blob{Data: input, Valid: true}))
+	case reflect.TypeOf(string("")):
+		value.SetString(string(input))
+	default:
+		return fmt.Errorf("can not assign []byte to type: %v", value.Type())
+	}
+	return nil
+}
 func setTime(value reflect.Value, input time.Time) error {
 	switch value.Type() {
 	case reflect.TypeOf(time.Time{}):
@@ -257,6 +269,10 @@ func setString(value reflect.Value, input string) error {
 		switch value.Type() {
 		case reflect.TypeOf(NVarChar("")):
 			value.Set(reflect.ValueOf(NVarChar(input)))
+		case reflect.TypeOf(Clob{}):
+			value.Set(reflect.ValueOf(Clob{String: input, Valid: true}))
+		case reflect.TypeOf(NClob{}):
+			value.Set(reflect.ValueOf(NClob{String: input, Valid: true}))
 		default:
 			return fmt.Errorf("can not assign string to type: %v", value.Type())
 		}

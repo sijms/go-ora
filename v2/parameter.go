@@ -732,6 +732,39 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		} else {
 			*value = tempVal
 		}
+	case NullTimeStampTZ:
+		if newValue == nil {
+			value.Valid = false
+		} else {
+			value.Valid = true
+			if tempNewVal, ok := newValue.(TimeStampTZ); ok {
+				value.TimeStampTZ = tempNewVal
+			} else if tempNewVal, ok := newValue.(time.Time); ok {
+				value.TimeStampTZ = TimeStampTZ(tempNewVal)
+			} else {
+				return errors.New("NullTimeStampTZ col/par need TimeStamp, time.Time or Nil value")
+			}
+		}
+		par.Value = value
+	case *NullTimeStampTZ:
+		var tempVal NullTimeStampTZ
+		if newValue == nil {
+			tempVal.Valid = false
+		} else {
+			tempVal.Valid = true
+			if tempNewVal, ok := newValue.(TimeStampTZ); ok {
+				tempVal.TimeStampTZ = tempNewVal
+			} else if tempNewVal, ok := newValue.(time.Time); ok {
+				tempVal.TimeStampTZ = TimeStampTZ(tempNewVal)
+			} else {
+				return errors.New("*NullTimeStampTZ col/par need TimeStampTZ, time.Time or Nil value")
+			}
+		}
+		if value == nil {
+			par.Value = &tempVal
+		} else {
+			*value = tempVal
+		}
 	case NullTimeStamp:
 		if newValue == nil {
 			value.Valid = false
@@ -742,7 +775,7 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 			} else if tempNewVal, ok := newValue.(time.Time); ok {
 				value.TimeStamp = TimeStamp(tempNewVal)
 			} else {
-				return errors.New("NullTimeStamp col/par need TimeStamp, time.Time or Nil value")
+				return errors.New("NullTimeStamp col/par need TimeStampTZ, time.Time or Nil value")
 			}
 		}
 		par.Value = value

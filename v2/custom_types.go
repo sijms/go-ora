@@ -73,7 +73,7 @@ type NullNVarChar struct {
 	NVarChar NVarChar
 }
 
-func (val *NullNVarChar) Value() (driver.Value, error) {
+func (val NullNVarChar) Value() (driver.Value, error) {
 	if val.Valid {
 		return val.NVarChar.Value()
 	} else {

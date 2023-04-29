@@ -1654,7 +1654,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 						fieldType := structVal.Field(i).Type()
 						if _, ok := fieldValue.Interface().(driver.Valuer); ok {
 							fieldValue.Set(reflect.ValueOf(par.Value))
-							return nil
+							continue
 						}
 						if valuer, ok := par.Value.(driver.Valuer); ok {
 							tempVal, err := valuer.Value()
@@ -1672,42 +1672,64 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 									fieldValue = fieldValue.Elem()
 								}
 								if scanner, ok := fieldValue.Interface().(sql.Scanner); ok {
-									return scanner.Scan(par.Value)
+									err = scanner.Scan(par.Value)
+									if err != nil {
+										return err
+									}
+									continue
 								}
 								switch aval := par.Value.(type) {
 								case sql.NullFloat64:
 									if aval.Valid {
-										return setNumber(fieldValue, aval.Float64)
+										err = setNumber(fieldValue, aval.Float64)
+										if err != nil {
+											return err
+										}
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
 								case sql.NullString:
 									if aval.Valid {
-										return setString(fieldValue, aval.String)
+										err = setString(fieldValue, aval.String)
+										if err != nil {
+											return err
+										}
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
 								case NullNVarChar:
 									if aval.Valid {
-										return setString(fieldValue, string(aval.NVarChar))
+										err = setString(fieldValue, string(aval.NVarChar))
+										if err != nil {
+											return err
+										}
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
 								case sql.NullTime:
 									if aval.Valid {
-										return setTime(fieldValue, aval.Time)
+										err = setTime(fieldValue, aval.Time)
+										if err != nil {
+											return err
+										}
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
 								case NullTimeStamp:
 									if aval.Valid {
-										return setTime(fieldValue, time.Time(aval.TimeStamp))
+										err = setTime(fieldValue, time.Time(aval.TimeStamp))
+										if err != nil {
+											return err
+										}
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
 								case NullTimeStampTZ:
 									if aval.Valid {
-										return setTime(fieldValue, time.Time(aval.TimeStampTZ))
+										err = setTime(fieldValue, time.Time(aval.TimeStampTZ))
+										if err != nil {
+											return err
+										}
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
@@ -1719,23 +1741,35 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 								if aval == nil {
 									fieldValue.Set(reflect.Zero(fieldType))
 								} else {
-									return setBytes(fieldValue, aval)
+									err := setBytes(fieldValue, aval)
+									if err != nil {
+										return err
+									}
 								}
 							case Clob:
 								if aval.Valid {
-									return setString(fieldValue, aval.String)
+									err := setString(fieldValue, aval.String)
+									if err != nil {
+										return err
+									}
 								} else {
 									fieldValue.Set(reflect.Zero(fieldType))
 								}
 							case NClob:
 								if aval.Valid {
-									return setString(fieldValue, aval.String)
+									err := setString(fieldValue, aval.String)
+									if err != nil {
+										return err
+									}
 								} else {
 									fieldValue.Set(reflect.Zero(fieldType))
 								}
 							case Blob:
 								if aval.Valid {
-									return setBytes(fieldValue, aval.Data)
+									err := setBytes(fieldValue, aval.Data)
+									if err != nil {
+										return err
+									}
 								} else {
 									fieldValue.Set(reflect.Zero(fieldType))
 								}

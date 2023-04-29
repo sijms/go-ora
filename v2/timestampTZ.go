@@ -48,7 +48,7 @@ type NullTimeStampTZ struct {
 	TimeStampTZ TimeStampTZ
 }
 
-func (val *NullTimeStampTZ) Value() (driver.Value, error) {
+func (val NullTimeStampTZ) Value() (driver.Value, error) {
 	if val.Valid {
 		return val.TimeStampTZ.Value()
 	} else {

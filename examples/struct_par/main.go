@@ -71,6 +71,33 @@ func query(conn *sql.DB) error {
 	fmt.Println("finish query: ", time.Now().Sub(t))
 	return nil
 }
+func query2(conn *sql.DB) error {
+	t := time.Now()
+	temp := struct {
+		Id    int       `db:"ID,,,output"`
+		Name  string    `db:"NAME,,500,output"`
+		Name2 string    `db:"NAME2,nvarchar,500,output"`
+		Val   float32   `db:"VAL,,,output"`
+		Val2  int       `db:"VAL2,,,output"`
+		Date  time.Time `db:"LDATE,,,output"`
+		Date2 time.Time `db:"LDATE2,timestamp,,output"`
+		Date3 time.Time `db:"LDATE3,timestamptz,,output"`
+	}{}
+
+	sqlText := `BEGIN
+SELECT ID, NAME, NAME2, VAL, VAL2, LDATE, LDATE2, LDATE3 INTO :ID,:NAME,:NAME2,:VAL,:VAL2,:LDATE,:LDATE2,:LDATE3
+    FROM TEMP_TABLE_343;
+end;`
+	//sqlText := `BEGIN SELECT ID INTO :ID FROM TEMP_TABLE_343; END;`
+	//sqlText := `BEGIN SELECT 2 into :ID FROM DUAL; END;`
+	_, err := conn.Exec(sqlText, &temp)
+	if err != nil {
+		return err
+	}
+	fmt.Println(temp)
+	fmt.Println("finish query: ", time.Now().Sub(t))
+	return nil
+}
 func insert(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `INSERT INTO TEMP_TABLE_343(ID, NAME, NAME2, VAL, VAL2, LDATE, LDATE2, LDATE3) VALUES(:ID, :NAME, :NAME2, :VAL, :VAL2, :LDATE, :LDATE2, :LDATE3)`
@@ -153,6 +180,11 @@ func main() {
 	//	return
 	//}
 	err = query(conn)
+	if err != nil {
+		fmt.Println("can't query: ", err)
+		return
+	}
+	err = query2(conn)
 	if err != nil {
 		fmt.Println("can't query: ", err)
 		return

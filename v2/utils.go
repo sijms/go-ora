@@ -3,10 +3,12 @@ package go_ora
 import (
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -307,4 +309,8 @@ func setNumber(value reflect.Value, input float64) error {
 	default:
 		return fmt.Errorf("can not assign number to type: %v", value.Type())
 	}
+}
+
+func isBadConn(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE)
 }

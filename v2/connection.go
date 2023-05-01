@@ -7,16 +7,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
+	"github.com/sijms/go-ora/v2/advanced_nego"
+	"github.com/sijms/go-ora/v2/converters"
+	"github.com/sijms/go-ora/v2/network"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
-
-	"github.com/sijms/go-ora/v2/advanced_nego"
-	"github.com/sijms/go-ora/v2/converters"
-	"github.com/sijms/go-ora/v2/network"
 )
 
 type ConnectionState int
@@ -30,31 +27,31 @@ type LogonMode int
 
 const (
 	NoNewPass   LogonMode = 0x1
-	WithNewPass LogonMode = 0x2
 	SysDba      LogonMode = 0x20
 	SysOper     LogonMode = 0x40
 	UserAndPass LogonMode = 0x100
+	//WithNewPass LogonMode = 0x2
 	//PROXY       LogonMode = 0x400
 )
 
 type NLSData struct {
-	Calender        string
-	Comp            string
+	Calender        string `db:"p_nls_calendar,,40,out"`
+	Comp            string `db:"p_nls_comp,,40,out"`
 	Language        string
-	LengthSemantics string
-	NCharConvExcep  string
+	LengthSemantics string `db:"p_nls_length_semantics,,40,out"`
+	NCharConvExcep  string `db:"p_nls_nchar_conv_excep,,40,out"`
 	NCharConvImp    string
-	DateLang        string
-	Sort            string
-	Currency        string
-	DateFormat      string
-	TimeFormat      string
-	IsoCurrency     string
-	NumericChars    string
-	DualCurrency    string
+	DateLang        string `db:"p_nls_date_lang,,40,out"`
+	Sort            string `db:"p_nls_sort,,40,out"`
+	Currency        string `db:"p_nls_currency,,40,out"`
+	DateFormat      string `db:"p_nls_date_format,,40,out"`
+	TimeFormat      string ``
+	IsoCurrency     string `db:"p_nls_iso_currency,,40,out"`
+	NumericChars    string `db:"p_nls_numeric_chars,,40,out"`
+	DualCurrency    string `db:"p_nls_dual_currency,,40,out"`
 	UnionCurrency   string
-	Timestamp       string
-	TimestampTZ     string
+	Timestamp       string `db:"p_nls_timestamp,,48,out"`
+	TimestampTZ     string `db:"p_nls_timestamp_tz,,56,out"`
 	TTimezoneFormat string
 	NTimezoneFormat string
 	Territory       string
@@ -154,7 +151,7 @@ func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 }
 
 // SetStringConverter this function is used to set a custom string converter interface
-// that will used to encode and decode strings and bytearrays
+// that will be used to encode and decode strings and bytearrays
 func (conn *Connection) SetStringConverter(converter converters.IStringConverter) {
 	conn.sStrConv = converter
 	conn.session.StrConv = converter
@@ -166,9 +163,6 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 
 	// we read from nls_session_parameters ONCE
 	cmdText := `
-DECLARE
-	err_code VARCHAR2(2000);
-	err_msg  VARCHAR2(2000);
 	BEGIN
 		SELECT 
 			MAX(CASE WHEN PARAMETER='NLS_CALENDAR' THEN VALUE END) AS NLS_CALENDAR,
@@ -183,57 +177,88 @@ DECLARE
 			MAX(CASE WHEN PARAMETER='NLS_NUMERIC_CHARACTERS' THEN VALUE END) AS NLS_NUMERIC_CHARACTERS,
 			MAX(CASE WHEN PARAMETER='NLS_DUAL_CURRENCY' THEN VALUE END) AS NLS_DUAL_CURRENCY,
 			MAX(CASE WHEN PARAMETER='NLS_TIMESTAMP_FORMAT' THEN VALUE END) AS NLS_TIMESTAMP_FORMAT,
-			MAX(CASE WHEN PARAMETER='NLS_TIMESTAMP_TZ_FORMAT' THEN VALUE END) AS NLS_TIMESTAMP_TZ_FORMAT,
-			'0' AS p_err_code,
-			'0' AS p_err_msg
+			MAX(CASE WHEN PARAMETER='NLS_TIMESTAMP_TZ_FORMAT' THEN VALUE END) AS NLS_TIMESTAMP_TZ_FORMAT
 			into :p_nls_calendar, :p_nls_comp, :p_nls_length_semantics, :p_nls_nchar_conv_excep, 
 				:p_nls_date_lang, :p_nls_sort, :p_nls_currency, :p_nls_date_format, :p_nls_iso_currency,
-				:p_nls_numeric_chars, :p_nls_dual_currency, :p_nls_timestamp, :p_nls_timestamp_tz,
-				:p_err_code, :p_err_msg
+				:p_nls_numeric_chars, :p_nls_dual_currency, :p_nls_timestamp, :p_nls_timestamp_tz
 		FROM
 			nls_session_parameters
 		;
 	END;`
 	stmt := NewStmt(cmdText, conn)
-	stmt.AddParam("p_nls_calendar", "", 40, Output)
-	stmt.AddParam("p_nls_comp", "", 40, Output)
-	stmt.AddParam("p_nls_length_semantics", "", 40, Output)
-	stmt.AddParam("p_nls_nchar_conv_excep", "", 40, Output)
-	stmt.AddParam("p_nls_date_lang", "", 40, Output)
-	stmt.AddParam("p_nls_sort", "", 40, Output)
-	stmt.AddParam("p_nls_currency", "", 40, Output)
-	stmt.AddParam("p_nls_date_format", "", 40, Output)
-	stmt.AddParam("p_nls_iso_currency", "", 40, Output)
-	stmt.AddParam("p_nls_numeric_chars", "", 40, Output)
-	stmt.AddParam("p_nls_dual_currency", "", 40, Output)
-	stmt.AddParam("p_nls_timestamp", "", 48, Output)
-	stmt.AddParam("p_nls_timestamp_tz", "", 56, Output)
-	stmt.AddParam("p_err_code", "", 2000, Output)
-	stmt.AddParam("p_err_msg", "", 2000, Output)
 	defer func(stmt *Stmt) {
 		_ = stmt.Close()
 	}(stmt)
-	//fmt.Println(stmt.Pars)
-	_, err := stmt.Exec(nil)
+	_, err := stmt.Exec([]driver.Value{&conn.NLSData})
 	if err != nil {
 		return nil, err
 	}
+	//err := stmt.AddParam("p_nls_calendar", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = stmt.AddParam("p_nls_comp", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = stmt.AddParam("p_nls_length_semantics", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = stmt.AddParam("p_nls_nchar_conv_excep", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = stmt.AddParam("p_nls_date_lang", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = stmt.AddParam("p_nls_sort", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = stmt.AddParam("p_nls_currency", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = stmt.AddParam("p_nls_date_format", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = stmt.AddParam("p_nls_iso_currency", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//err = stmt.AddParam("p_nls_numeric_chars", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//stmt.AddParam("p_nls_dual_currency", "", 40, Output)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//stmt.AddParam("p_nls_timestamp", "", 48, Output)
+	//stmt.AddParam("p_nls_timestamp_tz", "", 56, Output)
+	//stmt.AddParam("p_err_code", "", 2000, Output)
+	//stmt.AddParam("p_err_msg", "", 2000, Output)
 
-	if len(stmt.Pars) >= 10 {
-		conn.NLSData.Calender = conn.sStrConv.Decode(stmt.Pars[0].BValue)
-		conn.NLSData.Comp = conn.sStrConv.Decode(stmt.Pars[1].BValue)
-		conn.NLSData.LengthSemantics = conn.sStrConv.Decode(stmt.Pars[2].BValue)
-		conn.NLSData.NCharConvExcep = conn.sStrConv.Decode(stmt.Pars[3].BValue)
-		conn.NLSData.DateLang = conn.sStrConv.Decode(stmt.Pars[4].BValue)
-		conn.NLSData.Sort = conn.sStrConv.Decode(stmt.Pars[5].BValue)
-		conn.NLSData.Currency = conn.sStrConv.Decode(stmt.Pars[6].BValue)
-		conn.NLSData.DateFormat = conn.sStrConv.Decode(stmt.Pars[7].BValue)
-		conn.NLSData.IsoCurrency = conn.sStrConv.Decode(stmt.Pars[8].BValue)
-		conn.NLSData.NumericChars = conn.sStrConv.Decode(stmt.Pars[9].BValue)
-		conn.NLSData.DualCurrency = conn.sStrConv.Decode(stmt.Pars[10].BValue)
-		conn.NLSData.Timestamp = conn.sStrConv.Decode(stmt.Pars[11].BValue)
-		conn.NLSData.TimestampTZ = conn.sStrConv.Decode(stmt.Pars[12].BValue)
-	}
+	//fmt.Println(stmt.Pars)
+
+	//if len(stmt.Pars) >= 10 {
+	//	conn.NLSData.Calender = conn.sStrConv.Decode(stmt.Pars[0].BValue)
+	//	conn.NLSData.Comp = conn.sStrConv.Decode(stmt.Pars[1].BValue)
+	//	conn.NLSData.LengthSemantics = conn.sStrConv.Decode(stmt.Pars[2].BValue)
+	//	conn.NLSData.NCharConvExcep = conn.sStrConv.Decode(stmt.Pars[3].BValue)
+	//	conn.NLSData.DateLang = conn.sStrConv.Decode(stmt.Pars[4].BValue)
+	//	conn.NLSData.Sort = conn.sStrConv.Decode(stmt.Pars[5].BValue)
+	//	conn.NLSData.Currency = conn.sStrConv.Decode(stmt.Pars[6].BValue)
+	//	conn.NLSData.DateFormat = conn.sStrConv.Decode(stmt.Pars[7].BValue)
+	//	conn.NLSData.IsoCurrency = conn.sStrConv.Decode(stmt.Pars[8].BValue)
+	//	conn.NLSData.NumericChars = conn.sStrConv.Decode(stmt.Pars[9].BValue)
+	//	conn.NLSData.DualCurrency = conn.sStrConv.Decode(stmt.Pars[10].BValue)
+	//	conn.NLSData.Timestamp = conn.sStrConv.Decode(stmt.Pars[11].BValue)
+	//	conn.NLSData.TimestampTZ = conn.sStrConv.Decode(stmt.Pars[12].BValue)
+	//}
 
 	/*
 		for _, par := range stmt.Pars {
@@ -289,23 +314,23 @@ func (conn *Connection) Ping(ctx context.Context) error {
 	}).exec()
 }
 
-func (conn *Connection) reConnect(errReceived error, trial int) (bool, error) {
-	tracer := conn.connOption.Tracer
-	if conn.State != Opened {
-		tracer.Print("reconnect trial #", trial)
-		err := conn.Open()
-		return true, err
-	}
-	if errReceived != nil {
-		if errors.Is(errReceived, io.EOF) || errors.Is(errReceived, syscall.EPIPE) {
-			tracer.Print("reconnect trial #", trial)
-			conn.State = Closed
-			err := conn.Open()
-			return true, err
-		}
-	}
-	return false, errReceived
-}
+//func (conn *Connection) reConnect(errReceived error, trial int) (bool, error) {
+//	tracer := conn.connOption.Tracer
+//	if conn.State != Opened {
+//		tracer.Print("reconnect trial #", trial)
+//		err := conn.Open()
+//		return true, err
+//	}
+//	if errReceived != nil {
+//		if errors.Is(errReceived, io.EOF) || errors.Is(errReceived, syscall.EPIPE) {
+//			tracer.Print("reconnect trial #", trial)
+//			conn.State = Closed
+//			err := conn.Open()
+//			return true, err
+//		}
+//	}
+//	return false, errReceived
+//}
 
 func (conn *Connection) getStrConv(charsetID int) (converters.IStringConverter, error) {
 	switch charsetID {
@@ -387,26 +412,26 @@ func (conn *Connection) getStrConv(charsetID int) (converters.IStringConverter, 
 //	return nil
 //}
 
-// Open open the connection = bring it online
+// Open the connection = bring it online
 func (conn *Connection) Open() error {
 	return conn.OpenWithContext(context.Background())
 }
 
-func (conn *Connection) restore() error {
-	tracer := conn.connOption.Tracer
-	failOver := conn.connOption.Failover
-	var err error
-	for trial := 0; trial < failOver; trial++ {
-		tracer.Print("reconnect trial #", trial+1)
-		err = conn.Open()
-		if err != nil {
-			tracer.Print("Error: ", err)
-			continue
-		}
-		break
-	}
-	return err
-}
+//func (conn *Connection) restore() error {
+//	tracer := conn.connOption.Tracer
+//	failOver := conn.connOption.Failover
+//	var err error
+//	for trial := 0; trial < failOver; trial++ {
+//		tracer.Print("reconnect trial #", trial+1)
+//		err = conn.Open()
+//		if err != nil {
+//			tracer.Print("Error: ", err)
+//			continue
+//		}
+//		break
+//	}
+//	return err
+//}
 
 // OpenWithContext open the connection with timeout context
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
@@ -499,7 +524,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	//this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
 	//this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
-	//this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompiletimeCapabilities[7] >= (byte) 8;
+	//this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompileTimeCapabilities[7] >= (byte) 8;
 	//if len(conn.connOption.UserID) > 0 && len(conn.conStr.password) > 0 {
 	//
 	//} else {
@@ -540,7 +565,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	return nil
 }
 
-// Begin called to begin a transaction
+// Begin a transaction
 func (conn *Connection) Begin() (driver.Tx, error) {
 	conn.connOption.Tracer.Print("Begin transaction")
 	conn.autoCommit = false
@@ -1094,7 +1119,7 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 	return stmt.ExecContext(ctx, args)
 }
 
-func (conn *Connection) CheckNamedValue(named *driver.NamedValue) error {
+func (conn *Connection) CheckNamedValue(_ *driver.NamedValue) error {
 	return nil
 }
 

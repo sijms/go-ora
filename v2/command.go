@@ -550,9 +550,6 @@ func (stmt *Stmt) getExeOption() int {
 
 // fetch get more rows from network stream
 func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
-	//stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
-	// note if _noOfRowsToFetch is default i will try to calculate the best value for
-	// according to the query
 	if stmt._noOfRowsToFetch == 25 {
 		//m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
 		maxRowSize := 0
@@ -572,29 +569,36 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	}
 
 	tracer := stmt.connection.connOption.Tracer
-	failOver := stmt.connection.connOption.Failover
-	if failOver == 0 {
-		failOver = 1
-	}
+	//failOver := stmt.connection.connOption.Failover if failOver == 0 {
+	//	failOver = 1
+	//}
 
 	// if fetch fail cannot re-fetch only reconnect and return error
 	var err = stmt._fetch(dataSet)
-	var reconnect bool
-	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-		reconnect, err = stmt.connection.reConnect(err, writeTrials)
-		if err != nil {
+	if err != nil {
+		if isBadConn(err) {
 			tracer.Print("Error: ", err)
-			if !reconnect {
-				return err
-			}
-			continue
+			return driver.ErrBadConn
 		}
-		break
+		return err
 	}
-	if reconnect {
-		return &network.OracleError{ErrCode: 3135}
-	}
-	return err
+	return nil
+	//var reconnect bool
+	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+	//	reconnect, err = stmt.connection.reConnect(err, writeTrials)
+	//	if err != nil {
+	//		tracer.Print("Error: ", err)
+	//		if !reconnect {
+	//			return err
+	//		}
+	//		continue
+	//	}
+	//	break
+	//}
+	//if reconnect {
+	//	return &network.OracleError{ErrCode: 3135}
+	//}
+	//return err
 	//if err != nil {
 	//	if errors.Is(err, io.EOF) {
 	//		stmt.connection.State = Closed
@@ -670,7 +674,7 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 	return stmt.read(dataSet)
 }
 
-// read this is common read for stmt it read many information related to
+// read this is common read for stmt it read much information related to
 // columns, dataset information, output parameter information, rows values
 // and at the end summary object about this operation
 func (stmt *defaultStmt) read(dataSet *DataSet) error {
@@ -770,7 +774,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 						}
 					}
 				} else {
-					// see if it is re-execute
+					// see if it is re-executed
 					if len(dataSet.Cols) == 0 && len(stmt.columns) > 0 {
 						dataSet.Cols = make([]ParameterInfo, len(stmt.columns))
 						copy(dataSet.Cols, stmt.columns)
@@ -1143,7 +1147,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if stringVal, ok := tempVal.(string); ok {
 								val.String = stringVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
 							}
 						}
 					case Clob:
@@ -1158,7 +1162,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if stringVal, ok := tempVal.(string); ok {
 								val.String = stringVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
 							}
 						}
 						stmt.Pars[parIndex].Value = val
@@ -1174,7 +1178,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if stringVal, ok := tempVal.(string); ok {
 								val.String = stringVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
 							}
 						}
 					case NClob:
@@ -1189,7 +1193,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if stringVal, ok := tempVal.(string); ok {
 								val.String = stringVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
 							}
 						}
 						stmt.Pars[parIndex].Value = val
@@ -1205,7 +1209,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if byteVal, ok := tempVal.([]byte); ok {
 								val.Data = byteVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
 							}
 						}
 					case Blob:
@@ -1220,7 +1224,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if byteVal, ok := tempVal.([]byte); ok {
 								val.Data = byteVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
 							}
 						}
 						stmt.Pars[parIndex].Value = val
@@ -1419,7 +1423,7 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 		if col.cusType == nil {
 			return fmt.Errorf("unregister custom type: %s. call RegisterType first", col.TypeName)
 		}
-		_, err := session.GetDlc() // contian toid and some 0s
+		_, err := session.GetDlc() // contain toid and some 0s
 		if err != nil {
 			return err
 		}
@@ -1491,7 +1495,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		if param.cusType == nil {
 			return fmt.Errorf("unregister custom type: %s. call RegisterType first", param.TypeName)
 		}
-		_, err := session.GetDlc() // contian toid and some 0s
+		_, err := session.GetDlc() // contain toid and some 0s
 		if err != nil {
 			return err
 		}
@@ -1578,7 +1582,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	return param.decodeParameterValue(stmt.connection)
 }
 
-// Close close stmt cursor in the server
+// Close stmt cursor in the server
 func (stmt *defaultStmt) Close() error {
 	if stmt.connection.State != Opened {
 		return &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
@@ -1614,28 +1618,36 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	tracer := stmt.connection.connOption.Tracer
-	failOver := stmt.connection.connOption.Failover
-	if failOver == 0 {
-		failOver = 1
-	}
+	//failOver := stmt.connection.connOption.Failover
+	//if failOver == 0 {
+	//	failOver = 1
+	//}
 	tracer.Printf("Exec:\n%s", stmt.text)
 	result, err := stmt._exec(args)
-	var reconnect bool
-	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-		reconnect, err = stmt.connection.reConnect(err, writeTrials)
-		if err != nil {
+	if err != nil {
+		if isBadConn(err) {
 			tracer.Print("Error: ", err)
-			if !reconnect {
-				return nil, err
-			}
-			continue
+			return nil, driver.ErrBadConn
 		}
-		break
+		return nil, err
 	}
-	if reconnect {
-		return nil, &network.OracleError{ErrCode: 3135}
-	}
-	return result, err
+	return result, nil
+	//var reconnect bool
+	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+	//	reconnect, err = stmt.connection.reConnect(err, writeTrials)
+	//	if err != nil {
+	//		tracer.Print("Error: ", err)
+	//		if !reconnect {
+	//			return nil, err
+	//		}
+	//		continue
+	//	}
+	//	break
+	//}
+	//if reconnect {
+	//	return nil, &network.OracleError{ErrCode: 3135}
+	//}
+	//return result, err
 	//return stmt.Exec(args)
 }
 func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
@@ -1941,7 +1953,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 					}
 					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 				case []byte:
-					fieldVal := []byte{}
+					var fieldVal []byte
 					if !hasNullValue {
 						fieldVal = aval
 					}
@@ -2326,10 +2338,10 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	tracer := stmt.connection.connOption.Tracer
-	failOver := stmt.connection.connOption.Failover
-	if failOver == 0 {
-		failOver = 1
-	}
+	//failOver := stmt.connection.connOption.Failover
+	//if failOver == 0 {
+	//	failOver = 1
+	//}
 	tracer.Printf("Exec:\n%s", stmt.text)
 	var result *QueryResult
 	var err error
@@ -2342,21 +2354,28 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		}
 		result, err = stmt._exec(namedArgs)
 	}
-	var reconnect bool
-	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-		reconnect, err = stmt.connection.reConnect(err, writeTrials)
-		if err != nil {
+	if err != nil {
+		if isBadConn(err) {
 			tracer.Print("Error: ", err)
-			if !reconnect {
-				return nil, err
-			}
-			continue
+			return nil, driver.ErrBadConn
 		}
-		break
+		return nil, err
 	}
-	if reconnect {
-		return nil, &network.OracleError{ErrCode: 3135}
-	}
+	//var reconnect bool
+	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+	//	reconnect, err = stmt.connection.reConnect(err, writeTrials)
+	//	if err != nil {
+	//		tracer.Print("Error: ", err)
+	//		if !reconnect {
+	//			return nil, err
+	//		}
+	//		continue
+	//	}
+	//	break
+	//}
+	//if reconnect {
+	//	return nil, &network.OracleError{ErrCode: 3135}
+	//}
 	return result, err
 }
 
@@ -2407,7 +2426,7 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 	//stmt.Pars = append(stmt.Pars, )
 }
 
-// AddRefCursorParam add new output parameter of type REFCURSOR
+// AddRefCursorParam add new output parameter of type REF CURSOR
 //
 // note: better to use sql.Out structure see examples for more information
 func (stmt *Stmt) AddRefCursorParam(name string) {
@@ -2445,44 +2464,58 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 		}
 	}
 
-	failOver := stmt.connection.connOption.Failover
-	retryTime := stmt.connection.connOption.RetryTime
-	if failOver == 0 {
-		failOver = 1
-	}
-	var dataSet *DataSet
-	var err error
-	var reconnect bool
-	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-		reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
-		if err != nil {
+	//failOver := stmt.connection.connOption.Failover
+	//retryTime := stmt.connection.connOption.RetryTime
+	//if failOver == 0 {
+	//	failOver = 1
+	//}
+
+	dataSet, err := stmt._query()
+	if err != nil {
+		if isBadConn(err) {
 			tracer.Print("Error: ", err)
-			if !reconnect {
-				return nil, err
-			}
-			continue
+			return nil, driver.ErrBadConn
 		}
-		// reset statement if connection break and reconnect
-		if writeTrials > 0 {
-			stmt.reset()
-		}
-		// call query
-		dataSet, err = stmt._query()
-		if err == nil {
-			break
-		}
-		reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
-		if err != nil {
-			tracer.Print("Error: ", err)
-			if !reconnect {
-				return nil, err
-			}
-		}
-		if retryTime > 0 {
-			time.Sleep(time.Duration(retryTime) * time.Second)
-		}
+		return nil, err
 	}
-	return dataSet, err
+	return dataSet, nil
+	//	if err == nil {
+	//		break
+	//	}
+	//var dataSet *DataSet
+	//var err error
+	//
+	//var reconnect bool
+	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+	//	reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
+	//	if err != nil {
+	//		tracer.Print("Error: ", err)
+	//		if !reconnect {
+	//			return nil, err
+	//		}
+	//		continue
+	//	}
+	//	// reset statement if connection break and reconnect
+	//	if writeTrials > 0 {
+	//		stmt.reset()
+	//	}
+	//	// call query
+	//	dataSet, err = stmt._query()
+	//	if err == nil {
+	//		break
+	//	}
+	//	reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
+	//	if err != nil {
+	//		tracer.Print("Error: ", err)
+	//		if !reconnect {
+	//			return nil, err
+	//		}
+	//	}
+	//	if retryTime > 0 {
+	//		time.Sleep(time.Duration(retryTime) * time.Second)
+	//	}
+	//}
+	//return dataSet, err
 
 	//result, err := stmt.Query(args)
 	//if err != nil {

@@ -23,7 +23,7 @@ func NewEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
 			availableServiceIDs: []int{0, 1, 8, 10, 6, 3, 2, 11, 12, 15, 16, 17},
 		},
 	}
-	err := output.buildServiceList([]string{"DES56C", "AES128", "AES192", "AES256"}, true, true)
+	err := output.buildServiceList([]string{"DES56C", "AES128", "AES192", "AES256", "RC4_256"}, true, true)
 	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err
@@ -75,6 +75,8 @@ func (serv *encryptService) activateAlgorithm() error {
 		return nil
 	case 2:
 		algo, err = security.NewOracleNetworkDESCryptor(key[:8], nil)
+	case 6:
+		algo, err = security.NewOracleNetworkRC4Cryptor(key[:32])
 	case 15:
 		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], nil)
 	case 16:

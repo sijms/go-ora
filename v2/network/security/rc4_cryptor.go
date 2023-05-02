@@ -5,23 +5,33 @@ import (
 )
 
 type OracleNetworkRC4Cryptor struct {
-	cipher *rc4.Cipher
+	encryptCipher *rc4.Cipher
+	decryptCipher *rc4.Cipher
 }
 
 func NewOracleNetworkRC4Cryptor(key []byte) (*OracleNetworkRC4Cryptor, error) {
-	cipher, err := rc4.NewCipher(key)
+	encryptCipher, err := rc4.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	return &OracleNetworkRC4Cryptor{cipher: cipher}, nil
+	decryptCipher, err := rc4.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	return &OracleNetworkRC4Cryptor{
+		encryptCipher: encryptCipher,
+		decryptCipher: decryptCipher,
+	}, nil
 }
 
 func (sec *OracleNetworkRC4Cryptor) Encrypt(input []byte) ([]byte, error) {
-	output := make([]byte, len(input))
-	sec.cipher.XORKeyStream(output, input)
-	return output, nil
+	//fmt.Println("encrypt string:", string(input))
+	sec.encryptCipher.XORKeyStream(input, input)
+	return input, nil
 }
 
 func (sec *OracleNetworkRC4Cryptor) Decrypt(input []byte) ([]byte, error) {
-	return sec.Encrypt(input)
+	//fmt.Println("decrypt: ")
+	sec.decryptCipher.XORKeyStream(input, input)
+	return input, nil
 }

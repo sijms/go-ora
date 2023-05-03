@@ -45,7 +45,7 @@ type NLSData struct {
 	Sort            string `db:"p_nls_sort,,40,out"`
 	Currency        string `db:"p_nls_currency,,40,out"`
 	DateFormat      string `db:"p_nls_date_format,,40,out"`
-	TimeFormat      string ``
+	TimeFormat      string
 	IsoCurrency     string `db:"p_nls_iso_currency,,40,out"`
 	NumericChars    string `db:"p_nls_numeric_chars,,40,out"`
 	DualCurrency    string `db:"p_nls_dual_currency,,40,out"`

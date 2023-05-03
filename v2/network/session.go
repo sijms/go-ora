@@ -720,6 +720,12 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				return nil, err
 			}
 		}
+		if session.resetConnection && session.Context.AdvancedService.CryptAlgo != nil {
+			err = session.Context.AdvancedService.CryptAlgo.Reset()
+			if err != nil {
+				return nil, err
+			}
+		}
 		session.breakConnection = false
 		session.resetConnection = false
 		//return nil, ErrConnectionReset

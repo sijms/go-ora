@@ -11,6 +11,11 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### version 2.7.3: Use database/sql fail over
+* use database/sql fail over by returning driver.ErrBadConn
+when connection interrupted
+* other features:
+  * add support for RC4 encryption
 ### version 2.7.2: Use golang structure as an oracle (output) parameters
 all rules used for input will be required for output plus:
 * structure should be passed as a pointer

@@ -1625,8 +1625,9 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	result, err := stmt._exec(args)
 	if err != nil {
 		if isBadConn(err) {
-			tracer.Print("Error: ", err)
-			return nil, driver.ErrBadConn
+			//tracer.Print("Error: ", err)
+			stmt.connection.setBad()
+			return nil, err
 		}
 		return nil, err
 	}

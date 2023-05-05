@@ -415,7 +415,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		connOption: network.ConnectionOption{
 			PrefetchRows: 25,
 			SessionInfo: network.SessionInfo{
-				Timeout: time.Duration(15),
+				Timeout: time.Second * time.Duration(15),
 				//TransportDataUnitSize: 0xFFFF,
 				//SessionDataUnitSize:   0xFFFF,
 				TransportDataUnitSize: 0x200000,
@@ -570,7 +570,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				if err != nil {
 					return nil, errors.New("CONNECTION TIMEOUT value must be an integer")
 				}
-				ret.connOption.SessionInfo.Timeout = time.Duration(to)
+				ret.connOption.SessionInfo.Timeout = time.Second * time.Duration(to)
 			case "TRACE FILE":
 				ret.Trace = val[0]
 			case "PREFETCH_ROWS":

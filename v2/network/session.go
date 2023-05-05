@@ -40,14 +40,14 @@ type Session struct {
 	conn    net.Conn
 	sslConn *tls.Conn
 	//connOption        ConnectionOption
-	Context           *SessionContext
-	sendPcks          []PacketInterface
-	inBuffer          []byte
-	outBuffer         bytes.Buffer
-	index             int
-	key               []byte
-	salt              []byte
-	verifierType      int
+	Context   *SessionContext
+	sendPcks  []PacketInterface
+	inBuffer  []byte
+	outBuffer bytes.Buffer
+	index     int
+	//key               []byte
+	//salt              []byte
+	//verifierType      int
 	TimeZone          []byte
 	TTCVersion        uint8
 	HasEOSCapability  bool
@@ -94,11 +94,10 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 func NewSession(connOption *ConnectionOption) *Session {
 
 	return &Session{
-		ctx:      context.Background(),
-		conn:     nil,
-		inBuffer: nil,
-		index:    0,
-		//connOption:      *connOption,
+		ctx:             context.Background(),
+		conn:            nil,
+		inBuffer:        nil,
+		index:           0,
 		Context:         NewSessionContext(connOption),
 		Summary:         nil,
 		UseBigClrChunks: false,
@@ -173,36 +172,46 @@ func (session *Session) EndContext() {
 
 func (session *Session) initRead() error {
 	var err error
+	timeout := time.Now().Add(session.Context.ConnOption.Timeout)
 	if deadline, ok := session.ctx.Deadline(); ok {
-		if session.sslConn != nil {
-			err = session.sslConn.SetReadDeadline(deadline)
-		} else {
-			err = session.conn.SetReadDeadline(deadline)
+		if deadline.Before(timeout) {
+			timeout = deadline
 		}
+	}
+	//else {
+	//	if session.sslConn != nil {
+	//		err = session.sslConn.SetReadDeadline(time.Time{})
+	//	} else {
+	//		err = session.conn.SetReadDeadline(time.Time{})
+	//	}
+	//}
+	if session.sslConn != nil {
+		err = session.sslConn.SetReadDeadline(timeout)
 	} else {
-		if session.sslConn != nil {
-			err = session.sslConn.SetReadDeadline(time.Time{})
-		} else {
-			err = session.conn.SetReadDeadline(time.Time{})
-		}
+		err = session.conn.SetReadDeadline(timeout)
 	}
 	return err
 }
 
 func (session *Session) initWrite() error {
 	var err error
+	timeout := time.Now().Add(session.Context.ConnOption.Timeout)
 	if deadline, ok := session.ctx.Deadline(); ok {
-		if session.sslConn != nil {
-			err = session.sslConn.SetWriteDeadline(deadline)
-		} else {
-			err = session.conn.SetWriteDeadline(deadline)
+		if deadline.Before(timeout) {
+			timeout = deadline
 		}
+	}
+	//else {
+	//	if session.sslConn != nil {
+	//		err = session.sslConn.SetWriteDeadline(time.Time{})
+	//	} else {
+	//		err = session.conn.SetWriteDeadline(time.Time{})
+	//	}
+	//}
+	if session.sslConn != nil {
+		err = session.sslConn.SetWriteDeadline(timeout)
 	} else {
-		if session.sslConn != nil {
-			err = session.sslConn.SetWriteDeadline(time.Time{})
-		} else {
-			err = session.conn.SetWriteDeadline(time.Time{})
-		}
+		err = session.conn.SetWriteDeadline(timeout)
 	}
 	return err
 }
@@ -313,7 +322,7 @@ func (session *Session) Connect(ctx context.Context) error {
 	dialer := connOption.Dialer
 	if dialer == nil {
 		dialer = &net.Dialer{
-			Timeout: time.Second * session.Context.ConnOption.Timeout,
+			Timeout: session.Context.ConnOption.Timeout,
 		}
 	}
 	//connOption.serverIndex = 0
@@ -484,9 +493,10 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 				session.Context.ConnOption.Tracer.Print("Read Timeout")
 				var breakErr error
 				pck, breakErr = session.BreakConnection()
-				if err != nil {
+				if breakErr != nil {
 					//return nil, err
 					session.Context.ConnOption.Tracer.Print("Connection Break With Error: ", breakErr)
+					return nil, breakErr
 				}
 			} else {
 				return nil, err
@@ -543,6 +553,7 @@ func (session *Session) GetError() *OracleError {
 
 // read a packet from network stream
 func (session *Session) readPacket() (PacketInterface, error) {
+	session.Context.ConnOption.Tracer.Print("Start Reading")
 	readPacketData := func() ([]byte, error) {
 		trials := 0
 		for {

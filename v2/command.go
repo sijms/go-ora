@@ -1585,6 +1585,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 // Close stmt cursor in the server
 func (stmt *defaultStmt) Close() error {
 	if stmt.connection.State != Opened {
+		stmt.connection.setBad()
 		return &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	if stmt.cursorID != 0 {
@@ -1604,9 +1605,11 @@ func (stmt *defaultStmt) Close() error {
 
 func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	if stmt.connection.State != Opened {
+		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
-	stmt.connection.connOption.Tracer.Printf("Exec With Context:")
+	tracer := stmt.connection.connOption.Tracer
+	tracer.Printf("Exec With Context:")
 	//args := make([]driver.Value, len(namedArgs))
 	//for x := 0; x < len(args); x++ {
 	//	args[x] = namedArgs[x].Value
@@ -1614,10 +1617,6 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext()
 
-	if stmt.connection.State != Opened {
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
-	}
-	tracer := stmt.connection.connOption.Tracer
 	//failOver := stmt.connection.connOption.Failover
 	//if failOver == 0 {
 	//	failOver = 1
@@ -2185,7 +2184,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			if stmt.bulkExec {
 				tempType := reflect.TypeOf(args[x].Value)
 				tempVal := reflect.ValueOf(args[x].Value)
-				if tempType != reflect.TypeOf([]byte{}) && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
+				if args[x].Value != nil && tempType != reflect.TypeOf([]byte{}) && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
 					// setup array count
 					if stmt.arrayBindCount == 0 {
 						stmt.arrayBindCount = tempVal.Len()
@@ -2277,6 +2276,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	session.ResetBuffer()
 	err = stmt.write()
 	if err != nil {
+		stmt.connection.setBad()
 		return nil, err
 	}
 	dataSet := new(DataSet)
@@ -2335,6 +2335,7 @@ func (stmt *Stmt) useNamedParameters() error {
 // Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	if stmt.connection.State != Opened {
+		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	tracer := stmt.connection.connOption.Tracer
@@ -2385,6 +2386,7 @@ func (stmt *Stmt) CheckNamedValue(_ *driver.NamedValue) error {
 
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) (*ParameterInfo, error) {
 	if stmt.connection.State != Opened {
+		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	param := &ParameterInfo{
@@ -2439,6 +2441,7 @@ func (stmt *Stmt) AddRefCursorParam(name string) {
 // args is an array of values that corresponding to parameters in sql
 func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	if stmt.connection.State != Opened {
+		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	tracer := stmt.connection.connOption.Tracer
@@ -2529,6 +2532,7 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 
 func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
+		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	tracer := stmt.connection.connOption.Tracer
@@ -2647,6 +2651,7 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 // args is an array of values that corresponding to parameters in sql
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
+		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	tracer := stmt.connection.connOption.Tracer

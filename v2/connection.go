@@ -85,6 +85,7 @@ type Connection struct {
 		date      int
 		timestamp int
 	}
+	bad bool
 }
 
 type OracleConnector struct {
@@ -1263,4 +1264,15 @@ func (conn *Connection) readResponse(msgCode uint8) error {
 	}
 	return nil
 	// cancel loop if = 4 or 9
+}
+
+func (conn *Connection) setBad() {
+	conn.bad = true
+}
+
+func (conn *Connection) ResetSession(ctx context.Context) error {
+	if conn.bad {
+		return driver.ErrBadConn
+	}
+	return nil
 }

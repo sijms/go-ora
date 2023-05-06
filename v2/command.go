@@ -2204,7 +2204,14 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 							if db != "" {
 								arrayValues := make([]driver.Value, stmt.arrayBindCount)
 								for x := 0; x < stmt.arrayBindCount; x++ {
-									arrayValues[x] = tempVal.Index(x).Field(i).Interface()
+
+									if (tempVal.Index(x).Field(i).Kind() == reflect.Ptr ||
+										tempVal.Index(x).Field(i).Kind() == reflect.Slice ||
+										tempVal.Index(x).Field(i).Kind() == reflect.Array) && tempVal.Index(x).Field(i).IsNil() {
+										arrayValues[x] = nil
+									} else {
+										arrayValues[x] = tempVal.Index(x).Field(i).Interface()
+									}
 								}
 								structArrayAsNamedPars = append(structArrayAsNamedPars, driver.NamedValue{Name: db, Value: arrayValues})
 							}

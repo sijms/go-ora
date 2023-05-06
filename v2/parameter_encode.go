@@ -123,6 +123,9 @@ func (par *ParameterInfo) encodeRaw(value []byte, size int) {
 	if size > par.MaxLen {
 		par.MaxLen = size
 	}
+	if par.MaxLen == 0 {
+		par.MaxLen = 1
+	}
 	par.ContFlag = 0
 	par.MaxCharLen = 0
 	par.CharsetForm = 0
@@ -549,12 +552,16 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			}
 		}
 	case []byte:
-		if len(value) > connection.maxLen.raw && par.Direction == Input {
-			return par.encodeValue(Blob{Valid: true, Data: value}, size, connection)
+		if len(value) == 0 {
+			par.encodeRaw(nil, size)
+		} else {
+			if len(value) > connection.maxLen.raw && par.Direction == Input {
+				return par.encodeValue(Blob{Valid: true, Data: value}, size, connection)
+			}
+			par.encodeRaw(value, size)
 		}
-		par.encodeRaw(value, size)
 	case *[]byte:
-		if value == nil {
+		if *value == nil || len(*value) == 0 {
 			par.encodeRaw(nil, size)
 		} else {
 			if len(*value) > connection.maxLen.raw && par.Direction == Input {

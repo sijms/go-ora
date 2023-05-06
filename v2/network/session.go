@@ -174,9 +174,10 @@ func (session *Session) initRead() error {
 	var err error
 	timeout := time.Now().Add(session.Context.ConnOption.Timeout)
 	if deadline, ok := session.ctx.Deadline(); ok {
-		if deadline.Before(timeout) {
-			timeout = deadline
-		}
+		//if deadline.Before(timeout) {
+		//	timeout = deadline
+		//}
+		timeout = deadline
 	}
 	//else {
 	//	if session.sslConn != nil {
@@ -197,9 +198,10 @@ func (session *Session) initWrite() error {
 	var err error
 	timeout := time.Now().Add(session.Context.ConnOption.Timeout)
 	if deadline, ok := session.ctx.Deadline(); ok {
-		if deadline.Before(timeout) {
-			timeout = deadline
-		}
+		//if deadline.Before(timeout) {
+		//	timeout = deadline
+		//}
+		timeout = deadline
 	}
 	//else {
 	//	if session.sslConn != nil {
@@ -496,7 +498,7 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 				if breakErr != nil {
 					//return nil, err
 					session.Context.ConnOption.Tracer.Print("Connection Break With Error: ", breakErr)
-					return nil, breakErr
+					return nil, err
 				}
 			} else {
 				return nil, err

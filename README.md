@@ -11,6 +11,15 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### version 2.7.4:
+* activate global timeout value to protect against block read/write
+if no timeout context specified
+* default value for timeout is 30 second you can change by
+passing one of the following ["TIMEOUT", "CONNECT TIMEOUT", "CONNECTION TIMEOUT"]
+* other feature/issues:
+  * fix passing empty `[]byte{}` will produce error
+  * fix passing empty array as a parameter will produce error
+  * return first binding error when the driver return `ora-24381: error in DML array`
 ### version 2.7.3: Use database/sql fail over
 * use database/sql fail over by returning driver.ErrBadConn
 when connection interrupted

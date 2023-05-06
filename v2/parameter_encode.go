@@ -155,6 +155,11 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	}
 	if tempType != reflect.TypeOf([]byte{}) {
 		if tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice {
+			par.Flag = 0x43
+			par.MaxNoOfArrayElements = reflect.ValueOf(val).Len()
+			if par.MaxNoOfArrayElements == 0 {
+				par.MaxNoOfArrayElements = 1
+			}
 			return par.encodeArrayValue(val, size, connection)
 		}
 	}

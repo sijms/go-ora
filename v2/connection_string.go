@@ -563,6 +563,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 					strings.ToUpper(val[0]) == "ENABLED"
 			case "DBA PRIVILEGE":
 				ret.DBAPrivilege = DBAPrivilegeFromString(val[0])
+			case "TIMEOUT":
+				fallthrough
 			case "CONNECT TIMEOUT":
 				fallthrough
 			case "CONNECTION TIMEOUT":
@@ -583,19 +585,21 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			case "PROXY CLIENT NAME":
 				ret.connOption.DatabaseInfo.ProxyClientName = val[0]
 			case "FAILOVER":
-				ret.connOption.Failover, err = strconv.Atoi(val[0])
-				if err != nil {
-					ret.connOption.Failover = 0
-				}
+				return nil, errors.New("starting from v2.7.0 this feature is not supported and the driver use database/sql package fail over")
+				//ret.connOption.Failover, err = strconv.Atoi(val[0])
+				//if err != nil {
+				//	ret.connOption.Failover = 0
+				//}
 			case "RETRYTIME":
 				fallthrough
 			case "RE-TRY TIME":
 				fallthrough
 			case "RETRY TIME":
-				ret.connOption.RetryTime, err = strconv.Atoi(val[0])
-				if err != nil {
-					ret.connOption.RetryTime = 0
-				}
+				return nil, errors.New("starting from v2.7.0 this feature is not supported and the driver use database/sql package fail over")
+				//ret.connOption.RetryTime, err = strconv.Atoi(val[0])
+				//if err != nil {
+				//	ret.connOption.RetryTime = 0
+				//}
 			case "LOB FETCH":
 				tempVal := strings.ToUpper(val[0])
 				if tempVal == "PRE" {

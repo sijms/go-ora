@@ -58,8 +58,8 @@ type Session struct {
 	UseBigClrChunks   bool
 	UseBigScn         bool
 	ClrChunkSize      int
-	breakConnection   bool
-	resetConnection   bool
+	breakConn         bool
+	resetConn         bool
 	SSL               struct {
 		CertificateRequest []*x509.CertificateRequest
 		PrivateKeys        []*rsa.PrivateKey
@@ -174,9 +174,6 @@ func (session *Session) initRead() error {
 	var err error
 	timeout := time.Now().Add(session.Context.ConnOption.Timeout)
 	if deadline, ok := session.ctx.Deadline(); ok {
-		//if deadline.Before(timeout) {
-		//	timeout = deadline
-		//}
 		timeout = deadline
 	}
 	//else {
@@ -198,9 +195,6 @@ func (session *Session) initWrite() error {
 	var err error
 	timeout := time.Now().Add(session.Context.ConnOption.Timeout)
 	if deadline, ok := session.ctx.Deadline(); ok {
-		//if deadline.Before(timeout) {
-		//	timeout = deadline
-		//}
 		timeout = deadline
 	}
 	//else {
@@ -283,7 +277,55 @@ func (session *Session) negotiate() {
 
 // IsBreak tell if the connection break elicit
 func (session *Session) IsBreak() bool {
-	return session.breakConnection
+	return session.breakConn
+}
+func (session *Session) resetConnection() error {
+	temp, err := session.readPacket()
+	if err != nil {
+		return err
+	}
+	if pck, ok := temp.(*MarkerPacket); ok {
+		switch pck.markerType {
+		case 0:
+			session.breakConn = true
+		case 1:
+			if pck.markerData == 2 {
+				session.resetConn = true
+			} else {
+				session.breakConn = true
+			}
+		default:
+			return errors.New("unknown marker type")
+		}
+	} else {
+		return errors.New("marker packet not received")
+	}
+	for session.breakConn && !session.resetConn {
+		temp, err = session.readPacket()
+		if pck, ok := temp.(*MarkerPacket); ok {
+			switch pck.markerType {
+			case 0:
+				session.breakConn = true
+			case 1:
+				if pck.markerData == 2 {
+					session.resetConn = true
+				} else {
+					session.breakConn = true
+				}
+			default:
+				return errors.New("unknown marker type")
+			}
+		} else {
+			return errors.New("marker packet not received")
+		}
+	}
+	session.ResetBuffer()
+	if session.resetConn && session.Context.AdvancedService.HashAlgo != nil {
+		err = session.Context.AdvancedService.HashAlgo.Init()
+		if err != nil {
+			return err
+		}
+	}
 }
 
 // BreakConnection elicit connetion break to cancel the current operation
@@ -296,8 +338,23 @@ func (session *Session) BreakConnection() (PacketInterface, error) {
 		session.EndContext()
 		session.oldCtx = tempCtx
 	}()
-	session.breakConnection = true
-	session.resetConnection = false
+	session.breakConn = true
+	session.resetConn = false
+	if session.Context.NegotiatedOptions&0x400 > 0 {
+		fmt.Println(session.Context.NegotiatedOptions)
+		err := session.initWrite()
+		if err != nil {
+			return nil, err
+		}
+		if session.sslConn != nil {
+			_, err = session.sslConn.Write([]byte{33})
+		} else {
+			_, err = session.conn.Write([]byte{33})
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
 	marker := newMarkerPacket(1, session.Context)
 	session.ResetBuffer()
 	err := session.writePacket(marker)
@@ -555,7 +612,6 @@ func (session *Session) GetError() *OracleError {
 
 // read a packet from network stream
 func (session *Session) readPacket() (PacketInterface, error) {
-	session.Context.ConnOption.Tracer.Print("Start Reading")
 	readPacketData := func() ([]byte, error) {
 		trials := 0
 		for {
@@ -685,21 +741,21 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		pck := newMarkerPacketFromData(packetData, session.Context)
 		switch pck.markerType {
 		case 0:
-			session.breakConnection = true
+			session.breakConn = true
 		case 1:
 			if pck.markerData == 2 {
-				session.resetConnection = true
+				session.resetConn = true
 			} else {
-				session.breakConnection = true
+				session.breakConn = true
 			}
 		default:
 			return nil, errors.New("unknown marker type")
 		}
 		trials := 1
-		for session.breakConnection && !session.resetConnection {
-			if trials > 3 {
-				return nil, errors.New("connection break")
-			}
+		for session.breakConn && !session.resetConn {
+			//if trials > 3 {
+			//	return nil, errors.New("connection break")
+			//}
 			packetData, err = readPacketData()
 			if err != nil {
 				return nil, err
@@ -710,12 +766,12 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			}
 			switch pck.markerType {
 			case 0:
-				session.breakConnection = true
+				session.breakConn = true
 			case 1:
 				if pck.markerData == 2 {
-					session.resetConnection = true
+					session.resetConn = true
 				} else {
-					session.breakConnection = true
+					session.breakConn = true
 				}
 			default:
 				return nil, errors.New("unknown marker type")
@@ -727,20 +783,20 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		if err != nil {
 			return nil, err
 		}
-		if session.resetConnection && session.Context.AdvancedService.HashAlgo != nil {
+		if session.resetConn && session.Context.AdvancedService.HashAlgo != nil {
 			err = session.Context.AdvancedService.HashAlgo.Init()
 			if err != nil {
 				return nil, err
 			}
 		}
-		if session.resetConnection && session.Context.AdvancedService.CryptAlgo != nil {
+		if session.resetConn && session.Context.AdvancedService.CryptAlgo != nil {
 			err = session.Context.AdvancedService.CryptAlgo.Reset()
 			if err != nil {
 				return nil, err
 			}
 		}
-		session.breakConnection = false
-		session.resetConnection = false
+		session.breakConn = false
+		session.resetConn = false
 		//return nil, ErrConnectionReset
 		packetData, err = readPacketData()
 		if err != nil {

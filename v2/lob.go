@@ -644,6 +644,7 @@ func (val *Clob) Scan(value interface{}) error {
 	if value == nil {
 		val.Valid = false
 		val.String = ""
+		return nil
 	}
 	switch temp := value.(type) {
 	case Clob:
@@ -670,6 +671,7 @@ func (val *Blob) Scan(value interface{}) error {
 	if value == nil {
 		val.Valid = false
 		val.Data = nil
+		return nil
 	}
 	switch temp := value.(type) {
 	case Blob:
@@ -692,6 +694,7 @@ func (val *NClob) Scan(value interface{}) error {
 	if value == nil {
 		val.Valid = false
 		val.String = ""
+		return nil
 	}
 	switch temp := value.(type) {
 	case Clob:

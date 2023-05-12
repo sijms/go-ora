@@ -323,7 +323,11 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 	}
 
 	if dataSet.index%noOfRowsToFetch < len(dataSet.rows) {
-		for x := 0; x < len(dataSet.rows[dataSet.index%noOfRowsToFetch]); x++ {
+		length := len(dataSet.rows[dataSet.index%noOfRowsToFetch])
+		if len(dest) < length {
+			length = len(dest)
+		}
+		for x := 0; x < length; x++ {
 			dest[x] = dataSet.rows[dataSet.index%noOfRowsToFetch][x]
 		}
 		dataSet.index++

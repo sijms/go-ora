@@ -10,10 +10,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"net"
-	"os"
 	"reflect"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/sijms/go-ora/v2/trace"
@@ -357,47 +355,12 @@ func (session *Session) BreakConnection() (PacketInterface, error) {
 	session.resetConn = false
 	var err error
 	done := false
+
 	if session.Context.NegotiatedOptions&0x400 > 0 {
-
-		//if session.sslConn != nil {
-		//
-		//} else {
-
-		if tcpConn, ok := session.conn.(*net.TCPConn); ok {
-			if remoteAddr, ok := tcpConn.RemoteAddr().(*net.TCPAddr); ok {
-				var to syscall.Sockaddr
-				if len(remoteAddr.IP) == 4 {
-					temp := (*[4]byte)(remoteAddr.IP)
-					to = &syscall.SockaddrInet4{
-						Port: remoteAddr.Port,
-						Addr: *temp,
-					}
-				} else {
-					temp := (*[16]byte)(remoteAddr.IP)
-					to = &syscall.SockaddrInet6{
-						Port:   remoteAddr.Port,
-						ZoneId: 0,
-						Addr:   *temp,
-					}
-				}
-				file, err := tcpConn.File()
-				if err != nil {
-					return nil, err
-				}
-				defer func(file *os.File) {
-					_ = file.Close()
-				}(file)
-				err = syscall.Sendmsg(int(file.Fd()), nil, []byte{33}, to, syscall.MSG_OOB)
-				if err != nil {
-					return nil, err
-				}
-				done = true
-				_ = syscall.SetNonblock(int(file.Fd()), true)
-			}
-		} else {
-			return nil, errors.New("not a tcp connection")
+		done, err = sendOOB(session.conn)
+		if err != nil {
+			return nil, err
 		}
-		//}
 	}
 	session.ResetBuffer()
 	if done {

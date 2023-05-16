@@ -131,6 +131,24 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 			param.MaxLen = int(length.Int64)
 			param.MaxCharLen = 0
 			param.CharsetForm = 0
+		case "BLOB":
+			param.DataType = OCIBlobLocator
+			param.ContFlag = 0
+			param.MaxLen = int(length.Int64)
+			param.MaxCharLen = 0
+			param.CharsetForm = 0
+		case "CLOB":
+			param.DataType = OCIClobLocator
+			param.CharsetForm = 1
+			param.ContFlag = 16
+			param.MaxCharLen = int(length.Int64)
+			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
+		case "NCLOB":
+			param.DataType = OCIClobLocator
+			param.CharsetForm = 2
+			param.ContFlag = 16
+			param.MaxCharLen = int(length.Int64)
+			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
 		default:
 			return fmt.Errorf("unsupported attribute type: %s", attTypeName.String)
 		}

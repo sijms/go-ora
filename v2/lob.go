@@ -18,6 +18,7 @@ type NClob Clob
 type lobInterface interface {
 	getLocator() []byte
 }
+
 type Blob struct {
 	locator []byte
 	Data    []byte

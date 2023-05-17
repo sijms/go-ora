@@ -93,20 +93,24 @@ func merge(db *sql.DB) error {
 		}
 		fmt.Println("connection closed")
 	}(conn)
-	//tx, err := conn.BeginTx(context.Background(), &sql.TxOptions{})
-	//if err != nil {
-	//	return err
-	//}
-	//_, err = tx.ExecContext(ctxTimeout, sqlText, bindall...)
-	_, err = conn.ExecContext(ctxTimeout, sqlText, bindall...)
+	tx, err := conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		//if err2 := tx.Rollback(); err2 != nil {
-		//	fmt.Println("error in rollback: ", err2)
-		//}
+		return err
+	}
+	_, err = tx.Exec(`LOCK TABLE TESTSHORT IN EXCLUSIVE MODE NOWAIT`)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctxTimeout, sqlText, bindall...)
+	//_, err = conn.ExecContext(ctxTimeout, sqlText, bindall...)
+	if err != nil {
+		if err2 := tx.Rollback(); err2 != nil {
+			fmt.Println("error in rollback: ", err2)
+		}
 		return err
 	}
 	fmt.Println("finish merge: ", time.Now().Sub(t))
-	//return tx.Commit()
+	return tx.Commit()
 	return nil
 }
 func main() {

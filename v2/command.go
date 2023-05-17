@@ -1130,6 +1130,38 @@ func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Valu
 }
 
 func (stmt *defaultStmt) readLobsUDT(dataSet *DataSet) error {
+	if stmt.containOutputPars {
+		for _, par := range stmt.Pars {
+			if par.DataType != XMLType || par.cusType == nil {
+				continue
+			}
+			for _, attr := range par.cusType.attribs {
+				if attr.DataType != OCIClobLocator && attr.DataType != OCIBlobLocator {
+					continue
+				}
+				if lob, ok := attr.Value.(lobInterface); ok {
+					locator := lob.getLocator()
+					var err error
+					if scan, ok := attr.Value.(sql.Scanner); ok {
+						if locator == nil {
+							err = scan.Scan(nil)
+							if err != nil {
+								return err
+							}
+						} else {
+							var tempVal interface{}
+							tempVal, err = stmt.readLob(attr, locator)
+							if err != nil {
+								return err
+							}
+							err = scan.Scan(tempVal)
+							return err
+						}
+					}
+				}
+			}
+		}
+	}
 	for colIndex, col := range dataSet.Cols {
 		if col.DataType == XMLType {
 			for _, row := range dataSet.rows {
@@ -1160,119 +1192,44 @@ func (stmt *defaultStmt) readLobsUDT(dataSet *DataSet) error {
 func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 	if stmt._hasBLOB {
 		if stmt.containOutputPars {
-			for parIndex, par := range stmt.Pars {
+			for _, par := range stmt.Pars {
 				if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
-					switch val := par.Value.(type) {
-					case *Clob:
-						if val.locator == nil {
-							val.Valid = false
-							val.String = ""
-						} else {
-							tempVal, err := stmt.readLob(par, val.locator)
-							if err != nil {
-								return err
-							}
-							if stringVal, ok := tempVal.(string); ok {
-								val.String = stringVal
-							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-							}
-						}
-					case Clob:
-						if val.locator == nil {
-							val.Valid = false
-							val.String = ""
-						} else {
-							tempVal, err := stmt.readLob(par, val.locator)
-							if err != nil {
-								return err
-							}
-							if stringVal, ok := tempVal.(string); ok {
-								val.String = stringVal
-							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-							}
-						}
-						stmt.Pars[parIndex].Value = val
-					case *NClob:
-						if val.locator == nil {
-							val.Valid = false
-							val.String = ""
-						} else {
-							tempVal, err := stmt.readLob(par, val.locator)
-							if err != nil {
-								return err
-							}
-							if stringVal, ok := tempVal.(string); ok {
-								val.String = stringVal
-							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-							}
-						}
-					case NClob:
-						if val.locator == nil {
-							val.Valid = false
-							val.String = ""
-						} else {
-							tempVal, err := stmt.readLob(par, val.locator)
-							if err != nil {
-								return err
-							}
-							if stringVal, ok := tempVal.(string); ok {
-								val.String = stringVal
-							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-							}
-						}
-						stmt.Pars[parIndex].Value = val
-					case *Blob:
-						if val.locator == nil {
-							val.Valid = false
-							val.Data = nil
-						} else {
-							tempVal, err := stmt.readLob(par, val.locator)
-							if err != nil {
-								return err
-							}
-							if byteVal, ok := tempVal.([]byte); ok {
-								val.Data = byteVal
-							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-							}
-						}
-					case Blob:
-						if val.locator == nil {
-							val.Valid = false
-							val.Data = nil
-						} else {
-							tempVal, err := stmt.readLob(par, val.locator)
-							if err != nil {
-								return err
-							}
-							if byteVal, ok := tempVal.([]byte); ok {
-								val.Data = byteVal
-							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-							}
-						}
-						stmt.Pars[parIndex].Value = val
-					}
-				}
-			}
-		} else {
-			for colIndex, col := range dataSet.Cols {
-				if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
-					for _, row := range dataSet.rows {
-						if lob, ok := row[colIndex].(lobInterface); ok {
-							locator := lob.getLocator()
+					if lob, ok := par.Value.(lobInterface); ok {
+						locator := lob.getLocator()
+						var err error
+						if scan, ok := par.Value.(sql.Scanner); ok {
 							if locator == nil {
-								row[colIndex] = nil
-							} else {
-								var err error
-								row[colIndex], err = stmt.readLob(col, lob.getLocator())
+								err = scan.Scan(nil)
 								if err != nil {
 									return err
 								}
+							} else {
+								var tempVal interface{}
+								tempVal, err = stmt.readLob(par, locator)
+								if err != nil {
+									return err
+								}
+								err = scan.Scan(tempVal)
+								return err
+							}
+						}
+					}
+				}
+			}
+			return nil
+		}
+		for colIndex, col := range dataSet.Cols {
+			if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
+				for _, row := range dataSet.rows {
+					if lob, ok := row[colIndex].(lobInterface); ok {
+						locator := lob.getLocator()
+						if locator == nil {
+							row[colIndex] = nil
+						} else {
+							var err error
+							row[colIndex], err = stmt.readLob(col, lob.getLocator())
+							if err != nil {
+								return err
 							}
 						}
 					}

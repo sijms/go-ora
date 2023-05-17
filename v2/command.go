@@ -781,7 +781,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					}
 					for x := 0; x < len(dataSet.Cols); x++ {
 						if dataSet.Cols[x].getDataFromServer {
-							err = stmt.calculateColumnValue(&dataSet.Cols[x])
+							err = stmt.calculateColumnValue(&dataSet.Cols[x], false)
 							if err != nil {
 								return err
 							}
@@ -1129,6 +1129,34 @@ func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Valu
 	}
 }
 
+func (stmt *defaultStmt) readLobsUDT(dataSet *DataSet) error {
+	for colIndex, col := range dataSet.Cols {
+		if col.DataType == XMLType {
+			for _, row := range dataSet.rows {
+				if val, ok := row[colIndex].(customType); ok {
+					for attIndex, par := range val.attribs {
+						if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
+							if lob, ok := par.Value.(lobInterface); ok {
+								locator := lob.getLocator()
+								if locator == nil {
+									val.attribs[attIndex].Value = nil
+								} else {
+									var err error
+									val.attribs[attIndex].Value, err = stmt.readLob(par, locator)
+									if err != nil {
+										return err
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 	if stmt._hasBLOB {
 		if stmt.containOutputPars {
@@ -1235,92 +1263,15 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 			for colIndex, col := range dataSet.Cols {
 				if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
 					for _, row := range dataSet.rows {
-						//if row[colIndex] == nil {
-						//	continue
-						//}
-						switch val := row[colIndex].(type) {
-						case *Clob:
-							if val.locator == nil {
+						if lob, ok := row[colIndex].(lobInterface); ok {
+							locator := lob.getLocator()
+							if locator == nil {
 								row[colIndex] = nil
 							} else {
-								tempVal, err := stmt.readLob(col, val.locator)
+								var err error
+								row[colIndex], err = stmt.readLob(col, lob.getLocator())
 								if err != nil {
 									return err
-								}
-								if stringVal, ok := tempVal.(string); ok {
-									row[colIndex] = stringVal
-								} else {
-									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-								}
-							}
-						case Clob:
-							if val.locator == nil {
-								row[colIndex] = nil
-							} else {
-								tempVal, err := stmt.readLob(col, val.locator)
-								if err != nil {
-									return err
-								}
-								if stringVal, ok := tempVal.(string); ok {
-									row[colIndex] = stringVal
-								} else {
-									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-								}
-							}
-						case *NClob:
-							if val.locator == nil {
-								row[colIndex] = nil
-							} else {
-								tempVal, err := stmt.readLob(col, val.locator)
-								if err != nil {
-									return err
-								}
-								if stringVal, ok := tempVal.(string); ok {
-									row[colIndex] = stringVal
-								} else {
-									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-								}
-							}
-						case NClob:
-							if val.locator == nil {
-								row[colIndex] = nil
-							} else {
-								tempVal, err := stmt.readLob(col, val.locator)
-								if err != nil {
-									return err
-								}
-								if stringVal, ok := tempVal.(string); ok {
-									row[colIndex] = stringVal
-								} else {
-									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-								}
-							}
-						case *Blob:
-							if val.locator == nil {
-								row[colIndex] = nil
-							} else {
-								tempVal, err := stmt.readLob(col, val.locator)
-								if err != nil {
-									return err
-								}
-								if byteVal, ok := tempVal.([]byte); ok {
-									row[colIndex] = byteVal
-								} else {
-									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
-								}
-							}
-						case Blob:
-							if val.locator == nil {
-								row[colIndex] = nil
-							} else {
-								tempVal, err := stmt.readLob(col, val.locator)
-								if err != nil {
-									return err
-								}
-								if byteVal, ok := tempVal.([]byte); ok {
-									row[colIndex] = byteVal
-								} else {
-									return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
 								}
 							}
 						}
@@ -1393,7 +1344,7 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	return nil
 }
 
-func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
+func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) error {
 	session := stmt.connection.session
 	//if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
 	//	stmt._hasBLOB = true
@@ -1464,22 +1415,23 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 			}
 		}
 		for x := 0; x < len(col.cusType.attribs); x++ {
-			err = stmt.calculateColumnValue(&col.cusType.attribs[x])
+			err = stmt.calculateColumnValue(&col.cusType.attribs[x], true)
 			if err != nil {
 				return err
 			}
 		}
 		_ = session.LoadState()
-		paramValue := reflect.ValueOf(col.Value)
-		if paramValue.Kind() == reflect.Ptr {
-			paramValue.Elem().Set(reflect.ValueOf(col.cusType.getObject()))
-		} else {
-			col.Value = col.cusType.getObject()
-		}
+		col.Value = *col.cusType
+		//paramValue := reflect.ValueOf(col.Value)
+		//if paramValue.Kind() == reflect.Ptr {
+		//	paramValue.Elem().Set(reflect.ValueOf(col.cusType.getObject()))
+		//} else {
+		//	col.Value = col.cusType.getObject()
+		//}
 		return nil
 	}
 
-	return col.decodeColumnValue(stmt.connection)
+	return col.decodeColumnValue(stmt.connection, udt)
 }
 
 // get values of rows and output parameter according to DataType and binary value (bValue)
@@ -1564,7 +1516,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 				//}
 				// last unused integer is reader outside this function
 
-				values[x], err = param.decodeValue(stmt.connection)
+				values[x], err = param.decodeValue(stmt.connection, false)
 				if x < size-1 {
 					_, err = session.GetInt(2, true, true)
 				}
@@ -2604,6 +2556,19 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 			err = stmt.readLobs(dataSet)
 			if err != nil {
 				return nil, err
+			}
+		}
+	}
+	err = stmt.readLobsUDT(dataSet)
+	if err != nil {
+		return nil, err
+	}
+	for colIndex, col := range dataSet.Cols {
+		if col.DataType == XMLType {
+			for _, row := range dataSet.rows {
+				if custVal, ok := row[colIndex].(customType); ok {
+					row[colIndex] = custVal.getObject()
+				}
 			}
 		}
 	}

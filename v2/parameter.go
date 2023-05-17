@@ -847,7 +847,7 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 	return nil
 }
 
-func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, error) {
+func (par *ParameterInfo) decodeValue(connection *Connection, udt bool) (driver.Value, error) {
 	session := connection.session
 	var tempVal driver.Value
 	var err error
@@ -957,7 +957,14 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 			}
 			tempVal = dateVal
 		case OCIBlobLocator, OCIClobLocator:
-			locator, err := session.GetClr()
+			var locator []byte
+			var err error
+			if !udt {
+				locator, err = session.GetClr()
+			} else {
+				locator = par.BValue
+				par.BValue = nil
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -999,16 +1006,16 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 }
 
 func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
-	tempVal, err := par.decodeValue(connection)
+	tempVal, err := par.decodeValue(connection, false)
 	if err != nil {
 		return err
 	}
 	return par.setParameterValue(tempVal)
 }
 
-func (par *ParameterInfo) decodeColumnValue(connection *Connection) error {
+func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) error {
 	var err error
-	if connection.connOption.Lob == 0 && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
+	if !udt && connection.connOption.Lob == 0 && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
 		session := connection.session
 		maxSize, err := session.GetInt(4, true, true)
 		if err != nil {
@@ -1069,6 +1076,6 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection) error {
 		}
 		return nil
 	}
-	par.Value, err = par.decodeValue(connection)
+	par.Value, err = par.decodeValue(connection, udt)
 	return err
 }

@@ -15,6 +15,9 @@ type Clob struct {
 
 type NClob Clob
 
+type lobInterface interface {
+	getLocator() []byte
+}
 type Blob struct {
 	locator []byte
 	Data    []byte
@@ -716,13 +719,24 @@ func (val *NClob) Scan(value interface{}) error {
 	return nil
 }
 
-//func (val *Clob) Value() (driver.Value, error) {
+func (val Blob) getLocator() []byte {
+	return val.locator
+}
+func (val Clob) getLocator() []byte {
+	return val.locator
+}
+func (val NClob) getLocator() []byte {
+	return val.locator
+}
+
+//func (val Clob) Value() (driver.Value, error) {
 //	if val.Valid {
 //		return val.String, nil
 //	} else {
 //		return nil, nil
 //	}
 //}
+
 //
 //func (val *NClob) Value() (driver.Value, error) {
 //	if val.Valid {

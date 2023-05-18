@@ -75,15 +75,7 @@ END;`
 		visitId int64
 		test    test1
 	)
-	err := stmt.AddParam("1", &visitId, 0, go_ora.Output)
-	if err != nil {
-		return err
-	}
-	err = stmt.AddParam("2", &test, 0, go_ora.Output)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec(nil)
+	_, err := stmt.Exec([]driver.Value{go_ora.Out{Dest: &visitId}, go_ora.Out{Dest: &test}})
 	if err != nil {
 		return err
 	}

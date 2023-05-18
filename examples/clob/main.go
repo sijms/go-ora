@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"database/sql/driver"
 	"flag"
 	"fmt"
 	_ "github.com/sijms/go-ora/v2"
@@ -75,15 +76,8 @@ END;`
 		data3 go_ora.Blob
 		data4 go_ora.Blob
 	)
-	// passing by value ==> you cannot use the original variable
-	// use stmt.Pars[index]
-	stmt.AddParam("1", data, 10000, go_ora.Output)
-	// pass a pointer ==> you can use the original variable
-	stmt.AddParam("2", &data2, 10, go_ora.Output)
-	// Blob as Clob above
-	stmt.AddParam("3", data3, 10000, go_ora.Output)
-	stmt.AddParam("4", &data4, 10, go_ora.Output)
-	_, err = stmt.Exec(nil)
+	_, err = conn.Exec(sqlText, go_ora.Out{Dest: &data, Size: 100000}, go_ora.Out{Dest: &data2, Size: 10},
+		go_ora.Out{Dest: &data3, Size: 100000}, go_ora.Out{Dest: &data4, Size: 10})
 	if err != nil {
 		return err
 	}
@@ -225,16 +219,7 @@ func insertData2() error {
 			fmt.Println("Can't close stmt: ", err)
 		}
 	}()
-	err = stmt.AddParam("1", val1, -1, go_ora.Input)
-	if err != nil {
-		return err
-	}
-	err = stmt.AddParam("2", val2, -1, go_ora.Input)
-	if err != nil {
-		return err
-	}
-	err = stmt.AddParam("3", 2, 0, go_ora.Input)
-	_, err = stmt.Exec(nil)
+	_, err = stmt.Exec([]driver.Value{val1, val2, 2})
 	if err != nil {
 		return err
 	}

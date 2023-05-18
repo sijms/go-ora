@@ -336,9 +336,9 @@ func (cust *customType) getTOID(conn *Connection) error {
 	defer func(stmt *Stmt) {
 		_ = stmt.Close()
 	}(stmt)
-	stmt.AddParam("1", strings.ToUpper(cust.owner), 0, Input)
-	stmt.AddParam("2", strings.ToUpper(cust.name), 0, Input)
-	rows, err := stmt.Query_(nil)
+
+	rows, err := stmt.Query_([]driver.NamedValue{driver.NamedValue{Value: strings.ToUpper(cust.owner)},
+		driver.NamedValue{Value: strings.ToUpper(cust.name)}})
 	if err != nil {
 		return err
 	}

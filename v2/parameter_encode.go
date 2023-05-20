@@ -132,6 +132,18 @@ func (par *ParameterInfo) encodeRaw(value []byte, size int) {
 	par.CharsetID = 0
 }
 
+func (par *ParameterInfo) encodeWithType(val driver.Value, connection *Connection) error {
+	switch par.DataType {
+	case NUMBER:
+	case NCHAR:
+	case DATE:
+	case TIMESTAMP:
+	case TimeStampTZ_DTY:
+	case OCIBlobLocator:
+	case OCIClobLocator:
+	}
+	return nil
+}
 func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Connection) error {
 	var err error
 	par.Value = val
@@ -636,19 +648,19 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		par.DataType = TimeStampTZ_DTY
 		par.MaxLen = converters.MAX_LEN_TIMESTAMP
 	default:
-		custVal := reflect.ValueOf(val)
-		if custVal.Kind() == reflect.Ptr {
-			custVal = custVal.Elem()
-		}
+		custVal := reflect.Indirect(reflect.ValueOf(val))
+		//if custVal.Kind() == reflect.Ptr {
+		//	custVal = custVal.Elem()
+		//}
 		if custVal.Kind() == reflect.Struct {
 			par.setForUDT()
 			for _, cusTyp := range connection.cusTyp {
 				if custVal.Type() == cusTyp.typ {
-					par.cusType = &cusTyp
+					par.cusType = cusTyp
 					par.ToID = cusTyp.toid
 				}
 			}
-			if par.cusType == nil {
+			if par.ToID == nil {
 				return errors.New("struct parameter only allowed with user defined type (UDT)")
 			}
 			var objectBuffer bytes.Buffer
@@ -660,6 +672,8 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 						CharsetID:   connection.tcpNego.ServerCharset,
 						CharsetForm: 1,
 					}
+					// don't use actualy value passed by the user but use best value
+					// that fit for this type
 					err = tempPar.encodeValue(custVal.Field(fieldIndex).Interface(), 0, connection)
 					if err != nil {
 						return err

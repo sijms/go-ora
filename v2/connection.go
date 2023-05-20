@@ -194,54 +194,6 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 	if err != nil {
 		return nil, err
 	}
-	//err := stmt.AddParam("p_nls_calendar", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = stmt.AddParam("p_nls_comp", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = stmt.AddParam("p_nls_length_semantics", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = stmt.AddParam("p_nls_nchar_conv_excep", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = stmt.AddParam("p_nls_date_lang", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = stmt.AddParam("p_nls_sort", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = stmt.AddParam("p_nls_currency", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = stmt.AddParam("p_nls_date_format", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = stmt.AddParam("p_nls_iso_currency", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = stmt.AddParam("p_nls_numeric_chars", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//stmt.AddParam("p_nls_dual_currency", "", 40, Output)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//stmt.AddParam("p_nls_timestamp", "", 48, Output)
-	//stmt.AddParam("p_nls_timestamp_tz", "", 56, Output)
-	//stmt.AddParam("p_err_code", "", 2000, Output)
-	//stmt.AddParam("p_err_msg", "", 2000, Output)
 
 	//fmt.Println(stmt.Pars)
 

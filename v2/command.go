@@ -1210,7 +1210,9 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 									return err
 								}
 								err = scan.Scan(tempVal)
-								return err
+								if err != nil {
+									return err
+								}
 							}
 						}
 					}
@@ -2334,8 +2336,8 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 	}
 }
 
-// AddParam create new parameter and append it to stmt.Pars
-func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) error {
+// addParam create new parameter and append it to stmt.Pars
+func (stmt *Stmt) addParam(name string, val driver.Value, size int, direction ParameterDirection) error {
 	par, err := stmt.NewParam(name, val, size, direction)
 	if err != nil {
 		return err
@@ -2348,10 +2350,10 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 // AddRefCursorParam add new output parameter of type REF CURSOR
 //
 // note: better to use sql.Out structure see examples for more information
-func (stmt *Stmt) AddRefCursorParam(name string) {
-	par, _ := stmt.NewParam(name, new(RefCursor), 0, Output)
-	stmt.Pars = append(stmt.Pars, *par)
-}
+//func (stmt *Stmt) AddRefCursorParam(name string) {
+//	par, _ := stmt.NewParam(name, new(RefCursor), 0, Output)
+//	stmt.Pars = append(stmt.Pars, *par)
+//}
 
 // Query_ execute a query command and return oracle dataset object
 //

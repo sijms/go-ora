@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sijms/go-ora/v2/converters"
-	"io"
 	"reflect"
 	"strings"
 )
@@ -67,16 +66,7 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 	defer func(stmt *Stmt) {
 		_ = stmt.Close()
 	}(stmt)
-	err = stmt.AddParam("1", strings.ToUpper(owner), 40, Input)
-	if err != nil {
-		return err
-	}
-	err = stmt.AddParam("2", strings.ToUpper(typeName), 40, Input)
-	if err != nil {
-		return err
-	}
-	//values := make([]driver.Value, 4)
-	rows, err := stmt.Query_(nil)
+	rows, err := stmt.Query_([]driver.NamedValue{{Value: strings.ToUpper(owner)}, {Value: strings.ToUpper(typeName)}})
 	if err != nil {
 		return err
 	}
@@ -112,6 +102,7 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 			param.ContFlag = 16
 			param.MaxCharLen = int(length.Int64)
 			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
+			param.Value = sql.NullString{}
 		case "NVARCHAR2":
 			param.DataType = NCHAR
 			param.CharsetForm = 2
@@ -232,97 +223,75 @@ END;`
 	defer func(stmt *Stmt) {
 		_ = stmt.Close()
 	}(stmt)
-	stmt.AddParam("retVal", 0, 8, Output)
-	stmt.AddParam("typeName", typeName, 40, Input)
-	stmt.AddRefCursorParam("att_rc")
-	_, err := stmt.Exec(nil)
+	var cursor RefCursor
+	var ret int64
+	_, err := stmt.Exec([]driver.Value{Out{Dest: &ret}, typeName, Out{Dest: &cursor}})
 	if err != nil {
 		return err
 	}
-	if stmt.Pars[0].Value.(int64) != 0 {
+	if ret != 0 {
 		return errors.New(fmt.Sprint("unknown type: ", typeName))
 	}
-	if cursor, ok := stmt.Pars[2].Value.(RefCursor); ok {
-		defer func(cursor *RefCursor) {
-			_ = cursor.Close()
-		}(&cursor)
-		rows, err := cursor.Query()
-		if err != nil {
-			return err
+	defer func(cursor *RefCursor) {
+		_ = cursor.Close()
+	}(&cursor)
+	rows, err := cursor.Query()
+	if err != nil {
+		return err
+	}
+	var (
+		attName     string
+		attOrder    int64
+		attTypeName string
+	)
+	for rows.Next_() {
+		rows.Scan(&attName, &attOrder, &attTypeName)
+
+		for int(attOrder) > len(cust.attribs) {
+			cust.attribs = append(cust.attribs, ParameterInfo{
+				Direction:   Input,
+				Flag:        3,
+				CharsetID:   conn.tcpNego.ServerCharset,
+				CharsetForm: 1,
+			})
 		}
-
-		var (
-			attName     string
-			attOrder    int64
-			attTypeName string
-		)
-		values := make([]driver.Value, 10)
-		for {
-			err = rows.Next(values)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				return err
-			}
-			// check for error and if == io.EOF break
-
-			if attName, ok = values[1].(string); !ok {
-				return errors.New(fmt.Sprint("error reading attribute properties for type: ", typeName))
-			}
-			if attOrder, ok = values[2].(int64); !ok {
-				return errors.New(fmt.Sprint("error reading attribute properties for type: ", typeName))
-			}
-			if attTypeName, ok = values[3].(string); !ok {
-				return errors.New(fmt.Sprint("error reading attribute properties for type: ", typeName))
-			}
-			//fmt.Println(attOrder, "\t", attName, "\t", attTypeName)
-			for int(attOrder) > len(cust.attribs) {
-				cust.attribs = append(cust.attribs, ParameterInfo{
-					Direction:   Input,
-					Flag:        3,
-					CharsetID:   conn.tcpNego.ServerCharset,
-					CharsetForm: 1,
-				})
-			}
-			param := &cust.attribs[attOrder-1]
-			param.Name = attName
-			param.TypeName = attTypeName
-			switch strings.ToUpper(attTypeName) {
-			case "NUMBER":
-				param.DataType = NUMBER
-				param.ContFlag = 0
-				param.MaxCharLen = 0
-				param.MaxLen = 22
-				param.CharsetForm = 0
-			case "VARCHAR2":
-				param.DataType = NCHAR
-				param.CharsetForm = 1
-				param.ContFlag = 16
-				param.MaxCharLen = 1000
-				param.MaxLen = 1000 * converters.MaxBytePerChar(param.CharsetID)
-			case "NVARCHAR2":
-				param.DataType = NCHAR
-				param.CharsetForm = 2
-				param.ContFlag = 16
-				param.MaxCharLen = 1000
-				param.MaxLen = 1000 * converters.MaxBytePerChar(param.CharsetID)
-			case "TIMESTAMP":
-				fallthrough
-			case "DATE":
-				param.DataType = DATE
-				param.ContFlag = 0
-				param.MaxLen = 11
-				param.MaxCharLen = 11
-			case "RAW":
-				param.DataType = RAW
-				param.ContFlag = 0
-				param.MaxLen = 1000
-				param.MaxCharLen = 0
-				param.CharsetForm = 0
-			default:
-				return errors.New(fmt.Sprint("unsupported attribute type: ", attTypeName))
-			}
+		param := &cust.attribs[attOrder-1]
+		param.Name = attName
+		param.TypeName = attTypeName
+		switch strings.ToUpper(attTypeName) {
+		case "NUMBER":
+			param.DataType = NUMBER
+			param.ContFlag = 0
+			param.MaxCharLen = 0
+			param.MaxLen = 22
+			param.CharsetForm = 0
+		case "VARCHAR2":
+			param.DataType = NCHAR
+			param.CharsetForm = 1
+			param.ContFlag = 16
+			param.MaxCharLen = 1000
+			param.MaxLen = 1000 * converters.MaxBytePerChar(param.CharsetID)
+		case "NVARCHAR2":
+			param.DataType = NCHAR
+			param.CharsetForm = 2
+			param.ContFlag = 16
+			param.MaxCharLen = 1000
+			param.MaxLen = 1000 * converters.MaxBytePerChar(param.CharsetID)
+		case "TIMESTAMP":
+			fallthrough
+		case "DATE":
+			param.DataType = DATE
+			param.ContFlag = 0
+			param.MaxLen = 11
+			param.MaxCharLen = 11
+		case "RAW":
+			param.DataType = RAW
+			param.ContFlag = 0
+			param.MaxLen = 1000
+			param.MaxCharLen = 0
+			param.CharsetForm = 0
+		default:
+			return errors.New(fmt.Sprint("unsupported attribute type: ", attTypeName))
 		}
 	}
 	cust.loadFieldMap()

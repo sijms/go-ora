@@ -1026,12 +1026,6 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
 	}
 	session := stmt.connection.session
-	//if len(args) > 0 {
-	//	stmt.Pars = nil
-	//}
-	//for x := 0; x < len(args); x++ {
-	//	stmt.AddParam("", args[x], 0, Input)
-	//}
 	session.ResetBuffer()
 	err := stmt.write(session)
 	if err != nil {
@@ -1139,85 +1133,9 @@ func (stmt *Stmt) AddRefCursorParam(_ string) {
 	stmt.Pars = append(stmt.Pars, *par)
 }
 
-//func (stmt *Stmt) AddParam(name string, val driver.BValue, size int, direction ParameterDirection) {
-//	param := ParameterInfo{
-//		Name:        name,
-//		Direction:   direction,
-//		Flag:        3,
-//		CharsetID:   871,
-//		CharsetForm: 1,
-//	}
-//	//if param.Direction == Output {
-//	//	if _, ok := val.(string); ok {
-//	//		param.MaxCharLen = size
-//	//		param.MaxLen = size * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
-//	//	}
-//	//	stmt.Pars = append(stmt.Pars, param)
-//	//	return
-//	//}
-//	if val == nil {
-//		param.DataType = NCHAR
-//		param.BValue = nil
-//		param.ContFlag = 16
-//		param.MaxCharLen = 0
-//		param.MaxLen = 1
-//		param.CharsetForm = 1
-//	} else {
-//		switch val := val.(type) {
-//		case int64:
-//			param.BValue = converters.EncodeInt64(val)
-//			param.DataType = NUMBER
-//		case int32:
-//			param.BValue = converters.EncodeInt(int(val))
-//			param.DataType = NUMBER
-//		case int16:
-//			param.BValue = converters.EncodeInt(int(val))
-//			param.DataType = NUMBER
-//		case int8:
-//			param.BValue = converters.EncodeInt(int(val))
-//			param.DataType = NUMBER
-//		case int:
-//			param.BValue = converters.EncodeInt(val)
-//			param.DataType = NUMBER
-//		case float32:
-//			param.BValue, _ = converters.EncodeDouble(float64(val))
-//			param.DataType = NUMBER
-//		case float64:
-//			param.BValue, _ = converters.EncodeDouble(val)
-//			param.DataType = NUMBER
-//		case time.Time:
-//			param.BValue = converters.EncodeDate(val)
-//			param.DataType = DATE
-//			param.ContFlag = 0
-//			param.MaxLen = 11
-//			param.MaxCharLen = 11
-//		case string:
-//			param.BValue = stmt.connection.strConv.Encode(val)
-//			param.DataType = NCHAR
-//			param.ContFlag = 16
-//			param.MaxCharLen = len(val)
-//			if size > len(val) {
-//				param.MaxCharLen = size
-//			}
-//			param.MaxLen = param.MaxCharLen * converters.MaxBytePerChar(stmt.connection.strConv.LangID)
-//			param.CharsetForm = 1
-//		}
-//		if param.DataType == NUMBER {
-//			param.ContFlag = 0
-//			param.MaxCharLen = 22
-//			param.MaxLen = 22
-//			param.CharsetForm = 1
-//		}
-//		if direction == Output {
-//			param.BValue = nil
-//		}
-//	}
-//	stmt.Pars = append(stmt.Pars, param)
-//}
-
-//func (stmt *Stmt) reExec() (driver.Rows, error) {
+// func (stmt *Stmt) reExec() (driver.Rows, error) {
 //
-//}
+// }
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	stmt.connection.connOption.Tracer.Printf("Query:\n%s", stmt.text)
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
@@ -1235,7 +1153,7 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	}
 	//stmt.Pars = nil
 	//for x := 0; x < len(args); x++ {
-	//	stmt.AddParam()
+	//	stmt.addParam()
 	//}
 	stmt.connection.session.ResetBuffer()
 	// if re-execute

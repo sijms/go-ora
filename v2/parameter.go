@@ -24,7 +24,7 @@ const (
 	Input  ParameterDirection = 1
 	Output ParameterDirection = 2
 	InOut  ParameterDirection = 3
-	RetVal ParameterDirection = 9
+	//RetVal ParameterDirection = 9
 )
 
 type Out struct {
@@ -123,7 +123,7 @@ type ParameterInfo struct {
 	OutputVarPtr         interface{}
 	getDataFromServer    bool
 	oaccollid            int
-	cusType              *customType
+	cusType              customType
 }
 
 // load get parameter information form network session
@@ -263,7 +263,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if par.DataType == XMLType && par.TypeName != "XMLTYPE" {
 		for typName, cusTyp := range conn.cusTyp {
 			if typName == par.TypeName {
-				par.cusType = &cusTyp
+				par.cusType = cusTyp
 			}
 		}
 	}

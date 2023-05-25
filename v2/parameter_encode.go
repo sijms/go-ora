@@ -132,14 +132,40 @@ func (par *ParameterInfo) encodeRaw(value []byte, size int) {
 	par.CharsetID = 0
 }
 
-func (par *ParameterInfo) encodeWithType(val driver.Value, connection *Connection) error {
+func (par *ParameterInfo) encodeWithType(connection *Connection) error {
+	var err error
+	var val driver.Value
+	val, err = getValue(par.Value)
+	if err != nil {
+		return err
+	}
+	if val == nil {
+		par.primValue = nil
+		par.BValue = nil
+		par.ContFlag = 0
+		par.MaxCharLen = 0
+		par.MaxLen = 1
+		return nil
+	}
 	switch par.DataType {
 	case NUMBER:
+		par.primValue, err = getFloat(val)
+		if err != nil {
+			return err
+		}
 	case NCHAR:
+		par.primValue = getString(val)
 	case DATE:
+		fallthrough
 	case TIMESTAMP:
+		fallthrough
 	case TimeStampTZ_DTY:
+		par.primValue, err = getDate(val)
+		if err != nil {
+			return err
+		}
 	case OCIBlobLocator:
+
 	case OCIClobLocator:
 	}
 	return nil
@@ -414,7 +440,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				if err != nil {
 					return err
 				}
-				err = lob.putString(value.String, connection.tcpNego.ServernCharset)
+				err = lob.putString(value.String)
 				if err != nil {
 					return err
 				}
@@ -438,7 +464,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				if err != nil {
 					return err
 				}
-				err = lob.putString(value.String, connection.tcpNego.ServernCharset)
+				err = lob.putString(value.String)
 				if err != nil {
 					return err
 				}
@@ -460,7 +486,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				if err != nil {
 					return err
 				}
-				err = lob.putString(value.String, connection.tcpNego.ServerCharset)
+				err = lob.putString(value.String)
 				if err != nil {
 					return err
 				}
@@ -486,7 +512,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 				if err != nil {
 					return err
 				}
-				err = lob.putString(value.String, connection.tcpNego.ServerCharset)
+				err = lob.putString(value.String)
 				if err != nil {
 					return err
 				}
@@ -656,7 +682,8 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			par.setForUDT()
 			for _, cusTyp := range connection.cusTyp {
 				if custVal.Type() == cusTyp.typ {
-					par.cusType = cusTyp
+					par.cusType = new(customType)
+					*par.cusType = cusTyp
 					par.ToID = cusTyp.toid
 				}
 			}

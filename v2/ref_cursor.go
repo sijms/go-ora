@@ -18,7 +18,7 @@ func (cursor *RefCursor) load() error {
 	cursor._hasLONG = false
 	cursor._hasBLOB = false
 	cursor._hasReturnClause = false
-	cursor.disableCompression = true
+	cursor.disableCompression = false
 	cursor.arrayBindCount = 1
 	cursor.scnForSnapshot = make([]int, 2)
 	cursor.stmtType = SELECT

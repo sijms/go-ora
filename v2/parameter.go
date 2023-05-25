@@ -13,7 +13,7 @@ import (
 	"github.com/sijms/go-ora/v2/network"
 )
 
-type OracleType int
+type TNSType int
 type ParameterDirection int
 
 // func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
@@ -40,55 +40,56 @@ type Out struct {
 // InputOutput = 48,
 // }
 
-//go:generate stringer -type=OracleType
+//go:generate stringer -type=TNSType
 
 const (
-	NCHAR            OracleType = 1
-	NUMBER           OracleType = 2
-	SB1              OracleType = 3
-	SB2              OracleType = 3
-	SB4              OracleType = 3
-	FLOAT            OracleType = 4
-	NullStr          OracleType = 5
-	VarNum           OracleType = 6
-	LONG             OracleType = 8
-	VARCHAR          OracleType = 9
-	ROWID            OracleType = 11
-	DATE             OracleType = 12
-	VarRaw           OracleType = 15
-	BFloat           OracleType = 21
-	BDouble          OracleType = 22
-	RAW              OracleType = 23
-	LongRaw          OracleType = 24
-	UINT             OracleType = 68
-	LongVarChar      OracleType = 94
-	LongVarRaw       OracleType = 95
-	CHAR             OracleType = 96
-	CHARZ            OracleType = 97
-	IBFloat          OracleType = 100
-	IBDouble         OracleType = 101
-	REFCURSOR        OracleType = 102
-	OCIXMLType       OracleType = 108
-	XMLType          OracleType = 109
-	OCIRef           OracleType = 110
-	OCIClobLocator   OracleType = 112
-	OCIBlobLocator   OracleType = 113
-	OCIFileLocator   OracleType = 114
-	ResultSet        OracleType = 116
-	OCIString        OracleType = 155
-	OCIDate          OracleType = 156
-	TimeStampDTY     OracleType = 180
-	TimeStampTZ_DTY  OracleType = 181
-	IntervalYM_DTY   OracleType = 182
-	IntervalDS_DTY   OracleType = 183
-	TimeTZ           OracleType = 186
-	TIMESTAMP        OracleType = 187
-	TIMESTAMPTZ      OracleType = 188
-	IntervalYM       OracleType = 189
-	IntervalDS       OracleType = 190
-	UROWID           OracleType = 208
-	TimeStampLTZ_DTY OracleType = 231
-	TimeStampeLTZ    OracleType = 232
+	NCHAR    TNSType = 1
+	NUMBER   TNSType = 2
+	BInteger TNSType = 3
+	//SB1              TNSType = 3
+	//SB2              TNSType = 3
+	//SB4              TNSType = 3
+	FLOAT            TNSType = 4
+	NullStr          TNSType = 5
+	VarNum           TNSType = 6
+	LONG             TNSType = 8
+	VARCHAR          TNSType = 9
+	ROWID            TNSType = 11
+	DATE             TNSType = 12
+	VarRaw           TNSType = 15
+	BFloat           TNSType = 21
+	BDouble          TNSType = 22
+	RAW              TNSType = 23
+	LongRaw          TNSType = 24
+	UINT             TNSType = 68
+	LongVarChar      TNSType = 94
+	LongVarRaw       TNSType = 95
+	CHAR             TNSType = 96
+	CHARZ            TNSType = 97
+	IBFloat          TNSType = 100
+	IBDouble         TNSType = 101
+	REFCURSOR        TNSType = 102
+	OCIXMLType       TNSType = 108
+	XMLType          TNSType = 109
+	OCIRef           TNSType = 110
+	OCIClobLocator   TNSType = 112
+	OCIBlobLocator   TNSType = 113
+	OCIFileLocator   TNSType = 114
+	ResultSet        TNSType = 116
+	OCIString        TNSType = 155
+	OCIDate          TNSType = 156
+	TimeStampDTY     TNSType = 180
+	TimeStampTZ_DTY  TNSType = 181
+	IntervalYM_DTY   TNSType = 182
+	IntervalDS_DTY   TNSType = 183
+	TimeTZ           TNSType = 186
+	TIMESTAMP        TNSType = 187
+	TIMESTAMPTZ      TNSType = 188
+	IntervalYM       TNSType = 189
+	IntervalDS       TNSType = 190
+	UROWID           TNSType = 208
+	TimeStampLTZ_DTY TNSType = 231
+	TimeStampeLTZ    TNSType = 232
 )
 
 type ParameterType int
@@ -105,7 +106,7 @@ type ParameterInfo struct {
 	IsNull               bool
 	AllowNull            bool
 	ColAlias             string
-	DataType             OracleType
+	DataType             TNSType
 	IsXmlType            bool
 	Flag                 uint8
 	Precision            uint8
@@ -120,10 +121,11 @@ type ParameterInfo struct {
 	CharsetForm          int
 	BValue               []byte
 	Value                driver.Value
+	primValue            driver.Value
 	OutputVarPtr         interface{}
 	getDataFromServer    bool
 	oaccollid            int
-	cusType              customType
+	cusType              *customType
 }
 
 // load get parameter information form network session
@@ -134,7 +136,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if err != nil {
 		return err
 	}
-	par.DataType = OracleType(dataType)
+	par.DataType = TNSType(dataType)
 	par.Flag, err = session.GetByte()
 	if err != nil {
 		return err
@@ -263,7 +265,8 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if par.DataType == XMLType && par.TypeName != "XMLTYPE" {
 		for typName, cusTyp := range conn.cusTyp {
 			if typName == par.TypeName {
-				par.cusType = cusTyp
+				par.cusType = new(customType)
+				*par.cusType = cusTyp
 			}
 		}
 	}

@@ -302,7 +302,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	ret.text = text
 	ret._hasBLOB = false
 	ret._hasLONG = false
-	ret.disableCompression = true
+	ret.disableCompression = false
 	ret.arrayBindCount = 0
 	ret.scnForSnapshot = make([]int, 2)
 	// get stmt type
@@ -2470,7 +2470,7 @@ func (stmt *Stmt) reset() {
 	stmt._hasBLOB = false
 	stmt._hasLONG = false
 	stmt.bulkExec = false
-	stmt.disableCompression = true
+	stmt.disableCompression = false
 	stmt.arrayBindCount = 0
 }
 

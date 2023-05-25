@@ -1,6 +1,7 @@
 package go_ora
 
 import (
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
@@ -157,8 +158,32 @@ func tNumber(input reflect.Type) bool {
 	return tInteger(input) || tFloat(input)
 }
 
-// try to get string data from row field
+//======== get primitive data from original data types ========//
+
+// get value to bypass pointer and sql.Null* values
+func getValue(origVal driver.Value) (driver.Value, error) {
+	if origVal == nil {
+		return nil, nil
+	}
+	proVal := reflect.Indirect(reflect.ValueOf(origVal))
+	if valuer, ok := proVal.Interface().(driver.Valuer); ok {
+		return valuer.Value()
+	}
+	return proVal.Interface(), nil
+}
+
+// get prim string value from supported types
 func getString(col interface{}) string {
+	col, _ = getValue(col)
+	if col == nil {
+		return ""
+	}
+	switch val := col.(type) {
+	case Clob:
+		return val.String
+	case NClob:
+		return val.String
+	}
 	if temp, ok := col.(string); ok {
 		return temp
 	} else {
@@ -166,12 +191,23 @@ func getString(col interface{}) string {
 	}
 }
 
-// try to get float64 data from row field
+// get prim float64 from supported types
 func getFloat(col interface{}) (float64, error) {
+	var err error
+	col, err = getValue(col)
+	if err != nil {
+		return 0, err
+	}
+	if col == nil {
+		return 0, nil
+	}
 	rType := reflect.TypeOf(col)
 	rValue := reflect.ValueOf(col)
 	if tInteger(rType) {
 		return float64(rValue.Int()), nil
+	}
+	if f32, ok := col.(float32); ok {
+		return strconv.ParseFloat(fmt.Sprint(f32), 64)
 	}
 	if tFloat(rType) {
 		return rValue.Float(), nil
@@ -188,8 +224,16 @@ func getFloat(col interface{}) (float64, error) {
 	}
 }
 
-// try to get int64 value from the row field
+// get prim int64 value from supported types
 func getInt(col interface{}) (int64, error) {
+	var err error
+	col, err = getValue(col)
+	if err != nil {
+		return 0, err
+	}
+	if col == nil {
+		return 0, nil
+	}
 	rType := reflect.TypeOf(col)
 	rValue := reflect.ValueOf(col)
 	if tInteger(rType) {
@@ -216,10 +260,23 @@ func getInt(col interface{}) (int64, error) {
 	}
 }
 
+// get prim time.Time from supported types
 func getDate(col interface{}) (time.Time, error) {
+	var err error
+	col, err = getValue(col)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if col == nil {
+		return time.Time{}, nil
+	}
 	switch val := col.(type) {
 	case time.Time:
 		return val, nil
+	case TimeStamp:
+		return time.Time(val), nil
+	case TimeStampTZ:
+		return time.Time(val), nil
 	case string:
 		return time.Parse(time.RFC3339, val)
 	default:
@@ -227,16 +284,77 @@ func getDate(col interface{}) (time.Time, error) {
 	}
 }
 
+// get prim []byte from supported types
 func getBytes(col interface{}) ([]byte, error) {
+	var err error
+	col, err = getValue(col)
+	if err != nil {
+		return nil, err
+	}
+	if col == nil {
+		return nil, nil
+	}
 	switch val := col.(type) {
 	case []byte:
 		return val, nil
 	case string:
 		return []byte(val), nil
+	case Blob:
+		return val.Data, nil
 	default:
 		return nil, errors.New("conversion of unsupported type to []byte")
 	}
 }
+
+// get prim lob from supported types
+func getLob(col interface{}, conn *Connection) (*Lob, error) {
+	var err error
+	col, err = getValue(col)
+	if err != nil {
+		return nil, err
+	}
+	if col == nil {
+		return nil, nil
+	}
+	lob := newLob(conn)
+	charsetForm := 1
+
+	switch val := col.(type) {
+	case string:
+		if len(val) == 0 {
+			return nil, nil
+		}
+		err = lob.createTemporaryClob(conn.tcpNego.ServerCharset, 1)
+		if err != nil {
+			return nil, err
+		}
+		err = lob.putString(val)
+		if err != nil {
+			return nil, err
+		}
+	case Clob:
+		if val.Valid == false || len(val.String) == 0 {
+			return nil, nil
+		}
+		err = lob.createTemporaryClob(conn.tcpNego.ServerCharset, 1)
+		if err != nil {
+			return nil, err
+		}
+		err = lob.putString(val.String)
+		if err != nil {
+			return nil, err
+		}
+	case NVarChar:
+	case NClob:
+	case []byte:
+	case Blob:
+
+	}
+	return lob, nil
+}
+
+//=============================================================//
+
 func setBytes(value reflect.Value, input []byte) error {
 	switch value.Type() {
 	case reflect.TypeOf([]byte{}):
@@ -281,7 +399,6 @@ func setString(value reflect.Value, input string) error {
 	}
 	return nil
 }
-
 func setNumber(value reflect.Value, input float64) error {
 	if tSigned(value.Type()) {
 		value.SetInt(int64(input))

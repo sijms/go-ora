@@ -1006,32 +1006,36 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	var locators [][]byte
 	for _, par := range stmt.Pars {
 		//if par.Direction == Input {
-		switch value := par.Value.(type) {
-		case Clob:
-			if value.locator != nil {
-				locators = append(locators, value.locator)
-			}
-		case *Clob:
-			if value.locator != nil {
-				locators = append(locators, value.locator)
-			}
-		case Blob:
-			if value.locator != nil {
-				locators = append(locators, value.locator)
-			}
-		case *Blob:
-			if value.locator != nil {
-				locators = append(locators, value.locator)
-			}
-		case NClob:
-			if value.locator != nil {
-				locators = append(locators, value.locator)
-			}
-		case *NClob:
-			if value.locator != nil {
-				locators = append(locators, value.locator)
+		if value, ok := par.primValue.(*Lob); ok {
+			if value != nil && value.sourceLocator != nil {
+				locators = append(locators, value.sourceLocator)
 			}
 		}
+		//case Clob:
+		//	if value.locator != nil {
+		//		locators = append(locators, value.locator)
+		//	}
+		//case *Clob:
+		//	if value.locator != nil {
+		//		locators = append(locators, value.locator)
+		//	}
+		//case Blob:
+		//	if value.locator != nil {
+		//		locators = append(locators, value.locator)
+		//	}
+		//case *Blob:
+		//	if value.locator != nil {
+		//		locators = append(locators, value.locator)
+		//	}
+		//case NClob:
+		//	if value.locator != nil {
+		//		locators = append(locators, value.locator)
+		//	}
+		//case *NClob:
+		//	if value.locator != nil {
+		//		locators = append(locators, value.locator)
+		//	}
+		//}
 		//}
 	}
 	if len(locators) == 0 {
@@ -2309,18 +2313,12 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	param := &ParameterInfo{
-		Name:        name,
-		Direction:   direction,
-		Flag:        3,
-		CharsetID:   stmt.connection.tcpNego.ServerCharset,
-		CharsetForm: 1,
+		Name:      name,
+		Direction: direction,
 	}
 	err := param.encodeValue(val, size, stmt.connection)
 	if err != nil {
 		return nil, err
-	}
-	if param.Direction == Output {
-		param.BValue = nil
 	}
 	return param, err
 }

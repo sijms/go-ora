@@ -155,7 +155,7 @@ func tFloat(input reflect.Type) bool {
 	return input.Kind() == reflect.Float32 || input.Kind() == reflect.Float64
 }
 func tNumber(input reflect.Type) bool {
-	return tInteger(input) || tFloat(input)
+	return tInteger(input) || tFloat(input) || input.Kind() == reflect.Bool
 }
 
 //======== get primitive data from original data types ========//
@@ -191,6 +191,44 @@ func getString(col interface{}) string {
 	}
 }
 
+func getNumber(col interface{}) (interface{}, error) {
+	var err error
+	col, err = getValue(col)
+	if err != nil {
+		return int64(0), err
+	}
+	if col == nil {
+		return int64(0), nil
+	}
+	rType := reflect.TypeOf(col)
+	rValue := reflect.ValueOf(col)
+	if tInteger(rType) {
+		return rValue.Int(), nil
+	}
+	if f32, ok := col.(float32); ok {
+		return strconv.ParseFloat(fmt.Sprint(f32), 64)
+	}
+	if tFloat(rType) {
+		return rValue.Float(), nil
+	}
+	switch rType.Kind() {
+	case reflect.Bool:
+		if rValue.Bool() {
+			return int64(1), nil
+		} else {
+			return int64(0), nil
+		}
+	case reflect.String:
+		tempFloat, err := strconv.ParseFloat(rValue.String(), 64)
+		if err != nil {
+			return 0, err
+		}
+		return tempFloat, nil
+	default:
+		return 0, errors.New("conversion of unsupported type to number")
+	}
+}
+
 // get prim float64 from supported types
 func getFloat(col interface{}) (float64, error) {
 	var err error
@@ -213,6 +251,12 @@ func getFloat(col interface{}) (float64, error) {
 		return rValue.Float(), nil
 	}
 	switch rType.Kind() {
+	case reflect.Bool:
+		if rValue.Bool() {
+			return 1, nil
+		} else {
+			return 0, nil
+		}
 	case reflect.String:
 		tempFloat, err := strconv.ParseFloat(rValue.String(), 64)
 		if err != nil {
@@ -316,41 +360,47 @@ func getLob(col interface{}, conn *Connection) (*Lob, error) {
 	if col == nil {
 		return nil, nil
 	}
-	lob := newLob(conn)
+	charsetID := conn.tcpNego.ServerCharset
 	charsetForm := 1
-
+	stringVar := ""
+	var byteVar []byte
 	switch val := col.(type) {
 	case string:
-		if len(val) == 0 {
-			return nil, nil
-		}
-		err = lob.createTemporaryClob(conn.tcpNego.ServerCharset, 1)
-		if err != nil {
-			return nil, err
-		}
-		err = lob.putString(val)
-		if err != nil {
-			return nil, err
-		}
+		stringVar = val
 	case Clob:
-		if val.Valid == false || len(val.String) == 0 {
-			return nil, nil
-		}
-		err = lob.createTemporaryClob(conn.tcpNego.ServerCharset, 1)
-		if err != nil {
-			return nil, err
-		}
-		err = lob.putString(val.String)
-		if err != nil {
-			return nil, err
-		}
+		stringVar = val.String
 	case NVarChar:
+		stringVar = string(val)
+		charsetForm = 2
+		charsetID = conn.tcpNego.ServernCharset
 	case NClob:
+		stringVar = val.String
+		charsetForm = 2
+		charsetID = conn.tcpNego.ServernCharset
 	case []byte:
+		byteVar = val
 	case Blob:
-
+		byteVar = val.Data
 	}
-	return lob, nil
+	if len(stringVar) > 0 {
+		lob := newLob(conn)
+		err = lob.createTemporaryClob(charsetID, charsetForm)
+		if err != nil {
+			return nil, err
+		}
+		err = lob.putString(stringVar)
+		return lob, err
+	}
+	if len(byteVar) > 0 {
+		lob := newLob(conn)
+		err = lob.createTemporaryBLOB()
+		if err != nil {
+			return nil, err
+		}
+		err = lob.putData(byteVar)
+		return lob, err
+	}
+	return nil, nil
 }
 
 //=============================================================//

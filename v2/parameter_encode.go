@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -51,7 +52,6 @@ func (par *ParameterInfo) setForUDT() {
 	par.CharsetForm = 0
 	par.MaxLen = 2000
 }
-
 func (par *ParameterInfo) encodeInt(value int64) {
 	par.setForNumber()
 	par.BValue = converters.EncodeInt64(value)
@@ -131,7 +131,135 @@ func (par *ParameterInfo) encodeRaw(value []byte, size int) {
 	par.CharsetForm = 0
 	par.CharsetID = 0
 }
+func (par *ParameterInfo) encodePrimValue() error {
+	var err error
+	if par.primValue == nil {
+		par.BValue = nil
+		return nil
+	}
+	switch value := par.primValue.(type) {
+	case float64:
+		par.BValue, err = converters.EncodeDouble(value)
+		if err != nil {
+			return err
+		}
+	case int64:
+		par.BValue = converters.EncodeInt64(value)
+	case string:
+		conv := converters.NewStringConverter(par.CharsetID)
+		par.BValue = conv.Encode(value)
+		par.MaxLen = len(par.BValue)
+	case time.Time:
+		par.BValue = converters.EncodeDate(value)
+	case *Lob:
+		par.BValue = value.sourceLocator
+	case []byte:
+		par.BValue = value
+	default:
+		return fmt.Errorf("unsupported primitive type: %v", reflect.TypeOf(par.primValue).Name())
+	}
+	return nil
+}
 
+func (par *ParameterInfo) setDataType(conn *Connection) error {
+	par.Flag = 3
+	par.CharsetID = 0
+	par.MaxLen = 1
+	par.BValue = nil
+	if par.Value == nil {
+		par.DataType = NCHAR
+		return nil
+	}
+	val := reflect.Indirect(reflect.ValueOf(par.Value))
+	if tNumber(val.Type()) {
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
+		return nil
+	}
+	switch val.Interface().(type) {
+	case bool:
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
+	case sql.NullBool:
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
+	case sql.NullInt16:
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
+	case sql.NullInt32:
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
+	case sql.NullInt64:
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
+	case sql.NullFloat64:
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
+	case sql.NullByte:
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
+	case string:
+		par.DataType = NCHAR
+		par.CharsetForm = 1
+		par.ContFlag = 16
+		par.CharsetID = conn.tcpNego.ServerCharset
+	case sql.NullString:
+		par.DataType = NCHAR
+		par.CharsetForm = 1
+		par.ContFlag = 16
+		par.CharsetID = conn.tcpNego.ServerCharset
+	case NVarChar:
+		par.DataType = NCHAR
+		par.CharsetForm = 2
+		par.ContFlag = 16
+		par.CharsetID = conn.tcpNego.ServernCharset
+	case NullNVarChar:
+		par.DataType = NCHAR
+		par.CharsetForm = 2
+		par.ContFlag = 16
+		par.CharsetID = conn.tcpNego.ServernCharset
+	case time.Time:
+		par.DataType = DATE
+		par.MaxLen = converters.MAX_LEN_DATE
+	case sql.NullTime:
+		par.DataType = DATE
+		par.MaxLen = converters.MAX_LEN_DATE
+	case TimeStamp:
+		par.DataType = TIMESTAMP
+		par.MaxLen = converters.MAX_LEN_DATE
+	case NullTimeStamp:
+		par.DataType = TIMESTAMP
+		par.MaxLen = converters.MAX_LEN_DATE
+	case TimeStampTZ:
+		par.DataType = TimeStampTZ_DTY
+		par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	case NullTimeStampTZ:
+		par.DataType = TimeStampTZ_DTY
+		par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	case []byte:
+		par.DataType = RAW
+	case Clob:
+		// if data length < max length of varchar
+		// use datatype varchar2
+		par.DataType = OCIClobLocator
+		par.CharsetForm = 1
+		par.CharsetID = conn.tcpNego.ServerCharset
+		// if data length > max length of varchar
+		// use clob
+	case NClob:
+		par.DataType = OCIClobLocator
+		par.CharsetForm = 2
+		par.CharsetID = conn.tcpNego.ServernCharset
+	case Blob:
+		par.DataType = OCIBlobLocator
+	case BFile:
+		par.DataType = OCIFileLocator
+	case RefCursor:
+		par.DataType = REFCURSOR
+	default:
+	}
+	return nil
+}
 func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 	var err error
 	var val driver.Value
@@ -141,48 +269,91 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 	}
 	if val == nil {
 		par.primValue = nil
-		par.BValue = nil
-		par.ContFlag = 0
-		par.MaxCharLen = 0
-		par.MaxLen = 1
 		return nil
 	}
 	switch par.DataType {
 	case NUMBER:
-		par.primValue, err = getFloat(val)
+		par.primValue, err = getNumber(val)
 		if err != nil {
 			return err
 		}
 	case NCHAR:
-		par.primValue = getString(val)
+		tempString := getString(val)
+		par.MaxCharLen = len([]rune(tempString))
+		par.primValue = tempString
 	case DATE:
 		fallthrough
 	case TIMESTAMP:
-		fallthrough
+		par.primValue, err = getDate(val)
+		if err != nil {
+			return err
+		}
 	case TimeStampTZ_DTY:
 		par.primValue, err = getDate(val)
 		if err != nil {
 			return err
 		}
-	case OCIBlobLocator:
-
+	case RAW:
+		var tempByte []byte
+		tempByte, err = getBytes(val)
+		if err != nil {
+			return err
+		}
+		par.MaxLen = len(tempByte)
+		par.primValue = tempByte
 	case OCIClobLocator:
+		fallthrough
+	case OCIBlobLocator:
+		var temp *Lob
+		temp, err = getLob(val, connection)
+		if err != nil {
+			return err
+		}
+		if temp == nil {
+			if par.Direction == Input {
+				par.DataType = NCHAR
+			}
+			par.MaxLen = 1
+			par.primValue = nil
+		} else {
+			par.primValue = temp
+		}
+	case REFCURSOR:
+		par.primValue = nil
 	}
 	return nil
 }
 func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Connection) error {
-	var err error
 	par.Value = val
-	if val == nil {
-		par.setForNull()
-		return nil
+	err := par.setDataType(connection)
+	if err != nil {
+		return err
 	}
-	// put common values
-	par.Flag = 3
-	par.CharsetID = connection.tcpNego.ServerCharset
-	par.CharsetForm = 1
-	par.BValue = nil
-
+	err = par.encodeWithType(connection)
+	if err != nil {
+		return err
+	}
+	err = par.encodePrimValue()
+	if err != nil {
+		return err
+	}
+	if par.Direction != Input {
+		if par.DataType == NCHAR {
+			if par.MaxCharLen < size {
+				par.MaxCharLen = size
+			}
+			par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(par.CharsetID)
+		}
+		if par.DataType == RAW {
+			if par.MaxLen < size {
+				par.MaxLen = size
+			}
+		}
+	}
+	if par.Direction == Output {
+		par.BValue = nil
+	}
+	return nil
 	tempType := reflect.TypeOf(val)
 	if tempType.Kind() == reflect.Ptr {
 		if reflect.ValueOf(val).IsNil() && par.Direction == Input {

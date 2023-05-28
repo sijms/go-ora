@@ -162,10 +162,6 @@ func (par *ParameterInfo) encodePrimValue() error {
 }
 
 func (par *ParameterInfo) setDataType(conn *Connection) error {
-	par.Flag = 3
-	par.CharsetID = 0
-	par.MaxLen = 1
-	par.BValue = nil
 	if par.Value == nil {
 		par.DataType = NCHAR
 		return nil
@@ -325,6 +321,14 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 }
 func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Connection) error {
 	par.Value = val
+	par.DataType = 0
+	par.Flag = 3
+	par.ContFlag = 0
+	par.CharsetID = 0
+	par.CharsetForm = 0
+	par.MaxLen = 1
+	par.MaxCharLen = 0
+	par.BValue = nil
 	err := par.setDataType(connection)
 	if err != nil {
 		return err

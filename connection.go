@@ -109,7 +109,7 @@ func (conn *Connection) SetStringConverter(converter converters.IStringConverter
 
 func (conn *Connection) GetNLS() (*NLSData, error) {
 
-	// we read from nls_session_parameters ONCE
+	// we read from sys.nls_session_parameters ONCE
 	cmdText := `
 DECLARE
 	err_code VARCHAR2(2000);

@@ -11,7 +11,7 @@ import (
 )
 
 func (par *ParameterInfo) encodeArrayFloat(session *network.Session, value []float64) error {
-	par.setForNumber()
+	//par.setForNumber()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -28,7 +28,7 @@ func (par *ParameterInfo) encodeArrayFloat(session *network.Session, value []flo
 }
 
 func (par *ParameterInfo) encodeArrayNullFloat64(session *network.Session, value []sql.NullFloat64) error {
-	par.setForNumber()
+	//par.setForNumber()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -49,7 +49,7 @@ func (par *ParameterInfo) encodeArrayNullFloat64(session *network.Session, value
 }
 
 func (par *ParameterInfo) encodeArrayNullBool(session *network.Session, value []sql.NullBool) {
-	par.setForNumber()
+	//par.setForNumber()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -69,7 +69,7 @@ func (par *ParameterInfo) encodeArrayNullBool(session *network.Session, value []
 }
 
 func (par *ParameterInfo) encodeArrayNullByte(session *network.Session, value []sql.NullByte) {
-	par.setForNumber()
+	//par.setForNumber()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -85,7 +85,7 @@ func (par *ParameterInfo) encodeArrayNullByte(session *network.Session, value []
 }
 
 func (par *ParameterInfo) encodeArrayNullInt16(session *network.Session, value []sql.NullInt16) {
-	par.setForNumber()
+	//par.setForNumber()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -101,7 +101,7 @@ func (par *ParameterInfo) encodeArrayNullInt16(session *network.Session, value [
 }
 
 func (par *ParameterInfo) encodeArrayNullInt32(session *network.Session, value []sql.NullInt32) {
-	par.setForNumber()
+	//par.setForNumber()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -117,7 +117,7 @@ func (par *ParameterInfo) encodeArrayNullInt32(session *network.Session, value [
 }
 
 func (par *ParameterInfo) encodeArrayNullInt64(session *network.Session, value []sql.NullInt64) {
-	par.setForNumber()
+	//par.setForNumber()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -133,7 +133,7 @@ func (par *ParameterInfo) encodeArrayNullInt64(session *network.Session, value [
 }
 
 func (par *ParameterInfo) encodeArrayInt(session *network.Session, value []int64) {
-	par.setForNumber()
+	//par.setForNumber()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -145,7 +145,7 @@ func (par *ParameterInfo) encodeArrayInt(session *network.Session, value []int64
 }
 
 func (par *ParameterInfo) encodeArrayNullTimeStamp(session *network.Session, value []NullTimeStamp) {
-	par.setForTime()
+	//par.setForTime()
 	par.DataType = TIMESTAMP
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
@@ -162,7 +162,7 @@ func (par *ParameterInfo) encodeArrayNullTimeStamp(session *network.Session, val
 }
 
 func (par *ParameterInfo) encodeArrayNullTime(session *network.Session, value []sql.NullTime) {
-	par.setForTime()
+	//par.setForTime()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
@@ -178,7 +178,7 @@ func (par *ParameterInfo) encodeArrayNullTime(session *network.Session, value []
 }
 
 func (par *ParameterInfo) encodeArrayTimeStamp(session *network.Session, value []TimeStamp) {
-	par.setForTime()
+	//par.setForTime()
 	par.DataType = TIMESTAMP
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
@@ -191,7 +191,7 @@ func (par *ParameterInfo) encodeArrayTimeStamp(session *network.Session, value [
 }
 
 func (par *ParameterInfo) encodeArrayTime(session *network.Session, value []time.Time) {
-	par.setForTime()
+	//par.setForTime()
 	if len(value) > 0 {
 		arrayBuffer := bytes.Buffer{}
 		session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)

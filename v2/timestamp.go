@@ -44,8 +44,8 @@ func (val *TimeStamp) UnmarshalJSON(data []byte) error {
 }
 
 type NullTimeStamp struct {
-	Valid     bool
 	TimeStamp TimeStamp
+	Valid     bool
 }
 
 func (val NullTimeStamp) Value() (driver.Value, error) {

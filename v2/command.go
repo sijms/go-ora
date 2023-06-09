@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
 	"reflect"
 	"regexp"
@@ -636,7 +635,7 @@ func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 		return err
 	}
 	if stmt.connection.connOption.Lob > 0 {
-		return stmt.readLobs(dataSet)
+		return stmt.decodePrim(dataSet)
 	}
 	return nil
 }
@@ -799,7 +798,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					}
 					newRow := make(Row, dataSet.columnCount)
 					for x := 0; x < len(dataSet.Cols); x++ {
-						newRow[x] = dataSet.Cols[x].Value
+						newRow[x] = dataSet.Cols[x].oPrimValue
 					}
 					//copy(newRow, dataSet.currentRow)
 					dataSet.rows = append(dataSet.rows, newRow)
@@ -1003,41 +1002,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 }
 
 func (stmt *defaultStmt) freeTemporaryLobs() error {
-	var locators [][]byte
-	for _, par := range stmt.Pars {
-		//if par.Direction == Input {
-		if value, ok := par.primValue.(*Lob); ok {
-			if value != nil && value.sourceLocator != nil {
-				locators = append(locators, value.sourceLocator)
-			}
-		}
-		//case Clob:
-		//	if value.locator != nil {
-		//		locators = append(locators, value.locator)
-		//	}
-		//case *Clob:
-		//	if value.locator != nil {
-		//		locators = append(locators, value.locator)
-		//	}
-		//case Blob:
-		//	if value.locator != nil {
-		//		locators = append(locators, value.locator)
-		//	}
-		//case *Blob:
-		//	if value.locator != nil {
-		//		locators = append(locators, value.locator)
-		//	}
-		//case NClob:
-		//	if value.locator != nil {
-		//		locators = append(locators, value.locator)
-		//	}
-		//case *NClob:
-		//	if value.locator != nil {
-		//		locators = append(locators, value.locator)
-		//	}
-		//}
-		//}
-	}
+	var locators = collectLocators(stmt.Pars)
 	if len(locators) == 0 {
 		return nil
 	}
@@ -1079,172 +1044,172 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	//return (&Lob{connection: stmt.connection}).freeAllTemporary(locators)
 }
 
-func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Value, error) {
-	if locator == nil {
-		return nil, nil
-	}
-	lob := &Lob{
-		connection:    stmt.connection,
-		sourceLocator: locator,
-		sourceLen:     len(locator),
-	}
-	dataSize, err := lob.getSize()
-	if err != nil {
-		return nil, err
-	}
-	lobData, err := lob.getData()
-	if err != nil {
-		return nil, err
-	}
-	if col.DataType == OCIBlobLocator {
-		if dataSize != int64(len(lobData)) {
-			return nil, errors.New("error reading lob data: data size mismatching")
-		}
-		return lobData, nil
-	} else {
-		conn := stmt.connection
-		var strConv converters.IStringConverter
-		//tempCharset := conn.strConv.GetLangID()
-		if lob.variableWidthChar() {
-			if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
-				strConv, _ = conn.getStrConv(2002)
-				//conn.strConv.SetLangID(2002)
-			} else {
-				strConv, _ = conn.getStrConv(2000)
-				//conn.strConv.SetLangID(2000)
-			}
-		} else {
-			strConv, err = conn.getStrConv(col.CharsetID)
-			if err != nil {
-				return nil, err
-			}
-			//if conn.connOption.CharsetID != 0 && col.CharsetForm == 1 {
-			//	conn.strConv.SetLangID(conn.connOption.CharsetID)
-			//} else {
-			//	conn.strConv.SetLangID(col.CharsetID)
-			//}
-		}
-		resultClobString := strConv.Decode(lobData)
-		//conn.strConv.SetLangID(tempCharset)
-		//if dataSize != int64(len([]rune(resultClobString))) {
-		//	return nil, errors.New("error reading clob data")
-		//}
-		return resultClobString, nil
-	}
-}
+//func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Value, error) {
+//	if locator == nil {
+//		return nil, nil
+//	}
+//	lob := &Lob{
+//		connection:    stmt.connection,
+//		sourceLocator: locator,
+//		sourceLen:     len(locator),
+//	}
+//	dataSize, err := lob.getSize()
+//	if err != nil {
+//		return nil, err
+//	}
+//	lobData, err := lob.getData()
+//	if err != nil {
+//		return nil, err
+//	}
+//	if col.DataType == OCIBlobLocator {
+//		if dataSize != int64(len(lobData)) {
+//			return nil, errors.New("error reading lob data: data size mismatching")
+//		}
+//		return lobData, nil
+//	} else {
+//		conn := stmt.connection
+//		var strConv converters.IStringConverter
+//		//tempCharset := conn.strConv.GetLangID()
+//		if lob.variableWidthChar() {
+//			if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
+//				strConv, _ = conn.getStrConv(2002)
+//				//conn.strConv.SetLangID(2002)
+//			} else {
+//				strConv, _ = conn.getStrConv(2000)
+//				//conn.strConv.SetLangID(2000)
+//			}
+//		} else {
+//			strConv, err = conn.getStrConv(col.CharsetID)
+//			if err != nil {
+//				return nil, err
+//			}
+//			//if conn.connOption.CharsetID != 0 && col.CharsetForm == 1 {
+//			//	conn.strConv.SetLangID(conn.connOption.CharsetID)
+//			//} else {
+//			//	conn.strConv.SetLangID(col.CharsetID)
+//			//}
+//		}
+//		resultClobString := strConv.Decode(lobData)
+//		//conn.strConv.SetLangID(tempCharset)
+//		//if dataSize != int64(len([]rune(resultClobString))) {
+//		//	return nil, errors.New("error reading clob data")
+//		//}
+//		return resultClobString, nil
+//	}
+//}
 
-func (stmt *defaultStmt) readLobsUDT(dataSet *DataSet) error {
-	if stmt.containOutputPars {
-		for _, par := range stmt.Pars {
-			if par.DataType != XMLType || par.cusType == nil {
-				continue
-			}
-			for _, attr := range par.cusType.attribs {
-				if attr.DataType != OCIClobLocator && attr.DataType != OCIBlobLocator {
-					continue
-				}
-				if lob, ok := attr.Value.(lobInterface); ok {
-					locator := lob.getLocator()
-					var err error
-					if scan, ok := attr.Value.(sql.Scanner); ok {
-						if locator == nil {
-							err = scan.Scan(nil)
-							if err != nil {
-								return err
-							}
-						} else {
-							var tempVal interface{}
-							tempVal, err = stmt.readLob(attr, locator)
-							if err != nil {
-								return err
-							}
-							err = scan.Scan(tempVal)
-							return err
-						}
-					}
-				}
-			}
-		}
-	}
-	for colIndex, col := range dataSet.Cols {
-		if col.DataType == XMLType {
-			for _, row := range dataSet.rows {
-				if val, ok := row[colIndex].(customType); ok {
-					for attIndex, par := range val.attribs {
-						if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
-							if lob, ok := par.Value.(lobInterface); ok {
-								locator := lob.getLocator()
-								if locator == nil {
-									val.attribs[attIndex].Value = nil
-								} else {
-									var err error
-									val.attribs[attIndex].Value, err = stmt.readLob(par, locator)
-									if err != nil {
-										return err
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
+//func (stmt *defaultStmt) readLobsUDT(dataSet *DataSet) error {
+//	if stmt.containOutputPars {
+//		for _, par := range stmt.Pars {
+//			if par.DataType != XMLType || par.cusType == nil {
+//				continue
+//			}
+//			for _, attr := range par.cusType.attribs {
+//				if attr.DataType != OCIClobLocator && attr.DataType != OCIBlobLocator {
+//					continue
+//				}
+//				if lob, ok := attr.Value.(lobInterface); ok {
+//					locator := lob.getLocator()
+//					var err error
+//					if scan, ok := attr.Value.(sql.Scanner); ok {
+//						if locator == nil {
+//							err = scan.Scan(nil)
+//							if err != nil {
+//								return err
+//							}
+//						} else {
+//							var tempVal interface{}
+//							tempVal, err = stmt.readLob(attr, locator)
+//							if err != nil {
+//								return err
+//							}
+//							err = scan.Scan(tempVal)
+//							return err
+//						}
+//					}
+//				}
+//			}
+//		}
+//	}
+//	for colIndex, col := range dataSet.Cols {
+//		if col.DataType == XMLType {
+//			for _, row := range dataSet.rows {
+//				if val, ok := row[colIndex].(customType); ok {
+//					for attIndex, par := range val.attribs {
+//						if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
+//							if lob, ok := par.Value.(lobInterface); ok {
+//								locator := lob.getLocator()
+//								if locator == nil {
+//									val.attribs[attIndex].Value = nil
+//								} else {
+//									var err error
+//									val.attribs[attIndex].Value, err = stmt.readLob(par, locator)
+//									if err != nil {
+//										return err
+//									}
+//								}
+//							}
+//						}
+//					}
+//				}
+//			}
+//		}
+//	}
+//	return nil
+//}
 
-func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
-	if stmt._hasBLOB {
-		if stmt.containOutputPars {
-			for _, par := range stmt.Pars {
-				if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
-					if lob, ok := par.Value.(lobInterface); ok {
-						locator := lob.getLocator()
-						var err error
-						if scan, ok := par.Value.(sql.Scanner); ok {
-							if locator == nil {
-								err = scan.Scan(nil)
-								if err != nil {
-									return err
-								}
-							} else {
-								var tempVal interface{}
-								tempVal, err = stmt.readLob(par, locator)
-								if err != nil {
-									return err
-								}
-								err = scan.Scan(tempVal)
-								if err != nil {
-									return err
-								}
-							}
-						}
-					}
-				}
-			}
-			return nil
-		}
-		for colIndex, col := range dataSet.Cols {
-			if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
-				for _, row := range dataSet.rows {
-					if lob, ok := row[colIndex].(lobInterface); ok {
-						locator := lob.getLocator()
-						if locator == nil {
-							row[colIndex] = nil
-						} else {
-							var err error
-							row[colIndex], err = stmt.readLob(col, lob.getLocator())
-							if err != nil {
-								return err
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
+//func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
+//	if stmt._hasBLOB {
+//		if stmt.containOutputPars {
+//			for _, par := range stmt.Pars {
+//				if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
+//					if lob, ok := par.Value.(lobInterface); ok {
+//						locator := lob.getLocator()
+//						var err error
+//						if scan, ok := par.Value.(sql.Scanner); ok {
+//							if locator == nil {
+//								err = scan.Scan(nil)
+//								if err != nil {
+//									return err
+//								}
+//							} else {
+//								var tempVal interface{}
+//								tempVal, err = stmt.readLob(par, locator)
+//								if err != nil {
+//									return err
+//								}
+//								err = scan.Scan(tempVal)
+//								if err != nil {
+//									return err
+//								}
+//							}
+//						}
+//					}
+//				}
+//			}
+//			return nil
+//		}
+//		for colIndex, col := range dataSet.Cols {
+//			if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
+//				for _, row := range dataSet.rows {
+//					if lob, ok := row[colIndex].(lobInterface); ok {
+//						locator := lob.getLocator()
+//						if locator == nil {
+//							row[colIndex] = nil
+//						} else {
+//							var err error
+//							row[colIndex], err = stmt.readLob(col, lob.getLocator())
+//							if err != nil {
+//								return err
+//							}
+//						}
+//					}
+//				}
+//			}
+//		}
+//	}
+//	return nil
+//}
 
 // requestCustomTypeInfo an experimental function to ask for UDT information
 func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
@@ -1330,169 +1295,77 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) erro
 		col.Value = cursor
 		return nil
 	}
-	if col.DataType == XMLType {
-		if col.TypeName == "XMLTYPE" {
-			return errors.New("unsupported data type: XMLTYPE")
-		}
-		if col.cusType == nil {
-			return fmt.Errorf("unregister custom type: %s. call RegisterType first", col.TypeName)
-		}
-		_, err := session.GetDlc() // contain toid and some 0s
-		if err != nil {
-			return err
-		}
-		_, err = session.GetBytes(3) // 3 0s
-		if err != nil {
-			return err
-		}
-		_, err = session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		tempBytes, err := session.GetClr()
-		if err != nil {
-			return err
-		}
-		newState := network.SessionState{InBuffer: tempBytes}
-		session.SaveState(&newState)
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		ctl, err := session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		if ctl == 0xFE {
-			_, err = session.GetInt(4, false, true)
-			if err != nil {
-				return err
-			}
-		}
-		for x := 0; x < len(col.cusType.attribs); x++ {
-			err = stmt.calculateColumnValue(&col.cusType.attribs[x], true)
-			if err != nil {
-				return err
-			}
-		}
-		_ = session.LoadState()
-		col.Value = *col.cusType
-		//paramValue := reflect.ValueOf(col.Value)
-		//if paramValue.Kind() == reflect.Ptr {
-		//	paramValue.Elem().Set(reflect.ValueOf(col.cusType.getObject()))
-		//} else {
-		//	col.Value = col.cusType.getObject()
-		//}
-		return nil
-	}
+	//if col.DataType == XMLType {
+	//	if col.TypeName == "XMLTYPE" {
+	//		return errors.New("unsupported data type: XMLTYPE")
+	//	}
+	//	if col.cusType == nil {
+	//		return fmt.Errorf("unregister custom type: %s. call RegisterType first", col.TypeName)
+	//	}
+	//	_, err := session.GetDlc() // contain toid and some 0s
+	//	if err != nil {
+	//		return err
+	//	}
+	//	_, err = session.GetBytes(3) // 3 0s
+	//	if err != nil {
+	//		return err
+	//	}
+	//	_, err = session.GetInt(4, true, true)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	_, err = session.GetByte()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	_, err = session.GetByte()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	tempBytes, err := session.GetClr()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	newState := network.SessionState{InBuffer: tempBytes}
+	//	session.SaveState(&newState)
+	//	_, err = session.GetByte()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	ctl, err := session.GetInt(4, true, true)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	if ctl == 0xFE {
+	//		_, err = session.GetInt(4, false, true)
+	//		if err != nil {
+	//			return err
+	//		}
+	//	}
+	//	for x := 0; x < len(col.cusType.attribs); x++ {
+	//		err = stmt.calculateColumnValue(&col.cusType.attribs[x], true)
+	//		if err != nil {
+	//			return err
+	//		}
+	//	}
+	//	_ = session.LoadState()
+	//	col.Value = *col.cusType
+	//paramValue := reflect.ValueOf(col.Value)
+	//if paramValue.Kind() == reflect.Ptr {
+	//	paramValue.Elem().Set(reflect.ValueOf(col.cusType.getObject()))
+	//} else {
+	//	col.Value = col.cusType.getObject()
+	//}
+	//return nil
+	//}
 
 	return col.decodeColumnValue(stmt.connection, udt)
 }
 
 // get values of rows and output parameter according to DataType and binary value (bValue)
 func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
-	session := stmt.connection.session
 	if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator {
 		stmt._hasBLOB = true
-	}
-	if param.DataType == XMLType {
-		if param.TypeName == "XMLTYPE" {
-			return errors.New("unsupported data type: XMLTYPE")
-		}
-		if param.cusType == nil {
-			return fmt.Errorf("unregister custom type: %s. call RegisterType first", param.TypeName)
-		}
-		_, err := session.GetDlc() // contain toid and some 0s
-		if err != nil {
-			return err
-		}
-		_, err = session.GetBytes(3) // 3 0s
-		if err != nil {
-			return err
-		}
-		_, err = session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		tempBytes, err := session.GetClr()
-		if err != nil {
-			return err
-		}
-		newState := network.SessionState{InBuffer: tempBytes}
-		session.SaveState(&newState)
-		_, err = session.GetByte()
-		if err != nil {
-			return err
-		}
-		ctl, err := session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		if ctl == 0xFE {
-			_, err = session.GetInt(4, false, true)
-			if err != nil {
-				return err
-			}
-		}
-		for x := 0; x < len(param.cusType.attribs); x++ {
-			err = stmt.calculateParameterValue(&param.cusType.attribs[x])
-			if err != nil {
-				return err
-			}
-		}
-		_ = session.LoadState()
-		paramValue := reflect.ValueOf(param.Value)
-		if paramValue.Kind() == reflect.Ptr {
-			paramValue.Elem().Set(reflect.ValueOf(param.cusType.getObject()))
-		} else {
-			param.Value = param.cusType.getObject()
-		}
-		return nil
-	}
-	if param.MaxNoOfArrayElements > 0 {
-		size, err := session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		if size > 0 {
-			values := make([]driver.Value, size)
-			for x := 0; x < size; x++ {
-				//param.BValue, err = session.GetClr()
-				//if err != nil {
-				//	return err
-				//}
-				// last unused integer is reader outside this function
-
-				values[x], err = param.decodeValue(stmt.connection, false)
-				if x < size-1 {
-					_, err = session.GetInt(2, true, true)
-				}
-				if err != nil {
-					return err
-				}
-			}
-			err = param.setParameterArrayValue(values)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
 	}
 	return param.decodeParameterValue(stmt.connection)
 }
@@ -2208,9 +2081,33 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		return nil, err
 	}
 	// need to deal with lobs
-	err = stmt.readLobs(dataSet)
-	if err != nil {
-		return nil, err
+	//err = stmt.readLobs(dataSet)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	// before release results decode parameters
+	for _, par := range stmt.Pars {
+		if par.Direction != Input && par.DataType != REFCURSOR {
+			fieldValue := reflect.ValueOf(par.Value)
+			if fieldValue.Kind() != reflect.Ptr {
+				return nil, errors.New("output parameter should be pointer type")
+			}
+			fieldValue = fieldValue.Elem()
+			if par.MaxNoOfArrayElements > 0 {
+				if pars, ok := par.oPrimValue.([]ParameterInfo); ok {
+					err = setArray(fieldValue, pars)
+					if err != nil {
+						return nil, err
+					}
+				}
+			} else {
+				err = setFieldValue(fieldValue, par.cusType, par.oPrimValue)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 	result := new(QueryResult)
 	if session.Summary != nil {
@@ -2510,25 +2407,33 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 				return nil, err
 			}
 		} else {
-			err = stmt.readLobs(dataSet)
-			if err != nil {
-				return nil, err
-			}
+			//err = stmt.readLobs(dataSet)
+			//if err != nil {
+			//	return nil, err
+			//}
 		}
 	}
-	err = stmt.readLobsUDT(dataSet)
+	err = stmt.decodePrim(dataSet)
 	if err != nil {
 		return nil, err
 	}
-	for colIndex, col := range dataSet.Cols {
-		if col.DataType == XMLType {
-			for _, row := range dataSet.rows {
-				if custVal, ok := row[colIndex].(customType); ok {
-					row[colIndex] = custVal.getObject()
-				}
-			}
-		}
-	}
+
+	//err = stmt.readLobsUDT(dataSet)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//for colIndex, col := range dataSet.Cols {
+	//	if col.DataType == XMLType {
+	//		for _, row := range dataSet.rows {
+	//			if custVal, ok := row[colIndex].(customType); ok {
+	//				row[colIndex], err = custVal.getObject()
+	//				if err != nil {
+	//					return nil, err
+	//				}
+	//			}
+	//		}
+	//	}
+	//}
 
 	//tracer := stmt.connection.connOption.Tracer
 	//failOver := stmt.connection.connOption.Failover
@@ -2574,6 +2479,54 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	//	break
 	//}
 	return dataSet, err
+}
+
+func (stmt *defaultStmt) decodePrim(dataSet *DataSet) error {
+	var err error
+	// convert from go-ora primitives to sql primitives
+	for rowIndex, row := range dataSet.rows {
+		for colIndex, col := range dataSet.Cols {
+			if row == nil {
+				continue
+			}
+			switch val := row[colIndex].(type) {
+			case Lob:
+				if col.DataType == OCIClobLocator {
+					var tempString = sql.NullString{"", false}
+					err = setLob(reflect.ValueOf(&tempString).Elem(), val)
+					if err != nil {
+						return err
+					}
+					if tempString.Valid {
+						dataSet.rows[rowIndex][colIndex] = tempString.String
+					} else {
+						dataSet.rows[rowIndex][colIndex] = nil
+					}
+				} else {
+					var tempByte []byte
+					err = setLob(reflect.ValueOf(&tempByte).Elem(), val)
+					if err != nil {
+						return err
+					}
+					dataSet.rows[rowIndex][colIndex] = tempByte
+				}
+			case BFile:
+				var tempByte []byte
+				err = setBFile(reflect.ValueOf(&tempByte).Elem(), val)
+				dataSet.rows[rowIndex][colIndex] = tempByte
+			case []ParameterInfo:
+				if col.cusType != nil {
+					tempObject := reflect.New(col.cusType.typ)
+					err = setUDTObject(tempObject.Elem(), col.cusType, val)
+					if err != nil {
+						return err
+					}
+					dataSet.rows[rowIndex][colIndex] = tempObject.Elem().Interface()
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // Query execute a query command and return dataset object in form of driver.Rows interface

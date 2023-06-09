@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -121,7 +122,8 @@ type ParameterInfo struct {
 	CharsetForm          int
 	BValue               []byte
 	Value                driver.Value
-	primValue            driver.Value
+	iPrimValue           driver.Value
+	oPrimValue           driver.Value
 	OutputVarPtr         interface{}
 	getDataFromServer    bool
 	oaccollid            int
@@ -850,174 +852,391 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 	return nil
 }
 
-func (par *ParameterInfo) decodeValue(connection *Connection, udt bool) (driver.Value, error) {
-	session := connection.session
-	var tempVal driver.Value
+func (par *ParameterInfo) clone() ParameterInfo {
+	tempPar := ParameterInfo{}
+	tempPar.DataType = par.DataType
+	tempPar.cusType = par.cusType
+	tempPar.TypeName = par.TypeName
+	tempPar.MaxLen = par.MaxLen
+	tempPar.MaxCharLen = par.MaxCharLen
+	tempPar.CharsetID = par.CharsetID
+	tempPar.CharsetForm = par.CharsetForm
+	tempPar.Scale = par.Scale
+	tempPar.Precision = par.Precision
+	return tempPar
+}
+func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
+	session := conn.session
 	var err error
+	if par.MaxNoOfArrayElements > 0 {
+		size, err := session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
+		par.MaxNoOfArrayElements = size
+		if size > 0 {
+			pars := make([]ParameterInfo, 0, size)
+			for x := 0; x < size; x++ {
+				tempPar := par.clone()
+				err = tempPar.decodeParameterValue(conn)
+				if err != nil {
+					return err
+				}
+				//, err = tempPar.decodeValue(stmt.connection, false)
+				if x < size-1 {
+					_, err = session.GetInt(2, true, true)
+					if err != nil {
+						return err
+					}
+				}
+				pars = append(pars, tempPar)
+			}
+			par.oPrimValue = pars
+		}
+		return nil
+	}
+	if par.DataType == XMLType {
+		if par.TypeName == "XMLTYPE" {
+			return errors.New("unsupported data type: XMLTYPE")
+		}
+		if par.cusType == nil {
+			return fmt.Errorf("unregister custom type: %s. call RegisterType first", par.TypeName)
+		}
+		_, err = session.GetDlc() // contain toid and some 0s
+		if err != nil {
+			return err
+		}
+		_, err = session.GetBytes(3) // 3 0s
+		if err != nil {
+			return err
+		}
+		_, err = session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
+		_, err = session.GetByte()
+		if err != nil {
+			return err
+		}
+		_, err = session.GetByte()
+		if err != nil {
+			return err
+		}
+	}
 	if par.DataType == ROWID {
 		rowid, err := newRowID(session)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if rowid == nil {
-			tempVal = nil
-		} else {
-			tempVal = string(rowid.getBytes())
+		if rowid != nil {
+			par.oPrimValue = string(rowid.getBytes())
 		}
-		return tempVal, nil
+		return nil
 	}
 	if par.DataType == UROWID {
 		rowid, err := newURowID(session)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if rowid == nil {
-			tempVal = nil
-		} else {
-			tempVal = string(rowid.getBytes())
+		if rowid != nil {
+			par.oPrimValue = string(rowid.getBytes())
 		}
-		return tempVal, nil
+		return nil
 	}
 	if (par.DataType == NCHAR || par.DataType == CHAR) && par.MaxCharLen == 0 {
-		par.BValue = nil
-		return nil, nil
+		return nil
 	}
 	if par.DataType == RAW && par.MaxLen == 0 {
-		par.BValue = nil
-		return nil, nil
+		return nil
 	}
 	par.BValue, err = session.GetClr()
 	if err != nil {
-		return nil, err
-	}
-	if par.BValue == nil {
-		switch par.DataType {
-		case OCIClobLocator:
-			if par.CharsetForm == 1 {
-				tempVal = Clob{locator: nil, Valid: false}
-			} else {
-				tempVal = NClob{locator: nil, Valid: false}
-			}
-		case OCIBlobLocator:
-			tempVal = Blob{locator: nil, Valid: false}
-		case OCIFileLocator:
-			tempVal = BFile{lob: Lob{sourceLocator: nil, connection: connection}}
-		default:
-			tempVal = nil
-		}
-	} else {
-		switch par.DataType {
-		case ROWID:
-
-		case NCHAR, CHAR, LONG:
-			strConv, err := connection.getStrConv(par.CharsetID)
-			if err != nil {
-				return nil, err
-			}
-			tempVal = strConv.Decode(par.BValue)
-		case NUMBER:
-			// Scale = 0 and Precision <18 --> int64
-			if par.Scale == 0 && par.Precision <= 18 {
-				tempVal, err = converters.NumberToInt64(par.BValue)
-				if err != nil {
-					return nil, err
-				}
-			} else if par.Scale == 0 && (converters.CompareBytes(par.BValue, converters.Int64MaxByte) > 0 &&
-				converters.CompareBytes(par.BValue, converters.Uint64MaxByte) < 0) {
-				tempVal, err = converters.NumberToUInt64(par.BValue)
-				if err != nil {
-					return tempVal, err
-				}
-			} else if par.Scale > 0 {
-				tempVal, err = converters.NumberToString(par.BValue)
-				if err != nil {
-					return tempVal, err
-				}
-			} else {
-				tempVal = converters.DecodeNumber(par.BValue)
-			}
-		case TimeStampDTY:
-			fallthrough
-		case TimeStampeLTZ:
-			fallthrough
-		case TimeStampLTZ_DTY:
-			fallthrough
-		case TIMESTAMPTZ:
-			fallthrough
-		case TimeStampTZ_DTY:
-			fallthrough
-		case TIMESTAMP:
-			//dateVal, err := converters.DecodeDate(par.BValue)
-			//if err != nil {
-			//	return nil, err
-			//}
-			//tempVal = TimeStamp(dateVal)
-			fallthrough
-		case DATE:
-			dateVal, err := converters.DecodeDate(par.BValue)
-			if err != nil {
-				return nil, err
-			}
-			tempVal = dateVal
-		case OCIBlobLocator, OCIClobLocator:
-			var locator []byte
-			var err error
-			if !udt {
-				locator, err = session.GetClr()
-			} else {
-				locator = par.BValue
-				par.BValue = nil
-			}
-			if err != nil {
-				return nil, err
-			}
-			if par.DataType == OCIClobLocator {
-				if par.CharsetForm == 1 {
-					tempVal = Clob{locator: locator}
-				} else {
-					tempVal = NClob{locator: locator}
-				}
-			} else {
-				tempVal = Blob{locator: locator}
-			}
-		case OCIFileLocator:
-			locator, err := session.GetClr()
-			if err != nil {
-				return nil, err
-			}
-			tempVal = BFile{
-				isOpened: false,
-				lob: Lob{
-					sourceLocator: locator,
-					sourceLen:     len(locator),
-					connection:    connection,
-				},
-			}
-		case IBFloat:
-			tempVal = converters.ConvertBinaryFloat(par.BValue)
-		case IBDouble:
-			tempVal = converters.ConvertBinaryDouble(par.BValue)
-		case IntervalYM_DTY:
-			tempVal = converters.ConvertIntervalYM_DTY(par.BValue)
-		case IntervalDS_DTY:
-			tempVal = converters.ConvertIntervalDS_DTY(par.BValue)
-		default:
-			tempVal = par.BValue
-		}
-	}
-	return tempVal, nil
-}
-
-func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
-	tempVal, err := par.decodeValue(connection, false)
-	if err != nil {
 		return err
 	}
-	return par.setParameterValue(tempVal)
+	if par.BValue == nil {
+		return nil
+	}
+	switch par.DataType {
+	case NCHAR, CHAR, LONG:
+		strConv, err := conn.getStrConv(par.CharsetID)
+		if err != nil {
+			return err
+		}
+		par.oPrimValue = strConv.Decode(par.BValue)
+	case RAW:
+		par.oPrimValue = par.BValue
+	case NUMBER:
+		if par.Scale == 0 && par.Precision <= 18 {
+			par.oPrimValue, err = converters.NumberToInt64(par.BValue)
+			if err != nil {
+				return err
+			}
+		} else if par.Scale == 0 && (converters.CompareBytes(par.BValue, converters.Int64MaxByte) > 0 &&
+			converters.CompareBytes(par.BValue, converters.Uint64MaxByte) < 0) {
+			par.oPrimValue, err = converters.NumberToUInt64(par.BValue)
+			if err != nil {
+				return err
+			}
+		} else if par.Scale > 0 {
+			par.oPrimValue, err = converters.NumberToString(par.BValue)
+			if err != nil {
+				return err
+			}
+		} else {
+			par.oPrimValue = converters.DecodeNumber(par.BValue)
+		}
+	case TimeStampDTY, TimeStampeLTZ, TimeStampLTZ_DTY, TIMESTAMPTZ, TimeStampTZ_DTY:
+		fallthrough
+	case TIMESTAMP, DATE:
+		par.oPrimValue, err = converters.DecodeDate(par.BValue)
+		if err != nil {
+			return err
+		}
+	case OCIClobLocator, OCIBlobLocator:
+		var locator []byte
+		if !udt {
+			locator, err = session.GetClr()
+		} else {
+			locator = par.BValue
+
+		}
+		if err != nil {
+			return err
+		}
+		par.oPrimValue = Lob{
+			sourceLocator: locator,
+			sourceLen:     len(locator),
+			connection:    conn,
+			charsetID:     par.CharsetID,
+		}
+	case OCIFileLocator:
+		locator, err := session.GetClr()
+		if err != nil {
+			return err
+		}
+		par.oPrimValue = BFile{
+			isOpened: false,
+			lob: Lob{
+				sourceLocator: locator,
+				sourceLen:     len(locator),
+				connection:    conn,
+				charsetID:     par.CharsetID,
+			},
+		}
+	case IBFloat:
+		par.oPrimValue = float64(converters.ConvertBinaryFloat(par.BValue))
+	case IBDouble:
+		par.oPrimValue = converters.ConvertBinaryDouble(par.BValue)
+	case IntervalYM_DTY:
+		par.oPrimValue = converters.ConvertIntervalYM_DTY(par.BValue)
+	case IntervalDS_DTY:
+		par.oPrimValue = converters.ConvertIntervalDS_DTY(par.BValue)
+	case XMLType:
+		newState := network.SessionState{InBuffer: par.BValue}
+		session.SaveState(&newState)
+		_, err = session.GetByte()
+		if err != nil {
+			return err
+		}
+		var ctl int
+		ctl, err = session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
+		if ctl == 0xFE {
+			_, err = session.GetInt(4, false, true)
+			if err != nil {
+				return err
+			}
+		}
+		pars := make([]ParameterInfo, 0)
+		for _, attrib := range par.cusType.attribs {
+			tempPar := attrib
+			tempPar.Direction = par.Direction
+			err = tempPar.decodePrimValue(conn, true)
+			if err != nil {
+				return err
+			}
+			pars = append(pars, tempPar)
+		}
+		par.oPrimValue = pars
+		_ = session.LoadState()
+	default:
+		return fmt.Errorf("unable to decode oracle type %v to its primitive value", par.DataType)
+	}
+	return nil
+}
+
+//func (par *ParameterInfo) decodeValue(connection *Connection, udt bool) (driver.Value, error) {
+//	session := connection.session
+//	var tempVal driver.Value
+//	var err error
+//	if par.DataType == ROWID {
+//		rowid, err := newRowID(session)
+//		if err != nil {
+//			return nil, err
+//		}
+//		if rowid == nil {
+//			tempVal = nil
+//		} else {
+//			tempVal = string(rowid.getBytes())
+//		}
+//		return tempVal, nil
+//	}
+//	if par.DataType == UROWID {
+//		rowid, err := newURowID(session)
+//		if err != nil {
+//			return nil, err
+//		}
+//		if rowid == nil {
+//			tempVal = nil
+//		} else {
+//			tempVal = string(rowid.getBytes())
+//		}
+//		return tempVal, nil
+//	}
+//	if (par.DataType == NCHAR || par.DataType == CHAR) && par.MaxCharLen == 0 {
+//		par.BValue = nil
+//		return nil, nil
+//	}
+//	if par.DataType == RAW && par.MaxLen == 0 {
+//		par.BValue = nil
+//		return nil, nil
+//	}
+//	par.BValue, err = session.GetClr()
+//	if err != nil {
+//		return nil, err
+//	}
+//	if par.BValue == nil {
+//		switch par.DataType {
+//		case OCIClobLocator:
+//			if par.CharsetForm == 1 {
+//				tempVal = Clob{locator: nil, Valid: false}
+//			} else {
+//				tempVal = NClob{locator: nil, Valid: false}
+//			}
+//		case OCIBlobLocator:
+//			tempVal = Blob{locator: nil, Valid: false}
+//		case OCIFileLocator:
+//			tempVal = BFile{lob: Lob{sourceLocator: nil, connection: connection}}
+//		default:
+//			tempVal = nil
+//		}
+//	} else {
+//		switch par.DataType {
+//		case NCHAR, CHAR, LONG:
+//			strConv, err := connection.getStrConv(par.CharsetID)
+//			if err != nil {
+//				return nil, err
+//			}
+//			tempVal = strConv.Decode(par.BValue)
+//		case NUMBER:
+//			// Scale = 0 and Precision <18 --> int64
+//			if par.Scale == 0 && par.Precision <= 18 {
+//				tempVal, err = converters.NumberToInt64(par.BValue)
+//				if err != nil {
+//					return nil, err
+//				}
+//			} else if par.Scale == 0 && (converters.CompareBytes(par.BValue, converters.Int64MaxByte) > 0 &&
+//				converters.CompareBytes(par.BValue, converters.Uint64MaxByte) < 0) {
+//				tempVal, err = converters.NumberToUInt64(par.BValue)
+//				if err != nil {
+//					return tempVal, err
+//				}
+//			} else if par.Scale > 0 {
+//				tempVal, err = converters.NumberToString(par.BValue)
+//				if err != nil {
+//					return tempVal, err
+//				}
+//			} else {
+//				tempVal = converters.DecodeNumber(par.BValue)
+//			}
+//		case TimeStampDTY:
+//			fallthrough
+//		case TimeStampeLTZ:
+//			fallthrough
+//		case TimeStampLTZ_DTY:
+//			fallthrough
+//		case TIMESTAMPTZ:
+//			fallthrough
+//		case TimeStampTZ_DTY:
+//			fallthrough
+//		case TIMESTAMP:
+//			fallthrough
+//		case DATE:
+//			dateVal, err := converters.DecodeDate(par.BValue)
+//			if err != nil {
+//				return nil, err
+//			}
+//			tempVal = dateVal
+//		case OCIBlobLocator, OCIClobLocator:
+//			var locator []byte
+//			var err error
+//			if !udt {
+//				locator, err = session.GetClr()
+//			} else {
+//				locator = par.BValue
+//				par.BValue = nil
+//			}
+//			if err != nil {
+//				return nil, err
+//			}
+//			if par.DataType == OCIClobLocator {
+//				if par.CharsetForm == 1 {
+//					tempVal = Clob{locator: locator}
+//				} else {
+//					tempVal = NClob{locator: locator}
+//				}
+//			} else {
+//				tempVal = Blob{locator: locator}
+//			}
+//		case OCIFileLocator:
+//			locator, err := session.GetClr()
+//			if err != nil {
+//				return nil, err
+//			}
+//			tempVal = BFile{
+//				isOpened: false,
+//				lob: Lob{
+//					sourceLocator: locator,
+//					sourceLen:     len(locator),
+//					connection:    connection,
+//				},
+//			}
+//		case IBFloat:
+//			tempVal = converters.ConvertBinaryFloat(par.BValue)
+//		case IBDouble:
+//			tempVal = converters.ConvertBinaryDouble(par.BValue)
+//		case IntervalYM_DTY:
+//			tempVal = converters.ConvertIntervalYM_DTY(par.BValue)
+//		case IntervalDS_DTY:
+//			tempVal = converters.ConvertIntervalDS_DTY(par.BValue)
+//		default:
+//			tempVal = par.BValue
+//		}
+//	}
+//	return tempVal, nil
+//}
+
+func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
+	par.oPrimValue = nil
+	par.BValue = nil
+	return par.decodePrimValue(connection, false)
+	//if err != nil {
+	//	return err
+	//}
+	//fieldValue := reflect.ValueOf(par.Value).Elem()
+	//return setFieldValue(fieldValue, par.oPrimValue)
+
+	//tempVal, err := par.decodeValue(connection, false)
+	//if err != nil {
+	//	return err
+	//}
+	//return par.setParameterValue(tempVal)
 }
 
 func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) error {
-	var err error
+	//var err error
 	if !udt && connection.connOption.Lob == 0 && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
 		session := connection.session
 		maxSize, err := session.GetInt(4, true, true)
@@ -1060,25 +1279,23 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) er
 			}
 			par.BValue, err = session.GetClr()
 			if par.DataType == OCIClobLocator {
-				var tempString string
 				strConv, err := connection.getStrConv(par.CharsetID)
 				if err != nil {
 					return err
 				}
-				tempString = strConv.Decode(par.BValue)
-				par.Value = tempString
+				par.oPrimValue = strConv.Decode(par.BValue)
 			} else {
-				par.Value = par.BValue
+				par.oPrimValue = par.BValue
 			}
 			_ /*locator*/, err = session.GetClr()
 			if err != nil {
 				return err
 			}
 		} else {
-			par.Value = nil
+			par.oPrimValue = nil
 		}
 		return nil
 	}
-	par.Value, err = par.decodeValue(connection, udt)
-	return err
+	//par.Value, err = par.decodeValue(connection, udt)
+	return par.decodePrimValue(connection, udt)
 }

@@ -16,7 +16,7 @@ type customType struct {
 	attribs  []ParameterInfo
 	typ      reflect.Type
 	toid     []byte // type oid
-	filedMap map[string]int
+	fieldMap map[string]int
 }
 
 // RegisterType register user defined type with owner equal to user id
@@ -53,7 +53,7 @@ func (conn *Connection) RegisterTypeWithOwner(owner, typeName string, typeObj in
 		owner:    owner,
 		name:     typeName,
 		typ:      typ,
-		filedMap: map[string]int{},
+		fieldMap: map[string]int{},
 	}
 	err := cust.getTOID(conn)
 	if err != nil {
@@ -95,7 +95,8 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 		param.TypeName = attTypeName.String
 		switch strings.ToUpper(attTypeName.String) {
 		case "NUMBER":
-			param.setForNumber()
+			param.DataType = NUMBER
+			param.MaxLen = converters.MAX_LEN_NUMBER
 		case "VARCHAR2":
 			param.DataType = NCHAR
 			param.CharsetForm = 1
@@ -203,7 +204,7 @@ func (conn *Connection) RegisterType2(typeName string, typeObj interface{}) erro
 	if typ.Kind() != reflect.Struct {
 		return errors.New("type object should be of structure type")
 	}
-	cust := customType{typ: typ, filedMap: map[string]int{}}
+	cust := customType{typ: typ, fieldMap: map[string]int{}}
 	sqlText := `
 DECLARE
     toid raw(128);
@@ -334,7 +335,7 @@ func (cust *customType) loadFieldMap() {
 			continue
 		}
 		fieldID = strings.ToUpper(fieldID)
-		cust.filedMap[fieldID] = x
+		cust.fieldMap[fieldID] = x
 		//tag := f.Tag.Get("oracle")
 		//if len(tag) == 0 {
 		//	continue
@@ -351,7 +352,7 @@ func (cust *customType) loadFieldMap() {
 		//			continue
 		//		}
 		//		fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
-		//		cust.filedMap[fieldID] = x
+		//		cust.fieldMap[fieldID] = x
 		//	}
 		//}
 	}
@@ -360,11 +361,11 @@ func (cust *customType) loadFieldMap() {
 // getObject return an object of Golang type supplied in RegisterType function
 // the object is filled with data from attrib []ParameterInfo
 // which is filled inside Stmt during data reading
-func (cust *customType) getObject() interface{} {
+func (cust *customType) getObject() (interface{}, error) {
 	typ := cust.typ
 	obj := reflect.New(typ)
 	for _, attrib := range cust.attribs {
-		if fieldIndex, ok := cust.filedMap[attrib.Name]; ok {
+		if fieldIndex, ok := cust.fieldMap[attrib.Name]; ok {
 			if attrib.Value != nil {
 				//tempField := obj.Elem().Field(fieldIndex)
 
@@ -375,14 +376,17 @@ func (cust *customType) getObject() interface{} {
 				tempPar := ParameterInfo{Value: obj.Elem().Field(fieldIndex).Interface()}
 				err := tempPar.setParameterValue(attrib.Value)
 				if err != nil {
-					return err
+					return nil, err
 				}
-
-				obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(tempPar.Value))
+				err = setFieldValue(obj.Elem().Field(fieldIndex), tempPar.cusType, tempPar.Value)
+				if err != nil {
+					return nil, err
+				}
+				//obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(tempPar.Value))
 			}
 		}
 	}
-	return obj.Elem().Interface()
+	return obj.Elem().Interface(), nil
 }
 
 //func (cust *customType) getFieldRepr(index int, input_value interface{}) ([]byte, error) {

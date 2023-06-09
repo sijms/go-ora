@@ -69,8 +69,8 @@ func (val *NVarChar) UnmarshalJSON(data []byte) error {
 //}
 
 type NullNVarChar struct {
-	Valid    bool
 	NVarChar NVarChar
+	Valid    bool
 }
 
 func (val NullNVarChar) Value() (driver.Value, error) {

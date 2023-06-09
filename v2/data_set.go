@@ -138,6 +138,10 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 			return errors.New("go-ora: argument in scan should be passed as pointers")
 		}
 		col := dataSet.currentRow[srcIndex]
+		// first check if the input is struct
+		// if struct is custom type finish it
+		// other structure should support db tag
+		// non structure input
 		result, err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem(), srcIndex)
 		if err != nil {
 			return err
@@ -222,6 +226,8 @@ func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, e
 		obj.Set(reflect.ValueOf(field))
 		return true, nil
 	}
+	//return true, setFieldValue(obj, nil, field)
+
 	if temp, ok := obj.Interface().(sql.Scanner); ok {
 		err := temp.Scan(field)
 		return err == nil, err

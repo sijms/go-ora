@@ -1,9 +1,11 @@
 package go_ora
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/converters"
 	"io"
 	"reflect"
 	"regexp"
@@ -11,6 +13,31 @@ import (
 	"strings"
 	"syscall"
 	"time"
+)
+
+var (
+	tyBytes           = reflect.TypeOf((*[]byte)(nil)).Elem()
+	tyString          = reflect.TypeOf((*string)(nil)).Elem()
+	tyNVarChar        = reflect.TypeOf((*NVarChar)(nil)).Elem()
+	tyTime            = reflect.TypeOf((*time.Time)(nil)).Elem()
+	tyTimeStamp       = reflect.TypeOf((*TimeStamp)(nil)).Elem()
+	tyTimeStampTZ     = reflect.TypeOf((*TimeStampTZ)(nil)).Elem()
+	tyClob            = reflect.TypeOf((*Clob)(nil)).Elem()
+	tyNClob           = reflect.TypeOf((*NClob)(nil)).Elem()
+	tyBlob            = reflect.TypeOf((*Blob)(nil)).Elem()
+	tyBFile           = reflect.TypeOf((*BFile)(nil)).Elem()
+	tyNullByte        = reflect.TypeOf((*sql.NullByte)(nil)).Elem()
+	tyNullInt16       = reflect.TypeOf((*sql.NullInt16)(nil)).Elem()
+	tyNullInt32       = reflect.TypeOf((*sql.NullInt32)(nil)).Elem()
+	tyNullInt64       = reflect.TypeOf((*sql.NullInt64)(nil)).Elem()
+	tyNullFloat64     = reflect.TypeOf((*sql.NullFloat64)(nil)).Elem()
+	tyNullBool        = reflect.TypeOf((*sql.NullBool)(nil)).Elem()
+	tyNullString      = reflect.TypeOf((*sql.NullString)(nil)).Elem()
+	tyNullNVarChar    = reflect.TypeOf((*NullNVarChar)(nil)).Elem()
+	tyNullTime        = reflect.TypeOf((*sql.NullTime)(nil)).Elem()
+	tyNullTimeStamp   = reflect.TypeOf((*NullTimeStamp)(nil)).Elem()
+	tyNullTimeStampTZ = reflect.TypeOf((*NullTimeStampTZ)(nil)).Elem()
+	tyRefCursor       = reflect.TypeOf((*RefCursor)(nil)).Elem()
 )
 
 func parseSqlText(text string) ([]string, error) {
@@ -157,6 +184,15 @@ func tFloat(input reflect.Type) bool {
 func tNumber(input reflect.Type) bool {
 	return tInteger(input) || tFloat(input) || input.Kind() == reflect.Bool
 }
+func tNullNumber(input reflect.Type) bool {
+	switch input {
+	case tyNullBool, tyNullByte, tyNullInt16, tyNullInt32, tyNullInt64:
+		fallthrough
+	case tyNullFloat64:
+		return true
+	}
+	return false
+}
 
 //======== get primitive data from original data types ========//
 
@@ -165,7 +201,11 @@ func getValue(origVal driver.Value) (driver.Value, error) {
 	if origVal == nil {
 		return nil, nil
 	}
-	proVal := reflect.Indirect(reflect.ValueOf(origVal))
+	rOriginal := reflect.ValueOf(origVal)
+	if rOriginal.Kind() == reflect.Ptr && rOriginal.IsNil() {
+		return nil, nil
+	}
+	proVal := reflect.Indirect(rOriginal)
 	if valuer, ok := proVal.Interface().(driver.Valuer); ok {
 		return valuer.Value()
 	}
@@ -202,8 +242,11 @@ func getNumber(col interface{}) (interface{}, error) {
 	}
 	rType := reflect.TypeOf(col)
 	rValue := reflect.ValueOf(col)
-	if tInteger(rType) {
+	if tSigned(rType) {
 		return rValue.Int(), nil
+	}
+	if tUnsigned(rType) {
+		return rValue.Uint(), nil
 	}
 	if f32, ok := col.(float32); ok {
 		return strconv.ParseFloat(fmt.Sprint(f32), 64)
@@ -406,50 +449,423 @@ func getLob(col interface{}, conn *Connection) (*Lob, error) {
 //=============================================================//
 
 func setBytes(value reflect.Value, input []byte) error {
-	switch value.Type() {
-	case reflect.TypeOf([]byte{}):
-		value.SetBytes(input)
-	case reflect.TypeOf(Blob{}):
-		value.Set(reflect.ValueOf(Blob{Data: input, Valid: true}))
-	case reflect.TypeOf(string("")):
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setBytes(value.Elem(), input)
+	}
+	switch value.Kind() {
+	case reflect.String:
 		value.SetString(string(input))
+		return nil
+	}
+	switch value.Type() {
+	case tyBytes:
+		value.SetBytes(input)
+	case tyNVarChar:
+		value.Set(reflect.ValueOf(NVarChar(input)))
+	case tyBlob:
+		value.Set(reflect.ValueOf(Blob{Data: input, Valid: true}))
+	case tyClob:
+		value.Set(reflect.ValueOf(Clob{String: string(input), Valid: true}))
+	case tyNClob:
+		value.Set(reflect.ValueOf(NClob{String: string(input), Valid: true}))
+	case tyNullString:
+		value.Set(reflect.ValueOf(sql.NullString{string(input), true}))
+	case tyNullNVarChar:
+		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(input), true}))
 	default:
-		return fmt.Errorf("can not assign []byte to type: %v", value.Type())
+		return fmt.Errorf("can not assign []byte to type: %v", value.Type().Name())
 	}
 	return nil
 }
 func setTime(value reflect.Value, input time.Time) error {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setTime(value.Elem(), input)
+	}
+	switch value.Kind() {
+	case reflect.String:
+		value.SetString(input.Format(time.RFC3339))
+		return nil
+	}
 	switch value.Type() {
-	case reflect.TypeOf(time.Time{}):
+	case tyTime:
 		value.Set(reflect.ValueOf(input))
-	case reflect.TypeOf(TimeStamp{}):
+	case tyTimeStamp:
 		value.Set(reflect.ValueOf(TimeStamp(input)))
-	case reflect.TypeOf(TimeStampTZ{}):
+	case tyTimeStampTZ:
 		value.Set(reflect.ValueOf(TimeStampTZ(input)))
+	case tyNullString:
+		value.Set(reflect.ValueOf(sql.NullString{input.Format(time.RFC3339), true}))
+	case tyNullTime:
+		value.Set(reflect.ValueOf(sql.NullTime{input, true}))
+	case tyNullTimeStamp:
+		value.Set(reflect.ValueOf(NullTimeStamp{TimeStamp(input), true}))
+	case tyNullTimeStampTZ:
+		value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ(input), true}))
 	default:
-		return fmt.Errorf("can not assign time to type: %v", value.Type())
+		return fmt.Errorf("can not assign time to type: %v", value.Type().Name())
 	}
 	return nil
 }
+func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}) error {
+
+	//input should be one of primitive values
+	if input == nil {
+		return setNull(fieldValue)
+	}
+	switch val := input.(type) {
+	case int64:
+		return setNumber(fieldValue, float64(val))
+	case float64:
+		return setNumber(fieldValue, val)
+	case string:
+		return setString(fieldValue, val)
+	case time.Time:
+		return setTime(fieldValue, val)
+	case []byte:
+		return setBytes(fieldValue, val)
+	case Lob:
+		return setLob(fieldValue, val)
+	case BFile:
+		return setBFile(fieldValue, val)
+	case []ParameterInfo:
+		return setUDTObject(fieldValue, cust, val)
+	default:
+		if temp, ok := fieldValue.Interface().(sql.Scanner); ok {
+			if temp != nil && !reflect.ValueOf(temp).IsNil() {
+				return temp.Scan(input)
+			}
+		}
+		if fieldValue.CanAddr() {
+			if temp, ok := fieldValue.Addr().Interface().(sql.Scanner); ok {
+				err := temp.Scan(input)
+				return err
+			}
+		}
+		return fmt.Errorf("unsupported primitive type: %s", fieldValue.Type().Name())
+	}
+}
+func setNull(value reflect.Value) error {
+	if value.Kind() == reflect.Ptr && value.IsNil() {
+		return nil
+	}
+	value.SetZero()
+	return nil
+}
+func setBFile(value reflect.Value, input BFile) error {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setBFile(value.Elem(), input)
+	}
+	switch value.Type() {
+	case tyBFile:
+		value.Set(reflect.ValueOf(input))
+	default:
+		return fmt.Errorf("can't assign BFILE to type: %v", value.Type().Name())
+	}
+	return nil
+}
+func setArray(value reflect.Value, input []ParameterInfo) error {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setArray(value.Elem(), input)
+	}
+	tValue := value.Type()
+	tempSlice := reflect.MakeSlice(tValue, 0, len(input))
+	for _, par := range input {
+		tempObj := reflect.New(tValue.Elem())
+		err := setFieldValue(tempObj.Elem(), par.cusType, par.oPrimValue)
+		if err != nil {
+			return err
+		}
+		tempSlice = reflect.Append(tempSlice, tempObj.Elem())
+	}
+	value.Set(tempSlice)
+	return nil
+}
+
+func setUDTObject(value reflect.Value, cust *customType, input []ParameterInfo) error {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setUDTObject(value.Elem(), cust, input)
+	}
+	tempObj := reflect.New(cust.typ)
+	for _, par := range input {
+		if fieldIndex, ok := cust.fieldMap[par.Name]; ok {
+			err := setFieldValue(tempObj.Elem().Field(fieldIndex), par.cusType, par.oPrimValue)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if value.Kind() == reflect.Ptr {
+		value.Elem().Set(tempObj.Elem())
+	} else {
+		value.Set(tempObj.Elem())
+	}
+	return nil
+}
+
+func setLob(value reflect.Value, input Lob) error {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setLob(value.Elem(), input)
+	}
+	//dataSize, err := input.getSize()
+	//if err != nil {
+	//	return err
+	//}
+	if input.connection == nil || len(input.sourceLocator) == 0 {
+		return setNull(value)
+	}
+	lobData, err := input.getData()
+	if err != nil {
+		return err
+	}
+	conn := input.connection
+	if len(lobData) == 0 {
+		return setNull(value)
+	}
+	getStrConv := func() (converters.IStringConverter, error) {
+		var ret converters.IStringConverter
+		if input.variableWidthChar() {
+			if conn.dBVersion.Number < 10200 && input.littleEndianClob() {
+				ret, _ = conn.getStrConv(2002)
+			} else {
+				ret, _ = conn.getStrConv(2000)
+			}
+		} else {
+			ret, err = conn.getStrConv(input.charsetID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return ret, nil
+	}
+	var strConv converters.IStringConverter
+	switch value.Kind() {
+	case reflect.String:
+		strConv, err = getStrConv()
+		if err != nil {
+			return err
+		}
+		value.SetString(strConv.Decode(lobData))
+		return nil
+	}
+	switch value.Type() {
+	case tyNullString:
+		strConv, err = getStrConv()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(sql.NullString{strConv.Decode(lobData), true}))
+	case tyNVarChar:
+		strConv, err = getStrConv()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(NVarChar(strConv.Decode(lobData))))
+	case tyNullNVarChar:
+		strConv, err = getStrConv()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(strConv.Decode(lobData)), true}))
+	case tyClob:
+		strConv, err = getStrConv()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(Clob{
+			String:  strConv.Decode(lobData),
+			Valid:   true,
+			locator: input.sourceLocator}))
+	case tyNClob:
+		strConv, err = getStrConv()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(NClob{
+			String:  strConv.Decode(lobData),
+			Valid:   true,
+			locator: input.sourceLocator}))
+	case tyBlob:
+		value.Set(reflect.ValueOf(Blob{
+			Data:    lobData,
+			Valid:   true,
+			locator: input.sourceLocator}))
+	case tyBytes:
+		value.Set(reflect.ValueOf(lobData))
+	default:
+		return fmt.Errorf("can't assign LOB to type: %v", value.Type().Name())
+	}
+	return nil
+}
+
 func setString(value reflect.Value, input string) error {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setString(value.Elem(), input)
+	}
+	var intErr, floatErr, timeErr error
+	tempInt, err := strconv.ParseInt(input, 10, 64)
+	if err != nil {
+		intErr = fmt.Errorf(`can't assign string "%v" to int variable`, input)
+	}
+	tempFloat, err := strconv.ParseFloat(input, 64)
+	if err != nil {
+		floatErr = fmt.Errorf(`can't assign string "%v" to float variablle`, input)
+	}
+	tempTime, err := time.Parse(time.RFC3339, input)
+	if err != nil {
+		timeErr = fmt.Errorf(`can't assign string "%v" to time.Time variable`, input)
+	}
+	if tSigned(value.Type()) {
+		if intErr == nil {
+			value.SetInt(tempInt)
+		}
+		return intErr
+	}
+	if tUnsigned(value.Type()) {
+		if intErr == nil {
+			value.SetUint(uint64(tempInt))
+		}
+		return intErr
+	}
+	if tFloat(value.Type()) {
+		if floatErr == nil {
+			value.SetFloat(tempFloat)
+		}
+		return floatErr
+	}
 	switch value.Kind() {
 	case reflect.String:
 		value.SetString(input)
-	default:
-		switch value.Type() {
-		case reflect.TypeOf(NVarChar("")):
-			value.Set(reflect.ValueOf(NVarChar(input)))
-		case reflect.TypeOf(Clob{}):
-			value.Set(reflect.ValueOf(Clob{String: input, Valid: true}))
-		case reflect.TypeOf(NClob{}):
-			value.Set(reflect.ValueOf(NClob{String: input, Valid: true}))
-		default:
-			return fmt.Errorf("can not assign string to type: %v", value.Type())
+		return nil
+	case reflect.Bool:
+		if strings.ToLower(input) == "true" {
+			value.SetBool(true)
+		} else {
+			value.SetBool(false)
 		}
+		return nil
+	}
+	switch value.Type() {
+	case tyNullString:
+		value.Set(reflect.ValueOf(sql.NullString{input, true}))
+	case tyNullByte:
+		if intErr == nil {
+			value.Set(reflect.ValueOf(sql.NullByte{uint8(tempInt), true}))
+		}
+		return intErr
+	case tyNullInt16:
+		if intErr == nil {
+			value.Set(reflect.ValueOf(sql.NullInt16{int16(tempInt), true}))
+		}
+		return intErr
+	case tyNullInt32:
+		if intErr == nil {
+			value.Set(reflect.ValueOf(sql.NullInt32{int32(tempInt), true}))
+		}
+		return intErr
+	case tyNullInt64:
+		if intErr == nil {
+			value.Set(reflect.ValueOf(sql.NullInt64{tempInt, true}))
+		}
+		return intErr
+	case tyNullFloat64:
+		if floatErr == nil {
+			value.Set(reflect.ValueOf(sql.NullFloat64{float64(tempInt), true}))
+		}
+		return floatErr
+	case tyNullBool:
+		temp := strings.ToLower(input) == "true"
+		value.Set(reflect.ValueOf(sql.NullBool{temp, true}))
+	case tyNVarChar:
+		value.Set(reflect.ValueOf(NVarChar(input)))
+	case tyNullNVarChar:
+		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(input), true}))
+	case tyTime:
+		if timeErr == nil {
+			value.Set(reflect.ValueOf(tempTime))
+		}
+		return timeErr
+	case tyNullTime:
+		if timeErr == nil {
+			value.Set(reflect.ValueOf(sql.NullTime{tempTime, true}))
+		}
+		return timeErr
+	case tyTimeStamp:
+		if timeErr == nil {
+			value.Set(reflect.ValueOf(TimeStamp(tempTime)))
+		}
+		return timeErr
+	case tyNullTimeStamp:
+		if timeErr == nil {
+			value.Set(reflect.ValueOf(NullTimeStamp{TimeStamp(tempTime), true}))
+		}
+		return timeErr
+	case tyTimeStampTZ:
+		if timeErr == nil {
+			value.Set(reflect.ValueOf(TimeStampTZ(tempTime)))
+		}
+		return timeErr
+	case tyNullTimeStampTZ:
+		if timeErr == nil {
+			value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ(tempTime), true}))
+		}
+		return timeErr
+	case tyClob:
+		value.Set(reflect.ValueOf(Clob{String: input, Valid: true}))
+	case tyNClob:
+		value.Set(reflect.ValueOf(NClob{String: input, Valid: true}))
+	default:
+		return fmt.Errorf("can not assign string to type: %v", value.Type().Name())
 	}
 	return nil
 }
+
+//	func setInt(value reflect.Value, input int64) error {
+//		if value.Kind() == reflect.Ptr && value.IsNil() {
+//			value.Set(reflect.New(value.Type().Elem()))
+//			return setInt(value.Elem(), input)
+//		}
+//		if tSigned(value.Type()) {
+//			value.SetInt(input)
+//			return nil
+//		}
+//		if tUnsigned(value.Type()) {
+//			value.SetUint(uint64(input))
+//			return nil
+//		}
+//		if tFloat(value.Type()) {
+//			value.SetFloat(float64(input))
+//			return nil
+//		}
+//	}
+
 func setNumber(value reflect.Value, input float64) error {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setNumber(value.Elem(), input)
+	}
 	if tSigned(value.Type()) {
 		value.SetInt(int64(input))
 		return nil
@@ -464,20 +880,60 @@ func setNumber(value reflect.Value, input float64) error {
 	}
 	switch value.Kind() {
 	case reflect.Bool:
-		if input == 0 {
-			value.SetBool(false)
-		} else {
-			value.SetBool(true)
-		}
+		value.SetBool(input != 0)
 		return nil
 	case reflect.String:
 		value.SetString(fmt.Sprintf("%v", input))
 		return nil
-	default:
-		return fmt.Errorf("can not assign number to type: %v", value.Type())
 	}
+	switch value.Type() {
+	case tyNullString:
+		value.Set(reflect.ValueOf(sql.NullString{fmt.Sprintf("%v", input), true}))
+	case tyNullByte:
+		value.Set(reflect.ValueOf(sql.NullByte{uint8(input), true}))
+	case tyNullInt16:
+		value.Set(reflect.ValueOf(sql.NullInt16{int16(input), true}))
+	case tyNullInt32:
+		value.Set(reflect.ValueOf(sql.NullInt32{int32(input), true}))
+	case tyNullInt64:
+		value.Set(reflect.ValueOf(sql.NullInt64{int64(input), true}))
+	case tyNullFloat64:
+		value.Set(reflect.ValueOf(sql.NullFloat64{input, true}))
+	case tyNullBool:
+		value.Set(reflect.ValueOf(sql.NullBool{input != 0, true}))
+	case tyNullNVarChar:
+		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(fmt.Sprintf("%v", input)), true}))
+	default:
+		return fmt.Errorf("can not assign number to type: %v", value.Type().Name())
+	}
+	return nil
 }
 
 func isBadConn(err error) bool {
 	return errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE)
 }
+
+func collectLocators(pars []ParameterInfo) [][]byte {
+	output := make([][]byte, 0, 10)
+	for _, par := range pars {
+		switch value := par.iPrimValue.(type) {
+		case *Lob:
+			if value != nil && value.sourceLocator != nil {
+				output = append(output, value.sourceLocator)
+			}
+		case *BFile:
+			if value != nil && value.lob.sourceLocator != nil {
+				output = append(output, value.lob.sourceLocator)
+			}
+		case []ParameterInfo:
+			temp := collectLocators(value)
+			output = append(output, temp...)
+		}
+	}
+	return output
+}
+
+//func initializePtr(v interface{}) {
+//	rv := reflect.ValueOf(v).Elem()
+//	rv.Set(reflect.New(rv.Type().Elem()))
+//}

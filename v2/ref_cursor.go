@@ -111,11 +111,15 @@ func (cursor *RefCursor) _query() (*DataSet, error) {
 		return nil, err
 	}
 	// read lobs
-	if cursor.connection.connOption.Lob != 0 {
-		err = cursor.readLobs(dataSet)
-		if err != nil {
-			return nil, err
-		}
+	//if cursor.connection.connOption.Lob != 0 {
+	//	err = cursor.readLobs(dataSet)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//}
+	err = cursor.decodePrim(dataSet)
+	if err != nil {
+		return nil, err
 	}
 	return dataSet, nil
 }

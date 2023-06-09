@@ -1440,7 +1440,20 @@ func ToNumber(mantissa []byte, negative bool, exponent int) []byte {
 	return buf
 }
 
-// EncodeInt64 encode a int64 into an oracle NUMBER internal format
+// EncodeUint64 encode an uint64 into an oracle NUMBER internal format
+// Keep all significant bits of the uint64
+func EncodeUint64(val uint64) []byte {
+	mantissa := []byte(strconv.FormatUint(val, 10))
+	exponent := len(mantissa) - 1
+	trailingZeros := 0
+	for i := len(mantissa) - 1; i >= 0 && mantissa[i] == '0'; i-- {
+		trailingZeros++
+	}
+	mantissa = mantissa[:len(mantissa)-trailingZeros]
+	return ToNumber(mantissa, false, exponent)
+}
+
+// EncodeInt64 encode an int64 into an oracle NUMBER internal format
 // Keep all significant bits of the int64
 func EncodeInt64(val int64) []byte {
 	mantissa := []byte(strconv.FormatInt(val, 10))

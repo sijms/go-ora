@@ -564,7 +564,9 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 				maxRowSize += col.MaxLen
 			}
 		}
-		stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
+		if maxRowSize > 0 {
+			stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
+		}
 		stmt.connection.connOption.Tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
 	}
 
@@ -655,7 +657,9 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 				maxRowSize += col.MaxLen
 			}
 		}
-		stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
+		if maxRowSize > 0 {
+			stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
+		}
 		stmt.connection.connOption.Tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
 	}
 	stmt.connection.session.ResetBuffer()

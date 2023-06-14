@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
 	"reflect"
 	"regexp"
@@ -55,7 +54,7 @@ type defaultStmt struct {
 	autoClose          bool
 }
 
-func (stmt *defaultStmt) CanAutoClose() bool {
+func (stmt defaultStmt) CanAutoClose() bool {
 	return stmt.autoClose
 }
 func (stmt *defaultStmt) hasMoreRows() bool {
@@ -78,7 +77,6 @@ func (stmt *defaultStmt) hasBLOB() bool {
 // through it the stmt data will send to network stream
 func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	session := stmt.connection.session
-	strConv, _ := stmt.connection.getStrConv(stmt.connection.tcpNego.ServerCharset)
 	session.PutBytes(3, 0x5E, 0)
 	session.PutUint(exeOp, 4, true, true)
 	session.PutUint(stmt.cursorID, 2, true, true)
@@ -89,8 +87,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutBytes(0)
 	}
 	if parse {
-		session.PutUint(len(strConv.Encode(stmt.text)), 4, true, true)
-		//session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
+		session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
 		session.PutBytes(1)
 	} else {
 		session.PutBytes(0, 1)
@@ -160,7 +157,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutBytes(0, 0)
 	}
 	if parse {
-		session.PutClr(strConv.Encode(stmt.text))
+		session.PutClr(stmt.connection.strConv.Encode(stmt.text))
 	}
 	al8i4 := make([]int, 13)
 	if exeOp&1 <= 0 {
@@ -273,7 +270,7 @@ type Stmt struct {
 	parse        bool // means parse the command in the server this occurs if the stmt is not cached
 	execute      bool
 	define       bool
-	bulkExec     bool
+
 	//noOfDefCols        int
 }
 
@@ -330,11 +327,8 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	}
 	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
 		ret.stmtType = SELECT
-	} else if strings.HasPrefix(uCmdText, "INSERT") ||
-		strings.HasPrefix(uCmdText, "MERGE") {
-		ret.stmtType = DML
-		ret.bulkExec = true
 	} else if strings.HasPrefix(uCmdText, "UPDATE") ||
+		strings.HasPrefix(uCmdText, "INSERT") ||
 		strings.HasPrefix(uCmdText, "DELETE") {
 		ret.stmtType = DML
 	} else if strings.HasPrefix(uCmdText, "DECLARE") || strings.HasPrefix(uCmdText, "BEGIN") {
@@ -342,6 +336,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	} else {
 		ret.stmtType = OTHERS
 	}
+
 	// returning clause
 	var err error
 	if ret.stmtType != PLSQL {
@@ -358,9 +353,6 @@ func (stmt *Stmt) writePars() error {
 		session := stmt.connection.session
 		session.PutBytes(7)
 		for _, par := range stmt.Pars {
-			if par.Flag == 0x80 {
-				continue
-			}
 			if !stmt.parse && par.Direction == Output && stmt.stmtType != PLSQL {
 				continue
 			}
@@ -434,34 +426,9 @@ func (stmt *Stmt) write() error {
 		session.PutUint(count, 2, true, true)
 		session.PutUint(exeOf, 2, true, true)
 		session.PutUint(execFlag, 2, true, true)
-		//err := stmt.writePars()
-		//if err != nil {
-		//	return err
-		//}
-		var err error
-		if stmt.bulkExec {
-			arrayValues := make([]driver.Value, len(stmt.Pars))
-			for x := 0; x < len(stmt.Pars); x++ {
-				arrayValues[x] = stmt.Pars[x].Value
-			}
-			for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
-				for parIndex, arrayValue := range arrayValues {
-					tempVal := reflect.ValueOf(arrayValue)
-					err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
-					if err != nil {
-						return err
-					}
-				}
-				err = stmt.writePars()
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			err = stmt.writePars()
-			if err != nil {
-				return err
-			}
+		err := stmt.writePars()
+		if err != nil {
+			return err
 		}
 	} else {
 		//stmt.reExec = true
@@ -469,35 +436,9 @@ func (stmt *Stmt) write() error {
 		if err != nil {
 			return err
 		}
-		if stmt.bulkExec {
-			arrayValues := make([]driver.Value, len(stmt.Pars))
-			for x := 0; x < len(stmt.Pars); x++ {
-				if stmt.Pars[x].Flag == 0x80 {
-					continue
-				}
-				arrayValues[x] = stmt.Pars[x].Value
-			}
-			for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
-				for parIndex, arrayValue := range arrayValues {
-					if stmt.Pars[parIndex].Flag == 0x80 {
-						continue
-					}
-					tempVal := reflect.ValueOf(arrayValue)
-					err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
-					if err != nil {
-						return err
-					}
-				}
-				err = stmt.writePars()
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			err = stmt.writePars()
-			if err != nil {
-				return err
-			}
+		err = stmt.writePars()
+		if err != nil {
+			return err
 		}
 		stmt.parse = false
 		stmt.define = false
@@ -550,6 +491,9 @@ func (stmt *Stmt) getExeOption() int {
 
 // fetch get more rows from network stream
 func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
+	//stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
+	// note if _noOfRowsToFetch is default i will try to calculate the best value for
+	// according to the query
 	if stmt._noOfRowsToFetch == 25 {
 		//m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
 		maxRowSize := 0
@@ -569,36 +513,29 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	}
 
 	tracer := stmt.connection.connOption.Tracer
-	//failOver := stmt.connection.connOption.Failover if failOver == 0 {
-	//	failOver = 1
-	//}
+	failOver := stmt.connection.connOption.Failover
+	if failOver == 0 {
+		failOver = 1
+	}
 
 	// if fetch fail cannot re-fetch only reconnect and return error
 	var err = stmt._fetch(dataSet)
-	if err != nil {
-		if isBadConn(err) {
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = stmt.connection.reConnect(err, writeTrials)
+		if err != nil {
 			tracer.Print("Error: ", err)
-			return driver.ErrBadConn
+			if !reconnect {
+				return err
+			}
+			continue
 		}
-		return err
+		break
 	}
-	return nil
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = stmt.connection.reConnect(err, writeTrials)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return err
-	//		}
-	//		continue
-	//	}
-	//	break
-	//}
-	//if reconnect {
-	//	return &network.OracleError{ErrCode: 3135}
-	//}
-	//return err
+	if reconnect {
+		return &network.OracleError{ErrCode: 3135}
+	}
+	return err
 	//if err != nil {
 	//	if errors.Is(err, io.EOF) {
 	//		stmt.connection.State = Closed
@@ -674,7 +611,7 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 	return stmt.read(dataSet)
 }
 
-// read this is common read for stmt it read much information related to
+// read this is common read for stmt it read many information related to
 // columns, dataset information, output parameter information, rows values
 // and at the end summary object about this operation
 func (stmt *defaultStmt) read(dataSet *DataSet) error {
@@ -691,6 +628,25 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			return err
 		}
 		switch msg {
+		//case 4:
+		//	stmt.connection.session.Summary, err = network.NewSummary(session)
+		//	if err != nil {
+		//		return err
+		//	}
+		//	stmt.connection.connOption.Tracer.Printf("Summary: RetCode:%d, Error Message:%q", stmt.connection.session.Summary.RetCode, string(stmt.connection.session.Summary.ErrorMessage))
+		//
+		//	stmt.cursorID = stmt.connection.session.Summary.CursorID
+		//	stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0
+		//	if stmt.connection.session.HasError() {
+		//		if stmt.connection.session.Summary.RetCode == 1403 {
+		//			stmt._hasMoreRows = false
+		//			stmt.connection.session.Summary = nil
+		//		} else {
+		//			return stmt.connection.session.GetError()
+		//		}
+		//
+		//	}
+		//	loop = false
 		case 6:
 			//_, err = session.GetByte()
 			err = dataSet.load(session)
@@ -740,16 +696,9 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 								if cursor, ok := stmt.Pars[x].Value.(*RefCursor); ok {
 									cursor.connection = stmt.connection
 									cursor.parent = stmt
-									cursor.autoClose = true
 									err = cursor.load()
 									if err != nil {
 										return err
-									}
-									if stmt.stmtType == PLSQL {
-										_, err = session.GetInt(2, true, true)
-										if err != nil {
-											return err
-										}
 									}
 								} else {
 									return errors.New("RefCursor parameter should contain pointer to  RefCursor struct")
@@ -774,7 +723,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 						}
 					}
 				} else {
-					// see if it is re-executed
+					// see if it is re-execute
 					if len(dataSet.Cols) == 0 && len(stmt.columns) > 0 {
 						dataSet.Cols = make([]ParameterInfo, len(stmt.columns))
 						copy(dataSet.Cols, stmt.columns)
@@ -963,6 +912,15 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				}
 			}
 			dataSet.setBitVector(bitVector)
+		//case 23:
+		//	opCode, err := session.GetByte()
+		//	if err != nil {
+		//		return err
+		//	}
+		//	err = stmt.connection.getServerNetworkInformation(opCode)
+		//	if err != nil {
+		//		return err
+		//	}
 		default:
 			err = stmt.connection.readResponse(msg)
 			if err != nil {
@@ -1093,35 +1051,26 @@ func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Valu
 		return nil, err
 	}
 	if col.DataType == OCIBlobLocator {
+		//if !lob.isValid() {
+		//
+		//}
 		if dataSize != int64(len(lobData)) {
 			return nil, errors.New("error reading lob data: data size mismatching")
 		}
 		return lobData, nil
 	} else {
-		conn := stmt.connection
-		var strConv converters.IStringConverter
-		//tempCharset := conn.strConv.GetLangID()
+		tempCharset := stmt.connection.strConv.GetLangID()
 		if lob.variableWidthChar() {
-			if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
-				strConv, _ = conn.getStrConv(2002)
-				//conn.strConv.SetLangID(2002)
+			if stmt.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
+				stmt.connection.strConv.SetLangID(2002)
 			} else {
-				strConv, _ = conn.getStrConv(2000)
-				//conn.strConv.SetLangID(2000)
+				stmt.connection.strConv.SetLangID(2000)
 			}
 		} else {
-			strConv, err = conn.getStrConv(col.CharsetID)
-			if err != nil {
-				return nil, err
-			}
-			//if conn.connOption.CharsetID != 0 && col.CharsetForm == 1 {
-			//	conn.strConv.SetLangID(conn.connOption.CharsetID)
-			//} else {
-			//	conn.strConv.SetLangID(col.CharsetID)
-			//}
+			stmt.connection.strConv.SetLangID(col.CharsetID)
 		}
-		resultClobString := strConv.Decode(lobData)
-		//conn.strConv.SetLangID(tempCharset)
+		resultClobString := stmt.connection.strConv.Decode(lobData)
+		stmt.connection.strConv.SetLangID(tempCharset)
 		//if dataSize != int64(len([]rune(resultClobString))) {
 		//	return nil, errors.New("error reading clob data")
 		//}
@@ -1147,7 +1096,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if stringVal, ok := tempVal.(string); ok {
 								val.String = stringVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
 							}
 						}
 					case Clob:
@@ -1162,7 +1111,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if stringVal, ok := tempVal.(string); ok {
 								val.String = stringVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
 							}
 						}
 						stmt.Pars[parIndex].Value = val
@@ -1178,7 +1127,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if stringVal, ok := tempVal.(string); ok {
 								val.String = stringVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
 							}
 						}
 					case NClob:
@@ -1193,7 +1142,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if stringVal, ok := tempVal.(string); ok {
 								val.String = stringVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
 							}
 						}
 						stmt.Pars[parIndex].Value = val
@@ -1209,7 +1158,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if byteVal, ok := tempVal.([]byte); ok {
 								val.Data = byteVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
 							}
 						}
 					case Blob:
@@ -1224,7 +1173,7 @@ func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 							if byteVal, ok := tempVal.([]byte); ok {
 								val.Data = byteVal
 							} else {
-								return &network.OracleError{ErrCode: 6502, ErrMsg: "numeric or value error"}
+								return &network.OracleError{ErrCode: 6502, ErrMsg: "numberic or value error"}
 							}
 						}
 						stmt.Pars[parIndex].Value = val
@@ -1346,10 +1295,10 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	//session.PutBytes(2)
 	session.PutInt(len(stmt.connection.connOption.UserID), 4, true, true)
 	//session.PutBytes(0, 0, 0)
-	session.PutClr(stmt.connection.sStrConv.Encode(stmt.connection.connOption.UserID))
+	session.PutClr(stmt.connection.strConv.Encode(stmt.connection.connOption.UserID))
 	session.PutInt(len(typeName), 4, true, true)
 	//session.PutBytes(0, 0, 0)
-	session.PutClr(stmt.connection.sStrConv.Encode(typeName))
+	session.PutClr(stmt.connection.strConv.Encode(typeName))
 	//session.PutBytes(0, 0, 0)
 	//if session.TTCVersion >= 4 {
 	//	session.PutBytes(0, 0, 1)
@@ -1398,24 +1347,6 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 	//if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
 	//	stmt._hasBLOB = true
 	//}
-	if col.DataType == REFCURSOR {
-		var cursor = new(RefCursor)
-		cursor.connection = stmt.connection
-		cursor.parent = stmt
-		cursor.autoClose = true
-		err := cursor.load()
-		if err != nil {
-			return err
-		}
-		if stmt.stmtType == PLSQL {
-			_, err = session.GetInt(2, true, true)
-			if err != nil {
-				return err
-			}
-		}
-		col.Value = cursor
-		return nil
-	}
 	if col.DataType == XMLType {
 		if col.TypeName == "XMLTYPE" {
 			return errors.New("unsupported data type: XMLTYPE")
@@ -1423,7 +1354,7 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 		if col.cusType == nil {
 			return fmt.Errorf("unregister custom type: %s. call RegisterType first", col.TypeName)
 		}
-		_, err := session.GetDlc() // contain toid and some 0s
+		_, err := session.GetDlc() // contian toid and some 0s
 		if err != nil {
 			return err
 		}
@@ -1478,7 +1409,6 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo) error {
 		}
 		return nil
 	}
-
 	return col.decodeColumnValue(stmt.connection)
 }
 
@@ -1495,7 +1425,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 		if param.cusType == nil {
 			return fmt.Errorf("unregister custom type: %s. call RegisterType first", param.TypeName)
 		}
-		_, err := session.GetDlc() // contain toid and some 0s
+		_, err := session.GetDlc() // contian toid and some 0s
 		if err != nil {
 			return err
 		}
@@ -1582,10 +1512,9 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	return param.decodeParameterValue(stmt.connection)
 }
 
-// Close stmt cursor in the server
+// Close close stmt cursor in the server
 func (stmt *defaultStmt) Close() error {
 	if stmt.connection.State != Opened {
-		stmt.connection.setBad()
 		return &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	if stmt.cursorID != 0 {
@@ -1603,542 +1532,31 @@ func (stmt *defaultStmt) Close() error {
 	return nil
 }
 
-func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+func (stmt *Stmt) ExecContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Result, error) {
 	if stmt.connection.State != Opened {
-		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
-	tracer := stmt.connection.connOption.Tracer
-	tracer.Printf("Exec With Context:")
-	//args := make([]driver.Value, len(namedArgs))
-	//for x := 0; x < len(args); x++ {
-	//	args[x] = namedArgs[x].Value
-	//}
+	stmt.connection.connOption.Tracer.Printf("Exec With Context:")
+	args := make([]driver.Value, len(namedArgs))
+	for x := 0; x < len(args); x++ {
+		args[x] = namedArgs[x].Value
+	}
 	stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext()
-
-	//failOver := stmt.connection.connOption.Failover
-	//if failOver == 0 {
-	//	failOver = 1
-	//}
-	tracer.Printf("Exec:\n%s", stmt.text)
-	result, err := stmt._exec(args)
-	if err != nil {
-		if isBadConn(err) {
-			//tracer.Print("Error: ", err)
-			stmt.connection.setBad()
-			return nil, err
-		}
-		return nil, err
-	}
-	return result, nil
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = stmt.connection.reConnect(err, writeTrials)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//		continue
-	//	}
-	//	break
-	//}
-	//if reconnect {
-	//	return nil, &network.OracleError{ErrCode: 3135}
-	//}
-	//return result, err
-	//return stmt.Exec(args)
-}
-func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
-	structType := reflect.TypeOf(parValue)
-	structVal := reflect.ValueOf(parValue)
-	if parValue != nil && structType.Kind() == reflect.Ptr && structVal.Elem().Kind() == reflect.Struct {
-		structType = structType.Elem()
-		structVal = structVal.Elem()
-		structFieldCount := structType.NumField()
-		for i := 0; i < structFieldCount; i++ {
-			name, _, _, dir := extractTag(structType.Field(i).Tag.Get("db"))
-			if name != "" && dir != Input {
-				for _, par := range stmt.Pars {
-					if par.Name == name {
-						fieldValue := structVal.Field(i)
-						fieldType := structVal.Field(i).Type()
-						if _, ok := fieldValue.Interface().(driver.Valuer); ok {
-							fieldValue.Set(reflect.ValueOf(par.Value))
-							continue
-						}
-						if valuer, ok := par.Value.(driver.Valuer); ok {
-							tempVal, err := valuer.Value()
-							if err != nil {
-								return err
-							}
-							if tempVal == nil {
-								fieldValue.Set(reflect.Zero(fieldType))
-							} else {
-								if fieldType.Kind() == reflect.Ptr {
-									if fieldValue.IsNil() {
-										temp := reflect.New(fieldType.Elem())
-										fieldValue.Set(temp)
-									}
-									fieldValue = fieldValue.Elem()
-								}
-								if scanner, ok := fieldValue.Interface().(sql.Scanner); ok {
-									err = scanner.Scan(par.Value)
-									if err != nil {
-										return err
-									}
-									continue
-								}
-								switch aval := par.Value.(type) {
-								case sql.NullFloat64:
-									if aval.Valid {
-										err = setNumber(fieldValue, aval.Float64)
-										if err != nil {
-											return err
-										}
-									} else {
-										fieldValue.Set(reflect.Zero(fieldType))
-									}
-								case sql.NullString:
-									if aval.Valid {
-										err = setString(fieldValue, aval.String)
-										if err != nil {
-											return err
-										}
-									} else {
-										fieldValue.Set(reflect.Zero(fieldType))
-									}
-								case NullNVarChar:
-									if aval.Valid {
-										err = setString(fieldValue, string(aval.NVarChar))
-										if err != nil {
-											return err
-										}
-									} else {
-										fieldValue.Set(reflect.Zero(fieldType))
-									}
-								case sql.NullTime:
-									if aval.Valid {
-										err = setTime(fieldValue, aval.Time)
-										if err != nil {
-											return err
-										}
-									} else {
-										fieldValue.Set(reflect.Zero(fieldType))
-									}
-								case NullTimeStamp:
-									if aval.Valid {
-										err = setTime(fieldValue, time.Time(aval.TimeStamp))
-										if err != nil {
-											return err
-										}
-									} else {
-										fieldValue.Set(reflect.Zero(fieldType))
-									}
-								case NullTimeStampTZ:
-									if aval.Valid {
-										err = setTime(fieldValue, time.Time(aval.TimeStampTZ))
-										if err != nil {
-											return err
-										}
-									} else {
-										fieldValue.Set(reflect.Zero(fieldType))
-									}
-								}
-							}
-						} else {
-							switch aval := par.Value.(type) {
-							case []byte:
-								if aval == nil {
-									fieldValue.Set(reflect.Zero(fieldType))
-								} else {
-									err := setBytes(fieldValue, aval)
-									if err != nil {
-										return err
-									}
-								}
-							case Clob:
-								if aval.Valid {
-									err := setString(fieldValue, aval.String)
-									if err != nil {
-										return err
-									}
-								} else {
-									fieldValue.Set(reflect.Zero(fieldType))
-								}
-							case NClob:
-								if aval.Valid {
-									err := setString(fieldValue, aval.String)
-									if err != nil {
-										return err
-									}
-								} else {
-									fieldValue.Set(reflect.Zero(fieldType))
-								}
-							case Blob:
-								if aval.Valid {
-									err := setBytes(fieldValue, aval.Data)
-									if err != nil {
-										return err
-									}
-								} else {
-									fieldValue.Set(reflect.Zero(fieldType))
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	return nil
+	return stmt.Exec(args)
 }
 
-func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars int, err error) {
-	tempType := reflect.TypeOf(parValue)
-	tempVal := reflect.ValueOf(parValue)
-	addOutputField := func(name, _type string, size int, dir ParameterDirection, fieldIndex int) (tempPar *ParameterInfo, err error) {
-		fieldValue := tempVal.Field(fieldIndex).Interface()
-		fieldType := tempType.Field(fieldIndex).Type
-		hasNullValue := false
-		if tempType.Field(fieldIndex).Type.Kind() == reflect.Ptr {
-			if tempVal.Field(fieldIndex).IsNil() {
-				hasNullValue = true
-				fieldType = fieldType.Elem()
-			} else {
-				fieldValue = tempVal.Field(fieldIndex).Elem().Interface()
-			}
-		}
-		if _, ok := fieldValue.(driver.Valuer); ok {
-			//if _, ok = fieldValue.(sql.Scanner); ok {
-			tempPar, err = stmt.NewParam(name, fieldValue, size, dir)
-			return
-			//}
-		}
-		typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
-		if len(_type) > 0 {
-			switch _type {
-			case "number":
-				var fieldVal sql.NullFloat64
-				if !hasNullValue {
-					fieldVal.Float64, err = getFloat(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					fieldVal.Valid = true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case "varchar":
-				var fieldVal sql.NullString
-				if !hasNullValue {
-					fieldVal.String, fieldVal.Valid = getString(fieldValue), true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case "nvarchar":
-				var fieldVal NullNVarChar
-				if !hasNullValue {
-					fieldVal.NVarChar, fieldVal.Valid = NVarChar(getString(fieldValue)), true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case "date":
-				var fieldVal sql.NullTime
-				if !hasNullValue {
-					fieldVal.Time, err = getDate(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					fieldVal.Valid = true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case "timestamp":
-				var fieldVal NullTimeStamp
-				if !hasNullValue {
-					var tempDate time.Time
-					tempDate, err = getDate(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					fieldVal.TimeStamp = TimeStamp(tempDate)
-					fieldVal.Valid = true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case "timestamptz":
-				var fieldVal NullTimeStampTZ
-				if !hasNullValue {
-					var tempDate time.Time
-					tempDate, err = getDate(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					fieldVal.TimeStampTZ = TimeStampTZ(tempDate)
-					fieldVal.Valid = true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case "raw":
-				var fieldVal []byte
-				if !hasNullValue {
-					fieldVal, err = getBytes(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case "clob":
-				fieldVal := Clob{}
-				if !hasNullValue {
-					fieldVal.String, fieldVal.Valid = getString(fieldValue), true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case "nclob":
-				fieldVal := NClob{}
-				if !hasNullValue {
-					fieldVal.String, fieldVal.Valid = getString(fieldValue), true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case "blob":
-				fieldVal := Blob{}
-				if !hasNullValue {
-					fieldVal.Data, err = getBytes(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			}
-		} else {
-			//fieldType := reflect.TypeOf(fieldValue)
-			if tNumber(fieldType) {
-				var fieldVal sql.NullFloat64
-				if !hasNullValue {
-					fieldVal.Float64, err = getFloat(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					fieldVal.Valid = true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			}
-			switch fieldType.Kind() {
-			case reflect.Bool:
-				var fieldVal sql.NullFloat64
-				if !hasNullValue {
-					fieldVal.Float64, err = getFloat(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					fieldVal.Valid = true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			case reflect.String:
-				fieldVal := sql.NullString{}
-				if !hasNullValue {
-					fieldVal.String, fieldVal.Valid = getString(fieldValue), true
-				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-			default:
-				switch aval := fieldValue.(type) {
-				case NVarChar:
-					fieldVal := NullNVarChar{}
-					if !hasNullValue {
-						fieldVal.NVarChar, fieldVal.Valid = aval, true
-					}
-					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-				case []byte:
-					var fieldVal []byte
-					if !hasNullValue {
-						fieldVal = aval
-					}
-					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-				case time.Time:
-					fieldVal := sql.NullTime{}
-					if !hasNullValue {
-						fieldVal.Time, fieldVal.Valid = aval, true
-					}
-					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-				case TimeStamp:
-					fieldVal := NullTimeStamp{}
-					if !hasNullValue {
-						fieldVal.TimeStamp, fieldVal.Valid = aval, true
-					}
-					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-				case TimeStampTZ:
-					fieldVal := NullTimeStampTZ{}
-					if !hasNullValue {
-						fieldVal.TimeStampTZ, fieldVal.Valid = aval, true
-					}
-					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-				case Clob:
-					tempPar, err = stmt.NewParam(name, aval, size, dir)
-				case NClob:
-					tempPar, err = stmt.NewParam(name, aval, size, dir)
-				case Blob:
-					tempPar, err = stmt.NewParam(name, aval, size, dir)
-				}
-			}
-		}
-		return
-	}
-	addInputField := func(name, _type string, fieldIndex int) (tempPar *ParameterInfo, err error) {
-		// check type
-		if len(_type) > 0 {
-			var fieldValue = tempVal.Field(fieldIndex).Interface()
-			// value is pointer
-			if tempType.Field(fieldIndex).Type.Kind() == reflect.Ptr {
-				if tempVal.Field(fieldIndex).IsNil() {
-					tempPar, err = stmt.NewParam(name, nil, 0, Input)
-				} else {
-					fieldValue = tempVal.Field(fieldIndex).Elem().Interface()
-				}
-			}
-			// value support valuer interface
-			if temp, ok := fieldValue.(driver.Valuer); ok {
-				fieldValue, err = temp.Value()
-				if err != nil {
-					return
-				}
-			}
-			typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
-			// primitive values
-			if tempPar == nil && fieldValue == nil {
-				tempPar, err = stmt.NewParam(name, fieldValue, 0, Input)
-			}
-			if tempPar == nil {
-				switch _type {
-				case "number":
-					var fieldVal float64
-					fieldVal, err = getFloat(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-				case "varchar":
-					fieldVal := getString(fieldValue)
-					tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-				case "nvarchar":
-					fieldVal := getString(fieldValue)
-					tempPar, err = stmt.NewParam(name, NVarChar(fieldVal), 0, Input)
-				case "date":
-					var fieldVal time.Time
-					fieldVal, err = getDate(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-				case "timestamp":
-					var fieldVal time.Time
-					fieldVal, err = getDate(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					tempPar, err = stmt.NewParam(name, TimeStamp(fieldVal), 0, Input)
-				case "timestamptz":
-					var fieldVal time.Time
-					fieldVal, err = getDate(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					tempPar, err = stmt.NewParam(name, TimeStampTZ(fieldVal), 0, Input)
-				case "raw":
-					var fieldVal []byte
-					fieldVal, err = getBytes(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-				case "clob":
-					fieldVal := getString(fieldValue)
-					tempPar, err = stmt.NewParam(name, Clob{String: fieldVal, Valid: true}, 0, Input)
-				case "nclob":
-					fieldVal := getString(fieldValue)
-					tempPar, err = stmt.NewParam(name, NClob{String: fieldVal, Valid: true}, 0, Input)
-				case "blob":
-					var fieldVal []byte
-					fieldVal, err = getBytes(fieldValue)
-					if err != nil {
-						err = typeErr
-						return
-					}
-					tempPar, err = stmt.NewParam(name, Blob{Data: fieldVal, Valid: true}, 0, Input)
-				}
-			}
-		} else {
-			tempPar, err = stmt.NewParam(name, tempVal.Field(fieldIndex).Interface(), 0, Input)
-		}
-		return
-	}
-	// deal with struct types
-	if parValue != nil && tempType.Kind() == reflect.Struct {
-		structFieldCount := tempType.NumField()
-
-		for i := 0; i < structFieldCount; i++ {
-			name, _type, _, _ := extractTag(tempType.Field(i).Tag.Get("db"))
-			if name != "" {
-				var tempPar *ParameterInfo
-				tempPar, err = addInputField(name, _type, i)
-				if err != nil {
-					return
-				}
-				stmt.setParam(parIndex, *tempPar)
-				processedPars++
-				parIndex++
-			}
-		}
-	}
-
-	// deal with Ptr struct types
-	if parValue != nil && tempType.Kind() == reflect.Ptr && tempVal.Elem().Kind() == reflect.Struct {
-		tempType = tempType.Elem()
-		tempVal = tempVal.Elem()
-		structFieldCount := tempType.NumField()
-		for i := 0; i < structFieldCount; i++ {
-			name, _type, size, dir := extractTag(tempType.Field(i).Tag.Get("db"))
-			if name != "" {
-				var tempPar *ParameterInfo
-				if dir == Input {
-					tempPar, err = addInputField(name, _type, i)
-				} else {
-					tempPar, err = addOutputField(name, _type, size, dir, i)
-				}
-				if err != nil {
-					return
-				}
-				stmt.setParam(parIndex, *tempPar)
-				processedPars++
-				parIndex++
-			}
-		}
-	}
-	return
-}
-
-func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
+func (stmt *Stmt) _exec(args []driver.Value) (*QueryResult, error) {
 	var err error
-	var useNamedPars = len(args) > 0
-	parIndex := 0
-	structPars := make([]driver.Value, 0, 2)
 	for x := 0; x < len(args); x++ {
 		var par *ParameterInfo
-		switch tempOut := args[x].Value.(type) {
+		switch tempOut := args[x].(type) {
 		case sql.Out:
 			direction := Output
 			if tempOut.In {
 				direction = InOut
 			}
-			par, err = stmt.NewParam(args[x].Name, tempOut.Dest, 0, direction)
+			par, err = stmt.NewParam("", tempOut.Dest, 0, direction)
 			if err != nil {
 				return nil, err
 			}
@@ -2147,7 +1565,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			if tempOut.In {
 				direction = InOut
 			}
-			par, err = stmt.NewParam(args[x].Name, tempOut.Dest, 0, direction)
+			par, err = stmt.NewParam("", tempOut.Dest, 0, direction)
 			if err != nil {
 				return nil, err
 			}
@@ -2156,7 +1574,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			if tempOut.In {
 				direction = InOut
 			}
-			par, err = stmt.NewParam(args[x].Name, tempOut.Dest, tempOut.Size, direction)
+			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, direction)
 			if err != nil {
 				return nil, err
 			}
@@ -2165,126 +1583,33 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			if tempOut.In {
 				direction = InOut
 			}
-			par, err = stmt.NewParam(args[x].Name, tempOut.Dest, tempOut.Size, direction)
+			par, err = stmt.NewParam("", tempOut.Dest, tempOut.Size, direction)
 			if err != nil {
 				return nil, err
 			}
 		default:
-			var processedPars = 0
-			processedPars, err = stmt.structPar(args[x].Value, parIndex)
+			par, err = stmt.NewParam("", args[x], 0, Input)
 			if err != nil {
 				return nil, err
 			}
-			if processedPars > 0 {
-				stmt.bulkExec = false
-				stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
-				parIndex += processedPars
-				structPars = append(structPars, args[x].Value)
-				continue
-			}
-			if stmt.bulkExec {
-				tempType := reflect.TypeOf(args[x].Value)
-				tempVal := reflect.ValueOf(args[x].Value)
-				if args[x].Value != nil && tempType != reflect.TypeOf([]byte{}) && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
-					// setup array count
-					if stmt.arrayBindCount == 0 {
-						stmt.arrayBindCount = tempVal.Len()
-					} else {
-						if stmt.arrayBindCount > tempVal.Len() {
-							stmt.arrayBindCount = tempVal.Len()
-						}
-					}
-					// see if first item is struct
-					firstItem := tempVal.Index(0)
-					if firstItem.Kind() == reflect.Struct {
-						fieldCount := firstItem.NumField()
-						structArrayAsNamedPars := make([]driver.NamedValue, 0, fieldCount)
-						for i := 0; i < fieldCount; i++ {
-							db, _, _, _ := extractTag(firstItem.Type().Field(i).Tag.Get("db"))
-							if db != "" {
-								arrayValues := make([]driver.Value, stmt.arrayBindCount)
-								for x := 0; x < stmt.arrayBindCount; x++ {
-
-									if (tempVal.Index(x).Field(i).Kind() == reflect.Ptr ||
-										tempVal.Index(x).Field(i).Kind() == reflect.Slice ||
-										tempVal.Index(x).Field(i).Kind() == reflect.Array) && tempVal.Index(x).Field(i).IsNil() {
-										arrayValues[x] = nil
-									} else {
-										arrayValues[x] = tempVal.Index(x).Field(i).Interface()
-									}
-								}
-								structArrayAsNamedPars = append(structArrayAsNamedPars, driver.NamedValue{Name: db, Value: arrayValues})
-							}
-						}
-						if len(structArrayAsNamedPars) > 0 {
-							return stmt._exec(structArrayAsNamedPars)
-						}
-					}
-					par, err = stmt.NewParam(args[x].Name, firstItem.Interface(), 0, Input)
-					if err != nil {
-						return nil, err
-					}
-					// calculate maxLen, maxCharLen and DataType
-					maxLen := par.MaxLen
-					maxCharLen := par.MaxCharLen
-					dataType := par.DataType
-					for y := 1; y < stmt.arrayBindCount; y++ {
-						err = par.encodeValue(tempVal.Index(y).Interface(), 0, stmt.connection)
-						if err != nil {
-							return nil, err
-						}
-						if maxLen < par.MaxLen {
-							maxLen = par.MaxLen
-						}
-						if maxCharLen < par.MaxCharLen {
-							maxCharLen = par.MaxCharLen
-						}
-						if par.DataType != dataType && par.DataType != NCHAR {
-							dataType = par.DataType
-						}
-					}
-					_ = par.encodeValue(tempVal.Index(0).Interface(), 0, stmt.connection)
-					par.MaxLen = maxLen
-					par.MaxCharLen = maxCharLen
-					par.DataType = dataType
-					par.Value = args[x].Value
-				} else {
-					if stmt.arrayBindCount > 0 {
-						return nil, errors.New("to activate bulk insert/merge all parameters should be arrays")
-					}
-					stmt.bulkExec = false
-				}
-			}
-			if par == nil {
-				par, err = stmt.NewParam(args[x].Name, args[x].Value, 0, Input)
-				if err != nil {
-					return nil, err
-				}
-			}
-
 		}
-		if len(par.Name) == 0 && useNamedPars {
-			useNamedPars = false
+		if x < len(stmt.Pars) {
+			if par.MaxLen > stmt.Pars[x].MaxLen {
+				stmt.reSendParDef = true
+			}
+			stmt.Pars[x] = *par
+		} else {
+			stmt.Pars = append(stmt.Pars, *par)
 		}
-		stmt.setParam(parIndex, *par)
-		parIndex++
 		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
-	}
-	if useNamedPars {
-		err = stmt.useNamedParameters()
-		if err != nil {
-			return nil, err
-		}
 	}
 	defer func() {
 		_ = stmt.freeTemporaryLobs()
 	}()
-
 	session := stmt.connection.session
 	session.ResetBuffer()
 	err = stmt.write()
 	if err != nil {
-		stmt.connection.setBad()
 		return nil, err
 	}
 	dataSet := new(DataSet)
@@ -2301,90 +1626,36 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	if session.Summary != nil {
 		result.rowsAffected = int64(session.Summary.CurRowNumber)
 	}
-	for _, par := range structPars {
-		err = stmt.fillStructPar(par)
-		if err != nil {
-			return nil, err
-		}
-	}
 	return result, nil
-}
-
-// useNamedParameters: re-arrange parameters according parameter defined in sql text
-func (stmt *Stmt) useNamedParameters() error {
-	names, err := parseSqlText(stmt.text)
-	if err != nil {
-		return err
-	}
-	var parCollection = make([]ParameterInfo, 0, len(names))
-	for x := 0; x < len(names); x++ {
-		found := false
-		for _, par := range stmt.Pars {
-			if par.Name == names[x] {
-				parCollection = append(parCollection, par)
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("parameter %s is not defined in parameter list", names[x])
-		}
-		for y := x - 1; y >= 0; y-- {
-			if names[y] == names[x] {
-				parCollection[x].Flag = 0x80
-				break
-			}
-		}
-	}
-	stmt.Pars = parCollection
-	return nil
 }
 
 // Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	if stmt.connection.State != Opened {
-		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	tracer := stmt.connection.connOption.Tracer
-	//failOver := stmt.connection.connOption.Failover
-	//if failOver == 0 {
-	//	failOver = 1
-	//}
+	failOver := stmt.connection.connOption.Failover
+	if failOver == 0 {
+		failOver = 1
+	}
 	tracer.Printf("Exec:\n%s", stmt.text)
-	var result *QueryResult
-	var err error
-	if len(args) == 0 {
-		result, err = stmt._exec(nil)
-	} else {
-		var namedArgs = make([]driver.NamedValue, len(args))
-		for x := 0; x < len(args); x++ {
-			namedArgs[x].Value = args[x]
-		}
-		result, err = stmt._exec(namedArgs)
-	}
-	if err != nil {
-		if isBadConn(err) {
+	result, err := stmt._exec(args)
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = stmt.connection.reConnect(err, writeTrials)
+		if err != nil {
 			tracer.Print("Error: ", err)
-			return nil, driver.ErrBadConn
+			if !reconnect {
+				return nil, err
+			}
+			continue
 		}
-		return nil, err
+		break
 	}
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = stmt.connection.reConnect(err, writeTrials)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//		continue
-	//	}
-	//	break
-	//}
-	//if reconnect {
-	//	return nil, &network.OracleError{ErrCode: 3135}
-	//}
+	if reconnect {
+		return nil, &network.OracleError{ErrCode: 3135}
+	}
 	return result, err
 }
 
@@ -2394,7 +1665,6 @@ func (stmt *Stmt) CheckNamedValue(_ *driver.NamedValue) error {
 
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) (*ParameterInfo, error) {
 	if stmt.connection.State != Opened {
-		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	param := &ParameterInfo{
@@ -2436,7 +1706,7 @@ func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction Pa
 	//stmt.Pars = append(stmt.Pars, )
 }
 
-// AddRefCursorParam add new output parameter of type REF CURSOR
+// AddRefCursorParam add new output parameter of type REFCURSOR
 //
 // note: better to use sql.Out structure see examples for more information
 func (stmt *Stmt) AddRefCursorParam(name string) {
@@ -2447,108 +1717,32 @@ func (stmt *Stmt) AddRefCursorParam(name string) {
 // Query_ execute a query command and return oracle dataset object
 //
 // args is an array of values that corresponding to parameters in sql
-func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
+func (stmt *Stmt) Query_(args []driver.Value) (*DataSet, error) {
 	if stmt.connection.State != Opened {
-		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
-	tracer := stmt.connection.connOption.Tracer
-	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
-	stmt._hasMoreRows = true
-	var useNamedPars = len(namedArgs) > 0
-	for x := 0; x < len(namedArgs); x++ {
-		par, err := stmt.NewParam(namedArgs[x].Name, namedArgs[x].Value, 0, Input)
-		if err != nil {
-			return nil, err
-		}
-		if len(par.Name) == 0 && useNamedPars {
-			useNamedPars = false
-		}
-		stmt.setParam(x, *par)
-		tracer.Printf("    %d:\n%v", x, namedArgs[x])
-	}
-
-	if useNamedPars {
-		err := stmt.useNamedParameters()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	//failOver := stmt.connection.connOption.Failover
-	//retryTime := stmt.connection.connOption.RetryTime
-	//if failOver == 0 {
-	//	failOver = 1
-	//}
-
-	dataSet, err := stmt._query()
+	result, err := stmt.Query(args)
 	if err != nil {
-		if isBadConn(err) {
-			tracer.Print("Error: ", err)
-			return nil, driver.ErrBadConn
-		}
 		return nil, err
 	}
-	return dataSet, nil
-	//	if err == nil {
-	//		break
-	//	}
-	//var dataSet *DataSet
-	//var err error
-	//
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//		continue
-	//	}
-	//	// reset statement if connection break and reconnect
-	//	if writeTrials > 0 {
-	//		stmt.reset()
-	//	}
-	//	// call query
-	//	dataSet, err = stmt._query()
-	//	if err == nil {
-	//		break
-	//	}
-	//	reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//	}
-	//	if retryTime > 0 {
-	//		time.Sleep(time.Duration(retryTime) * time.Second)
-	//	}
-	//}
-	//return dataSet, err
-
-	//result, err := stmt.Query(args)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if dataSet, ok := result.(*DataSet); ok {
-	//	return dataSet, nil
-	//}
-	//return nil, errors.New("the returned driver.rows is not an oracle DataSet")
+	if dataSet, ok := result.(*DataSet); ok {
+		return dataSet, nil
+	}
+	return nil, errors.New("the returned driver.rows is not an oracle DataSet")
 }
 
 func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
-		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
-	tracer := stmt.connection.connOption.Tracer
-	tracer.Print("Query With Context:", stmt.text)
-
+	stmt.connection.connOption.Tracer.Print("Query With Context:", stmt.text)
+	args := make([]driver.Value, len(namedArgs))
+	for x := 0; x < len(args); x++ {
+		args[x] = namedArgs[x].Value
+	}
 	stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext()
-	return stmt.Query_(namedArgs)
+	return stmt.Query(args)
 }
 
 func (stmt *Stmt) reset() {
@@ -2558,7 +1752,6 @@ func (stmt *Stmt) reset() {
 	stmt.define = false
 	stmt._hasBLOB = false
 	stmt._hasLONG = false
-	stmt.bulkExec = false
 	stmt.disableCompression = true
 	stmt.arrayBindCount = 0
 }
@@ -2575,19 +1768,6 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	err = stmt.read(dataSet)
 	if err != nil {
 		return nil, err
-	}
-	// deal with ref cursor
-	for colIndex, col := range dataSet.Cols {
-		if col.DataType == REFCURSOR {
-			for rowIndex, row := range dataSet.rows {
-				if cursor, ok := row[colIndex].(*RefCursor); ok {
-					dataSet.rows[rowIndex][colIndex], err = cursor.Query()
-					if err != nil {
-						return nil, err
-					}
-				}
-			}
-		}
 	}
 	// deal with lobs
 	if stmt._hasBLOB {
@@ -2659,72 +1839,59 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 // args is an array of values that corresponding to parameters in sql
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
-		stmt.connection.setBad()
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	tracer := stmt.connection.connOption.Tracer
 	tracer.Printf("Query:\n%s", stmt.text)
+	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
+	stmt._hasMoreRows = true
+	for x := 0; x < len(args); x++ {
+		par, err := stmt.NewParam("", args[x], 0, Input)
+		if err != nil {
+			return nil, err
+		}
+		stmt.setParam(x, *par)
+	}
+
+	// if the connection lost
+	failOver := stmt.connection.connOption.Failover
+	retryTime := stmt.connection.connOption.RetryTime
+	if failOver == 0 {
+		failOver = 1
+	}
 	var dataSet *DataSet
 	var err error
-	if len(args) == 0 {
-		dataSet, err = stmt.Query_(nil)
-	} else {
-		var namedArgs = make([]driver.NamedValue, len(args))
-		for x := 0; x < len(args); x++ {
-			namedArgs[x].Value = args[x]
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+			continue
 		}
-		dataSet, err = stmt.Query_(namedArgs)
+		// reset statement if connection break and reconnect
+		if writeTrials > 0 {
+			stmt.reset()
+		}
+		// call query
+		dataSet, err = stmt._query()
+		if err == nil {
+			break
+		}
+		reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+		}
+		if retryTime > 0 {
+			time.Sleep(time.Duration(retryTime) * time.Second)
+		}
 	}
 	return dataSet, err
-	//stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
-	//stmt._hasMoreRows = true
-	//for x := 0; x < len(args); x++ {
-	//	par, err := stmt.NewParam("", args[x], 0, Input)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	stmt.setParam(x, *par)
-	//}
-	//
-	//// if the connection lost
-	//failOver := stmt.connection.connOption.Failover
-	//retryTime := stmt.connection.connOption.RetryTime
-	//if failOver == 0 {
-	//	failOver = 1
-	//}
-	//var dataSet *DataSet
-	//var err error
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//		continue
-	//	}
-	//	// reset statement if connection break and reconnect
-	//	if writeTrials > 0 {
-	//		stmt.reset()
-	//	}
-	//	// call query
-	//	dataSet, err = stmt._query()
-	//	if err == nil {
-	//		break
-	//	}
-	//	reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//	}
-	//	if retryTime > 0 {
-	//		time.Sleep(time.Duration(retryTime) * time.Second)
-	//	}
-	//}
-	//return dataSet, err
 	//return stmt._query()
 }
 

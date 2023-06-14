@@ -126,6 +126,48 @@ type ParameterInfo struct {
 	cusType              *customType
 }
 
+//func (par *ParameterInfo) clone() *ParameterInfo {
+//	out := new(ParameterInfo)
+//	*out = *par
+//out.Name = par.Name
+//out.Direction = par.Direction
+//out.DataType = par.DataType
+//out.TypeName = par.TypeName
+//out.AllowNull = par.AllowNull
+//out.ColAlias = par.ColAlias
+//out.IsNull = par.IsNull
+//out.IsXmlType = par.IsXmlType
+//out.Flag = par.Flag
+//out.Precision = par.Precision
+//out.Scale = par.Scale
+//out.MaxLen = par.MaxLen
+//out.MaxCharLen = par.MaxCharLen
+//out.MaxNoOfArrayElements = par.MaxNoOfArrayElements
+//out.ContFlag = par.ContFlag
+//out.ToID = par.ToID
+//out.Version = par.Version
+//out.CharsetID = par.CharsetID
+//out.CharsetForm = par.CharsetForm
+//out.getDataFromServer = par.getDataFromServer
+//out.oaccollid = par.oaccollid
+//	return out
+//}
+//func (par *ParameterInfo) setForDefine() {
+//	par.Flag = 3
+//	par.CharsetForm = 1
+//	switch par.DataType {
+//	case NUMBER:
+//		par.MaxLen = 0x7FFFFFFF
+//	case OCIClobLocator:
+//		fallthrough
+//	case OCIBlobLocator:
+//		par.ContFlag = 0x2000000
+//		par.MaxCharLen = 0x8000
+//		par.MaxLen = 0
+//		par.oaccollid = 0
+//	}
+//}
+
 // load get parameter information form network session
 func (par *ParameterInfo) load(conn *Connection) error {
 	session := conn.session
@@ -732,39 +774,6 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 		} else {
 			*value = tempVal
 		}
-	case NullTimeStampTZ:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			if tempNewVal, ok := newValue.(TimeStampTZ); ok {
-				value.TimeStampTZ = tempNewVal
-			} else if tempNewVal, ok := newValue.(time.Time); ok {
-				value.TimeStampTZ = TimeStampTZ(tempNewVal)
-			} else {
-				return errors.New("NullTimeStampTZ col/par need TimeStamp, time.Time or Nil value")
-			}
-		}
-		par.Value = value
-	case *NullTimeStampTZ:
-		var tempVal NullTimeStampTZ
-		if newValue == nil {
-			tempVal.Valid = false
-		} else {
-			tempVal.Valid = true
-			if tempNewVal, ok := newValue.(TimeStampTZ); ok {
-				tempVal.TimeStampTZ = tempNewVal
-			} else if tempNewVal, ok := newValue.(time.Time); ok {
-				tempVal.TimeStampTZ = TimeStampTZ(tempNewVal)
-			} else {
-				return errors.New("*NullTimeStampTZ col/par need TimeStampTZ, time.Time or Nil value")
-			}
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
 	case NullTimeStamp:
 		if newValue == nil {
 			value.Valid = false
@@ -775,7 +784,7 @@ func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
 			} else if tempNewVal, ok := newValue.(time.Time); ok {
 				value.TimeStamp = TimeStamp(tempNewVal)
 			} else {
-				return errors.New("NullTimeStamp col/par need TimeStampTZ, time.Time or Nil value")
+				return errors.New("NullTimeStamp col/par need TimeStamp, time.Time or Nil value")
 			}
 		}
 		par.Value = value
@@ -907,11 +916,13 @@ func (par *ParameterInfo) decodeValue(connection *Connection) (driver.Value, err
 		case ROWID:
 
 		case NCHAR, CHAR, LONG:
-			strConv, err := connection.getStrConv(par.CharsetID)
-			if err != nil {
-				return nil, err
+			if connection.strConv.GetLangID() != par.CharsetID {
+				tempCharset := connection.strConv.SetLangID(par.CharsetID)
+				tempVal = connection.strConv.Decode(par.BValue)
+				connection.strConv.SetLangID(tempCharset)
+			} else {
+				tempVal = connection.strConv.Decode(par.BValue)
 			}
-			tempVal = strConv.Decode(par.BValue)
 		case NUMBER:
 			// Scale = 0 and Precision <18 --> int64
 			if par.Scale == 0 && par.Precision <= 18 {
@@ -1051,11 +1062,13 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection) error {
 			par.BValue, err = session.GetClr()
 			if par.DataType == OCIClobLocator {
 				var tempString string
-				strConv, err := connection.getStrConv(par.CharsetID)
-				if err != nil {
-					return err
+				if connection.strConv.GetLangID() != par.CharsetID {
+					tempCharset := connection.strConv.SetLangID(par.CharsetID)
+					tempString = connection.strConv.Decode(par.BValue)
+					connection.strConv.SetLangID(tempCharset)
+				} else {
+					tempString = connection.strConv.Decode(par.BValue)
 				}
-				tempString = strConv.Decode(par.BValue)
 				par.Value = tempString
 			} else {
 				par.Value = par.BValue

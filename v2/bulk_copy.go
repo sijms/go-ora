@@ -212,19 +212,19 @@ func (bulk *BulkCopy) writePrepareMessage() error {
 	session.PutInt(len(dppi4), 2, true, true)
 	session.PutBytes(0x1, 0x1, 0x1, 0x1, 0x1, 0x1)
 	if len(bulk.SchemaName) > 0 {
-		temp := bulk.conn.sStrConv.Encode(bulk.SchemaName)
+		temp := bulk.conn.strConv.Encode(bulk.SchemaName)
 		session.PutKeyVal(nil, temp, 3)
 	}
 	if len(bulk.TableName) > 0 {
-		temp := bulk.conn.sStrConv.Encode(bulk.TableName)
+		temp := bulk.conn.strConv.Encode(bulk.TableName)
 		session.PutKeyVal(nil, temp, 1)
 	}
 	if len(bulk.PartitionName) > 0 {
-		temp := bulk.conn.sStrConv.Encode(bulk.PartitionName)
+		temp := bulk.conn.strConv.Encode(bulk.PartitionName)
 		session.PutKeyVal(nil, temp, 2)
 	}
 	for _, col := range bulk.ColumnNames {
-		temp := bulk.conn.sStrConv.Encode(col)
+		temp := bulk.conn.strConv.Encode(col)
 		session.PutKeyVal(nil, temp, 4)
 	}
 	for _, x := range dppi4 {

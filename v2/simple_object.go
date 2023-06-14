@@ -1,8 +1,6 @@
 package go_ora
 
-import (
-	"database/sql/driver"
-)
+import "github.com/sijms/go-ora/v2/network"
 
 type simpleObject struct {
 	connection *Connection
@@ -55,28 +53,20 @@ func (obj *simpleObject) exec() error {
 		failOver = 1
 	}
 	var err = obj.write().read()
-	if err != nil {
-		if isBadConn(err) {
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = obj.connection.reConnect(err, writeTrials)
+		if err != nil {
 			tracer.Print("Error: ", err)
-			return driver.ErrBadConn
+			if !reconnect {
+				return err
+			}
+			continue
 		}
-		return err
+		break
 	}
-	return nil
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = obj.connection.reConnect(err, writeTrials)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return err
-	//		}
-	//		continue
-	//	}
-	//	break
-	//}
-	//if reconnect {
-	//	return &network.OracleError{ErrCode: 3135}
-	//}
-	//return err
+	if reconnect {
+		return &network.OracleError{ErrCode: 3135}
+	}
+	return err
 }

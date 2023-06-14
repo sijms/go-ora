@@ -71,7 +71,13 @@ func (par *ParameterInfo) encodeString(value string, converter converters.IStrin
 	if len(value) == 0 {
 		par.BValue = nil
 	} else {
-		par.BValue = converter.Encode(value)
+		if converter.GetLangID() != par.CharsetID {
+			tempCharset := converter.SetLangID(par.CharsetID)
+			par.BValue = converter.Encode(value)
+			converter.SetLangID(tempCharset)
+		} else {
+			par.BValue = converter.Encode(value)
+		}
 	}
 	if size > len(value) {
 		par.MaxCharLen = size
@@ -81,7 +87,6 @@ func (par *ParameterInfo) encodeString(value string, converter converters.IStrin
 			par.MaxLen = 1
 		} else {
 			par.MaxLen = len(par.BValue)
-			par.MaxCharLen = par.MaxLen
 		}
 	} else {
 		par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(par.CharsetID)
@@ -123,9 +128,6 @@ func (par *ParameterInfo) encodeRaw(value []byte, size int) {
 	if size > par.MaxLen {
 		par.MaxLen = size
 	}
-	if par.MaxLen == 0 {
-		par.MaxLen = 1
-	}
 	par.ContFlag = 0
 	par.MaxCharLen = 0
 	par.CharsetForm = 0
@@ -155,12 +157,6 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	}
 	if tempType != reflect.TypeOf([]byte{}) {
 		if tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice {
-			par.Flag = 0x43
-
-			par.MaxNoOfArrayElements = reflect.Indirect(reflect.ValueOf(val)).Len()
-			if par.MaxNoOfArrayElements == 0 {
-				par.MaxNoOfArrayElements = 1
-			}
 			return par.encodeArrayValue(val, size, connection)
 		}
 	}
@@ -390,8 +386,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	case NClob:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
-		strConv, _ := connection.getStrConv(par.CharsetID)
-		par.encodeString(value.String, strConv, size)
+		par.encodeString(value.String, connection.strConv, size)
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
 		} else {
@@ -414,8 +409,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	case *NClob:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
-		strConv, _ := connection.getStrConv(par.CharsetID)
-		par.encodeString(value.String, strConv, size)
+		par.encodeString(value.String, connection.strConv, size)
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
 		} else {
@@ -435,8 +429,7 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			}
 		}
 	case Clob:
-		strConv, _ := connection.getStrConv(par.CharsetID)
-		par.encodeString(value.String, strConv, size)
+		par.encodeString(value.String, connection.strConv, size)
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
 		} else {
@@ -459,10 +452,9 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		}
 	case *Clob:
 		if value == nil {
-			par.encodeString("", nil, size)
+			par.encodeString("", connection.strConv, size)
 		} else {
-			strConv, _ := connection.getStrConv(par.CharsetID)
-			par.encodeString(value.String, strConv, size)
+			par.encodeString(value.String, connection.strConv, size)
 		}
 		if par.Direction == Output {
 			par.DataType = OCIClobLocator
@@ -558,16 +550,12 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			}
 		}
 	case []byte:
-		if len(value) == 0 {
-			par.encodeRaw(nil, size)
-		} else {
-			if len(value) > connection.maxLen.raw && par.Direction == Input {
-				return par.encodeValue(Blob{Valid: true, Data: value}, size, connection)
-			}
-			par.encodeRaw(value, size)
+		if len(value) > connection.maxLen.raw && par.Direction == Input {
+			return par.encodeValue(Blob{Valid: true, Data: value}, size, connection)
 		}
+		par.encodeRaw(value, size)
 	case *[]byte:
-		if *value == nil || len(*value) == 0 {
+		if value == nil {
 			par.encodeRaw(nil, size)
 		} else {
 			if len(*value) > connection.maxLen.raw && par.Direction == Input {
@@ -581,32 +569,27 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 		if len(value) > connection.maxLen.nvarchar && par.Direction == Input {
 			return par.encodeValue(Clob{Valid: true, String: value}, size, connection)
 		}
-		strConv, _ := connection.getStrConv(par.CharsetID)
-		par.encodeString(value, strConv, size)
-
+		par.encodeString(value, connection.strConv, size)
 	case *string:
 		if value == nil {
-			par.encodeString("", nil, size)
+			par.encodeString("", connection.strConv, size)
 		} else {
 			if len(*value) > connection.maxLen.nvarchar && par.Direction == Input {
 				return par.encodeValue(&Clob{Valid: true, String: *value}, size, connection)
 			}
-			strConv, _ := connection.getStrConv(par.CharsetID)
-			par.encodeString(*value, strConv, size)
+			par.encodeString(*value, connection.strConv, size)
 		}
 	case NVarChar:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
-		strConv, _ := connection.getStrConv(par.CharsetID)
-		par.encodeString(string(value), strConv, size)
+		par.encodeString(string(value), connection.strConv, size)
 	case *NVarChar:
 		par.CharsetForm = 2
 		par.CharsetID = connection.tcpNego.ServernCharset
 		if value == nil {
-			par.encodeString("", nil, size)
+			par.encodeString("", connection.strConv, size)
 		} else {
-			strConv, _ := connection.getStrConv(par.CharsetID)
-			par.encodeString(string(*value), strConv, size)
+			par.encodeString(string(*value), connection.strConv, size)
 		}
 	case *sql.NullBool:
 		par.setForNumber()

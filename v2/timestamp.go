@@ -48,7 +48,7 @@ type NullTimeStamp struct {
 	TimeStamp TimeStamp
 }
 
-func (val NullTimeStamp) Value() (driver.Value, error) {
+func (val *NullTimeStamp) Value() (driver.Value, error) {
 	if val.Valid {
 		return val.TimeStamp.Value()
 	} else {

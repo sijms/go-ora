@@ -256,10 +256,6 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			return nil, err
 		}
 	}
-	if len(result.bindErrors) > 0 && result.RetCode == 24381 {
-		result.RetCode = result.bindErrors[0].errorCode
-		result.ErrorMessage = result.bindErrors[0].errorMsg
-	}
 	return result, nil
 }
 

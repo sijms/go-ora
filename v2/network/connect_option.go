@@ -30,7 +30,6 @@ type ClientInfo struct {
 	UseKerberos bool
 	Language    string
 	Territory   string
-	CharsetID   int
 }
 type DatabaseInfo struct {
 	UserID          string
@@ -61,9 +60,7 @@ type SessionInfo struct {
 	Dialer                DialerContext
 }
 type AdvNegoSeviceInfo struct {
-	AuthService     []string
-	EncServiceLevel int
-	IntServiceLevel int
+	AuthService []string
 }
 type ConnectionOption struct {
 	ClientInfo

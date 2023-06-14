@@ -38,8 +38,6 @@ func (err *OracleError) translate() {
 		err.ErrMsg = "ORA-12631: Username retrieval failed"
 	case 12564:
 		err.ErrMsg = "ORA-12564: TNS connection refused"
-	case 12506:
-		err.ErrMsg = "ORA-12506: TNS:listener rejected connection based on service ACL filtering"
 	case 12514:
 		err.ErrMsg = "ORA-12514: TNS:listener does not currently know of service requested in connect descriptor"
 	case 3135:

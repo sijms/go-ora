@@ -3,7 +3,6 @@ package go_ora
 import (
 	"bytes"
 	"errors"
-	"github.com/sijms/go-ora/v2/converters"
 	"go/types"
 )
 
@@ -133,25 +132,21 @@ func (lob *Lob) putData(data []byte) error {
 }
 
 func (lob *Lob) putString(data string, charset int) error {
-	conn := lob.connection
-	conn.connOption.Tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
+	lob.connection.connOption.Tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
 	lob.initialize()
 	lob.charsetID = charset
-	var strConv converters.IStringConverter
+	tempCharset := lob.connection.strConv.GetLangID()
 	if lob.variableWidthChar() {
-		if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
-			strConv, _ = conn.getStrConv(2002)
+		if lob.connection.dBVersion.Number < 10200 && lob.littleEndianClob() {
+			lob.connection.strConv.SetLangID(2002)
 		} else {
-			strConv, _ = conn.getStrConv(2000)
+			lob.connection.strConv.SetLangID(2000)
 		}
 	} else {
-		var err error
-		strConv, err = conn.getStrConv(lob.charsetID)
-		if err != nil {
-			return err
-		}
+		lob.connection.strConv.SetLangID(lob.charsetID)
 	}
-	lobData := strConv.Encode(data)
+	lobData := lob.connection.strConv.Encode(data)
+	lob.connection.strConv.SetLangID(tempCharset)
 	// lob.size = int64(len([]rune(data)))
 	// lob.sendSize = true
 	lob.sourceOffset = 1
@@ -644,7 +639,6 @@ func (val *Clob) Scan(value interface{}) error {
 	if value == nil {
 		val.Valid = false
 		val.String = ""
-		return nil
 	}
 	switch temp := value.(type) {
 	case Clob:
@@ -671,7 +665,6 @@ func (val *Blob) Scan(value interface{}) error {
 	if value == nil {
 		val.Valid = false
 		val.Data = nil
-		return nil
 	}
 	switch temp := value.(type) {
 	case Blob:
@@ -694,7 +687,6 @@ func (val *NClob) Scan(value interface{}) error {
 	if value == nil {
 		val.Valid = false
 		val.String = ""
-		return nil
 	}
 	switch temp := value.(type) {
 	case Clob:

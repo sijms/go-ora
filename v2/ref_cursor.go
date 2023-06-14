@@ -1,9 +1,6 @@
 package go_ora
 
-import (
-	"database/sql/driver"
-	"github.com/sijms/go-ora/v2/network"
-)
+import "github.com/sijms/go-ora/v2/network"
 
 type RefCursor struct {
 	defaultStmt
@@ -89,6 +86,10 @@ func (cursor *RefCursor) load() error {
 	if err != nil {
 		return err
 	}
+	_, err = session.GetInt(2, true, true)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (cursor *RefCursor) getExeOptions() int {
@@ -135,41 +136,32 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	if failOver == 0 {
 		failOver = 1
 	}
-	dataSet, err := cursor._query()
-	if err != nil {
-		if isBadConn(err) {
+	var dataSet *DataSet
+	var err error
+	var reconnect bool
+	for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+		reconnect, err = cursor.connection.reConnect(nil, writeTrials+1)
+		if err != nil {
 			tracer.Print("Error: ", err)
-			return nil, driver.ErrBadConn
+			if !reconnect {
+				return nil, err
+			}
+			continue
 		}
-		return nil, err
+		// call query
+		dataSet, err = cursor._query()
+		if err == nil {
+			break
+		}
+		reconnect, err = cursor.connection.reConnect(err, writeTrials+1)
+		if err != nil {
+			tracer.Print("Error: ", err)
+			if !reconnect {
+				return nil, err
+			}
+		}
 	}
 	return dataSet, nil
-	//var dataSet *DataSet
-	//var err error
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = cursor.connection.reConnect(nil, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//		continue
-	//	}
-	//	// call query
-	//	dataSet, err = cursor._query()
-	//	if err == nil {
-	//		break
-	//	}
-	//	reconnect, err = cursor.connection.reConnect(err, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//	}
-	//}
-	//return dataSet, nil
 }
 func (cursor *RefCursor) write() error {
 	var define = false

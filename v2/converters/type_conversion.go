@@ -1190,7 +1190,7 @@ func DecodeDate(data []byte) (time.Time, error) {
 	}
 	if tzHour == 0 && tzMin == 0 {
 		return time.Date(year, time.Month(data[2]), int(data[3]),
-			int(data[4]-1), int(data[5]-1), int(data[6]-1), nanoSec, time.UTC), nil
+			int(data[4]-1), int(data[5]-1), int(data[6]-1), nanoSec, time.Local), nil
 	}
 	var zone *time.Location
 	//var err error

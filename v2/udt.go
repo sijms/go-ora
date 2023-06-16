@@ -11,17 +11,19 @@ import (
 )
 
 type customType struct {
-	owner    string
-	name     string
-	attribs  []ParameterInfo
-	typ      reflect.Type
-	toid     []byte // type oid
-	fieldMap map[string]int
+	owner         string
+	name          string
+	arrayTypeName string
+	attribs       []ParameterInfo
+	typ           reflect.Type
+	toid          []byte // type oid
+	arrayTOID     []byte
+	fieldMap      map[string]int
 }
 
 // RegisterType register user defined type with owner equal to user id
-func (conn *Connection) RegisterType(typeName string, typeObj interface{}) error {
-	return conn.RegisterTypeWithOwner(conn.connOption.UserID, typeName, typeObj)
+func (conn *Connection) RegisterType(typeName, arrayTypeName string, typeObj interface{}) error {
+	return conn.RegisterTypeWithOwner(conn.connOption.UserID, typeName, arrayTypeName, typeObj)
 }
 
 // RegisterTypeWithOwner take typename, owner and go type object and make an information
@@ -29,7 +31,7 @@ func (conn *Connection) RegisterType(typeName string, typeObj interface{}) error
 //
 // DataType of UDT field that can be manipulated by this function are: NUMBER,
 // VARCHAR2, NVARCHAR2, TIMESTAMP, DATE AND RAW
-func (conn *Connection) RegisterTypeWithOwner(owner, typeName string, typeObj interface{}) error {
+func (conn *Connection) RegisterTypeWithOwner(owner, typeName, arrayTypeName string, typeObj interface{}) error {
 	if typeObj == nil {
 		return errors.New("type object cannot be nil")
 	}
@@ -50,14 +52,22 @@ func (conn *Connection) RegisterTypeWithOwner(owner, typeName string, typeObj in
 		return errors.New("type object should be of structure type")
 	}
 	cust := customType{
-		owner:    owner,
-		name:     typeName,
-		typ:      typ,
-		fieldMap: map[string]int{},
+		owner:         owner,
+		name:          typeName,
+		arrayTypeName: arrayTypeName,
+		typ:           typ,
+		fieldMap:      map[string]int{},
 	}
-	err := cust.getTOID(conn)
+	var err error
+	cust.toid, err = getTOID(conn, cust.owner, cust.name)
 	if err != nil {
 		return err
+	}
+	if len(cust.arrayTypeName) > 0 {
+		cust.arrayTOID, err = getTOID(conn, cust.owner, cust.arrayTypeName)
+		if err != nil {
+			return err
+		}
 	}
 	sqlText := `SELECT ATTR_NAME, ATTR_TYPE_NAME, LENGTH, ATTR_NO 
 FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
@@ -84,10 +94,8 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 
 		for int(attOrder) > len(cust.attribs) {
 			cust.attribs = append(cust.attribs, ParameterInfo{
-				Direction:   Input,
-				Flag:        3,
-				CharsetID:   conn.tcpNego.ServerCharset,
-				CharsetForm: 1,
+				Direction: Input,
+				Flag:      3,
 			})
 		}
 		param := &cust.attribs[attOrder-1]
@@ -102,43 +110,38 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 			param.CharsetForm = 1
 			param.ContFlag = 16
 			param.MaxCharLen = int(length.Int64)
+			param.CharsetID = conn.tcpNego.ServerCharset
 			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
-			param.Value = sql.NullString{}
 		case "NVARCHAR2":
 			param.DataType = NCHAR
 			param.CharsetForm = 2
 			param.ContFlag = 16
 			param.MaxCharLen = int(length.Int64)
+			param.CharsetID = conn.tcpNego.ServernCharset
 			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
 		case "TIMESTAMP":
 			fallthrough
 		case "DATE":
 			param.DataType = DATE
-			param.ContFlag = 0
 			param.MaxLen = 11
-			//param.MaxCharLen = 11
 		case "RAW":
 			param.DataType = RAW
-			param.ContFlag = 0
 			param.MaxLen = int(length.Int64)
-			param.MaxCharLen = 0
-			param.CharsetForm = 0
 		case "BLOB":
 			param.DataType = OCIBlobLocator
-			param.ContFlag = 0
 			param.MaxLen = int(length.Int64)
-			param.MaxCharLen = 0
-			param.CharsetForm = 0
 		case "CLOB":
 			param.DataType = OCIClobLocator
 			param.CharsetForm = 1
 			param.ContFlag = 16
+			param.CharsetID = conn.tcpNego.ServerCharset
 			param.MaxCharLen = int(length.Int64)
 			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
 		case "NCLOB":
 			param.DataType = OCIClobLocator
 			param.CharsetForm = 2
 			param.ContFlag = 16
+			param.CharsetID = conn.tcpNego.ServernCharset
 			param.MaxCharLen = int(length.Int64)
 			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
 		default:
@@ -277,6 +280,7 @@ END;`
 			param.CharsetForm = 2
 			param.ContFlag = 16
 			param.MaxCharLen = 1000
+			param.CharsetID = conn.tcpNego.ServernCharset
 			param.MaxLen = 1000 * converters.MaxBytePerChar(param.CharsetID)
 		case "TIMESTAMP":
 			fallthrough
@@ -298,30 +302,6 @@ END;`
 	cust.loadFieldMap()
 	conn.cusTyp[strings.ToUpper(typeName)] = cust
 	return nil
-}
-
-func (cust *customType) getTOID(conn *Connection) error {
-	sqlText := `SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
-	stmt := NewStmt(sqlText, conn)
-	defer func(stmt *Stmt) {
-		_ = stmt.Close()
-	}(stmt)
-
-	rows, err := stmt.Query_([]driver.NamedValue{driver.NamedValue{Value: strings.ToUpper(cust.owner)},
-		driver.NamedValue{Value: strings.ToUpper(cust.name)}})
-	if err != nil {
-		return err
-	}
-	if rows.Next_() {
-		err = rows.Scan(&cust.toid)
-		if err != nil {
-			return err
-		}
-	}
-	if len(cust.toid) == 0 {
-		return fmt.Errorf("unknown type: %s", cust.name)
-	}
-	return rows.Err()
 }
 
 // loadFieldMap read struct tag that supplied with golang type object passed in RegisterType

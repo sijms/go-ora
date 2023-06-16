@@ -172,10 +172,25 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 			if len(value) > 0 {
 				arrayBuffer := bytes.Buffer{}
 				session := conn.session
-				session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
+				//arrayBuffer.Write([]byte{1})
+				if par.DataType == XMLType {
+					arrayBuffer.Write([]byte{uint8(par.MaxNoOfArrayElements)})
+				} else {
+					session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
+				}
+				//session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
+				//session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 2, true, false)
+				//arrayBuffer.Write([]byte{3})
+				//03 11 00 01 10
+				//arrayBuffer.Write([]byte{0x3, 0x11, 0x0, 0x1, 0x10, uint8(par.MaxNoOfArrayElements)})
 				for _, tempPar := range value {
 					// get the binary representation of the item
 					err = tempPar.encodePrimValue(conn)
+					if par.DataType == XMLType {
+						//session.WriteUint(&arrayBuffer, len(tempPar.BValue), 4, true, true)
+						//session.WriteUint(&arrayBuffer, 0xff, 4, true, true)
+						arrayBuffer.Write([]byte{0, 0, 0, 0xfe})
+					}
 					if err != nil {
 						return err
 					}
@@ -189,8 +204,6 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 					session.WriteClr(&arrayBuffer, tempPar.BValue)
 				}
 				par.BValue = arrayBuffer.Bytes()
-			} else {
-				par.BValue = bytes.Repeat([]byte{0}, len(par.cusType.attribs))
 			}
 			// for array set maxsize of nchar and raw
 			if par.DataType == NCHAR {
@@ -200,6 +213,25 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 			if par.DataType == RAW {
 				par.MaxLen = conn.maxLen.raw
 			}
+			if par.DataType == XMLType {
+				par.ToID = par.cusType.arrayTOID
+				par.BValue = encodeObject(conn, par.BValue, true)
+				par.Flag = 3
+				par.MaxNoOfArrayElements = 0
+			}
+		} else {
+			par.BValue = encodeObject(conn, par.BValue, false)
+			// encode UDT object
+			//size := len(par.BValue) + 7
+			//itemData := bytes.Buffer{}
+			//conn.session.WriteInt(&itemData, size, 4, true, true)
+			//itemData.Write([]byte{1, 1})
+			//fieldsData := bytes.Buffer{}
+			//fieldsData.Write([]byte{0x84, 0x1, 0xfe})
+			//conn.session.WriteInt(&fieldsData, size, 4, true, false)
+			//fieldsData.Write(par.BValue)
+			//conn.session.WriteClr(&itemData, fieldsData.Bytes())
+			//par.BValue = itemData.Bytes()
 		}
 	default:
 		return fmt.Errorf("unsupported primitive type: %v", reflect.TypeOf(par.iPrimValue).Name())
@@ -453,7 +485,7 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		for _, attrib := range par.cusType.attribs {
 			if fieldIndex, ok := par.cusType.fieldMap[attrib.Name]; ok {
 				//tempPar := ParameterInfo{Direction: par.Direction, DataType: attrib.DataType}
-				tempPar := attrib
+				tempPar := attrib.clone()
 				tempPar.Direction = par.Direction
 				tempPar.Value = rValue.Field(fieldIndex).Interface()
 				err = tempPar.encodeWithType(connection)
@@ -503,7 +535,9 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	if err != nil {
 		return err
 	}
-
+	if par.MaxNoOfArrayElements > 0 && par.MaxNoOfArrayElements < size {
+		par.MaxNoOfArrayElements = size
+	}
 	err = par.encodeWithType(connection)
 	if err != nil {
 		return err
@@ -512,33 +546,28 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 	if err != nil {
 		return err
 	}
-	if par.MaxNoOfArrayElements > 0 {
-		if par.MaxNoOfArrayElements < size {
-			par.MaxNoOfArrayElements = size
+
+	if par.DataType == OCIFileLocator {
+		par.MaxLen = size
+		if par.MaxLen == 0 {
+			par.MaxLen = 4000
 		}
-	} else {
-		if par.DataType == OCIFileLocator {
-			par.MaxLen = size
-			if par.MaxLen == 0 {
-				par.MaxLen = 4000
+	}
+	if par.Direction != Input {
+		if par.DataType == NCHAR {
+			if par.MaxCharLen < size {
+				par.MaxCharLen = size
 			}
+			par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(par.CharsetID)
 		}
-		if par.Direction != Input {
-			if par.DataType == NCHAR {
-				if par.MaxCharLen < size {
-					par.MaxCharLen = size
-				}
-				par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(par.CharsetID)
-			}
-			if par.DataType == RAW {
-				if par.MaxLen < size {
-					par.MaxLen = size
-				}
+		if par.DataType == RAW {
+			if par.MaxLen < size {
+				par.MaxLen = size
 			}
 		}
 	}
 
-	if par.Direction == Output && !(par.DataType == XMLType || par.MaxNoOfArrayElements > 0) {
+	if par.Direction == Output && !(par.DataType == XMLType) {
 		par.BValue = nil
 	}
 	return nil

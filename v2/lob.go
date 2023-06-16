@@ -51,10 +51,10 @@ func (lob *Lob) initialize() {
 	lob.bNullO2U = false
 	lob.sendSize = false
 	lob.size = 0
-	lob.charsetID = 0
+	//lob.charsetID = 0
 	lob.sourceOffset = 0
 	lob.destOffset = 0
-	lob.scn = nil
+	//lob.scn = nil
 }
 
 // variableWidthChar if lob has variable width char or not
@@ -139,7 +139,7 @@ func (lob *Lob) putData(data []byte) error {
 func (lob *Lob) putString(data string) error {
 	conn := lob.connection
 	conn.connOption.Tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
-	lob.initialize()
+	//lob.initialize()
 	var strConv converters.IStringConverter
 	if lob.variableWidthChar() {
 		if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
@@ -169,7 +169,7 @@ func (lob *Lob) putString(data string) error {
 	return lob.read()
 }
 
-//isTemporary: return true if the lob is temporary
+// isTemporary: return true if the lob is temporary
 func (lob *Lob) isTemporary() bool {
 	if len(lob.sourceLocator) > 7 {
 		if lob.sourceLocator[7]&1 == 1 || lob.sourceLocator[4]&0x40 == 0x40 {

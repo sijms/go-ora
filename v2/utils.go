@@ -1,6 +1,7 @@
 package go_ora
 
 import (
+	"bytes"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -937,3 +938,44 @@ func collectLocators(pars []ParameterInfo) [][]byte {
 //	rv := reflect.ValueOf(v).Elem()
 //	rv.Set(reflect.New(rv.Type().Elem()))
 //}
+
+func getTOID(conn *Connection, owner, typeName string) ([]byte, error) {
+	sqlText := `SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
+	stmt := NewStmt(sqlText, conn)
+	defer func(stmt *Stmt) {
+		_ = stmt.Close()
+	}(stmt)
+	var ret []byte
+	rows, err := stmt.Query_([]driver.NamedValue{driver.NamedValue{Value: strings.ToUpper(owner)},
+		driver.NamedValue{Value: strings.ToUpper(typeName)}})
+	if err != nil {
+		return nil, err
+	}
+	if rows.Next_() {
+		err = rows.Scan(&ret)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(ret) == 0 {
+		return nil, fmt.Errorf("unknown type: %s", typeName)
+	}
+	return ret, rows.Err()
+}
+
+func encodeObject(conn *Connection, objectData []byte, isArray bool) []byte {
+	size := len(objectData) + 7
+	//itemData := bytes.Buffer{}
+	//conn.session.WriteInt(&itemData, size, 4, true, true)
+	//itemData.Write([]byte{1, 1})
+	fieldsData := bytes.Buffer{}
+	if isArray {
+		fieldsData.Write([]byte{0x88, 0x1, 0xfe})
+	} else {
+		fieldsData.Write([]byte{0x84, 0x1, 0xfe})
+	}
+	// from here object should encode
+	conn.session.WriteInt(&fieldsData, size, 4, true, false)
+	fieldsData.Write(objectData)
+	return fieldsData.Bytes()
+}

@@ -291,6 +291,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 func (par *ParameterInfo) write(session *network.Session) error {
 	session.PutBytes(uint8(par.DataType), par.Flag, par.Precision, par.Scale)
 	session.PutUint(par.MaxLen, 4, true, true)
+	// MaxNoOfArrayElements should be 0 in case of XML type
 	session.PutInt(par.MaxNoOfArrayElements, 4, true, true)
 	if session.TTCVersion >= 10 {
 		session.PutInt(par.ContFlag, 8, true, true)

@@ -371,15 +371,23 @@ func (stmt *Stmt) writePars() error {
 				session.PutClr(par.BValue)
 			} else {
 				if par.cusType != nil {
-					size := len(par.BValue) + 7
+					//size := len(par.BValue) + 7
 					session.PutBytes(0, 0, 0, 0)
+					size := len(par.BValue)
 					session.PutUint(size, 4, true, true)
 					session.PutBytes(1, 1)
-					tempBuffer := bytes.Buffer{}
-					tempBuffer.Write([]byte{0x84, 0x1, 0xfe})
-					session.WriteUint(&tempBuffer, size, 4, true, false)
-					tempBuffer.Write(par.BValue)
-					session.PutClr(tempBuffer.Bytes())
+					session.PutClr(par.BValue)
+					par.MaxNoOfArrayElements = 3
+					//tempBuffer := bytes.Buffer{}
+					//if par.MaxNoOfArrayElements > 0 {
+					//	tempBuffer.Write([]byte{0x84, 0x1, 0xfe})
+					//} else {
+					//	tempBuffer.Write([]byte{0x84, 0x1, 0xfe})
+					//}
+					//session.WriteUint(&tempBuffer, size, 4, true, false)
+					//tempBuffer.Write(par.BValue)
+					//session.PutClr(tempBuffer.Bytes())
+					//session.PutBytes(par.BValue...)
 				} else {
 					if par.MaxNoOfArrayElements > 0 {
 						if par.BValue == nil {

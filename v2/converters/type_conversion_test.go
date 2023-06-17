@@ -82,6 +82,14 @@ func TestEncodeInt64(t *testing.T) {
 	}
 }
 
+func TestEncodeUint64(t *testing.T) {
+	var x uint64 = 0xFFFFFFFFFFFFFFFE
+	intVal := EncodeInt64(int64(x))
+	uintVal := EncodeUint64(x)
+	t.Logf("Enode int64: %#v", intVal)
+	t.Logf("Encode uint64: %#v", uintVal)
+}
+
 func TestEncodeInt(t *testing.T) {
 	for _, tt := range TestFloatValue {
 		// Test only with interger values

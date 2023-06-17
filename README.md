@@ -11,6 +11,12 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### version 2.7.7:
+* add support for CLOB/BLOB in UDT
+* add support for UDT array as output parameters
+* parameter encode/decode is recoded from the start
+* fix uint64 truncation
+* fix some other issue
 ### version 2.7.4:
 * activate global timeout value to protect against block read/write
 if no timeout context specified

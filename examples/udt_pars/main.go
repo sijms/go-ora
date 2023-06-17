@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type test1 struct {
+type test2 struct {
 	Id    int64           `udt:"test_id"`
 	Name  *sql.NullString `udt:"test_name"`
 	Data1 string          `udt:"test_data1"`
@@ -23,7 +23,7 @@ func createTable(conn *go_ora.Connection) error {
 	t := time.Now()
 	sqlText := `CREATE TABLE GOORA_TEMP_VISIT(
 	VISIT_ID	number(10)	NOT NULL,
-	TEST_TYPE   TEST_TYPE1,
+	TEST_TYPE   UDTPAR_TYPE,
 	PRIMARY KEY(VISIT_ID)
 	)`
 	_, err := conn.Exec(sqlText)
@@ -42,8 +42,8 @@ func insertData(conn *go_ora.Connection) error {
 		_ = stmt.Close()
 	}()
 	nameText := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	for index = 1; index <= 100; index++ {
-		var test test1
+	for index = 1; index <= 1; index++ {
+		var test test2
 		test.Id = int64(index)
 		test.Name = &sql.NullString{String: nameText[:index], Valid: true}
 		test.Data1 = nameText
@@ -73,7 +73,7 @@ END;`
 	}()
 	var (
 		visitId int64
-		test    test1
+		test    test2
 	)
 	_, err := stmt.Exec([]driver.Value{go_ora.Out{Dest: &visitId}, go_ora.Out{Dest: &test}})
 	if err != nil {
@@ -100,7 +100,7 @@ func queryData(conn *go_ora.Connection) error {
 	}
 	var (
 		visitID int64
-		test    test1
+		test    test2
 		count   int
 	)
 	for rows.Next_() {
@@ -135,11 +135,11 @@ func dropTable(conn *go_ora.Connection) error {
 
 func createUDT(conn *go_ora.Connection) error {
 	t := time.Now()
-	sqlText := `create or replace TYPE TEST_TYPE1 IS OBJECT 
+	sqlText := `create or replace TYPE UDTPAR_TYPE IS OBJECT 
 (
     TEST_ID NUMBER(10, 0),
     TEST_NAME VARCHAR2(200),
-	TEST_DATA1 VARCHAR2(200),
+	TEST_DATA1 CLOB,
 	TEST_DATA2 VARCHAR2(200),
 	TEST_DATA3 VARCHAR2(200),
 	TEST_DATE DATE
@@ -158,7 +158,7 @@ func createUDT(conn *go_ora.Connection) error {
 
 func dropUDT(conn *go_ora.Connection) error {
 	t := time.Now()
-	stmt := go_ora.NewStmt("drop type TEST_TYPE1", conn)
+	stmt := go_ora.NewStmt("drop type UDTPAR_TYPE", conn)
 	defer func() {
 		_ = stmt.Close()
 	}()
@@ -188,11 +188,12 @@ func main() {
 	var (
 		server string
 	)
-
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
-
 	connStr := os.ExpandEnv(server)
+	if connStr == "" {
+		connStr = os.Getenv("DSN")
+	}
 	if connStr == "" {
 		fmt.Println("Missing -server option")
 		usage()
@@ -238,7 +239,7 @@ func main() {
 			fmt.Println("Can't drop table: ", err)
 		}
 	}()
-	err = conn.RegisterType("TEST_TYPE1", test1{})
+	err = conn.RegisterType("UDTPAR_TYPE", "", test2{})
 	if err != nil {
 		fmt.Println("Can't register UDT: ", err)
 		return
@@ -250,11 +251,11 @@ func main() {
 		fmt.Println("Can't insert data: ", err)
 		return
 	}
-	err = queryData(conn)
-	if err != nil {
-		fmt.Println("Can't query data: ", err)
-		return
-	}
+	//err = queryData(conn)
+	//if err != nil {
+	//	fmt.Println("Can't query data: ", err)
+	//	return
+	//}
 	err = outputPar(conn)
 	if err != nil {
 		fmt.Println("Can't query output par: ", err)

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sijms/go-ora/v2/converters"
+	"github.com/sijms/go-ora/v2/network"
 	"io"
 	"reflect"
 	"regexp"
@@ -601,18 +602,30 @@ func setUDTObject(value reflect.Value, cust *customType, input []ParameterInfo) 
 		}
 		return setUDTObject(value.Elem(), cust, input)
 	}
-	tempObj := reflect.New(cust.typ)
-	for _, par := range input {
-		if fieldIndex, ok := cust.fieldMap[par.Name]; ok {
-			err := setFieldValue(tempObj.Elem().Field(fieldIndex), par.cusType, par.oPrimValue)
-			if err != nil {
-				return err
+	if value.Kind() == reflect.Slice || value.Kind() == reflect.Array {
+		arrayObj := reflect.MakeSlice(reflect.SliceOf(cust.typ), 0, len(input))
+		for _, par := range input {
+			if temp, ok := par.oPrimValue.([]ParameterInfo); ok {
+				tempObj2 := reflect.New(cust.typ)
+				err := setFieldValue(tempObj2.Elem(), par.cusType, temp)
+				if err != nil {
+					return err
+				}
+				arrayObj = reflect.Append(arrayObj, tempObj2.Elem())
 			}
 		}
-	}
-	if value.Kind() == reflect.Ptr {
-		value.Elem().Set(tempObj.Elem())
+		value.Set(arrayObj)
 	} else {
+		tempObj := reflect.New(cust.typ)
+		for _, par := range input {
+
+			if fieldIndex, ok := cust.fieldMap[par.Name]; ok {
+				err := setFieldValue(tempObj.Elem().Field(fieldIndex), par.cusType, par.oPrimValue)
+				if err != nil {
+					return err
+				}
+			}
+		}
 		value.Set(tempObj.Elem())
 	}
 	return nil
@@ -963,19 +976,83 @@ func getTOID(conn *Connection, owner, typeName string) ([]byte, error) {
 	return ret, rows.Err()
 }
 
-func encodeObject(conn *Connection, objectData []byte, isArray bool) []byte {
-	size := len(objectData) + 7
-	//itemData := bytes.Buffer{}
-	//conn.session.WriteInt(&itemData, size, 4, true, true)
-	//itemData.Write([]byte{1, 1})
+func encodeObject(session *network.Session, objectData []byte, isArray bool) []byte {
+	size := len(objectData)
 	fieldsData := bytes.Buffer{}
 	if isArray {
-		fieldsData.Write([]byte{0x88, 0x1, 0xfe})
+		fieldsData.Write([]byte{0x88, 0x1})
 	} else {
-		fieldsData.Write([]byte{0x84, 0x1, 0xfe})
+		fieldsData.Write([]byte{0x84, 0x1})
 	}
-	// from here object should encode
-	conn.session.WriteInt(&fieldsData, size, 4, true, false)
+	if (size + 7) < 0xfe {
+		size += 3
+		fieldsData.Write([]byte{uint8(size)})
+	} else {
+		size += 7
+		fieldsData.Write([]byte{0xfe})
+		session.WriteInt(&fieldsData, size, 4, true, false)
+	}
 	fieldsData.Write(objectData)
 	return fieldsData.Bytes()
+}
+
+func decodeObject(conn *Connection, parent *ParameterInfo) error {
+	session := conn.session
+	newState := network.SessionState{InBuffer: parent.BValue}
+	session.SaveState(&newState)
+	objectType, err := session.GetByte()
+	if err != nil {
+		return err
+	}
+	ctl, err := session.GetInt(4, true, true)
+	if err != nil {
+		return err
+	}
+	if ctl == 0xFE {
+		_, err = session.GetInt(4, false, true)
+		if err != nil {
+			return err
+		}
+	}
+	switch objectType {
+	case 0x88:
+		_ /*attribsLen*/, err := session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+
+		itemsLen, err := session.GetInt(2, false, true)
+		if err != nil {
+			return err
+		}
+		pars := make([]ParameterInfo, 0, itemsLen)
+		for x := 0; x < itemsLen; x++ {
+			tempPar := parent.clone()
+			tempPar.Direction = parent.Direction
+			tempPar.BValue, err = session.GetClr()
+			if err != nil {
+				return err
+			}
+			err = decodeObject(conn, &tempPar)
+			if err != nil {
+				return err
+			}
+			pars = append(pars, tempPar)
+		}
+		parent.oPrimValue = pars
+	case 0x84:
+		pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
+		for _, attrib := range parent.cusType.attribs {
+			tempPar := attrib
+			tempPar.Direction = parent.Direction
+			err = tempPar.decodePrimValue(conn, true)
+			if err != nil {
+				return err
+			}
+			pars = append(pars, tempPar)
+		}
+		parent.oPrimValue = pars
+	}
+	_ = session.LoadState()
+	return nil
 }

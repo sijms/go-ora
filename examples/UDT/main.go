@@ -129,7 +129,7 @@ func main() {
 			fmt.Println("Can't drop UDT", err)
 		}
 	}()
-	err = conn.RegisterType("TEST_TYPE1", test1{})
+	err = conn.RegisterType("TEST_TYPE1", "", test1{})
 	if err != nil {
 		fmt.Println("Can't register UDT", err)
 		return

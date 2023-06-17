@@ -1033,35 +1033,10 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	case IntervalDS_DTY:
 		par.oPrimValue = converters.ConvertIntervalDS_DTY(par.BValue)
 	case XMLType:
-		newState := network.SessionState{InBuffer: par.BValue}
-		session.SaveState(&newState)
-		_, err = session.GetByte()
+		err = decodeObject(conn, par)
 		if err != nil {
 			return err
 		}
-		var ctl int
-		ctl, err = session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		if ctl == 0xFE {
-			_, err = session.GetInt(4, false, true)
-			if err != nil {
-				return err
-			}
-		}
-		pars := make([]ParameterInfo, 0)
-		for _, attrib := range par.cusType.attribs {
-			tempPar := attrib
-			tempPar.Direction = par.Direction
-			err = tempPar.decodePrimValue(conn, true)
-			if err != nil {
-				return err
-			}
-			pars = append(pars, tempPar)
-		}
-		par.oPrimValue = pars
-		_ = session.LoadState()
 	default:
 		return fmt.Errorf("unable to decode oracle type %v to its primitive value", par.DataType)
 	}

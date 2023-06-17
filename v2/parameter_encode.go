@@ -174,23 +174,21 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 				session := conn.session
 				//arrayBuffer.Write([]byte{1})
 				if par.DataType == XMLType {
-					arrayBuffer.Write([]byte{uint8(par.MaxNoOfArrayElements)})
+					// number of fields
+					arrayBuffer.Write([]byte{1, 3})
+					//session.WriteUint(&arrayBuffer, len(par.cusType.attribs), 2, true, true)
+					// number of elements
+					session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 2, true, false)
+					//arrayBuffer.Write([]byte{uint8(par.MaxNoOfArrayElements)})
 				} else {
 					session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
 				}
-				//session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
-				//session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 2, true, false)
-				//arrayBuffer.Write([]byte{3})
-				//03 11 00 01 10
-				//arrayBuffer.Write([]byte{0x3, 0x11, 0x0, 0x1, 0x10, uint8(par.MaxNoOfArrayElements)})
 				for _, tempPar := range value {
 					// get the binary representation of the item
 					err = tempPar.encodePrimValue(conn)
-					if par.DataType == XMLType {
-						//session.WriteUint(&arrayBuffer, len(tempPar.BValue), 4, true, true)
-						//session.WriteUint(&arrayBuffer, 0xff, 4, true, true)
-						arrayBuffer.Write([]byte{0, 0, 0, 0xfe})
-					}
+					//if par.DataType == XMLType {
+					//	arrayBuffer.Write([]byte{0, 0, 0, 0xfe})
+					//}
 					if err != nil {
 						return err
 					}
@@ -203,6 +201,9 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 					// save binary representation to the buffer
 					session.WriteClr(&arrayBuffer, tempPar.BValue)
 				}
+				//if par.DataType == XMLType {
+				//	arrayBuffer.Write([]byte{0})
+				//}
 				par.BValue = arrayBuffer.Bytes()
 			}
 			// for array set maxsize of nchar and raw
@@ -215,23 +216,12 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 			}
 			if par.DataType == XMLType {
 				par.ToID = par.cusType.arrayTOID
-				par.BValue = encodeObject(conn, par.BValue, true)
+				par.BValue = encodeObject(conn.session, par.BValue, true)
 				par.Flag = 3
 				par.MaxNoOfArrayElements = 0
 			}
 		} else {
-			par.BValue = encodeObject(conn, par.BValue, false)
-			// encode UDT object
-			//size := len(par.BValue) + 7
-			//itemData := bytes.Buffer{}
-			//conn.session.WriteInt(&itemData, size, 4, true, true)
-			//itemData.Write([]byte{1, 1})
-			//fieldsData := bytes.Buffer{}
-			//fieldsData.Write([]byte{0x84, 0x1, 0xfe})
-			//conn.session.WriteInt(&fieldsData, size, 4, true, false)
-			//fieldsData.Write(par.BValue)
-			//conn.session.WriteClr(&itemData, fieldsData.Bytes())
-			//par.BValue = itemData.Bytes()
+			par.BValue = encodeObject(conn.session, par.BValue, false)
 		}
 	default:
 		return fmt.Errorf("unsupported primitive type: %v", reflect.TypeOf(par.iPrimValue).Name())

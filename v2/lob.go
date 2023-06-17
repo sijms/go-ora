@@ -139,7 +139,7 @@ func (lob *Lob) putData(data []byte) error {
 func (lob *Lob) putString(data string) error {
 	conn := lob.connection
 	conn.connOption.Tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
-	//lob.initialize()
+	lob.initialize()
 	var strConv converters.IStringConverter
 	if lob.variableWidthChar() {
 		if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {

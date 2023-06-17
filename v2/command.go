@@ -377,7 +377,6 @@ func (stmt *Stmt) writePars() error {
 					session.PutUint(size, 4, true, true)
 					session.PutBytes(1, 1)
 					session.PutClr(par.BValue)
-					par.MaxNoOfArrayElements = 3
 					//tempBuffer := bytes.Buffer{}
 					//if par.MaxNoOfArrayElements > 0 {
 					//	tempBuffer.Write([]byte{0x84, 0x1, 0xfe})

@@ -249,8 +249,10 @@ END;`
 		attTypeName string
 	)
 	for rows.Next_() {
-		rows.Scan(&attName, &attOrder, &attTypeName)
-
+		err = rows.Scan(&attName, &attOrder, &attTypeName)
+		if err != nil {
+			return err
+		}
 		for int(attOrder) > len(cust.attribs) {
 			cust.attribs = append(cust.attribs, ParameterInfo{
 				Direction:   Input,

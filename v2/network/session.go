@@ -256,7 +256,7 @@ func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
 // used to create sslConn object
 func (session *Session) negotiate() {
 	connOption := session.Context.ConnOption
-	if session.SSL.roots == nil {
+	if session.SSL.roots == nil && len(session.SSL.Certificates) > 0 {
 		session.SSL.roots = x509.NewCertPool()
 		for _, cert := range session.SSL.Certificates {
 			session.SSL.roots.AddCert(cert)
@@ -264,9 +264,13 @@ func (session *Session) negotiate() {
 	}
 	host := connOption.GetActiveServer(false)
 	config := &tls.Config{
-		Certificates: session.SSL.tlsCertificates,
-		RootCAs:      session.SSL.roots,
-		ServerName:   host.Addr,
+		ServerName: host.Addr,
+	}
+	if len(session.SSL.tlsCertificates) > 0 {
+		config.Certificates = session.SSL.tlsCertificates
+	}
+	if session.SSL.roots != nil {
+		config.RootCAs = session.SSL.roots
 	}
 	if !connOption.SSLVerify {
 		config.InsecureSkipVerify = true

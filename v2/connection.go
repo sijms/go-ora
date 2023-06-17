@@ -181,7 +181,7 @@ func (conn *Connection) SetStringConverter(converter converters.IStringConverter
 // this function is left from v1. but v2 is using another method
 func (conn *Connection) GetNLS() (*NLSData, error) {
 
-	// we read from nls_session_parameters ONCE
+	// we read from sys.nls_session_parameters ONCE
 	cmdText := `
 	BEGIN
 		SELECT 
@@ -202,7 +202,7 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 				:p_nls_date_lang, :p_nls_sort, :p_nls_currency, :p_nls_date_format, :p_nls_iso_currency,
 				:p_nls_numeric_chars, :p_nls_dual_currency, :p_nls_timestamp, :p_nls_timestamp_tz
 		FROM
-			nls_session_parameters
+			sys.nls_session_parameters
 		;
 	END;`
 	stmt := NewStmt(cmdText, conn)

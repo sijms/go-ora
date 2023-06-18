@@ -328,7 +328,7 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 		}
 	}
 
-	if dataSet.index%noOfRowsToFetch < len(dataSet.rows) {
+	if noOfRowsToFetch > 0 && dataSet.index%noOfRowsToFetch < len(dataSet.rows) {
 		length := len(dataSet.rows[dataSet.index%noOfRowsToFetch])
 		if len(dest) < length {
 			length = len(dest)

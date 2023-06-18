@@ -31,7 +31,7 @@ end UDT_ARRAY_PKG;`
 	procedure test_get1(p_id t_id, p_test1 out test_type2) as
 		temp t_id := p_id;
 		cursor tempCur is select id, DATA from UDT_ARRAY_TABLE 
-			WHERE id in (select column_value from table(p_id));
+			WHERE id in (select column_value from table(temp));
 		tempRow tempCur%rowtype;
 		idx number := 1;
 	BEGIN

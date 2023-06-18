@@ -14,6 +14,9 @@
 ### version 2.7.7:
 * add support for CLOB/BLOB in UDT
 * add support for UDT array as output parameters
+* add function `go-ora.RegisterType(...)` so you can use it with database/sql package
+* add `arrayTypeName` (input for array type can be empty) to `RegisterType(...)` to support UDT array
+* `examples/udt_array` contain complete code that explain how to use udt array
 * parameter encode/decode is recoded from the start
 * fix uint64 truncation
 * fix some other issue

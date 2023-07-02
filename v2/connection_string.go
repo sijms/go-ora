@@ -585,7 +585,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			case "PROXY CLIENT NAME":
 				ret.connOption.DatabaseInfo.ProxyClientName = val[0]
 			case "FAILOVER":
-				return nil, errors.New("starting from v2.7.0 this feature is not supported and the driver use database/sql package fail over")
+				return nil, errors.New("starting from v2.7.0 this feature (FAILOVER) is not supported and the driver use database/sql package fail over")
 				//ret.connOption.Failover, err = strconv.Atoi(val[0])
 				//if err != nil {
 				//	ret.connOption.Failover = 0
@@ -595,7 +595,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			case "RE-TRY TIME":
 				fallthrough
 			case "RETRY TIME":
-				return nil, errors.New("starting from v2.7.0 this feature is not supported and the driver use database/sql package fail over")
+				return nil, errors.New("starting from v2.7.0 this feature (RETRY TIME) is not supported and the driver use database/sql package fail over")
 				//ret.connOption.RetryTime, err = strconv.Atoi(val[0])
 				//if err != nil {
 				//	ret.connOption.RetryTime = 0

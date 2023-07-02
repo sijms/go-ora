@@ -556,7 +556,8 @@ func setNull(value reflect.Value) error {
 	if value.Kind() == reflect.Ptr && value.IsNil() {
 		return nil
 	}
-	value.SetZero()
+	value.Set(reflect.Zero(value.Type()))
+	//value.SetZero()
 	return nil
 }
 func setBFile(value reflect.Value, input BFile) error {

@@ -1490,7 +1490,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 									continue
 								}
 								switch aval := par.Value.(type) {
-								case sql.NullFloat64:
+								case *sql.NullFloat64:
 									if aval.Valid {
 										err = setNumber(fieldValue, aval.Float64)
 										if err != nil {
@@ -1499,7 +1499,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
-								case sql.NullString:
+								case *sql.NullString:
 									if aval.Valid {
 										err = setString(fieldValue, aval.String)
 										if err != nil {
@@ -1508,7 +1508,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
-								case NullNVarChar:
+								case *NullNVarChar:
 									if aval.Valid {
 										err = setString(fieldValue, string(aval.NVarChar))
 										if err != nil {
@@ -1517,7 +1517,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
-								case sql.NullTime:
+								case *sql.NullTime:
 									if aval.Valid {
 										err = setTime(fieldValue, aval.Time)
 										if err != nil {
@@ -1526,7 +1526,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
-								case NullTimeStamp:
+								case *NullTimeStamp:
 									if aval.Valid {
 										err = setTime(fieldValue, time.Time(aval.TimeStamp))
 										if err != nil {
@@ -1535,7 +1535,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 									} else {
 										fieldValue.Set(reflect.Zero(fieldType))
 									}
-								case NullTimeStampTZ:
+								case *NullTimeStampTZ:
 									if aval.Valid {
 										err = setTime(fieldValue, time.Time(aval.TimeStampTZ))
 										if err != nil {
@@ -1548,16 +1548,16 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 							}
 						} else {
 							switch aval := par.Value.(type) {
-							case []byte:
+							case *[]byte:
 								if aval == nil {
 									fieldValue.Set(reflect.Zero(fieldType))
 								} else {
-									err := setBytes(fieldValue, aval)
+									err := setBytes(fieldValue, *aval)
 									if err != nil {
 										return err
 									}
 								}
-							case Clob:
+							case *Clob:
 								if aval.Valid {
 									err := setString(fieldValue, aval.String)
 									if err != nil {
@@ -1566,7 +1566,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 								} else {
 									fieldValue.Set(reflect.Zero(fieldType))
 								}
-							case NClob:
+							case *NClob:
 								if aval.Valid {
 									err := setString(fieldValue, aval.String)
 									if err != nil {
@@ -1575,7 +1575,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 								} else {
 									fieldValue.Set(reflect.Zero(fieldType))
 								}
-							case Blob:
+							case *Blob:
 								if aval.Valid {
 									err := setBytes(fieldValue, aval.Data)
 									if err != nil {
@@ -1601,7 +1601,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		fieldValue := tempVal.Field(fieldIndex).Interface()
 		fieldType := tempType.Field(fieldIndex).Type
 		hasNullValue := false
-		if tempType.Field(fieldIndex).Type.Kind() == reflect.Ptr {
+		if fieldType.Kind() == reflect.Ptr {
 			if tempVal.Field(fieldIndex).IsNil() {
 				hasNullValue = true
 				fieldType = fieldType.Elem()
@@ -1610,16 +1610,16 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 		}
 		if _, ok := fieldValue.(driver.Valuer); ok {
-			//if _, ok = fieldValue.(sql.Scanner); ok {
-			tempPar, err = stmt.NewParam(name, fieldValue, size, dir)
-			return
-			//}
+			if _, ok = fieldValue.(sql.Scanner); ok {
+				tempPar, err = stmt.NewParam(name, fieldValue, size, dir)
+				return
+			}
 		}
 		typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
 		if len(_type) > 0 {
 			switch _type {
 			case "number":
-				var fieldVal sql.NullFloat64
+				var fieldVal = &sql.NullFloat64{}
 				if !hasNullValue {
 					fieldVal.Float64, err = getFloat(fieldValue)
 					if err != nil {
@@ -1630,19 +1630,19 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 				}
 				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 			case "varchar":
-				var fieldVal sql.NullString
+				var fieldVal = &sql.NullString{}
 				if !hasNullValue {
 					fieldVal.String, fieldVal.Valid = getString(fieldValue), true
 				}
 				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 			case "nvarchar":
-				var fieldVal NullNVarChar
+				var fieldVal = &NullNVarChar{}
 				if !hasNullValue {
 					fieldVal.NVarChar, fieldVal.Valid = NVarChar(getString(fieldValue)), true
 				}
 				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 			case "date":
-				var fieldVal sql.NullTime
+				var fieldVal = &sql.NullTime{}
 				if !hasNullValue {
 					fieldVal.Time, err = getDate(fieldValue)
 					if err != nil {
@@ -1653,7 +1653,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 				}
 				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 			case "timestamp":
-				var fieldVal NullTimeStamp
+				var fieldVal = &NullTimeStamp{}
 				if !hasNullValue {
 					var tempDate time.Time
 					tempDate, err = getDate(fieldValue)
@@ -1666,7 +1666,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 				}
 				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 			case "timestamptz":
-				var fieldVal NullTimeStampTZ
+				var fieldVal = &NullTimeStampTZ{}
 				if !hasNullValue {
 					var tempDate time.Time
 					tempDate, err = getDate(fieldValue)
@@ -1687,21 +1687,21 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 						return
 					}
 				}
-				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
+				tempPar, err = stmt.NewParam(name, &fieldVal, size, dir)
 			case "clob":
-				fieldVal := Clob{}
+				fieldVal := &Clob{}
 				if !hasNullValue {
 					fieldVal.String, fieldVal.Valid = getString(fieldValue), true
 				}
 				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 			case "nclob":
-				fieldVal := NClob{}
+				fieldVal := &NClob{}
 				if !hasNullValue {
 					fieldVal.String, fieldVal.Valid = getString(fieldValue), true
 				}
 				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 			case "blob":
-				fieldVal := Blob{}
+				fieldVal := &Blob{}
 				if !hasNullValue {
 					fieldVal.Data, err = getBytes(fieldValue)
 					if err != nil {
@@ -1714,7 +1714,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		} else {
 			//fieldType := reflect.TypeOf(fieldValue)
 			if tNumber(fieldType) {
-				var fieldVal sql.NullFloat64
+				var fieldVal = &sql.NullFloat64{}
 				if !hasNullValue {
 					fieldVal.Float64, err = getFloat(fieldValue)
 					if err != nil {
@@ -1727,7 +1727,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			switch fieldType.Kind() {
 			case reflect.Bool:
-				var fieldVal sql.NullFloat64
+				var fieldVal = &sql.NullFloat64{}
 				if !hasNullValue {
 					fieldVal.Float64, err = getFloat(fieldValue)
 					if err != nil {
@@ -1738,7 +1738,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 				}
 				tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 			case reflect.String:
-				fieldVal := sql.NullString{}
+				fieldVal := &sql.NullString{}
 				if !hasNullValue {
 					fieldVal.String, fieldVal.Valid = getString(fieldValue), true
 				}
@@ -1746,7 +1746,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			default:
 				switch aval := fieldValue.(type) {
 				case NVarChar:
-					fieldVal := NullNVarChar{}
+					fieldVal := &NullNVarChar{}
 					if !hasNullValue {
 						fieldVal.NVarChar, fieldVal.Valid = aval, true
 					}
@@ -1756,31 +1756,31 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 					if !hasNullValue {
 						fieldVal = aval
 					}
-					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
+					tempPar, err = stmt.NewParam(name, &fieldVal, size, dir)
 				case time.Time:
-					fieldVal := sql.NullTime{}
+					fieldVal := &sql.NullTime{}
 					if !hasNullValue {
 						fieldVal.Time, fieldVal.Valid = aval, true
 					}
 					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 				case TimeStamp:
-					fieldVal := NullTimeStamp{}
+					fieldVal := &NullTimeStamp{}
 					if !hasNullValue {
 						fieldVal.TimeStamp, fieldVal.Valid = aval, true
 					}
 					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 				case TimeStampTZ:
-					fieldVal := NullTimeStampTZ{}
+					fieldVal := &NullTimeStampTZ{}
 					if !hasNullValue {
 						fieldVal.TimeStampTZ, fieldVal.Valid = aval, true
 					}
 					tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 				case Clob:
-					tempPar, err = stmt.NewParam(name, aval, size, dir)
+					tempPar, err = stmt.NewParam(name, &aval, size, dir)
 				case NClob:
-					tempPar, err = stmt.NewParam(name, aval, size, dir)
+					tempPar, err = stmt.NewParam(name, &aval, size, dir)
 				case Blob:
-					tempPar, err = stmt.NewParam(name, aval, size, dir)
+					tempPar, err = stmt.NewParam(name, &aval, size, dir)
 				}
 			}
 		}

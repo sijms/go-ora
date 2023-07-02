@@ -123,10 +123,11 @@ func (drv *OracleDriver) OpenConnector(name string) (driver.Connector, error) {
 func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, error) {
 
 	conn, err := NewConnection(connector.connectString)
-	conn.cusTyp = connector.drv.cusTyp
 	if err != nil {
 		return nil, err
 	}
+	conn.cusTyp = connector.drv.cusTyp
+
 	conn.connOption.Dialer = connector.dialer
 	err = conn.OpenWithContext(ctx)
 	if err != nil {

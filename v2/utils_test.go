@@ -311,3 +311,26 @@ func TestSetArray(t *testing.T) {
 	}
 	fmt.Println(array)
 }
+
+func TestSetNull(t *testing.T) {
+	var x int = 10
+	var xx float64 = 3.3
+	var xxx string = "test"
+	var rx = reflect.ValueOf(&x).Elem()
+	var rxx = reflect.ValueOf(&xx).Elem()
+	var rxxx = reflect.ValueOf(&xxx).Elem()
+	//var xx = reflect.ValueOf(float64(3.3))
+	//var xxx = reflect.ValueOf("test")
+	setNull(rx)
+	setNull(rxx)
+	setNull(rxxx)
+	if x != 0 {
+		t.Error("expected 0 get ", x)
+	}
+	if xx != 0 {
+		t.Error("expected 0 get: ", xx)
+	}
+	if xxx != "" {
+		t.Error("expected empty get: ", xxx)
+	}
+}

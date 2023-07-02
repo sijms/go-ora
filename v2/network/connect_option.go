@@ -135,6 +135,8 @@ func (op *ConnectionOption) updateSSL(server *ServerAddr) error {
 }
 
 func (op *ConnectionOption) UpdateDatabaseInfo(connStr string) error {
+	connStr = strings.ReplaceAll(connStr, "\r", "")
+	connStr = strings.ReplaceAll(connStr, "\n", "")
 	op.connStr = connStr
 	var err error
 	op.Servers, err = extractServers(connStr)

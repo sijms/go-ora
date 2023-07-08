@@ -869,6 +869,8 @@ func (par *ParameterInfo) clone() ParameterInfo {
 func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	session := conn.session
 	var err error
+	par.oPrimValue = nil
+	par.BValue = nil
 	if par.MaxNoOfArrayElements > 0 {
 		size, err := session.GetInt(4, true, true)
 		if err != nil {
@@ -955,6 +957,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 		return err
 	}
 	if par.BValue == nil {
+
 		return nil
 	}
 	switch par.DataType {
@@ -1195,8 +1198,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 //}
 
 func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
-	par.oPrimValue = nil
-	par.BValue = nil
 	return par.decodePrimValue(connection, false)
 	//if err != nil {
 	//	return err

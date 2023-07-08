@@ -149,7 +149,10 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 	case uint64:
 		par.BValue = converters.EncodeUint64(value)
 	case string:
-		conv := converters.NewStringConverter(par.CharsetID)
+		conv, err := conn.getStrConv(par.CharsetID)
+		if err != nil {
+			return err
+		}
 		par.BValue = conv.Encode(value)
 		par.MaxLen = len(par.BValue)
 		if par.MaxLen == 0 {
@@ -566,7 +569,11 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			if par.MaxCharLen < size {
 				par.MaxCharLen = size
 			}
-			par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(par.CharsetID)
+			conv, err := connection.getStrConv(par.CharsetID)
+			if err != nil {
+				return err
+			}
+			par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(conv.GetLangID())
 		}
 		if par.DataType == RAW {
 			if par.MaxLen < size {

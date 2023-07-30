@@ -1375,7 +1375,26 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 				param.MaxCharLen = int(length.Int64)
 				param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
 			default:
-				return fmt.Errorf("unsupported attribute type: %s", attTypeName.String)
+				found := false
+				for name, value := range driver.cusTyp {
+					if name == strings.ToUpper(attTypeName.String) {
+						found = true
+						param.cusType = new(customType)
+						*param.cusType = value
+						param.ToID = value.toid
+						break
+					}
+					if value.arrayTypeName == strings.ToUpper(attTypeName.String) {
+						found = true
+						param.cusType = new(customType)
+						*param.cusType = value
+						param.ToID = value.toid
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("unsupported attribute type: %s", attTypeName.String)
+				}
 			}
 		}
 		if len(cust.attribs) == 0 {

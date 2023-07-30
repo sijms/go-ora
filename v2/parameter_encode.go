@@ -227,7 +227,7 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 			// for array set maxsize of nchar and raw
 			if par.DataType == NCHAR {
 				par.MaxLen = conn.maxLen.nvarchar
-				par.MaxCharLen = par.MaxLen / converters.MaxBytePerChar(par.CharsetID)
+				par.MaxCharLen = par.MaxLen // / converters.MaxBytePerChar(par.CharsetID)
 			}
 			if par.DataType == RAW {
 				par.MaxLen = conn.maxLen.raw
@@ -438,7 +438,7 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		}
 	case NCHAR:
 		tempString := getString(val)
-		par.MaxCharLen = len([]rune(tempString))
+		par.MaxCharLen = len(tempString)
 		par.iPrimValue = tempString
 	case DATE:
 		fallthrough

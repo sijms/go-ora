@@ -1030,7 +1030,20 @@ func decodeObject(conn *Connection, parent *ParameterInfo) error {
 		for x := 0; x < itemsLen; x++ {
 			tempPar := parent.clone()
 			tempPar.Direction = parent.Direction
-			tempPar.BValue, err = session.GetClr()
+			ctlByte, err := session.GetByte()
+			if err != nil {
+				return err
+			}
+			var objectBufferSize int
+			if ctlByte == 0xFE {
+				objectBufferSize, err = session.GetInt(4, false, true)
+				if err != nil {
+					return err
+				}
+			} else {
+				objectBufferSize = int(ctlByte)
+			}
+			tempPar.BValue, err = session.GetBytes(objectBufferSize)
 			if err != nil {
 				return err
 			}

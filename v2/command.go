@@ -426,15 +426,15 @@ func (stmt *Stmt) write() error {
 			session.PutBytes(3, 0x4E, 0)
 			count = stmt._noOfRowsToFetch
 			exeOf = 0x20
-			if stmt._hasReturnClause || stmt.stmtType == PLSQL || stmt.disableCompression {
-				exeOf |= 0x40000
-			}
 
 		} else {
 			session.PutBytes(3, 4, 0)
 		}
 		if stmt.connection.autoCommit {
 			execFlag = 1
+		}
+		if stmt._hasReturnClause || stmt.stmtType == PLSQL || stmt.disableCompression {
+			exeOf |= 0x40000
 		}
 		session.PutUint(stmt.cursorID, 2, true, true)
 		session.PutUint(count, 2, true, true)
@@ -1933,6 +1933,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		var par *ParameterInfo
 		switch tempOut := args[x].Value.(type) {
 		case sql.Out:
+			stmt.bulkExec = false
 			direction := Output
 			if tempOut.In {
 				direction = InOut
@@ -1942,6 +1943,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				return nil, err
 			}
 		case *sql.Out:
+			stmt.bulkExec = false
 			direction := Output
 			if tempOut.In {
 				direction = InOut
@@ -1951,6 +1953,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				return nil, err
 			}
 		case Out:
+			stmt.bulkExec = false
 			direction := Output
 			if tempOut.In {
 				direction = InOut
@@ -1960,6 +1963,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				return nil, err
 			}
 		case *Out:
+			stmt.bulkExec = false
 			direction := Output
 			if tempOut.In {
 				direction = InOut

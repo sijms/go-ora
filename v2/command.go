@@ -353,61 +353,44 @@ func NewStmt(text string, conn *Connection) *Stmt {
 }
 
 func (stmt *Stmt) writePars() error {
-	if len(stmt.Pars) > 0 {
-		session := stmt.connection.session
-		session.PutBytes(7)
-		for _, par := range stmt.Pars {
-			if par.Flag == 0x80 {
-				continue
-			}
-			if !stmt.parse && par.Direction == Output && stmt.stmtType != PLSQL {
-				continue
-			}
-			if par.DataType == REFCURSOR {
-				session.PutBytes(1, 0)
-			} else if par.Direction == Input &&
-				(par.DataType == OCIClobLocator || par.DataType == OCIBlobLocator || par.DataType == OCIFileLocator) {
-				session.PutUint(len(par.BValue), 2, true, true)
-				session.PutClr(par.BValue)
+	session := stmt.connection.session
+	buffer := bytes.Buffer{}
+	for _, par := range stmt.Pars {
+		if par.Flag == 0x80 {
+			continue
+		}
+		if !stmt.parse && par.Direction == Output && stmt.stmtType != PLSQL {
+			continue
+		}
+		if par.DataType == REFCURSOR {
+			session.WriteBytes(&buffer, 1, 0)
+		} else if par.Direction == Input &&
+			(par.DataType == OCIClobLocator || par.DataType == OCIBlobLocator || par.DataType == OCIFileLocator) {
+			session.WriteUint(&buffer, len(par.BValue), 2, true, true)
+			session.WriteClr(&buffer, par.BValue)
+		} else {
+			if par.cusType != nil {
+				session.WriteBytes(&buffer, 0, 0, 0, 0)
+				size := len(par.BValue)
+				session.WriteUint(&buffer, size, 4, true, true)
+				session.WriteBytes(&buffer, 1, 1)
+				session.WriteClr(&buffer, par.BValue)
 			} else {
-				if par.cusType != nil {
-					//size := len(par.BValue) + 7
-					session.PutBytes(0, 0, 0, 0)
-					size := len(par.BValue)
-					session.PutUint(size, 4, true, true)
-					session.PutBytes(1, 1)
-					session.PutClr(par.BValue)
-					//tempBuffer := bytes.Buffer{}
-					//if par.MaxNoOfArrayElements > 0 {
-					//	tempBuffer.Write([]byte{0x84, 0x1, 0xfe})
-					//} else {
-					//	tempBuffer.Write([]byte{0x84, 0x1, 0xfe})
-					//}
-					//session.WriteUint(&tempBuffer, size, 4, true, false)
-					//tempBuffer.Write(par.BValue)
-					//session.PutClr(tempBuffer.Bytes())
-					//session.PutBytes(par.BValue...)
-				} else {
-					if par.MaxNoOfArrayElements > 0 {
-						if par.BValue == nil {
-							session.PutBytes(0)
-						} else {
-							session.PutBytes(par.BValue...)
-						}
+				if par.MaxNoOfArrayElements > 0 {
+					if par.BValue == nil {
+						session.WriteBytes(&buffer, 0)
 					} else {
-						session.PutClr(par.BValue)
+						session.WriteBytes(&buffer, par.BValue...)
 					}
+				} else {
+					session.WriteClr(&buffer, par.BValue)
 				}
 			}
-			//if par.DataType != RAW {
-			//
-			//}
 		}
-		//for _, par := range stmt.Pars {
-		//	if par.DataType == RAW {
-		//		session.PutClr(par.BValue)
-		//	}
-		//}
+	}
+	if buffer.Len() > 0 {
+		session.PutBytes(7)
+		session.PutBytes(buffer.Bytes()...)
 	}
 	return nil
 }
@@ -426,16 +409,16 @@ func (stmt *Stmt) write() error {
 			session.PutBytes(3, 0x4E, 0)
 			count = stmt._noOfRowsToFetch
 			exeOf = 0x20
-
+			if stmt._hasReturnClause || stmt.stmtType == PLSQL || stmt.disableCompression {
+				exeOf |= 0x40000
+			}
 		} else {
 			session.PutBytes(3, 4, 0)
 		}
 		if stmt.connection.autoCommit {
 			execFlag = 1
 		}
-		if stmt._hasReturnClause || stmt.stmtType == PLSQL || stmt.disableCompression {
-			exeOf |= 0x40000
-		}
+
 		session.PutUint(stmt.cursorID, 2, true, true)
 		session.PutUint(count, 2, true, true)
 		session.PutUint(exeOf, 2, true, true)

@@ -11,6 +11,38 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### version 2.7.11
+* add support for DBMS_OUTPUT
+```golang
+import (
+  "database/sql"
+  db_out "github.com/sijms/go-ora/dbms_output"
+  _ "github.com/sijms/go-ora/v2"
+  "os"
+)
+
+// create new output
+// conn is *sql.DB
+// bufferSize between 2000 and 32767
+output, err := db_out.NewOutput(conn, 0x7FFF)
+
+// close before exit
+defer func() {
+  err = output.Close()
+}()
+
+// put some line 
+err = exec_simple_stmt(conn, `BEGIN
+DBMS_OUTPUT.PUT_LINE('this is a test');
+END;`)
+
+// get data as string
+line, err := output.GetOutput()
+
+// or print it to io.StringWriter
+err = output.Print(os.Stdout)
+```
+* complete code found in examples/dbms_output/main.go
 ### version 2.7.7:
 * add support for CLOB/BLOB in UDT
 * add support for UDT array as output parameters

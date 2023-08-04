@@ -584,3 +584,7 @@ func Benchmark_DecodeNumber(b *testing.B) {
 		_ = DecodeNumber([]byte{62, 3, 25, 51, 102})
 	}
 }
+
+func TestDecodeNumber(t *testing.T) {
+	t.Log(DecodeNumber([]byte{01, 0}))
+}

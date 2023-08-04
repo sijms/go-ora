@@ -1,4 +1,4 @@
-package dbms_output
+package dbms
 
 import (
 	"database/sql"

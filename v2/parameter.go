@@ -91,6 +91,7 @@ const (
 	UROWID           TNSType = 208
 	TimeStampLTZ_DTY TNSType = 231
 	TimeStampeLTZ    TNSType = 232
+	Boolean          TNSType = 0xFC
 )
 
 type ParameterType int
@@ -866,6 +867,7 @@ func (par *ParameterInfo) clone() ParameterInfo {
 	tempPar.Precision = par.Precision
 	return tempPar
 }
+
 func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	session := conn.session
 	var err error
@@ -967,6 +969,8 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 			return err
 		}
 		par.oPrimValue = strConv.Decode(par.BValue)
+	case Boolean:
+		par.oPrimValue = converters.DecodeBool(par.BValue)
 	case RAW:
 		par.oPrimValue = par.BValue
 	case NUMBER:

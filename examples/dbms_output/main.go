@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	db_out "github.com/sijms/go-ora/dbms_output"
+	"github.com/sijms/go-ora/dbms"
 	_ "github.com/sijms/go-ora/v2"
 	"os"
 )
@@ -30,7 +30,7 @@ func main() {
 			fmt.Println("error in close: ", err)
 		}
 	}()
-	output, err := db_out.NewOutput(conn, 0x7FFF)
+	output, err := dbms.NewOutput(conn, 0x7FFF)
 	if err != nil {
 		fmt.Println("can't init DBMS_OUTPUT: ", err)
 		return

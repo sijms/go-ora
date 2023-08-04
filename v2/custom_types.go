@@ -8,6 +8,8 @@ import (
 type ValueEncoder interface {
 	EncodeValue(param *ParameterInfo, connection *Connection) error
 }
+
+type PLBool bool
 type NVarChar string
 
 func (val *NVarChar) Value() (driver.Value, error) {

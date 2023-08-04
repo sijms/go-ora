@@ -148,6 +148,8 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 		par.BValue = converters.EncodeInt64(value)
 	case uint64:
 		par.BValue = converters.EncodeUint64(value)
+	case bool:
+		par.BValue = converters.EncodeBool(value)
 	case string:
 		conv, err := conn.getStrConv(par.CharsetID)
 		if err != nil {
@@ -268,6 +270,9 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, conn *Connection) err
 	}
 
 	switch goType {
+	case tyPLBool:
+		par.DataType = Boolean
+		par.MaxLen = converters.MAX_LEN_BOOL
 	case tyString, tyNullString:
 		par.DataType = NCHAR
 		par.CharsetForm = 1
@@ -431,6 +436,11 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		return nil
 	}
 	switch par.DataType {
+	case Boolean:
+		par.iPrimValue, err = getBool(val)
+		if err != nil {
+			return err
+		}
 	case NUMBER:
 		par.iPrimValue, err = getNumber(val)
 		if err != nil {

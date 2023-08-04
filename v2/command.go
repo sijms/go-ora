@@ -2128,10 +2128,21 @@ func (stmt *Stmt) useNamedParameters() error {
 	}
 	var parCollection = make([]ParameterInfo, 0, len(names))
 	for x := 0; x < len(names); x++ {
+		// search if name is repeated
+		repeated := false
+		for y := x - 1; y >= 0; y-- {
+			if names[y] == names[x] {
+				repeated = true
+				//parCollection[x].Flag = 0x80
+				break
+			}
+		}
 		found := false
 		for _, par := range stmt.Pars {
 			if par.Name == names[x] {
-				parCollection = append(parCollection, par)
+				if !repeated {
+					parCollection = append(parCollection, par)
+				}
 				found = true
 				break
 			}
@@ -2139,12 +2150,7 @@ func (stmt *Stmt) useNamedParameters() error {
 		if !found {
 			return fmt.Errorf("parameter %s is not defined in parameter list", names[x])
 		}
-		for y := x - 1; y >= 0; y-- {
-			if names[y] == names[x] {
-				parCollection[x].Flag = 0x80
-				break
-			}
-		}
+
 	}
 	stmt.Pars = parCollection
 	return nil

@@ -1193,10 +1193,13 @@ func DecodeDate(data []byte) (time.Time, error) {
 			int(data[4]-1), int(data[5]-1), int(data[6]-1), nanoSec, time.UTC), nil
 	}
 	var zone *time.Location
+	var timeInZone bool
 	//var err error
+	fmt.Println(data[11:13])
 	if data[11]&0x80 != 0 {
 		var regionCode = (int(data[11]) & 0x7F) << 6
 		regionCode += (int(data[12]) & 0xFC) >> 2
+		timeInZone = (data[12]&0x1 == 1)
 		name, found := oracleZones[regionCode]
 		if found {
 			zone, _ = time.LoadLocation(name)
@@ -1217,8 +1220,13 @@ func DecodeDate(data []byte) (time.Time, error) {
 	if zone == nil {
 		zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHour, tzMin), tzHour*60*60+tzMin*60)
 	}
-	return time.Date(year, time.Month(data[2]), int(data[3]),
-		int(data[4]-1), int(data[5]-1), int(data[6]-1), nanoSec, zone), nil
+	if timeInZone {
+		return time.Date(year, time.Month(data[2]), int(data[3]),
+			int(data[4]-1), int(data[5]-1), int(data[6]-1), nanoSec, zone), nil
+	}
+	ret := time.Date(year, time.Month(data[2]), int(data[3]),
+		int(data[4]-1), int(data[5]-1), int(data[6]-1), nanoSec, time.UTC)
+	return ret.In(zone), nil
 	//return time.Date(year, time.Month(data[2]), int(data[3]),
 	//	int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, time.UTC), nil
 }

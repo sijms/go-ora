@@ -154,8 +154,8 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 				if strings.ToUpper(colInfo.Name) != strings.ToUpper(name) {
 					continue
 				}
-
-				err := setFieldValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), colInfo.cusType, dataSet.currentRow[srcIndex+processedFields])
+				err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), srcIndex+processedFields)
+				//err := setFieldValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), colInfo.cusType, dataSet.currentRow[srcIndex+processedFields])
 				if err != nil {
 					return err
 				}
@@ -168,7 +168,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 
 		}
 		// else
-		err := setFieldValue(reflect.ValueOf(dest[destIndex]).Elem(), dataSet.Cols[srcIndex].cusType, dataSet.currentRow[srcIndex])
+		err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem(), srcIndex)
 		if err != nil {
 			return err
 		}
@@ -190,13 +190,40 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 // set object value using currentRow[colIndex] return true if succeed or false
 // for non-supported type
 // error means error occur during operation
-func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, error) {
-	//field := dataSet.currentRow[colIndex]
+func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) error {
+	value := dataSet.currentRow[colIndex]
 	col := dataSet.Cols[colIndex]
-	err := setFieldValue(obj, col.cusType, dataSet.currentRow[colIndex])
-	if err != nil {
-		return false, err
+	if value == nil {
+		return setNull(obj)
 	}
+	switch val := value.(type) {
+	case int64:
+		return setNumber(obj, float64(val))
+	case float64:
+		return setNumber(obj, val)
+	case string:
+		return setString(obj, val)
+	case time.Time:
+		return setTime(obj, val)
+	case []byte:
+		return setBytes(obj, val)
+	case bool:
+		if val {
+			return setNumber(obj, 1)
+		} else {
+			return setNumber(obj, 0)
+		}
+	default:
+		if col.cusType != nil && col.cusType.typ == obj.Type() {
+			obj.Set(reflect.ValueOf(value))
+			return nil
+		}
+		return fmt.Errorf("can't assign value: %v to object of type: %v", value, obj.Type().Name())
+	}
+	//err := setFieldValue(obj, col.cusType, dataSet.currentRow[colIndex])
+	//if err != nil {
+	//	return err
+	//}
 	//if col.cusType != nil && col.cusType.typ == obj.Type() {
 	//	obj.Set(reflect.ValueOf(field))
 	//	return true, nil
@@ -255,7 +282,6 @@ func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) (bool, e
 	//		return false, nil
 	//	}
 	//}
-	return true, nil
 }
 
 func (dataSet *DataSet) Err() error {

@@ -626,9 +626,10 @@ func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 	if err != nil {
 		return err
 	}
-	if stmt.connection.connOption.Lob > 0 {
-		return stmt.decodePrim(dataSet)
-	}
+	//if stmt.connection.connOption.Lob > 0 {
+	//
+	//}
+	return stmt.decodePrim(dataSet)
 	return nil
 }
 func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {

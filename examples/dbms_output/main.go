@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"os"
+
 	"github.com/sijms/go-ora/dbms"
 	_ "github.com/sijms/go-ora/v2"
-	"os"
 )
 
 func exec_simple_conn(conn *sql.DB, texts ...string) error {
@@ -18,6 +20,85 @@ func exec_simple_conn(conn *sql.DB, texts ...string) error {
 	}
 	return err
 }
+
+func addOutput(conn *sql.DB, data string) error {
+	return exec_simple_conn(conn, fmt.Sprintf(`--sql
+		BEGIN
+			DBMS_OUTPUT.PUT_LINE('%s');
+		END;
+	`, data))
+}
+
+func withoutContext(conn *sql.DB) {
+	output, err := dbms.NewOutput(conn, 0x7FFF)
+	if err != nil {
+		fmt.Println("can't init DBMS_OUTPUT: ", err)
+		return
+	}
+	defer func() {
+		err = output.Close()
+		if err != nil {
+			fmt.Println("can't end dbms_output: ", err)
+		}
+	}()
+	err = addOutput(conn, "test1")
+	if err != nil {
+		fmt.Println("can't write output: ", err)
+		return
+	}
+	line, err := output.GetOutput()
+	if err != nil {
+		fmt.Println("can't get output: ", err)
+		return
+	}
+	fmt.Print(line)
+	err = addOutput(conn, "test2")
+	if err != nil {
+		fmt.Println("can't write output: ", err)
+		return
+	}
+	err = output.Print(os.Stdout)
+	if err != nil {
+		fmt.Println("can't print: ", err)
+		return
+	}
+}
+
+func withContext(conn *sql.DB, ctx context.Context) {
+	err := dbms.EnableOutput(ctx, conn)
+	if err != nil {
+		fmt.Println("can't init DBMS_OUTPUT: ", err)
+		return
+	}
+	defer func() {
+		err = dbms.DisableOutput(ctx)
+		if err != nil {
+			fmt.Println("can't end dbms_output: ", err)
+		}
+	}()
+	err = addOutput(conn, "test1")
+	if err != nil {
+		fmt.Println("can't write output: ", err)
+		return
+	}
+	output, err := dbms.GetOutput(ctx)
+	if err != nil {
+		fmt.Println("can't get output: ", err)
+		return
+	}
+	fmt.Print(output)
+	err = addOutput(conn, "test2")
+	if err != nil {
+		fmt.Println("can't write output: ", err)
+		return
+	}
+	err = dbms.PrintOutput(ctx, os.Stdout)
+	if err != nil {
+		fmt.Println("can't print output: ", err)
+		return
+	}
+}
+
 func main() {
 	conn, err := sql.Open("oracle", os.Getenv("DSN"))
 	if err != nil {
@@ -30,41 +111,8 @@ func main() {
 			fmt.Println("error in close: ", err)
 		}
 	}()
-	output, err := dbms.NewOutput(conn, 0x7FFF)
-	if err != nil {
-		fmt.Println("can't init DBMS_OUTPUT: ", err)
-		return
-	}
-	defer func() {
-		err = output.Close()
-		if err != nil {
-			fmt.Println("can't end dbms_output: ", err)
-		}
-	}()
-	err = exec_simple_conn(conn, `BEGIN
-DBMS_OUTPUT.PUT_LINE('this is a test');
-END;`)
-	if err != nil {
-		fmt.Println("can't write output: ", err)
-		return
-	}
-	line, err := output.GetOutput()
-	if err != nil {
-		fmt.Println("can't get output: ", err)
-		return
-	}
-	fmt.Print(line)
-	err = exec_simple_conn(conn, `BEGIN
-DBMS_OUTPUT.PUT_LINE('this is a test2');
-END;`)
-	if err != nil {
-		fmt.Println("can't write output: ", err)
-		return
-	}
-	err = output.Print(os.Stdout)
-	if err != nil {
-		fmt.Println("can't print: ", err)
-		return
-	}
 
+	withoutContext(conn)
+	ctx := context.Background()
+	withContext(conn, ctx)
 }

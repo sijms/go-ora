@@ -2236,7 +2236,7 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 	}
 }
 
-// addParam create new parameter and append it to stmt.Pars
+// addParam
 func (stmt *Stmt) addParam(name string, val driver.Value, size int, direction ParameterDirection) error {
 	par, err := stmt.NewParam(name, val, size, direction)
 	if err != nil {

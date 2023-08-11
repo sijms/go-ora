@@ -1096,6 +1096,19 @@ func (conn *Connection) CheckNamedValue(_ *driver.NamedValue) error {
 	return nil
 }
 
+func (conn *Connection) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) *DataSet {
+	stmt := NewStmt(query, conn)
+	stmt.autoClose = true
+	rows, err := stmt.QueryContext(ctx, args)
+	dataSet := rows.(*DataSet)
+	if err != nil {
+		dataSet.lasterr = err
+		return dataSet
+	}
+	dataSet.Next_()
+	return dataSet
+}
+
 func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true

@@ -200,164 +200,164 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		ret.connOption.Servers = append(ret.connOption.Servers, tempAddr)
 	}
 	ret.connOption.ServiceName = strings.Trim(u.Path, "/")
-	if q != nil {
-		for key, val := range q {
-			switch strings.ToUpper(key) {
-			case "CONNSTR":
-				err = ret.connOption.UpdateDatabaseInfo(q.Get("connStr"))
-				if err != nil {
-					return nil, err
-				}
-			case "SERVER":
-				for _, srv := range val {
-					srv = strings.TrimSpace(srv)
-					if srv != "" {
-						host, p, err := net.SplitHostPort(srv)
-						if err != nil {
-							return nil, err
-						}
-						tempAddr := network.ServerAddr{Addr: host, Port: defaultPort}
-						if p != "" {
-							tempAddr.Port, err = strconv.Atoi(p)
-							if err != nil {
-								tempAddr.Port = defaultPort
-							}
-						}
-						ret.connOption.Servers = append(ret.connOption.Servers, tempAddr)
-					}
-				}
-			case "SERVICE NAME":
-				ret.connOption.ServiceName = val[0]
-			case "SID":
-				ret.connOption.SID = val[0]
-			case "INSTANCE NAME":
-				ret.connOption.InstanceName = val[0]
-			case "WALLET":
-				ret.WalletPath = val[0]
-			case "AUTH TYPE":
-				if strings.ToUpper(val[0]) == "OS" {
-					ret.authType = OS
-				} else {
-					ret.authType = Normal
-				}
-			case "OS USER":
-				ret.connOption.ClientInfo.UserName = val[0]
-			case "OS PASS":
-				fallthrough
-			case "OS PASSWORD":
-				ret.connOption.ClientInfo.Password = val[0]
-			case "OS HASH":
-				fallthrough
-			case "OS PASSHASH":
-			case "OS PASSWORD HASH":
-				ret.connOption.ClientInfo.Password = val[0]
-				SetNTSAuth(&advanced_nego.NTSAuthHash{})
-			case "DOMAIN":
-				ret.connOption.DomainName = val[0]
-			case "AUTH SERV":
-				for _, tempVal := range val {
-					ret.connOption.AuthService, _ = uniqueAppendString(ret.connOption.AuthService, strings.ToUpper(strings.TrimSpace(tempVal)), false)
-				}
-			case "SSL":
-				ret.connOption.SSL = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
-			case "SSL VERIFY":
-				ret.connOption.SSLVerify = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
-			case "DBA PRIVILEGE":
-				ret.DBAPrivilege = DBAPrivilegeFromString(val[0])
-			case "CONNECT TIMEOUT":
-				fallthrough
-			case "CONNECTION TIMEOUT":
-				to, err := strconv.Atoi(val[0])
-				if err != nil {
-					return nil, errors.New("CONNECTION TIMEOUT value must be an integer")
-				}
-				ret.connOption.SessionInfo.Timeout = time.Duration(to)
-			case "TRACE FILE":
-				ret.Trace = val[0]
-			case "PREFETCH_ROWS":
-				ret.connOption.PrefetchRows, err = strconv.Atoi(val[0])
-				if err != nil {
-					ret.connOption.PrefetchRows = 25
-				}
-			case "UNIX SOCKET":
-				ret.connOption.SessionInfo.UnixAddress = val[0]
-			case "PROXY CLIENT NAME":
-				ret.connOption.DatabaseInfo.ProxyClientName = val[0]
-				//case "ENLIST":
-				//	ret.EnList = EnListFromString(val[0])
-				//case "INC POOL SIZE":
-				//	ret.IncrPoolSize, err = strconv.Atoi(val[0])
-				//	if err != nil {
-				//		return nil, errors.New("INC POOL SIZE value must be an integer")
-				//	}
-				//case "DECR POOL SIZE":
-				//	ret.DecrPoolSize, err = strconv.Atoi(val[0])
-				//	if err != nil {
-				//		return nil, errors.New("DECR POOL SIZE value must be an integer")
-				//	}
-				//case "MAX POOL SIZE":
-				//	ret.MaxPoolSize, err = strconv.Atoi(val[0])
-				//	if err != nil {
-				//		return nil, errors.New("MAX POOL SIZE value must be an integer")
-				//	}
-				//case "MIN POOL SIZE":
-				//	ret.MinPoolSize, err = strconv.Atoi(val[0])
-				//	if err != nil {
-				//		return nil, errors.New("MIN POOL SIZE value must be an integer")
-				//	}
-				//case "POOL REGULATOR":
-				//	ret.PoolRegulator, err = strconv.Atoi(val[0])
-				//	if err != nil {
-				//		return nil, errors.New("POOL REGULATOR value must be an integer")
-				//	}
-				//case "STATEMENT CACHE SIZE":
-				//	ret.StmtCacheSize, err = strconv.Atoi(val[0])
-				//	if err != nil {
-				//		return nil, errors.New("STATEMENT CACHE SIZE value must be an integer")
-				//	}
-				//case "CONNECTION POOL TIMEOUT":
-				//	ret.ConnectionPoolTimeout, err = strconv.Atoi(val[0])
-				//	if err != nil {
-				//		return nil, errors.New("CONNECTION POOL TIMEOUT value must be an integer")
-				//	}
-				//case "CONNECTION LIFETIME":
-				//	ret.ConnectionLifeTime, err = strconv.Atoi(val[0])
-				//	if err != nil {
-				//		return nil, errors.New("CONNECTION LIFETIME value must be an integer")
-				//	}
-				//case "PERSIST SECURITY INFO":
-				//	ret.PasswordSecurityInfo = val[0] == "TRUE"
-				//case "POOLING":
-				//	ret.Pooling = val[0] == "TRUE"
-				//case "VALIDATE CONNECTION":
-				//	ret.ValidateConnection = val[0] == "TRUE"
-				//case "STATEMENT CACHE PURGE":
-				//	ret.StmtCachePurge = val[0] == "TRUE"
-				//case "HA EVENTS":
-				//	ret.HaEvent = val[0] == "TRUE"
-				//case "LOAD BALANCING":
-				//	ret.LoadBalance = val[0] == "TRUE"
-				//case "METADATA POOLING":
-				//	ret.MetadataBooling = val[0] == "TRUE"
-				//case "SELF TUNING":
-				//	ret.SelfTuning = val[0] == "TRUE"
-				//case "CONTEXT CONNECTION":
-				//	ret.ContextConnection = val[0] == "TRUE"
-				//case "PROMOTABLE TRANSACTION":
-				//	if val[0] == "PROMOTABLE" {
-				//		ret.PromotableTransaction = Promotable
-				//	} else {
-				//		ret.PromotableTransaction = Local
-				//	}
-				//case "APPLICATION EDITION":
-				//	ret.ApplicationEdition = val[0]
-				//case "PROXY USER ID":
-				//	ret.ProxyUserID = val[0]
-				//case "PROXY PASSWORD":
-				//	ret.ProxyPassword = val[0]
+
+	for key, val := range q {
+		switch strings.ToUpper(key) {
+		case "CONNSTR":
+			err = ret.connOption.UpdateDatabaseInfo(q.Get("connStr"))
+			if err != nil {
+				return nil, err
 			}
+		case "SERVER":
+			for _, srv := range val {
+				srv = strings.TrimSpace(srv)
+				if srv != "" {
+					host, p, err := net.SplitHostPort(srv)
+					if err != nil {
+						return nil, err
+					}
+					tempAddr := network.ServerAddr{Addr: host, Port: defaultPort}
+					if p != "" {
+						tempAddr.Port, err = strconv.Atoi(p)
+						if err != nil {
+							tempAddr.Port = defaultPort
+						}
+					}
+					ret.connOption.Servers = append(ret.connOption.Servers, tempAddr)
+				}
+			}
+		case "SERVICE NAME":
+			ret.connOption.ServiceName = val[0]
+		case "SID":
+			ret.connOption.SID = val[0]
+		case "INSTANCE NAME":
+			ret.connOption.InstanceName = val[0]
+		case "WALLET":
+			ret.WalletPath = val[0]
+		case "AUTH TYPE":
+			if strings.ToUpper(val[0]) == "OS" {
+				ret.authType = OS
+			} else {
+				ret.authType = Normal
+			}
+		case "OS USER":
+			ret.connOption.ClientInfo.UserName = val[0]
+		case "OS PASS":
+			fallthrough
+		case "OS PASSWORD":
+			ret.connOption.ClientInfo.Password = val[0]
+		case "OS HASH":
+			fallthrough
+		case "OS PASSHASH":
+		case "OS PASSWORD HASH":
+			ret.connOption.ClientInfo.Password = val[0]
+			SetNTSAuth(&advanced_nego.NTSAuthHash{})
+		case "DOMAIN":
+			ret.connOption.DomainName = val[0]
+		case "AUTH SERV":
+			for _, tempVal := range val {
+				ret.connOption.AuthService, _ = uniqueAppendString(ret.connOption.AuthService, strings.ToUpper(strings.TrimSpace(tempVal)), false)
+			}
+		case "SSL":
+			ret.connOption.SSL = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
+		case "SSL VERIFY":
+			ret.connOption.SSLVerify = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
+		case "DBA PRIVILEGE":
+			ret.DBAPrivilege = DBAPrivilegeFromString(val[0])
+		case "CONNECT TIMEOUT":
+			fallthrough
+		case "CONNECTION TIMEOUT":
+			to, err := strconv.Atoi(val[0])
+			if err != nil {
+				return nil, errors.New("CONNECTION TIMEOUT value must be an integer")
+			}
+			ret.connOption.SessionInfo.Timeout = time.Duration(to)
+		case "TRACE FILE":
+			ret.Trace = val[0]
+		case "PREFETCH_ROWS":
+			ret.connOption.PrefetchRows, err = strconv.Atoi(val[0])
+			if err != nil {
+				ret.connOption.PrefetchRows = 25
+			}
+		case "UNIX SOCKET":
+			ret.connOption.SessionInfo.UnixAddress = val[0]
+		case "PROXY CLIENT NAME":
+			ret.connOption.DatabaseInfo.ProxyClientName = val[0]
+			//case "ENLIST":
+			//	ret.EnList = EnListFromString(val[0])
+			//case "INC POOL SIZE":
+			//	ret.IncrPoolSize, err = strconv.Atoi(val[0])
+			//	if err != nil {
+			//		return nil, errors.New("INC POOL SIZE value must be an integer")
+			//	}
+			//case "DECR POOL SIZE":
+			//	ret.DecrPoolSize, err = strconv.Atoi(val[0])
+			//	if err != nil {
+			//		return nil, errors.New("DECR POOL SIZE value must be an integer")
+			//	}
+			//case "MAX POOL SIZE":
+			//	ret.MaxPoolSize, err = strconv.Atoi(val[0])
+			//	if err != nil {
+			//		return nil, errors.New("MAX POOL SIZE value must be an integer")
+			//	}
+			//case "MIN POOL SIZE":
+			//	ret.MinPoolSize, err = strconv.Atoi(val[0])
+			//	if err != nil {
+			//		return nil, errors.New("MIN POOL SIZE value must be an integer")
+			//	}
+			//case "POOL REGULATOR":
+			//	ret.PoolRegulator, err = strconv.Atoi(val[0])
+			//	if err != nil {
+			//		return nil, errors.New("POOL REGULATOR value must be an integer")
+			//	}
+			//case "STATEMENT CACHE SIZE":
+			//	ret.StmtCacheSize, err = strconv.Atoi(val[0])
+			//	if err != nil {
+			//		return nil, errors.New("STATEMENT CACHE SIZE value must be an integer")
+			//	}
+			//case "CONNECTION POOL TIMEOUT":
+			//	ret.ConnectionPoolTimeout, err = strconv.Atoi(val[0])
+			//	if err != nil {
+			//		return nil, errors.New("CONNECTION POOL TIMEOUT value must be an integer")
+			//	}
+			//case "CONNECTION LIFETIME":
+			//	ret.ConnectionLifeTime, err = strconv.Atoi(val[0])
+			//	if err != nil {
+			//		return nil, errors.New("CONNECTION LIFETIME value must be an integer")
+			//	}
+			//case "PERSIST SECURITY INFO":
+			//	ret.PasswordSecurityInfo = val[0] == "TRUE"
+			//case "POOLING":
+			//	ret.Pooling = val[0] == "TRUE"
+			//case "VALIDATE CONNECTION":
+			//	ret.ValidateConnection = val[0] == "TRUE"
+			//case "STATEMENT CACHE PURGE":
+			//	ret.StmtCachePurge = val[0] == "TRUE"
+			//case "HA EVENTS":
+			//	ret.HaEvent = val[0] == "TRUE"
+			//case "LOAD BALANCING":
+			//	ret.LoadBalance = val[0] == "TRUE"
+			//case "METADATA POOLING":
+			//	ret.MetadataBooling = val[0] == "TRUE"
+			//case "SELF TUNING":
+			//	ret.SelfTuning = val[0] == "TRUE"
+			//case "CONTEXT CONNECTION":
+			//	ret.ContextConnection = val[0] == "TRUE"
+			//case "PROMOTABLE TRANSACTION":
+			//	if val[0] == "PROMOTABLE" {
+			//		ret.PromotableTransaction = Promotable
+			//	} else {
+			//		ret.PromotableTransaction = Local
+			//	}
+			//case "APPLICATION EDITION":
+			//	ret.ApplicationEdition = val[0]
+			//case "PROXY USER ID":
+			//	ret.ProxyUserID = val[0]
+			//case "PROXY PASSWORD":
+			//	ret.ProxyPassword = val[0]
 		}
 	}
+
 	if len(ret.connOption.Servers) == 0 {
 		return nil, errors.New("empty connection servers")
 	}

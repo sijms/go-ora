@@ -1195,7 +1195,6 @@ func DecodeDate(data []byte) (time.Time, error) {
 	var zone *time.Location
 	var timeInZone bool
 	//var err error
-	fmt.Println(data[11:13])
 	if data[11]&0x80 != 0 {
 		var regionCode = (int(data[11]) & 0x7F) << 6
 		regionCode += (int(data[12]) & 0xFC) >> 2

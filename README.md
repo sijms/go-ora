@@ -749,34 +749,44 @@ _, err := conn.Exec(inputSql, go_ora.NVarChar("7586"))
     fmt.Println(result.RowsAffected())
 
 #### 7- using transaction:
-    // after step 2 "Create Connection"
-    tx, err := conn.Begin()
-    // check for error
-    stmt, err := tx.Prepare("sql text")
-    // check for error
-    // continue as above
-    tx.Commit()
-    // or
-    tx.Rollback()
-    // note: any stmt created from conn will not be committed or rolled back
+```golang
+// after step 2 "Create Connection"
+tx, err := conn.Begin()
+// check for error
+stmt, err := tx.Prepare("sql text")
+// check for error
+// continue as above
+tx.Commit()
+// or
+tx.Rollback()
+// note: any stmt created from conn will not be committed or rolled back
+```
      
 ### B. direct use of the package
-  the benefit here is that you can use pl/sql and output parameters
-#### 1- import go_ora "go-ora"
-#### 2- create connection
+#### 1- create connection
+```golang
     conn, err := go_ora.NewConnection("oracle://user:pass@server/service_name")
     // check for error
     err = conn.Open()
     // check for error
     defer conn.Close()
-#### 2- create stmt
+```
+#### 2-A call query or exec from connection
+* QueryContext
+* QueryRowContext
+* ExecContext
+#### 2-B create stmt
+```golang
     stmt := go_ora.NewStmt("sql or pl/sql text", conn)
     defer stmt.Close()
-#### 3- add parameters
-    stmt.AddParam("name", value, size, go_ora.Input /* or go_ora.Output*/)
-    // note that size is need when you define string output parameters
-#### 4- exec or query as above and pass nil for parameters
-#### 5- after that you can read the output parameters using Pars variable of stmt structure
+```
+
+#### 3- Exec or Query and pass parameters
+```golang
+// parameter 3 is an output parameter
+rows, err := stmt.Query([]driver.Value{val1, val2, go_ora.Out{Dest: &val3, Size: 100, In: false}})
+defer rows.Close()
+```
  
  ## Server's URL options
 The complete syntax of connection url is: 
@@ -859,8 +869,10 @@ Read packet:
 2020-11-22T07:51:42.9114: 
 ```
 ### PREFETCH_ROWS
-Default value is 25 increase this value to higher level will significantly
-speed up the query
+* Initial value is 25
+* this initial value is re-calculated inside fetch to accomodate large data
+* change the initial to higher level will significantly speed up the query and 
+stop automatic calculation
 ## RefCursor
 #### note: See examples for using RefCursor with sql package
 to use RefCursor follow these steps:

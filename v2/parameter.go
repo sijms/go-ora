@@ -197,13 +197,13 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	case ROWID:
 		par.MaxLen = 128
 	case DATE:
-		par.MaxLen = 7
+		par.MaxLen = converters.MAX_LEN_DATE
 	case IBFloat:
 		par.MaxLen = 4
 	case IBDouble:
 		par.MaxLen = 8
 	case TimeStampTZ_DTY:
-		par.MaxLen = 13
+		par.MaxLen = converters.MAX_LEN_TIMESTAMP
 	case IntervalYM_DTY:
 		fallthrough
 	case IntervalDS_DTY:
@@ -996,9 +996,15 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	case TimeStampDTY, TimeStampeLTZ, TimeStampLTZ_DTY, TIMESTAMPTZ, TimeStampTZ_DTY:
 		fallthrough
 	case TIMESTAMP, DATE:
-		par.oPrimValue, err = converters.DecodeDate(par.BValue)
+		tempTime, err := converters.DecodeDate(par.BValue)
 		if err != nil {
 			return err
+		}
+		if par.DataType == DATE && conn.dbTimeLoc != time.UTC {
+			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
+				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbTimeLoc)
+		} else {
+			par.oPrimValue = tempTime
 		}
 	case OCIClobLocator, OCIBlobLocator:
 		var locator []byte

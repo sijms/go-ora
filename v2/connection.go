@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type ConnectionState int
@@ -86,7 +87,8 @@ type Connection struct {
 		date      int
 		timestamp int
 	}
-	bad bool
+	bad       bool
+	dbTimeLoc *time.Location
 }
 
 type OracleConnector struct {
@@ -535,7 +537,17 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			return err
 		}
 	}
+	conn.getDBTimeZone()
 	return nil
+}
+
+func (conn *Connection) getDBTimeZone() {
+	var current time.Time
+	err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
+	if err != nil {
+		conn.dbTimeLoc = time.UTC
+	}
+	conn.dbTimeLoc = current.Location()
 }
 
 // Begin a transaction

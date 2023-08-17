@@ -6,7 +6,6 @@ import (
 	"github.com/sijms/go-ora/v2/advanced_nego"
 	"github.com/sijms/go-ora/v2/network"
 	"github.com/sijms/go-ora/v2/trace"
-	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -415,7 +414,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		connOption: network.ConnectionOption{
 			PrefetchRows: 25,
 			SessionInfo: network.SessionInfo{
-				Timeout: time.Second * time.Duration(30),
+				Timeout: time.Second * time.Duration(120),
 				//TransportDataUnitSize: 0xFFFF,
 				//SessionDataUnitSize:   0xFFFF,
 				TransportDataUnitSize: 0x200000,
@@ -710,7 +709,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			return nil, errors.New("you should specify server/service if you will use wallet")
 		}
 		if _, err = os.Stat(path.Join(ret.WalletPath, "ewallet.p12")); err == nil && len(ret.walletPass) > 0 {
-			fileData, err := ioutil.ReadFile(path.Join(ret.WalletPath, "ewallet.p12"))
+			fileData, err := os.ReadFile(path.Join(ret.WalletPath, "ewallet.p12"))
 			if err != nil {
 				return nil, err
 			}

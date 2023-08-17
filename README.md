@@ -1,16 +1,524 @@
 # go-ora
-## Pure go oracle client
+# Pure go oracle client
 
-### note:
+## note:
 ###### the original oracle drivers are very complex and contain many features which are difficult to add them at one time
 ###### your feedbacks are very important for this project to proceed
 ```
-    - Use version 2 you will need to import github.com/sijms/go-ora/v2
+    - To use version 2 you should import github.com/sijms/go-ora/v2
     - V2 is more preferred for oracle servers 10.2 and above
     - I always update the driver fixing issues and add new features so
       always ensure that you get latest release
     - See examples for more help
 ```
+# How To Use
+## Connect to Database
+* ### Simple Connection
+  this connection require server name or IP, port, service name, username and password
+  * using database/sql
+  ```golang
+  port := 1521
+  connStr := go_ora.BulidUrl("server", port, "service_name", "username", "password", nil)
+  conn, err := sql.Open("oracle", connStr)
+  // check for error
+  err = conn.Ping()
+  // check for error
+  ```
+  * using package directly
+  ```golang
+  port := 1521
+  connStr := go_ora.BulidUrl("server", port, "service_name", "username", "password", nil)
+  conn, err := go_ora.NewConnection(connStr)
+  // check for error
+  err = conn.Open()
+  // check for error
+  ```
+* ### Connect using SID
+here we should pass urlOptions
+note that service name is empty
+```golang
+port := 1521
+urlOptions := map[string]string {
+  "SID": "SID_VALUE",
+}
+connStr := go_ora.BulidUrl("server", port, "", "username", "password", urlOptions)
+conn, err := sql.Open("oracle", connStr)
+// check for error
+```
+* ### Connect using JDBC string
+either pass a urlOption `connStr` with JDBC string
+server, port and service name will be collected from JDBC string
+```golang
+urlOptions := map[string]string {
+  "connStr": "JDBC string",
+}
+connStr := go_ora.BulidUrl("", 0, "", "username", "password", urlOptions)
+conn, err := sql.Open("oracle", connStr)
+// check for error
+```
+or use `go_ora.BuildJDBC`
+```golang
+urlOptions := map[string] string {
+	// other options
+}
+connStr := go_ora.BuildJDBC("username", "password", "JDBC string", urlOptions)
+conn, err := sql.Open("oracle", connStr)
+// check for error
+```
+* ### SSL Connection
+to use ssl connection you should pass required url options
+ssl verify will stop ssl certificate verification
+```golang
+port := 2484
+urlOptions := map[string] string {
+	"ssl": "true", // or enable
+	"ssl verify": "false",
+	"wallet": "path to folder that contains oracle wallet",
+}
+connStr := go_ora.BuildUrl("server", port, "service_name", "username", "password", urlOptions)
+```
+* ### OS Auth (for windows)
+connect to oracle using OS user instead of oracle user
+username and password parameters passed empty to `BuildUrl`
+see [examples/windows_os_auth](https://github.com/sijms/go-ora/blob/master/examples/windows_os_auth/main.go) for more help
+```golang
+urlOptions := map[string]string {
+    // optional as it will be automatically set 
+	// if you pass an empty oracle user or password
+    "AUTH TYPE": "OS",
+    // operating system user if empty the driver will use logon user name
+    "OS USER": user,
+    // operating system password needed for os logon
+    "OS PASS": password,
+    // Windows system domain name
+    "DOMAIN": domain,
+	// optional as it will be automatically set 
+	// when you define AUTH TYPE=OS in windows
+    "AUTH SERV": "NTS",
+}
+port := 1521
+connStr := go_ora.BuildUrl("server", port, "service_name", "", "", urlOptions)
+```
+* ### Client Auth
+you should have server and client certificate store in wallets + working TCPS communication
+> create oracle user as follows:
+```sql
+CREATE USER "SSLCLIENT" IDENTIFIED EXTERNALLY AS 'CN=ORCLCLIENT';
+```
+> configure sqlnet.ora in the server to use client authentication
+```sql
+SQLNET.AUTHENTICATION_SERVICES=(TCPS,NTS)
+SSL_CLIENT_AUTHENTICATION=TRUE
+```
+> connect
+```golang
+urlOptions := map[string]string {
+"TRACE FILE": "trace.log",
+"AUTH TYPE":  "TCPS",
+"SSL": "enable",
+"SSL VERIFY": "FALSE",
+"WALLET": "PATH TO WALLET"
+}
+connStr := go_ora.BuildUrl("server", 2484, "service", "", "", urlOptions)
+```
+* ### KERBEROS5 Auth
+> note that kerberos need an intact dns system
+
+> to test kerberos you need 3 machine
+* kerberos server you can use this link to install [on ubuntu](https://ubuntu.com/server/docs/service-kerberos)
+* oracle server you can configure it from this [link](https://docs.oracle.com/cd/E11882_01/network.112/e40393/asokerb.htm#ASOAG9636)
+* client which contain our gocode using package [gokrb5](https://github.com/jcmturner/gokrb5)
+* Complete code found in [examples/kerberos](https://github.com/sijms/go-ora/blob/master/examples/kerberos/main.go)
+```golang
+urlOptions := map[string]string{
+    "AUTH TYPE":  "KERBEROS",
+}
+// note empty password
+connStr := go_ora.BuildUrl("server", 1521, "service", "krb_user", "", urlOptions)
+
+type KerberosAuth struct{}
+func (kerb KerberosAuth) Authenticate(server, service string) ([]byte, error) {
+    // see implementation in examples/kerberos
+}
+advanced_nego.SetKerberosAuth(&KerberosAuth{})
+```
+before run the code you should run command `kinit user`
+## Other Connection Options
+
+<details>
+
+* ### Define more servers to Connect
+```golang
+urlOptions := map[string]string {
+	"server": "server2,server3",
+}
+connStr := go_ora.BuildUrl("server1", 1251, "service", "username", "password", urlOptions)
+/* now the driver will try to connect as follows
+1- server1
+2- server2
+3- server3
+*/
+```
+* ### Client Encryption
+this option give the client control weather to use encryption or not
+```golang
+urlOptions := map[string]string {
+	// values can be "required", "accepted", "requested", and rejected"
+	"encryption": "required",
+}
+```
+* ### Client Data Integrity
+this option give the client control weather to user data integrity or not
+```golang
+urlOptions := map[string]string {
+    // values can be "required", "accepted", "requested", and rejected"
+    "data integrity": "rejected",
+}
+```
+* ### Using Unix Socket
+you can use this option if server and client on same linux machine by specify the following url option
+```golang
+urlOptions := map[string]string{
+	// change the value according to your machine 
+	"unix socket": "/usr/tmp/.oracle/sEXTPROC1",
+}
+```
+* ### Using Timeout
+  * activate global timeout value (default=30 sec) to protect against block read/write if no timeout context specified
+  * timeout value should be numeric string which represent number of seconds that should pass before operation finish or canceled by the driver
+```golang
+urlOptions := map[string]string {
+	"TIMEOUT": "60",
+}
+```
+* ### Using Proxy user
+```golang
+urlOptions := map[string]string {
+	"proxy client name": "schema_owner",
+}
+connStr := go_ora.BuildUrl("server", 1521, "service", "proxy_user", "proxy_password", urlOptions)
+```
+* ### Define DBA Privilege
+  * define dba privilege of the connection
+  * default value is `NONE`
+  * using user `sys` automatically set its value to `SYSDBA`
+```golang
+urlOptions := map[string]string {
+	"dba privilege" : "sysdba", // other values "SYSOPER"
+}
+```
+* ### Define Lob Fetching Mode
+  * this option define how lob data will be loaded
+  * default value is `pre` means lob data is send online with other values
+  * other value is `post` means lob data will be loaded after finish loading other value through a separate network call
+```golang
+urlOptions := map[string]string {
+	"lob fetch": "post",
+}
+```
+* ### Define Client Charset
+  * this option will allow controlling string encoding and decoding at client level
+  * so using this option you can define a charset for the client that is different from the server
+  * client charset will work in the following situation
+    * encoding sql text
+    * decoding varchar column
+    * encoding and decoding varchar parameters
+    * encoding and decoding CLOB
+  * nvarchar, nclob and server messages are excluded from client charset
+```golang
+urlOptions := map[string]string {
+    // you can use also 
+    //"charset": "UTF8",
+    "client charset": "UTF8",
+}
+```
+* ### Define Client Territory and Language
+  * this will control the language of the server messages
+```golang
+urlOptions := map[string]string {
+    "language": "PORTUGUESE",
+    "territory": "BRAZILIAN",
+}
+```
+* ### Loging
+this option used for logging driver work and network data for debugging purpose
+```golang
+urlOptions := map[string]string {
+	"trace file": "trace.log",
+}
+```
+
+This produce this kind of log:
+```
+2020-11-22T07:51:42.8137: Open :(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=192.168.10.10)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=xe)(CID=(PROGRAM=C:\Users\Me\bin\hello_ora.exe)(HOST=workstation)(USER=Me))))
+2020-11-22T07:51:42.8147: Connect
+2020-11-22T07:51:42.8256: 
+Write packet:
+00000000  00 3a 00 00 01 00 00 00  01 38 01 2c 0c 01 ff ff  |.:.......8.,....|
+00000010  ff ff 4f 98 00 00 00 01  00 ea 00 3a 00 00 00 00  |..O........:....|
+00000020  04 04 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000030  00 00 00 00 00 00 00 00  00 00                    |..........|
+
+...
+
+2020-11-22T07:51:42.8705: Query:
+SELECT * FROM v$version
+2020-11-22T07:51:42.8705: 
+Write packet:
+00000000  00 55 00 00 06 00 00 00  00 00 03 5e 00 02 81 21  |.U.........^...!|
+00000010  00 01 01 17 01 01 0d 00  00 00 01 19 01 01 00 00  |................|
+00000020  00 00 00 00 00 00 00 00  00 01 00 00 00 00 00 53  |...............S|
+00000030  45 4c 45 43 54 20 2a 20  46 52 4f 4d 20 76 24 76  |ELECT * FROM v$v|
+00000040  65 72 73 69 6f 6e 01 01  00 00 00 00 00 00 01 01  |ersion..........|
+00000050  00 00 00 00 00                                    |.....|
+2020-11-22T07:51:42.9094: 
+Read packet:
+00000000  01 a7 00 00 06 00 00 00  00 00 10 17 3f d5 ec 21  |............?..!|
+00000010  d5 37 e0 67 cc 0f eb 03  cc c5 d1 d8 78 78 0b 15  |.7.g........xx..|
+00000020  0c 21 20 01 50 01 01 51  01 80 00 00 01 50 00 00  |.! .P..Q.....P..|
+00000030  00 00 02 03 69 01 01 50  01 06 01 06 06 42 41 4e  |....i..P.....BAN|
+00000040  4e 45 52 00 00 00 00 01  07 07 78 78 0b 16 07 34  |NER.......xx...4|
+00000050  2b 00 02 1f e8 01 0a 01  0a 00 06 22 01 01 00 01  |+.........."....|
+00000060  19 00 00 00 07 49 4f 72  61 63 6c 65 20 44 61 74  |.....IOracle Dat|
+00000070  61 62 61 73 65 20 31 31  67 20 45 78 70 72 65 73  |abase 11g Expres|
+00000080  73 20 45 64 69 74 69 6f  6e 20 52 65 6c 65 61 73  |s Edition Releas|
+00000090  65 20 31 31 2e 32 2e 30  2e 32 2e 30 20 2d 20 36  |e 11.2.0.2.0 - 6|
+000000a0  34 62 69 74 20 50 72 6f  64 75 63 74 69 6f 6e 07  |4bit Production.|
+000000b0  26 50 4c 2f 53 51 4c 20  52 65 6c 65 61 73 65 20  |&PL/SQL Release |
+000000c0  31 31 2e 32 2e 30 2e 32  2e 30 20 2d 20 50 72 6f  |11.2.0.2.0 - Pro|
+000000d0  64 75 63 74 69 6f 6e 15  01 01 01 07 1a 43 4f 52  |duction......COR|
+000000e0  45 09 31 31 2e 32 2e 30  2e 32 2e 30 09 50 72 6f  |E.11.2.0.2.0.Pro|
+000000f0  64 75 63 74 69 6f 6e 15  01 01 01 07 2e 54 4e 53  |duction......TNS|
+00000100  20 66 6f 72 20 4c 69 6e  75 78 3a 20 56 65 72 73  | for Linux: Vers|
+00000110  69 6f 6e 20 31 31 2e 32  2e 30 2e 32 2e 30 20 2d  |ion 11.2.0.2.0 -|
+00000120  20 50 72 6f 64 75 63 74  69 6f 6e 15 01 01 01 07  | Production.....|
+00000130  26 4e 4c 53 52 54 4c 20  56 65 72 73 69 6f 6e 20  |&NLSRTL Version |
+00000140  31 31 2e 32 2e 30 2e 32  2e 30 20 2d 20 50 72 6f  |11.2.0.2.0 - Pro|
+00000150  64 75 63 74 69 6f 6e 08  01 06 03 14 97 b7 00 01  |duction.........|
+00000160  01 01 02 00 00 00 00 00  04 01 05 01 07 01 05 02  |................|
+00000170  05 7b 00 00 01 01 00 03  00 01 20 00 00 00 00 00  |.{........ .....|
+00000180  00 00 00 00 00 00 00 01  01 00 00 00 00 19 4f 52  |..............OR|
+00000190  41 2d 30 31 34 30 33 3a  20 6e 6f 20 64 61 74 61  |A-01403: no data|
+000001a0  20 66 6f 75 6e 64 0a                              | found.|
+2020-11-22T07:51:42.9104: Summary: RetCode:1403, Error Message:"ORA-01403: no data found\n"
+2020-11-22T07:51:42.9104: Row 0
+2020-11-22T07:51:42.9104:   BANNER              : Oracle Database 11g Express Edition Release 11.2.0.2.0 - 64bit Production
+2020-11-22T07:51:42.9104: Row 1
+2020-11-22T07:51:42.9104:   BANNER              : PL/SQL Release 11.2.0.2.0 - Production
+2020-11-22T07:51:42.9104: Row 2
+2020-11-22T07:51:42.9104:   BANNER              : CORE	11.2.0.2.0	Production
+2020-11-22T07:51:42.9104: Row 3
+2020-11-22T07:51:42.9104:   BANNER              : TNS for Linux: Version 11.2.0.2.0 - Production
+2020-11-22T07:51:42.9104: Row 4
+2020-11-22T07:51:42.9104:   BANNER              : NLSRTL Version 11.2.0.2.0 - Production
+2020-11-22T07:51:42.9114: 
+```
+
+</details>
+
+## Execute SQL
+* ### simple query
+execute a query follows standards that defined in go package database/sql
+you have `Query` used for query rows and `Exec` used for DML/DDL and PL/SQL
+> Exec example
+```golang
+// note no semicolon at the end
+_, err := conn.Exec(`CREATE TABLE TABLE1(
+ID number(10),
+NAME varchar2(50),
+DAT DATE
+)`)
+// check for errors
+```
+> query example:
+```golang
+rows, err := conn.Query("SELECT ID, NAME, DAT FROM TABLE1")
+// check for errors
+defer rows.Close()
+var (
+	id int64
+	name sql.NullString
+	date sql.NullTime
+)
+for rows.Next() {
+	err = rows.Scan(&id, &name, &date)
+	// check for errors
+}
+```
+> PL/SQL
+```golang
+// note semicolon at the end
+_, err := conn.Exec("begin DBMS_LOCK.sleep(7); end;")
+// check for errors
+```
+complete example found in [examples/crud](https://github.com/sijms/go-ora/blob/master/examples/crud/main.go)
+* ### input parameters
+  * #### parameters in oracle should start with `:` for example `:pr1`
+passing input parameters as defined by database/sql package.
+> parameter type
+>   * int64 / float64 and their equivalent
+>   * string
+>   * time.Time
+>   * any time that support Valuer interface
+>   * NVarChar
+>   * TimeStamp
+>   * TimeStampTZ
+>   * sql.Null* and go_ora.Null* for all the above
+>   * Clob, NClob and Blob
+* ### output parameters
+  * passing parameter to Exec to return a value.
+  * output parameter should be passed as pointers.
+  * all output parameter should be passed inside `go_ora.Out` or `sql.Out` structures
+  * output parameters like strings should be passed in `go_ora.Out` to define max size.
+```golang
+var(
+	id int64
+	name sql.NullString
+	date sql.NullTime
+)
+_, err := conn.Exec("SELECT ID, NAME, DAT INTO :pr1, :pr2, :pr3 FROM TABLE1 WHERE ID=:pr4",
+	sql.Out{Dest: &id},
+	go_ora.Out{Dest: &name, Size: 100},
+	go_ora.Out{Dest: &date},
+	1)
+```
+* ### Lob Types
+  * Blob, Clob and NClob
+  * Clob use database charset and NClob will use database ncharset for string encoding and decoding
+  * complete code is found in [examples/clob](https://github.com/sijms/go-ora/blob/master/examples/clob/main.go)
+> input parameters
+```golang
+var1 := go_ora.Clob{String: "large string value"}
+var2 := go_ora.Blob{Data: []byte("large []byte value")}
+_, err := conn.Exec("insert into tb values(:1, :2)", var1, var2)
+```
+> output parameters
+```golang
+var {
+	var1 go_ora.NClob
+	var2 go_ora.Blob
+}
+// set size according to size of your data
+_, err := conn.Exec("BEGIN SELECT col1, col2 into :1, :2 FROM tb; END;",
+	go_ora.Out{Dest: &var1, size: 100000},
+	go_ora.Out{Dest: &var2, size: 300000})
+```
+* ### structures with tag
+you can pass a structure parameter to sql in one of the following situation
+- structure that implement Valuer interface
+- oracle user defined type UDT
+- struct with tag `db`
+> data in `db` tag can be recognized by its position or as key=value
+> ```golang
+> type TEMP_TABLE struct {
+>   // tag by position: db:"name,type,size,direction"
+>   Id int  `db: "ID,number"`
+> 
+>   Name string `db:"type=varchar,name=NAME"`
+> }  
+> ```
+
+> You should pass at least the name of the parameter to use this feature.
+>
+> input parameters can be defined by name. type is important in some situation
+> for example if you have field with type time.Time and you want to pass timestamp
+> to database so put `type=timestamp`
+
+> type can be one of the following
+> ```
+> number      mapped to golang types integer, float, string, bool
+> varchar     mapped to any golang types that can converted to string
+> nvarchar    mapped to any golang types that can converted to string
+> date        mapped to golang types time.Time and string
+> timestamp   mapped to golang types time.Time and string
+> timestamptz mapped to golang types time.Time and string
+> raw         mapped to golang types []byte and string
+> blob        mapped to golang types []byte and string
+> clob        mapped to any golang types that can converted to string
+> nclob       mapped to any golang types that can converted to string
+> ```
+
+> size and direction are required if the field mapped to an output parameter
+
+complete code can be found in [examples/struct_par](https://github.com/sijms/go-ora/blob/master/examples/struct_par/main.go)
+* ### Arrays
+> passing array as a parameter is useful in the following situation
+> * Multiple insert/merge
+> * Associative Array you can find complete code in [examples/array](https://github.com/sijms/go-ora/blob/master/examples/arrays/main.go)
+> * UDT array you can find complete code in [examples/udt_array](https://github.com/sijms/go-ora/blob/master/examples/udt_array/main.go)
+
+> multiple insert/merge
+> passing all parameters as arrays of same size will activate bulk-insert/merge.
+> 
+> you can also pass an array of tagged structure to do same thing.
+> complete code for bulk-insert/merge can be found in [examples/merge](https://github.com/sijms/go-ora/blob/master/examples/merge/main.go)
+* ### UDT
+* can be created inside oracle using `create type`
+* `UDT` can be inserted or returned from database as structure
+* to use UDT you should create struct with `udt` tag then call `go_ora.RegisterType(...)`
+* complete code is found in [examples/UDT](https://github.com/sijms/go-ora/blob/master/examples/UDT/main.go)
+
+* ### Named Parameters
+  * to use named parameter just wrap all you parameter inside `sql.Named`
+  * if one of the parameters doesn't have name driver will switch to positional mode
+  * parameter name in sql will be for example `:pr1` and its value will be `sql.Named("pr1", 1)`
+  * Named parameter is useful if you have one value passed in sql multiple times. parameter with its name passed to `Exec` or `Query` one time and use the name in sql many times
+  * Order is not important
+  * complete code for named parameters found in [examples/named_pars](https://github.com/sijms/go-ora/blob/master/examples/named_pars/main.go)
+* ### RefCursor
+> as an output parameter
+> ```golang
+>   var cursor go_ora.RefCursor
+>   _, err = conn.Exec(`BEGIN PROC1(:1, :2); END;`, 1, sql.Out{Dest: &cursor})
+> ```
+> complete code for RefCursor as output parameter found in [examples/refcursor](https://github.com/sijms/go-ora/blob/master/examples/refcursor/main.go)
+
+> Map RefCursor to sql.Rows
+```golang
+// TEMP_FUNC_316 is sql function that return RefCursor
+sqlText := `SELECT TEMP_FUNC_316(10) from dual`
+
+// use Query and don't use QueryRow
+rows, err := conn.Query(sqlText)
+if err != nil {
+	return err
+}
+
+// closing the parent rows will automatically close cursor
+defer rows.Close()
+
+for rows.Next() {
+    var cursor sql.Rows
+	err = rows.Scan(&cursor)
+	if err != nil {
+		return err
+	}
+	var (
+        id   int64
+        name string
+        val  float64
+        date time.Time
+    )
+	
+    // reading operation should be inside rows.Next
+    for cursor.Next() {
+        err = cursor.Scan(&id, &name, &val, &date)
+        if err != nil {
+            return err
+        }
+        fmt.Println("ID: ", id, "\tName: ", name, "\tval: ", val, "\tDate: ", date)
+    }
+}
+```
+complete code for mapping refcursor to sql.Rows is found in [example/refcursor_to_rows](https://github.com/sijms/go-ora/blob/master/examples/refcursor_to_rows/main.go)
+
+[//]: # (### Go and Oracle type mapping + special types)
+
+[//]: # ()
+[//]: # (### Supported DBMS features)
+### releases
+<details>
+
 ### version 2.7.11
 * add support for DBMS_OUTPUT
 ```golang
@@ -54,23 +562,23 @@ err = output.Print(os.Stdout)
 * fix some other issue
 ### version 2.7.4:
 * activate global timeout value to protect against block read/write
-if no timeout context specified
+  if no timeout context specified
 * default value for timeout is 30 second you can change by
-passing one of the following ["TIMEOUT", "CONNECT TIMEOUT", "CONNECTION TIMEOUT"]
+  passing one of the following ["TIMEOUT", "CONNECT TIMEOUT", "CONNECTION TIMEOUT"]
 * other feature/issues:
   * fix passing empty `[]byte{}` will produce error
   * fix passing empty array as a parameter will produce error
   * return first binding error when the driver return `ora-24381: error in DML array`
 ### version 2.7.3: Use database/sql fail over
 * use database/sql fail over by returning driver.ErrBadConn
-when connection interrupted
+  when connection interrupted
 * other features:
   * add support for RC4 encryption
 ### version 2.7.2: Use golang structure as an oracle (output) parameters
 all rules used for input will be required for output plus:
 * structure should be passed as a pointer
-* tag direction is required to be output or inout. size is used with 
-some types like strings
+* tag direction is required to be output or inout. size is used with
+  some types like strings
 * each field will be translated to a parameter as follows
 ```
 number      mapped to sql.NullFloat64
@@ -85,13 +593,13 @@ nclob       mapped to NClob
 blob        mapped to Blob
 ```
 all fields that support driver.Valuer interface will be passed as it is
-* data assigned back to structure fields after exec finish when a null 
-value read then field value will set to `reflect.Zero`
+* data assigned back to structure fields after exec finish when a null
+  value read then field value will set to `reflect.Zero`
 * `examples/struct_pars/main.go` contain full example for reading and
-writing struct pars
+  writing struct pars
 ### version 2.7.1: Use golang structure as an oracle (input) parameters
 * by define structure tag `db` now you can pass information to sql.Exec
-* data in `db` tag can be recognized by its position or as key=value 
+* data in `db` tag can be recognized by its position or as key=value
 ```golang
 type TEMP_TABLE struct {
 	// tag by position: db:"name,type,size,direction"
@@ -102,11 +610,11 @@ type TEMP_TABLE struct {
 ```
 * you should pass at least the name of the parameter to use this feature
 * input parameters need only name and type. if you omit type driver will
-use field value directly as input parameter. type is used to make 
-some flexibility
-example use time.Time field and pass type=timestamp in this
-case timestamp will be used instead of default value for time.Time which is date
-* type can be one of the following: 
+  use field value directly as input parameter. type is used to make
+  some flexibility
+  example use time.Time field and pass type=timestamp in this
+  case timestamp will be used instead of default value for time.Time which is date
+* type can be one of the following:
 ```
 number      mapped to golang types integer, float, string, bool
 varchar     mapped to any golang types that can converted to string
@@ -177,19 +685,19 @@ for rows.Next() {
 ```
 * complete code is present in `examples/refcursor_to_rows/main.go`
 ### version 2.6.14: Add Support for Named Parameters
-* to switch on named parameter mode simply pass all 
-your parameter to `Query` or `Exec` as `sql.Named("name", Value)`
+* to switch on named parameter mode simply pass all
+  your parameter to `Query` or `Exec` as `sql.Named("name", Value)`
 * if one of the parameter doesn't contain **name** the driver automatically switch to
-positional mode
-* parameter name in sql will be for example `:pr1` 
-and its value will be `sql.Named("pr1", 1)`
-* when using named parameters the order of the parameters is not important as 
-the driver will re-arrange the parameter according to declaration in
-sql text
+  positional mode
+* parameter name in sql will be for example `:pr1`
+  and its value will be `sql.Named("pr1", 1)`
+* when using named parameters the order of the parameters is not important as
+  the driver will re-arrange the parameter according to declaration in
+  sql text
 * See `examples/named_pars/main.go` for example code
 ### version 2.6.12: Add Client Charset option
 * this option will allow controlling string encoding and decoding at client level
-* so using this option you can define a charset for the client that is different from the server 
+* so using this option you can define a charset for the client that is different from the server
 * client charset will work in the following situation
   * encoding sql text
   * decoding varchar column
@@ -233,7 +741,7 @@ urlOptions := map[string]string {
 url := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
 ```
 ### version 2.6.4: Add Support for TimeStamp with timezone
-* now you can use TimeStampTZ as input/output parameters to manage timestamp with timezone 
+* now you can use TimeStampTZ as input/output parameters to manage timestamp with timezone
 * see code in examples/timestamp_tz
 ### version 2.6.2: Add Support for Lob Prefetch
 * now you can control how you need to get lob data
@@ -258,7 +766,7 @@ CREATE USER "SSLCLIENT" IDENTIFIED EXTERNALLY AS 'CN=ORCLCLIENT';
 SQLNET.AUTHENTICATION_SERVICES=(TCPS,NTS)
 SSL_CLIENT_AUTHENTICATION=TRUE
 ```
-* now connect 
+* now connect
 ```golang
 urlOptions := map[string]string {
   "TRACE FILE": "trace.log",
@@ -299,7 +807,7 @@ func (kerb KerberosAuth) Authenticate(server, service string) ([]byte, error) {
 advanced_nego.SetKerberosAuth(&KerberosAuth{})
 ```
 ### version 2.5.16: Add Support for cwallet.sso created with -auto_login_local option
-* note that this type of oracle wallets only work on the machine where they were created 
+* note that this type of oracle wallets only work on the machine where they were created
 ### version 2.5.14: Failover and wallet update
 * Exec will return error after connection restore
 * add new field _**WALLET PASSWORD**_ to read ewallet.p12 file
@@ -315,16 +823,16 @@ databaseUrl := go_ora.BuildUrl(server, port, service, user, password, urlOptions
 * FAILOVER value is integer indicate how many times the driver will try to reconnect after lose connection default value = 0
 * failover will activated when stmt receive io.EOF error during read or write
 * FAILOVER work in 3 places:
-    * Query when fail the driver will reconnect and re-query up to failover number.
-    * Exec when fail the driver will reconnect up to failover times then return the error to avoid unintended re-execution.
-    * Fetch when fail the driver will reconnect up to failover times then return the error (whatever failover success or fail)
+  * Query when fail the driver will reconnect and re-query up to failover number.
+  * Exec when fail the driver will reconnect up to failover times then return the error to avoid unintended re-execution.
+  * Fetch when fail the driver will reconnect up to failover times then return the error (whatever failover success or fail)
 
 ### version 2.4.28: Binary Double And Float Fix
 - Now you can read binary double and float without error issue#217
 - You can avoid calling cgo function `user.Current()` if you define environmental variable $USER
 ### version 2.4.20: Query To Struct
 - you can query to struct that contain basic types (int, float, string, datetime)
-or any types that implement sql.Scanner interface
+  or any types that implement sql.Scanner interface
 - see query to struct example for more information
 ### version 2.4.18: Add support for proxy user
 if you need to connect with proxy user pass following connection
@@ -406,7 +914,7 @@ if exists {
     data, err = file.ReadBytesFromPos(2, 5)
 ```
 * you can pass BFile object as input parameter or receive it from query or output parameters
-for more detail see example bfile
+  for more detail see example bfile
 ### version 2.4.4: Support for unix socket IPC
 you can use this option if server and client on same linux machine
 by specify the following url option
@@ -447,7 +955,7 @@ now you can pass password hash of the user instead of real password
 #### source of hash:
 * windows registry
 * create the hash by md4(unicode(password))
-passing hash through url option as follow
+  passing hash through url option as follow
 ```golang
 urlOptions := map[string]string {
 	"OS HASH": "yourpasswordhash"
@@ -501,9 +1009,9 @@ urlOptions := map[string]string{
 databaseUrl := go_ora.BuildUrl(server, port, service, "", "", urlOptions)
 ```
 #### note (Remote OS Auth):
-* you can make OS Auth **on the same machine** (Windows Server) 
-or **different machine** (Windows Server) and (Other Client) and in this situation you need to pass 
-`AUTH SERV: "NTS"` as url parameter
+* you can make OS Auth **on the same machine** (Windows Server)
+  or **different machine** (Windows Server) and (Other Client) and in this situation you need to pass
+  `AUTH SERV: "NTS"` as url parameter
 #### note (advanced users):
 * You can use custom NTS auth manager by implementing the following interface
 ```Golang
@@ -517,7 +1025,7 @@ type NTSAuthInterface interface {
 go_ora.SetNTSAuth(newNTSManager)
 ```
 * advantage of custom manager: you may not need to provide OS Password. for example using
-.NET or Windows API code as original driver
+  .NET or Windows API code as original driver
 ```cs
 // CustomStream will take data from NegotiateStream and give it to the driver
 // through NewNegotiateMessage
@@ -544,15 +1052,15 @@ url = "oracle://user:password@[::1]:1521/service"
 * Add go_ora.Out struct with Size member to set output parameter size
 ### version 2.2.22: Lob for output parameters
 * Add new types for output parameter which is `go_ora.Clob` and `go_ora.Blob`
-used for receiving Clob and Blob from output parameters **_see clob example for 
-more details_**
+  used for receiving Clob and Blob from output parameters **_see clob example for
+  more details_**
 * Fix some issue related to reading output parameters
 * Fix issue related to reading user defined type UDT
 ### version 2.2.19: improve lob reading with high prefetch rows value
 * Now Prefetch rows value is **_automatically calculated (when left with its default value = 25)_** according to column
-size 
+  size
 * Reading lob is retarded until all record has been read this fix error happen
-when you try to read lob with large PREFETCH_ROWS value
+  when you try to read lob with large PREFETCH_ROWS value
 ### version 2.2.9: add support for connect to multiple servers
 define multiple server in 2 way
 * in url string options
@@ -577,7 +1085,7 @@ urlOptions := map[string] string {
 databaseURL := go_ora.BuildUrl(server1, 1521, "service", "user", "pass", urlOptions)
 ```
 
-### version 2.2.8: add OracleError class 
+### version 2.2.8: add OracleError class
 OracleError carry error message from the server
 ### version 2.2.7: Add support for user defined types
 * this feature is now tested against these oracle versions 10.2, 12.2, 19.3.
@@ -633,7 +1141,7 @@ for rows.Next() {
 }
 ```
 ### version 2.2.5
-* add function go_ora.BuildUrl to escape special characters 
+* add function go_ora.BuildUrl to escape special characters
 ### version 2.2.4
 * add support for tcps. you can enable tcps through the following url options
 * this [link](https://oracle-base.com/articles/misc/configure-tcpip-with-ssl-and-tls-for-database-connections) explain how to enable tcps in your server
@@ -645,7 +1153,7 @@ SSL Verify=false  // to bypass certificate verification
 ### version 2.1.23
 * now support auto-login oracle wallet (non-local)
 * **note**:
-to use wallet you need to specify directory path for wallet the directory
+  to use wallet you need to specify directory path for wallet the directory
   should contain cwallet.sso file "the file that will be used"
 ```golang
 sqlQuery := "oracle://user@127.0.0.1:1522/service"
@@ -658,11 +1166,11 @@ conn, err := sql.open("oracle", sqlQuery)
 ###### password ---> should be empty as it will be supplied from wallet
 ### version 2.1.22
 * now support data packet integrity check using MD5, SHA1,
- SHA256, SHA384, SHA512
+  SHA256, SHA384, SHA512
 * key is exchanged between server and client using
   Diffie Hellman method
 * **note**:
-to enable data integrity check add the following line to sqlnet.ora of the server
+  to enable data integrity check add the following line to sqlnet.ora of the server
 ```bigquery
 # possible values ([accepted | rejected | requested | required])
 SQLNET.CRYPTO_CHECKSUM_SERVER = required
@@ -670,11 +1178,11 @@ SQLNET.CRYPTO_CHECKSUM_SERVER = required
 SQLNET.CRYPTO_CHECKSUM_TYPES_SERVER = SHA512
 ```
 ### version 2.1.21
-* now support data packet encryption using AES. 
+* now support data packet encryption using AES.
 * key is exchanged between server and client using
   Diffie Hellman method
 * note:
-to enable AES encryption add the following line to sqlnet.ora 
+  to enable AES encryption add the following line to sqlnet.ora
   of the server
 ```bigquery
 # possible values ([accepted | rejected | requested | required])
@@ -685,7 +1193,7 @@ SQLNET.ENCRYPTION_TYPES_SERVER = AES256
 
 ### version 2.1.20
 * add new type **go_ora.NVarChar**
-now you can pass string parameter in 2 way:
+  now you can pass string parameter in 2 way:
 ##### &nbsp; &nbsp; 1- varchar string:
 
 ```golang
@@ -706,216 +1214,4 @@ _, err := conn.Exec(inputSql, go_ora.NVarChar("7586"))
 * use advanced negotiation
 * use big clear chunks
 * use more verifier type in authentication object
-
-# Usage:
-## there are 2 way to use the client
-### A. Using sql/database interface
-#### 1- importing:
-    import (
-      "database/sql"
-      _ "github.com/sijms/go-ora/v2"
-    )
-      
-#### 2- create the connection
-    conn, err := sql.Open("oracle", "oracle://user:pass@server/service_name")
-    // check for error
-    defer conn.Close()
-   
-#### 3- create statment
-    stmt, err := conn.Prepare("SELECT col_1, col_2, col_3 FROM table WHERE col_1 = :1 or col_2 = :2")
-    // check for error
-    defer stmt.CLose()
-   
-#### 4- query
-    // suppose we have 2 params one time.Time and other is double
-    rows, err := stmt.Query(time.Date(2020, 9, 1, 0, 0, 0, 0, time.UTC), 9.2)
-    // check for error
-    defer rows.Close()
-   
-#### 5- extract data using next
-     for rows.Next() {
-        // define vars
-        err = rows.Scan(/*vars here */)
-        // check for error
-     }
-    
-#### 6- use exec instead of query for update and insert stmt
-    // i make change in parameter no 4 to explain that you can use string in parameter name instead of numbers
-    stmt, err := conn.Prepare("UPDATE table SET col_1=:1, col_2=:2 WHERE col_3 = :3 or col_4 = :col_4_par")
-    // check for error
-    defer stmt.Close()
-    result, err := stmt.Exec(/*pars value*/)
-    // check for error
-    fmt.Println(result.RowsAffected())
-
-#### 7- using transaction:
-```golang
-// after step 2 "Create Connection"
-tx, err := conn.Begin()
-// check for error
-stmt, err := tx.Prepare("sql text")
-// check for error
-// continue as above
-tx.Commit()
-// or
-tx.Rollback()
-// note: any stmt created from conn will not be committed or rolled back
-```
-     
-### B. direct use of the package
-#### 1- create connection
-```golang
-    conn, err := go_ora.NewConnection("oracle://user:pass@server/service_name")
-    // check for error
-    err = conn.Open()
-    // check for error
-    defer conn.Close()
-```
-#### 2-A call query or exec from connection
-* QueryContext
-* QueryRowContext
-* ExecContext
-#### 2-B create stmt
-```golang
-    stmt := go_ora.NewStmt("sql or pl/sql text", conn)
-    defer stmt.Close()
-```
-
-#### 3- Exec or Query and pass parameters
-```golang
-// parameter 3 is an output parameter
-rows, err := stmt.Query([]driver.Value{val1, val2, go_ora.Out{Dest: &val3, Size: 100, In: false}})
-defer rows.Close()
-```
- 
- ## Server's URL options
-The complete syntax of connection url is: 
-
-    oracle://user:pass@server/service_name[?OPTION1=VALUE1[&OPTIONn=VALUEn]...]
-
-Check possible options in `connection_string.go` 
-
-### TRACE FILE 
-This option enables logging driver activity and packet content into a file.
-
-    oracle://user:pass@server/service_name?TRACE FILE=trace.log
-
-The log file is created into the current directory.
-
-
-This produce this kind of log:
-```
-2020-11-22T07:51:42.8137: Open :(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=192.168.10.10)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=xe)(CID=(PROGRAM=C:\Users\Me\bin\hello_ora.exe)(HOST=workstation)(USER=Me))))
-2020-11-22T07:51:42.8147: Connect
-2020-11-22T07:51:42.8256: 
-Write packet:
-00000000  00 3a 00 00 01 00 00 00  01 38 01 2c 0c 01 ff ff  |.:.......8.,....|
-00000010  ff ff 4f 98 00 00 00 01  00 ea 00 3a 00 00 00 00  |..O........:....|
-00000020  04 04 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-00000030  00 00 00 00 00 00 00 00  00 00                    |..........|
-
-...
-
-2020-11-22T07:51:42.8705: Query:
-SELECT * FROM v$version
-2020-11-22T07:51:42.8705: 
-Write packet:
-00000000  00 55 00 00 06 00 00 00  00 00 03 5e 00 02 81 21  |.U.........^...!|
-00000010  00 01 01 17 01 01 0d 00  00 00 01 19 01 01 00 00  |................|
-00000020  00 00 00 00 00 00 00 00  00 01 00 00 00 00 00 53  |...............S|
-00000030  45 4c 45 43 54 20 2a 20  46 52 4f 4d 20 76 24 76  |ELECT * FROM v$v|
-00000040  65 72 73 69 6f 6e 01 01  00 00 00 00 00 00 01 01  |ersion..........|
-00000050  00 00 00 00 00                                    |.....|
-2020-11-22T07:51:42.9094: 
-Read packet:
-00000000  01 a7 00 00 06 00 00 00  00 00 10 17 3f d5 ec 21  |............?..!|
-00000010  d5 37 e0 67 cc 0f eb 03  cc c5 d1 d8 78 78 0b 15  |.7.g........xx..|
-00000020  0c 21 20 01 50 01 01 51  01 80 00 00 01 50 00 00  |.! .P..Q.....P..|
-00000030  00 00 02 03 69 01 01 50  01 06 01 06 06 42 41 4e  |....i..P.....BAN|
-00000040  4e 45 52 00 00 00 00 01  07 07 78 78 0b 16 07 34  |NER.......xx...4|
-00000050  2b 00 02 1f e8 01 0a 01  0a 00 06 22 01 01 00 01  |+.........."....|
-00000060  19 00 00 00 07 49 4f 72  61 63 6c 65 20 44 61 74  |.....IOracle Dat|
-00000070  61 62 61 73 65 20 31 31  67 20 45 78 70 72 65 73  |abase 11g Expres|
-00000080  73 20 45 64 69 74 69 6f  6e 20 52 65 6c 65 61 73  |s Edition Releas|
-00000090  65 20 31 31 2e 32 2e 30  2e 32 2e 30 20 2d 20 36  |e 11.2.0.2.0 - 6|
-000000a0  34 62 69 74 20 50 72 6f  64 75 63 74 69 6f 6e 07  |4bit Production.|
-000000b0  26 50 4c 2f 53 51 4c 20  52 65 6c 65 61 73 65 20  |&PL/SQL Release |
-000000c0  31 31 2e 32 2e 30 2e 32  2e 30 20 2d 20 50 72 6f  |11.2.0.2.0 - Pro|
-000000d0  64 75 63 74 69 6f 6e 15  01 01 01 07 1a 43 4f 52  |duction......COR|
-000000e0  45 09 31 31 2e 32 2e 30  2e 32 2e 30 09 50 72 6f  |E.11.2.0.2.0.Pro|
-000000f0  64 75 63 74 69 6f 6e 15  01 01 01 07 2e 54 4e 53  |duction......TNS|
-00000100  20 66 6f 72 20 4c 69 6e  75 78 3a 20 56 65 72 73  | for Linux: Vers|
-00000110  69 6f 6e 20 31 31 2e 32  2e 30 2e 32 2e 30 20 2d  |ion 11.2.0.2.0 -|
-00000120  20 50 72 6f 64 75 63 74  69 6f 6e 15 01 01 01 07  | Production.....|
-00000130  26 4e 4c 53 52 54 4c 20  56 65 72 73 69 6f 6e 20  |&NLSRTL Version |
-00000140  31 31 2e 32 2e 30 2e 32  2e 30 20 2d 20 50 72 6f  |11.2.0.2.0 - Pro|
-00000150  64 75 63 74 69 6f 6e 08  01 06 03 14 97 b7 00 01  |duction.........|
-00000160  01 01 02 00 00 00 00 00  04 01 05 01 07 01 05 02  |................|
-00000170  05 7b 00 00 01 01 00 03  00 01 20 00 00 00 00 00  |.{........ .....|
-00000180  00 00 00 00 00 00 00 01  01 00 00 00 00 19 4f 52  |..............OR|
-00000190  41 2d 30 31 34 30 33 3a  20 6e 6f 20 64 61 74 61  |A-01403: no data|
-000001a0  20 66 6f 75 6e 64 0a                              | found.|
-2020-11-22T07:51:42.9104: Summary: RetCode:1403, Error Message:"ORA-01403: no data found\n"
-2020-11-22T07:51:42.9104: Row 0
-2020-11-22T07:51:42.9104:   BANNER              : Oracle Database 11g Express Edition Release 11.2.0.2.0 - 64bit Production
-2020-11-22T07:51:42.9104: Row 1
-2020-11-22T07:51:42.9104:   BANNER              : PL/SQL Release 11.2.0.2.0 - Production
-2020-11-22T07:51:42.9104: Row 2
-2020-11-22T07:51:42.9104:   BANNER              : CORE	11.2.0.2.0	Production
-2020-11-22T07:51:42.9104: Row 3
-2020-11-22T07:51:42.9104:   BANNER              : TNS for Linux: Version 11.2.0.2.0 - Production
-2020-11-22T07:51:42.9104: Row 4
-2020-11-22T07:51:42.9104:   BANNER              : NLSRTL Version 11.2.0.2.0 - Production
-2020-11-22T07:51:42.9114: 
-```
-### PREFETCH_ROWS
-* Initial value is 25
-* this initial value is re-calculated inside fetch to accomodate large data
-* change the initial to higher level will significantly speed up the query and 
-stop automatic calculation
-## RefCursor
-#### note: See examples for using RefCursor with sql package
-to use RefCursor follow these steps:
-* create the connection object and open
-* create NewStmt from connection
-* pass RefCursorParam
-* cast parameter to go_ora.RefCursor
-* call cursor.Query()
-* reterive records use for loop 
-#### code:
-```Golang
-urlOptions := map[string] string {
-	"trace file": "trace.log" ,
-}
-databaseURL := go_ora.BuildUrl(server, port, service, user, password, urlOptions)
-conn, err := sql.Open("oracle", databaseURL)
-// check error
-
-err = conn.Ping()
-// check error
-
-defer conn.Close()
-
-cmdText := `BEGIN    
-    proc_1(:1); 
-end;`
-var cursor go_ora.RefCursor
-_, err = conn.Exec(cmdText, sql.Out{Dest: &cursor})
-//check errors
-
-defer cursor.Close()
-rows, err := cursor.Query()
-// check for error
-
-var (
-    var_1 int64
-    var_2 string
-)
-for rows.Next_() {
-    err = rows.Scan(&var_1, &var_2)
-    // check for error
-	fmt.Println(var_1, var_2)
-}
-```
-
-
+</details>

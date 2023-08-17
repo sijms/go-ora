@@ -384,7 +384,7 @@ _, err := conn.Exec("SELECT ID, NAME, DAT INTO :pr1, :pr2, :pr3 FROM TABLE1 WHER
 ```
 * ### Lob Types
   * Blob, Clob and NClob
-  * Clob use database charset and NClob will use database ncharset for string encoding and decoding
+  * Clob use database charset and NClob use database ncharset for string encoding and decoding
   * complete code is found in [examples/clob](https://github.com/sijms/go-ora/blob/master/examples/clob/main.go)
 > input parameters
 ```golang
@@ -420,7 +420,7 @@ you can pass a structure parameter to sql in one of the following situation
 
 > You should pass at least the name of the parameter to use this feature.
 >
-> input parameters can be defined by name. type is important in some situation
+> Type is important in some situations
 > for example if you have field with type time.Time and you want to pass timestamp
 > to database so put `type=timestamp`
 
@@ -438,32 +438,32 @@ you can pass a structure parameter to sql in one of the following situation
 > nclob       mapped to any golang types that can converted to string
 > ```
 
-> size and direction are required if the field mapped to an output parameter
+> size and direction are required if the fields mapped to an output parameter
 
 complete code can be found in [examples/struct_par](https://github.com/sijms/go-ora/blob/master/examples/struct_par/main.go)
 * ### Arrays
-> passing array as a parameter is useful in the following situation
+> passing array as a parameter is useful in the following situations
 > * Multiple insert/merge
-> * Associative Array you can find complete code in [examples/array](https://github.com/sijms/go-ora/blob/master/examples/arrays/main.go)
-> * UDT array you can find complete code in [examples/udt_array](https://github.com/sijms/go-ora/blob/master/examples/udt_array/main.go)
+> * Associative Array. You can find complete code in [examples/array](https://github.com/sijms/go-ora/blob/master/examples/arrays/main.go)
+> * UDT array. You can find complete code in [examples/udt_array](https://github.com/sijms/go-ora/blob/master/examples/udt_array/main.go)
 
-> multiple insert/merge
-> passing all parameters as arrays of same size will activate bulk-insert/merge.
+> Bulk insert/merge will be activated when you 
+> passing all parameters as arrays of same size.
 > 
 > you can also pass an array of tagged structure to do same thing.
 > complete code for bulk-insert/merge can be found in [examples/merge](https://github.com/sijms/go-ora/blob/master/examples/merge/main.go)
 * ### UDT
-* can be created inside oracle using `create type`
-* `UDT` can be inserted or returned from database as structure
-* to use UDT you should create struct with `udt` tag then call `go_ora.RegisterType(...)`
+* Created inside oracle using `create type`
+* `UDT` mapped to golang struct type.
+* To use UDT you should create struct with `udt` tag then call `go_ora.RegisterType(...)`
 * complete code is found in [examples/UDT](https://github.com/sijms/go-ora/blob/master/examples/UDT/main.go)
 
 * ### Named Parameters
-  * to use named parameter just wrap all you parameter inside `sql.Named`
+  * to use named parameters just wrap all you parameters inside `sql.Named`
   * if one of the parameters doesn't have name driver will switch to positional mode
-  * parameter name in sql will be for example `:pr1` and its value will be `sql.Named("pr1", 1)`
-  * Named parameter is useful if you have one value passed in sql multiple times. parameter with its name passed to `Exec` or `Query` one time and use the name in sql many times
-  * Order is not important
+  * parameter named `:pr1` in sql should be passed as `sql.Named("pr1", 1)`
+  * Named parameter is useful if you have one value passed in sql multiple times.
+  * order is not important
   * complete code for named parameters found in [examples/named_pars](https://github.com/sijms/go-ora/blob/master/examples/named_pars/main.go)
 * ### RefCursor
 > as an output parameter
@@ -563,7 +563,7 @@ err = output.Print(os.Stdout)
 ### version 2.7.4:
 * activate global timeout value to protect against block read/write
   if no timeout context specified
-* default value for timeout is 30 second you can change by
+* default value for timeout is 120 second you can change by
   passing one of the following ["TIMEOUT", "CONNECT TIMEOUT", "CONNECTION TIMEOUT"]
 * other feature/issues:
   * fix passing empty `[]byte{}` will produce error

@@ -325,7 +325,11 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		if err != nil {
 			return err
 		}
-		if val != nil && val != value {
+		if val == nil {
+			par.DataType = NCHAR
+			return nil
+		}
+		if val != value {
 			return par.setDataType(reflect.TypeOf(val), val, conn)
 		}
 		if goType.Kind() == reflect.Struct {

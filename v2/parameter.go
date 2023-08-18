@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -986,7 +987,12 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 				return err
 			}
 		} else if par.Scale > 0 {
-			par.oPrimValue, err = converters.NumberToString(par.BValue)
+			var tempFloat string
+			tempFloat, err = converters.NumberToString(par.BValue)
+			if err != nil {
+				return err
+			}
+			par.oPrimValue, err = strconv.ParseFloat(tempFloat, 64)
 			if err != nil {
 				return err
 			}

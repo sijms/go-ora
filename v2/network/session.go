@@ -171,7 +171,10 @@ func (session *Session) EndContext() {
 
 func (session *Session) initRead() error {
 	var err error
-	timeout := time.Now().Add(session.Context.ConnOption.Timeout)
+	var timeout = time.Time{}
+	if session.Context.ConnOption.Timeout > 0 {
+		timeout = time.Now().Add(session.Context.ConnOption.Timeout)
+	}
 	if deadline, ok := session.ctx.Deadline(); ok {
 		timeout = deadline
 	}
@@ -192,7 +195,10 @@ func (session *Session) initRead() error {
 
 func (session *Session) initWrite() error {
 	var err error
-	timeout := time.Now().Add(session.Context.ConnOption.Timeout)
+	var timeout = time.Time{}
+	if session.Context.ConnOption.Timeout > 0 {
+		timeout = time.Now().Add(session.Context.ConnOption.Timeout)
+	}
 	if deadline, ok := session.ctx.Deadline(); ok {
 		timeout = deadline
 	}

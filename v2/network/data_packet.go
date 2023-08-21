@@ -41,6 +41,8 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext) (*DataPacket,
 	if sessionCtx.AdvancedService.CryptAlgo != nil {
 		//outputData = make([]byte, len(outputData))
 		//copy(outputData, outputData)
+		tracer := sessionCtx.ConnOption.Tracer
+		tracer.LogPacket("Write packet (Decrypted): ", initialData)
 		initialData, err = sessionCtx.AdvancedService.CryptAlgo.Encrypt(initialData)
 		if err != nil {
 			return nil, err
@@ -93,6 +95,8 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext) (*Data
 		if err != nil {
 			return nil, err
 		}
+		tracer := sessionCtx.ConnOption.Tracer
+		tracer.LogPacket("Read packet (Decrypted): ", pck.buffer)
 	}
 	if sessionCtx.AdvancedService.HashAlgo != nil {
 		pck.buffer, err = sessionCtx.AdvancedService.HashAlgo.Validate(pck.buffer)

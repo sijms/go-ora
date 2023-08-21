@@ -184,8 +184,9 @@ urlOptions := map[string]string{
 }
 ```
 * ### Using Timeout
-  * activate global timeout value (default=30 sec) to protect against block read/write if no timeout context specified
+  * activate global timeout value (default=120 sec) to protect against block read/write if no timeout context specified
   * timeout value should be numeric string which represent number of seconds that should pass before operation finish or canceled by the driver
+  * to disable this option pass 0 value start from v2.7.15
 ```golang
 urlOptions := map[string]string {
 	"TIMEOUT": "60",
@@ -313,6 +314,15 @@ Read packet:
 2020-11-22T07:51:42.9104:   BANNER              : NLSRTL Version 11.2.0.2.0 - Production
 2020-11-22T07:51:42.9114: 
 ```
+
+* ### CID
+use this option if you want to pass your own CID started from v2.7.15
+
+> default CID
+```golang
+FulCid := "(CID=(PROGRAM=" + op.ProgramPath + ")(HOST=" + op.HostName + ")(USER=" + op.UserName + "))" 
+```
+
 
 </details>
 

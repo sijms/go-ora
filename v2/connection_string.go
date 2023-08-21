@@ -463,6 +463,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	ret.connOption.ServiceName = strings.Trim(u.Path, "/")
 	for key, val := range q {
 		switch strings.ToUpper(key) {
+		case "CID":
+			ret.connOption.Cid = val[0]
 		case "CONNSTR":
 			err = ret.connOption.UpdateDatabaseInfo(q.Get("connStr"))
 			if err != nil {

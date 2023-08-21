@@ -31,6 +31,7 @@ type ClientInfo struct {
 	Language    string
 	Territory   string
 	CharsetID   int
+	Cid         string
 }
 type DatabaseInfo struct {
 	UserID          string
@@ -210,6 +211,9 @@ func (op *ConnectionOption) ConnectionData() string {
 		protocol = host.Protocol
 	}
 	FulCid := "(CID=(PROGRAM=" + op.ProgramPath + ")(HOST=" + op.HostName + ")(USER=" + op.UserName + "))"
+	if len(op.Cid) > 0 {
+		FulCid = op.Cid
+	}
 	var address string
 	if len(op.UnixAddress) > 0 {
 		address = "(ADDRESS=(PROTOCOL=IPC)(KEY=EXTPROC1))"

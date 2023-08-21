@@ -404,8 +404,13 @@ func (session *Session) Connect(ctx context.Context) error {
 	var loop = true
 	dialer := connOption.Dialer
 	if dialer == nil {
-		dialer = &net.Dialer{
-			Timeout: session.Context.ConnOption.Timeout,
+		dialer = &net.Dialer{}
+		if session.Context.ConnOption.Timeout > 0 {
+			dialer = &net.Dialer{
+				Timeout: session.Context.ConnOption.Timeout,
+			}
+		} else {
+			dialer = &net.Dialer{}
 		}
 	}
 	//connOption.serverIndex = 0

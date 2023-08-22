@@ -196,6 +196,10 @@ func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) error {
 	if value == nil {
 		return setNull(obj)
 	}
+	if obj.Kind() == reflect.Interface {
+		obj.Set(reflect.ValueOf(value))
+		return nil
+	}
 	switch val := value.(type) {
 	case int64:
 		return setNumber(obj, float64(val))

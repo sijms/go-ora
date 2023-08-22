@@ -533,6 +533,12 @@ func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}
 	if input == nil {
 		return setNull(fieldValue)
 	}
+	if fieldValue.Kind() == reflect.Ptr && fieldValue.Elem().Kind() == reflect.Interface {
+		fieldValue.Elem().Set(reflect.ValueOf(input))
+	}
+	if fieldValue.Kind() == reflect.Interface {
+		fieldValue.Set(reflect.ValueOf(input))
+	}
 	switch val := input.(type) {
 	case int64:
 		return setNumber(fieldValue, float64(val))

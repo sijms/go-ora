@@ -957,6 +957,27 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				}
 			}
 			dataSet.setBitVector(bitVector)
+		case 27:
+			count, err := session.GetInt(4, true, true)
+			if err != nil {
+				return err
+			}
+			for x := 0; x < count; x++ {
+				//refCursorAccessor.UnmarshalOneRow();
+			}
+			//internal List<TTCResultSet> ProcessImplicitResultSet(
+			//ref List<TTCResultSet> implicitRSList)
+			//{
+			//int num = (int) this.m_marshallingEngine.UnmarshalUB4();
+			//TTCRefCursorAccessor refCursorAccessor = new TTCRefCursorAccessor((ColumnDescribeInfo) null, this.m_marshallingEngine);
+			//for (int index = 0; index < num; ++index)
+			//refCursorAccessor.UnmarshalOneRow();
+			//if (implicitRSList != null)
+			//implicitRSList.AddRange((IEnumerable<TTCResultSet>) refCursorAccessor.m_TTCResultSetList);
+			//else
+			//implicitRSList = refCursorAccessor.m_TTCResultSetList;
+			//return implicitRSList;
+			//}
 		default:
 			err = stmt.connection.readResponse(msg)
 			if err != nil {

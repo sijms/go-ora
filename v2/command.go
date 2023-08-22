@@ -964,6 +964,16 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			}
 			for x := 0; x < count; x++ {
 				//refCursorAccessor.UnmarshalOneRow();
+				// this function is equal to load cursor so each item is a cursor
+				cursor := RefCursor{}
+				cursor.connection = stmt.connection
+				cursor.parent = stmt
+				cursor.autoClose = true
+				err = cursor.load()
+				if err != nil {
+					return err
+				}
+				// what we will do with cursor?
 			}
 			//internal List<TTCResultSet> ProcessImplicitResultSet(
 			//ref List<TTCResultSet> implicitRSList)

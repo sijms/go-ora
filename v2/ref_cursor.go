@@ -135,10 +135,10 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 		copy(cursor.scnForSnapshot, cursor.parent.scnForSnapshot)
 	}
 
-	failOver := cursor.connection.connOption.Failover
-	if failOver == 0 {
-		failOver = 1
-	}
+	//failOver := cursor.connection.connOption.Failover
+	//if failOver == 0 {
+	//	failOver = 1
+	//}
 	dataSet, err := cursor._query()
 	if err != nil {
 		if isBadConn(err) {

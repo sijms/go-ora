@@ -668,16 +668,6 @@ func (conn *Connection) doAuth() error {
 		//case 27:
 		//	this.ProcessImplicitResultSet(ref implicitRSList);
 		//	continue;
-		case 28:
-			err = conn.protocolNegotiation()
-			if err != nil {
-				return err
-			}
-			err = conn.dataTypeNegotiation()
-			if err != nil {
-
-				return err
-			}
 		default:
 			return errors.New(fmt.Sprintf("message code error: received code %d", msg))
 		}
@@ -685,63 +675,6 @@ func (conn *Connection) doAuth() error {
 
 	// if verifyResponse == true
 	// conn.authObject.VerifyResponse(conn.SessionProperties["AUTH_SVR_RESPONSE"])
-	return nil
-}
-
-func (conn *Connection) dataTypeNegotiation() error {
-	tracer := conn.connOption.Tracer
-	var err error
-	tracer.Print("Data Type Negotiation")
-	conn.dataNego = buildTypeNego(conn.tcpNego, conn.session)
-	err = conn.dataNego.write(conn.session)
-	if err != nil {
-		return err
-	}
-	err = conn.dataNego.read(conn.session)
-	if err != nil {
-		return err
-	}
-	conn.session.TTCVersion = conn.dataNego.CompileTimeCaps[7]
-	conn.session.UseBigScn = conn.tcpNego.ServerCompileTimeCaps[7] >= 8
-	if conn.tcpNego.ServerCompileTimeCaps[7] < conn.session.TTCVersion {
-		conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
-	}
-	tracer.Print("TTC Version: ", conn.session.TTCVersion)
-	if len(conn.tcpNego.ServerRuntimeCaps) > 6 && conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
-		conn.maxLen.varchar = 0x7FFF
-		conn.maxLen.nvarchar = 0x7FFF
-		conn.maxLen.raw = 0x7FFF
-	} else {
-		conn.maxLen.varchar = 0xFA0
-		conn.maxLen.nvarchar = 0xFA0
-		conn.maxLen.raw = 0xFA0
-	}
-	return nil
-	//this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
-	//this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
-	//this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompileTimeCapabilities[7] >= (byte) 8;
-}
-func (conn *Connection) protocolNegotiation() error {
-	tracer := conn.connOption.Tracer
-	var err error
-	tracer.Print("TCP Negotiation")
-	conn.tcpNego, err = newTCPNego(conn.session)
-	if err != nil {
-		return err
-	}
-	tracer.Print("Server Charset: ", conn.tcpNego.ServerCharset)
-	tracer.Print("Server National Charset: ", conn.tcpNego.ServernCharset)
-	// create string converter object
-	conn.sStrConv = converters.NewStringConverter(conn.tcpNego.ServerCharset)
-	if conn.sStrConv == nil {
-		return fmt.Errorf("the server use charset with id: %d which is not supported by the driver", conn.tcpNego.ServerCharset)
-	}
-	conn.session.StrConv = conn.sStrConv
-	conn.nStrConv = converters.NewStringConverter(conn.tcpNego.ServernCharset)
-	if conn.nStrConv == nil {
-		return fmt.Errorf("the server use ncharset with id: %d which is not supported by the driver", conn.tcpNego.ServernCharset)
-	}
-	conn.tcpNego.ServerFlags |= 2
 	return nil
 }
 
@@ -1288,6 +1221,16 @@ func (conn *Connection) readResponse(msgCode uint8) error {
 		if err != nil {
 			return err
 		}
+	case 28:
+		err = conn.protocolNegotiation()
+		if err != nil {
+			return err
+		}
+		err = conn.dataTypeNegotiation()
+		if err != nil {
+
+			return err
+		}
 	default:
 		return errors.New(fmt.Sprintf("TTC error: received code %d during response reading", msgCode))
 	}
@@ -1464,4 +1407,61 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 		return nil
 	}
 	return errors.New("the driver used is not a go-ora driver type")
+}
+
+func (conn *Connection) dataTypeNegotiation() error {
+	tracer := conn.connOption.Tracer
+	var err error
+	tracer.Print("Data Type Negotiation")
+	conn.dataNego = buildTypeNego(conn.tcpNego, conn.session)
+	err = conn.dataNego.write(conn.session)
+	if err != nil {
+		return err
+	}
+	err = conn.dataNego.read(conn.session)
+	if err != nil {
+		return err
+	}
+	conn.session.TTCVersion = conn.dataNego.CompileTimeCaps[7]
+	conn.session.UseBigScn = conn.tcpNego.ServerCompileTimeCaps[7] >= 8
+	if conn.tcpNego.ServerCompileTimeCaps[7] < conn.session.TTCVersion {
+		conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
+	}
+	tracer.Print("TTC Version: ", conn.session.TTCVersion)
+	if len(conn.tcpNego.ServerRuntimeCaps) > 6 && conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
+		conn.maxLen.varchar = 0x7FFF
+		conn.maxLen.nvarchar = 0x7FFF
+		conn.maxLen.raw = 0x7FFF
+	} else {
+		conn.maxLen.varchar = 0xFA0
+		conn.maxLen.nvarchar = 0xFA0
+		conn.maxLen.raw = 0xFA0
+	}
+	return nil
+	//this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
+	//this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
+	//this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompileTimeCapabilities[7] >= (byte) 8;
+}
+func (conn *Connection) protocolNegotiation() error {
+	tracer := conn.connOption.Tracer
+	var err error
+	tracer.Print("TCP Negotiation")
+	conn.tcpNego, err = newTCPNego(conn.session)
+	if err != nil {
+		return err
+	}
+	tracer.Print("Server Charset: ", conn.tcpNego.ServerCharset)
+	tracer.Print("Server National Charset: ", conn.tcpNego.ServernCharset)
+	// create string converter object
+	conn.sStrConv = converters.NewStringConverter(conn.tcpNego.ServerCharset)
+	if conn.sStrConv == nil {
+		return fmt.Errorf("the server use charset with id: %d which is not supported by the driver", conn.tcpNego.ServerCharset)
+	}
+	conn.session.StrConv = conn.sStrConv
+	conn.nStrConv = converters.NewStringConverter(conn.tcpNego.ServernCharset)
+	if conn.nStrConv == nil {
+		return fmt.Errorf("the server use ncharset with id: %d which is not supported by the driver", conn.tcpNego.ServernCharset)
+	}
+	conn.tcpNego.ServerFlags |= 2
+	return nil
 }

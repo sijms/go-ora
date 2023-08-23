@@ -523,7 +523,7 @@ func (session *Session) Disconnect() {
 
 // Write send data store in output buffer through network
 //
-// if data bigger than SessionDataUnit it should be divided into
+// if data bigger than fSessionDataUnit it should be divided into
 // segment and each segment sent in data packet
 func (session *Session) Write() error {
 	outputBytes := session.outBuffer.Bytes()

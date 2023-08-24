@@ -538,6 +538,10 @@ func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Co
 			}
 			par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(conv.GetLangID())
 		}
+		//if par.DataType == NUMBER {
+		//	par.Precision = 38
+		//	par.Scale = 0xff
+		//}
 		if par.DataType == RAW {
 			if par.MaxLen < size {
 				par.MaxLen = size

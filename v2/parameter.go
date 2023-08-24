@@ -975,7 +975,21 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	case RAW:
 		par.oPrimValue = par.BValue
 	case NUMBER:
-		if par.Scale == 0 && par.Precision <= 18 {
+		if par.Scale == 0 && par.Precision == 0 {
+			var tempFloat string
+			tempFloat, err = converters.NumberToString(par.BValue)
+			if err != nil {
+				return err
+			}
+			if err != nil {
+				return err
+			}
+			if strings.Contains(tempFloat, ".") {
+				par.oPrimValue, err = strconv.ParseFloat(tempFloat, 64)
+			} else {
+				par.oPrimValue, err = strconv.ParseInt(tempFloat, 10, 64)
+			}
+		} else if par.Scale == 0 && par.Precision <= 18 {
 			par.oPrimValue, err = converters.NumberToInt64(par.BValue)
 			if err != nil {
 				return err
@@ -987,8 +1001,12 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 				return err
 			}
 		} else if par.Scale > 0 {
+			//par.oPrimValue, err = converters.NumberToString(par.BValue)
 			var tempFloat string
 			tempFloat, err = converters.NumberToString(par.BValue)
+			if err != nil {
+				return err
+			}
 			if err != nil {
 				return err
 			}
@@ -996,10 +1014,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 				par.oPrimValue, err = strconv.ParseFloat(tempFloat, 64)
 			} else {
 				par.oPrimValue, err = strconv.ParseInt(tempFloat, 10, 64)
-			}
-			//par.oPrimValue, err = converters.NumberToString(par.BValue)
-			if err != nil {
-				return err
 			}
 		} else {
 			par.oPrimValue = converters.DecodeNumber(par.BValue)

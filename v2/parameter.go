@@ -992,7 +992,12 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 			if err != nil {
 				return err
 			}
-			par.oPrimValue, err = strconv.ParseFloat(tempFloat, 64)
+			if strings.Contains(tempFloat, ".") {
+				par.oPrimValue, err = strconv.ParseFloat(tempFloat, 64)
+			} else {
+				par.oPrimValue, err = strconv.ParseInt(tempFloat, 10, 64)
+			}
+			//par.oPrimValue, err = converters.NumberToString(par.BValue)
 			if err != nil {
 				return err
 			}

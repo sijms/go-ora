@@ -36,6 +36,16 @@ const (
 	//PROXY       LogonMode = 0x400
 )
 
+// from GODROR
+const wrapResultset = "--WRAP_RESULTSET--"
+
+// Querier is the QueryContext of sql.Conn.
+type Querier interface {
+	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
+}
+
+/////
+
 type NLSData struct {
 	Calender        string `db:"p_nls_calendar,,40,out"`
 	Comp            string `db:"p_nls_comp,,40,out"`
@@ -1086,7 +1096,17 @@ func (conn *Connection) QueryRowContext(ctx context.Context, query string, args 
 	return dataSet
 }
 
+func WrapRefCursor(ctx context.Context, q Querier, cursor *RefCursor) (*sql.Rows, error) {
+	rows, err := cursor.Query()
+	if err != nil {
+		return nil, err
+	}
+	return q.QueryContext(ctx, wrapResultset, rows)
+}
 func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	if query == wrapResultset {
+		return args[0].Value.(driver.Rows), nil
+	}
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
 	rows, err := stmt.QueryContext(ctx, args)

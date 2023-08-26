@@ -66,13 +66,12 @@ conn, err := sql.Open("oracle", connStr)
 // check for error
 ```
 * ### SSL Connection
-to use ssl connection you should pass required url options
-ssl verify will stop ssl certificate verification
+to use ssl connection you should pass required url options.
 ```golang
 port := 2484
 urlOptions := map[string] string {
 	"ssl": "true", // or enable
-	"ssl verify": "false",
+	"ssl verify": "false", // stop ssl certificate verification
 	"wallet": "path to folder that contains oracle wallet",
 }
 connStr := go_ora.BuildUrl("server", port, "service_name", "username", "password", urlOptions)
@@ -369,7 +368,7 @@ passing input parameters as defined by database/sql package.
 >   * int64 / float64 and their equivalent
 >   * string
 >   * time.Time
->   * any time that support Valuer interface
+>   * any type that support Valuer interface
 >   * NVarChar
 >   * TimeStamp
 >   * TimeStampTZ
@@ -413,6 +412,15 @@ _, err := conn.Exec("BEGIN SELECT col1, col2 into :1, :2 FROM tb; END;",
 	go_ora.Out{Dest: &var1, size: 100000},
 	go_ora.Out{Dest: &var2, size: 300000})
 ```
+
+* ### Named Parameters
+  * to use named parameters just wrap all you parameters inside `sql.Named`
+  * if one of the parameters doesn't have name driver will switch to positional mode
+  * parameter named `:pr1` in sql should be passed as `sql.Named("pr1", 1)`
+  * Named parameter is useful if you have one value passed in sql multiple times.
+  * order is not important
+  * complete code for named parameters found in [examples/named_pars](https://github.com/sijms/go-ora/blob/master/examples/named_pars/main.go)
+
 * ### structures with tag
 you can pass a structure parameter to sql in one of the following situation
 - structure that implement Valuer interface
@@ -428,7 +436,7 @@ you can pass a structure parameter to sql in one of the following situation
 > }  
 > ```
 
-> You should pass at least the name of the parameter to use this feature.
+> **struct with tag uses named parameters** so you should pass at least the name of the parameter to use this feature.
 >
 > Type is important in some situations
 > for example if you have field with type time.Time and you want to pass timestamp
@@ -451,6 +459,7 @@ you can pass a structure parameter to sql in one of the following situation
 > size and direction are required if the fields mapped to an output parameter
 
 complete code can be found in [examples/struct_par](https://github.com/sijms/go-ora/blob/master/examples/struct_par/main.go)
+
 * ### Arrays
 > passing array as a parameter is useful in the following situations
 > * Multiple insert/merge
@@ -462,25 +471,21 @@ complete code can be found in [examples/struct_par](https://github.com/sijms/go-
 > 
 > you can also pass an array of tagged structure to do same thing.
 > complete code for bulk-insert/merge can be found in [examples/merge](https://github.com/sijms/go-ora/blob/master/examples/merge/main.go)
+
 * ### UDT
 * Created inside oracle using `create type`
 * `UDT` mapped to golang struct type.
 * To use UDT you should create struct with `udt` tag then call `go_ora.RegisterType(...)`
 * complete code is found in [examples/UDT](https://github.com/sijms/go-ora/blob/master/examples/UDT/main.go)
 
-* ### Named Parameters
-  * to use named parameters just wrap all you parameters inside `sql.Named`
-  * if one of the parameters doesn't have name driver will switch to positional mode
-  * parameter named `:pr1` in sql should be passed as `sql.Named("pr1", 1)`
-  * Named parameter is useful if you have one value passed in sql multiple times.
-  * order is not important
-  * complete code for named parameters found in [examples/named_pars](https://github.com/sijms/go-ora/blob/master/examples/named_pars/main.go)
 * ### RefCursor
 > as an output parameter
 > ```golang
 >   var cursor go_ora.RefCursor
 >   _, err = conn.Exec(`BEGIN PROC1(:1, :2); END;`, 1, sql.Out{Dest: &cursor})
 > ```
+> you can use `go_ora.WrapRefCursor(...)` to convert `*RefCursor` into `*sql.Rows` started from v2.7.17
+
 > complete code for RefCursor as output parameter found in [examples/refcursor](https://github.com/sijms/go-ora/blob/master/examples/refcursor/main.go)
 
 > Map RefCursor to sql.Rows
@@ -528,6 +533,15 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 [//]: # (### Supported DBMS features)
 ### releases
 <details>
+
+### version 2.7.17
+* add `WrapRefCursor` which converts `*RefCursor` into `*sql.Rows`
+* code:
+```golang
+// conn is *sql.DB
+// cursor comming from output parameter
+rows, err := go_ora.WrapRefCursor(context.Background(), conn, cursor)
+```
 
 ### version 2.7.11
 * add support for DBMS_OUTPUT

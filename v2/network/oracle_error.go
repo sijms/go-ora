@@ -42,6 +42,8 @@ func (err *OracleError) translate() {
 		err.ErrMsg = "ORA-12506: TNS:listener rejected connection based on service ACL filtering"
 	case 12514:
 		err.ErrMsg = "ORA-12514: TNS:listener does not currently know of service requested in connect descriptor"
+	case 12516:
+		err.ErrMsg = "ORA-12516: TNS:listener could not find available handler with matching protocol stack"
 	case 3135:
 		err.ErrMsg = "ORA-03135: connection lost contact"
 	default:

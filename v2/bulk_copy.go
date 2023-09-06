@@ -76,12 +76,12 @@ func (bulk *BulkCopy) AddRow(values ...interface{}) error {
 	if err != nil {
 		return err
 	}
-	if bulk.data.Len() > 0x20000 {
-		err = bulk.EndStream()
-		if err != nil {
-			return err
-		}
-	}
+	//if bulk.data.Len() > 0x20000 {
+	//	err = bulk.EndStream()
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 	return nil
 	//session.PutBytes(flag)
 	//session.PutInt(length, 2, true, false)

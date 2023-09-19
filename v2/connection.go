@@ -185,6 +185,7 @@ func (driver *OracleDriver) collectData(conn *Connection) {
 		driver.dataCollected = true
 	}
 }
+
 func (connector *OracleConnector) Driver() driver.Driver {
 	return connector.drv
 }

@@ -527,12 +527,50 @@ for rows.Next() {
 ```
 complete code for mapping refcursor to sql.Rows is found in [example/refcursor_to_rows](https://github.com/sijms/go-ora/blob/master/examples/refcursor_to_rows/main.go)
 
+* ### Connect to multiple database
+  * note that `sql.Open(...)` will use default driver so use it if you want to connect to one database
+  * to use multiple databse you should create a separate driver for each database (don't use default driver) 
+```golang
+  // Get a driver-specific connector.   
+  connector, err := mysql.NewConnector(connStr)
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  // Get a database handle.
+  db = sql.OpenDB(connector)
+```
+
+* ### Use Custom String encode/decode
+  * if your database charset is not supported you can create a custom object that implement IStringConverter interface and pass it to the driver as follow
+```golang
+  db, err := sql.Open("oracle", connStr)
+  if err != nil {
+	  // error handling
+  }
+  
+  // call SetStringConverter before use db object
+  // charset and nCharset are custom object that implement 
+  // IStringConverter interface
+  // if you pass nil for any of them then the driver will use 
+  // default StringConverter
+  go_ora.SetStringConverter(db, charset, nCharset)
+  
+  // rest of your code
+```
+
 [//]: # (### Go and Oracle type mapping + special types)
 
 [//]: # ()
 [//]: # (### Supported DBMS features)
 ### releases
 <details>
+
+### version 2.7.18
+* Add 2 function `go_ora.NewDriver` and `go_ora.NewConnector`
+* Add new function `go_ora.SetStringConverter` which accept custom converter for unsupported charset and nCharset
+* `go_ora.SetStringConverter` accept `*sql.DB` as first parameter and IStringConveter interface object for charset and nCharset (you can pass nil to use default converter)
+* Add support for charset ID 846
 
 ### version 2.7.17
 * add `WrapRefCursor` which converts `*RefCursor` into `*sql.Rows`

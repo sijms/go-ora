@@ -532,7 +532,7 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
   * to use multiple databse you should create a separate driver for each database (don't use default driver) 
 ```golang
   // Get a driver-specific connector.   
-  connector, err := mysql.NewConnector(connStr)
+  connector, err := go_ora.NewConnector(connStr)
   if err != nil {
     log.Fatal(err)
   }

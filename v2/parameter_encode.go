@@ -321,18 +321,35 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 	case tyRefCursor:
 		par.DataType = REFCURSOR
 	default:
-		val, err := getValue(value)
-		if err != nil {
-			return err
+		rOriginal := reflect.ValueOf(value)
+		if value != nil && !(rOriginal.Kind() == reflect.Ptr && rOriginal.IsNil()) {
+			proVal := reflect.Indirect(rOriginal)
+			if valuer, ok := proVal.Interface().(driver.Valuer); ok {
+				val, err := valuer.Value()
+				if err != nil {
+					return err
+				}
+				if val == nil {
+					par.DataType = NCHAR
+					return nil
+				}
+			}
 		}
-		if val == nil {
-			par.DataType = NCHAR
-			return nil
-		}
-		if val != value {
-			return par.setDataType(reflect.TypeOf(val), val, conn)
-		}
+
+		//val, err := getValue(value)
+		//if err != nil {
+		//	return err
+		//}
+		//if val == nil {
+		//	par.DataType = NCHAR
+		//	return nil
+		//}
+		//if val != value {
+		//	return par.setDataType(reflect.TypeOf(val), val, conn)
+		//}
 		if goType.Kind() == reflect.Struct {
+			// see if the struct is support valuer interface
+
 			for _, cusTyp := range conn.cusTyp {
 				if goType == cusTyp.typ {
 					par.cusType = new(customType)

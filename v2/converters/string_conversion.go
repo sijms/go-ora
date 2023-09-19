@@ -10,6 +10,7 @@ type IStringConverter interface {
 	Encode(string) []byte
 	Decode([]byte) string
 	GetLangID() int
+	Clone() IStringConverter
 	//SetLangID(langID int) int
 }
 
@@ -53,6 +54,18 @@ func MaxBytePerChar(charsetID int) int {
 		return 2
 	default:
 		return 1
+	}
+}
+
+func (conv *StringConverter) Clone() IStringConverter {
+	return &StringConverter{
+		LangID:    conv.LangID,
+		CharWidth: conv.CharWidth,
+		eReplace:  conv.eReplace,
+		dReplace:  conv.dReplace,
+		dBuffer:   conv.dBuffer,
+		dBuffer2:  conv.dBuffer2,
+		eBuffer:   conv.eBuffer,
 	}
 }
 func (conv *StringConverter) GetLangID() int {

@@ -538,7 +538,7 @@ func (session *Session) Write() error {
 		//return errors.New("the output buffer is empty")
 	}
 
-	segmentLen := int(session.Context.SessionDataUnit - 20)
+	segmentLen := int(session.Context.SessionDataUnit - 64)
 	offset := 0
 	if size > segmentLen {
 		segment := make([]byte, segmentLen)

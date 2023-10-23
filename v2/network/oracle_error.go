@@ -50,3 +50,12 @@ func (err *OracleError) translate() {
 		err.ErrMsg = "ORA-" + strconv.Itoa(err.ErrCode)
 	}
 }
+
+func (err *OracleError) Bad() bool {
+	switch err.ErrCode {
+	case 28, 1012, 1033, 1034, 1089, 3113, 3114, 3135, 12528, 12537:
+		return true
+	default:
+		return false
+	}
+}

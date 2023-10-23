@@ -6,15 +6,17 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/converters"
-	"github.com/sijms/go-ora/v2/network"
 	"io"
+	"net"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/sijms/go-ora/v2/converters"
+	"github.com/sijms/go-ora/v2/network"
 )
 
 var (
@@ -944,7 +946,21 @@ func setNumber(value reflect.Value, input float64) error {
 }
 
 func isBadConn(err error) bool {
-	return errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE)
+	var opError *net.OpError
+	var oraError *network.OracleError
+	switch {
+	case errors.Is(err, io.EOF):
+		return true
+	case errors.Is(err, syscall.EPIPE):
+		return true
+	case errors.As(err, &opError):
+		if opError.Net == "tcp" && opError.Op == "write" {
+			return true
+		}
+	case errors.As(err, &oraError):
+		return oraError.Bad()
+	}
+	return false
 }
 
 func collectLocators(pars []ParameterInfo) [][]byte {

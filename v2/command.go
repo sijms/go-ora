@@ -8,11 +8,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/network"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/v2/network"
 )
 
 type StmtType int
@@ -568,6 +569,7 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	var err = stmt._fetch(dataSet)
 	if err != nil {
 		if isBadConn(err) {
+			stmt.connection.setBad()
 			tracer.Print("Error: ", err)
 			return driver.ErrBadConn
 		}
@@ -2213,6 +2215,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	}
 	if err != nil {
 		if isBadConn(err) {
+			stmt.connection.setBad()
 			tracer.Print("Error: ", err)
 			return nil, driver.ErrBadConn
 		}
@@ -2326,6 +2329,7 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	dataSet, err := stmt._query()
 	if err != nil {
 		if isBadConn(err) {
+			stmt.connection.setBad()
 			tracer.Print("Error: ", err)
 			return nil, driver.ErrBadConn
 		}

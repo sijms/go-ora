@@ -57,6 +57,7 @@ func (obj *simpleObject) exec() error {
 	var err = obj.write().read()
 	if err != nil {
 		if isBadConn(err) {
+			obj.connection.setBad()
 			tracer.Print("Error: ", err)
 			return driver.ErrBadConn
 		}

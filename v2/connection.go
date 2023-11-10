@@ -7,15 +7,17 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/advanced_nego"
-	"github.com/sijms/go-ora/v2/converters"
-	"github.com/sijms/go-ora/v2/network"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/sijms/go-ora/v2/advanced_nego"
+	"github.com/sijms/go-ora/v2/converters"
+	"github.com/sijms/go-ora/v2/network"
 )
 
 type ConnectionState int
@@ -102,7 +104,7 @@ type Connection struct {
 		date      int
 		timestamp int
 	}
-	bad       bool
+	bad       atomic.Bool
 	dbTimeLoc *time.Location
 }
 
@@ -1289,11 +1291,12 @@ func (conn *Connection) readResponse(msgCode uint8) error {
 }
 
 func (conn *Connection) setBad() {
-	conn.bad = true
+	conn.bad.Swap(true)
+	//conn.bad = true
 }
 
 func (conn *Connection) ResetSession(ctx context.Context) error {
-	if conn.bad {
+	if conn.bad.Load() {
 		return driver.ErrBadConn
 	}
 	return nil

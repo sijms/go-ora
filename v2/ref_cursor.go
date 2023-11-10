@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"database/sql/driver"
+
 	"github.com/sijms/go-ora/v2/network"
 )
 
@@ -142,6 +143,7 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	dataSet, err := cursor._query()
 	if err != nil {
 		if isBadConn(err) {
+			cursor.connection.setBad()
 			tracer.Print("Error: ", err)
 			return nil, driver.ErrBadConn
 		}

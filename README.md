@@ -528,8 +528,8 @@ for rows.Next() {
 complete code for mapping refcursor to sql.Rows is found in [example/refcursor_to_rows](https://github.com/sijms/go-ora/blob/master/examples/refcursor_to_rows/main.go)
 
 * ### Connect to multiple database
-  * note that `sql.Open(...)` will use default driver so use it if you want to connect to one database
-  * to use multiple databse you should create a separate driver for each database (don't use default driver) 
+  * note that `sql.Open(...)` will use default driver so it will be suitable for one database projects.
+  * to use multiple database you should create a separate driver for each one (don't use default driver) 
 ```golang
   // Get a driver-specific connector.   
   connector, err := go_ora.NewConnector(connStr)
@@ -542,7 +542,7 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 ```
 
 * ### Use Custom String encode/decode
-  * if your database charset is not supported you can create a custom object that implement IStringConverter interface and pass it to the driver as follow
+  * if your database charset is not supported you can create a custom object that implement IStringConverter interface and pass it to the driver as follows
 ```golang
   db, err := sql.Open("oracle", connStr)
   if err != nil {

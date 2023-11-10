@@ -1216,10 +1216,12 @@ func DecodeDate(data []byte) (time.Time, error) {
 		//	return time.Date(year, time.Month(data[2]), int(data[3]),
 		//		int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, loc.Location()), nil
 		//}
+	} else {
+		timeInZone = data[11]&0x40 == 0x40
 	}
 	if zone == nil {
 		zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHour, tzMin), tzHour*60*60+tzMin*60)
-		timeInZone = true
+		//timeInZone = true
 	}
 	if timeInZone {
 		return time.Date(year, time.Month(data[2]), int(data[3]),

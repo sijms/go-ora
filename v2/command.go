@@ -36,23 +36,23 @@ type StmtInterface interface {
 	CanAutoClose() bool
 }
 type defaultStmt struct {
-	connection         *Connection
-	text               string
-	disableCompression bool
-	_hasLONG           bool
-	_hasBLOB           bool
-	_hasMoreRows       bool
-	_hasReturnClause   bool
-	_noOfRowsToFetch   int
-	stmtType           StmtType
-	cursorID           int
-	queryID            uint64
-	Pars               []ParameterInfo
-	columns            []ParameterInfo
-	scnForSnapshot     []int
-	arrayBindCount     int
-	containOutputPars  bool
-	autoClose          bool
+	connection *Connection
+	text       string
+	//disableCompression bool
+	_hasLONG          bool
+	_hasBLOB          bool
+	_hasMoreRows      bool
+	_hasReturnClause  bool
+	_noOfRowsToFetch  int
+	stmtType          StmtType
+	cursorID          int
+	queryID           uint64
+	Pars              []ParameterInfo
+	columns           []ParameterInfo
+	scnForSnapshot    []int
+	arrayBindCount    int
+	containOutputPars bool
+	autoClose         bool
 }
 
 func (stmt *defaultStmt) CanAutoClose() bool {
@@ -302,7 +302,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	ret.text = text
 	ret._hasBLOB = false
 	ret._hasLONG = false
-	ret.disableCompression = false
+	//ret.disableCompression = false
 	ret.arrayBindCount = 0
 	ret.scnForSnapshot = make([]int, 2)
 	// get stmt type
@@ -410,7 +410,7 @@ func (stmt *Stmt) write() error {
 			session.PutBytes(3, 0x4E, 0)
 			count = stmt._noOfRowsToFetch
 			exeOf = 0x20
-			if stmt._hasReturnClause || stmt.stmtType == PLSQL || stmt.disableCompression {
+			if stmt._hasReturnClause || stmt.stmtType == PLSQL /*|| stmt.disableCompression*/ {
 				exeOf |= 0x40000
 			}
 		} else {
@@ -997,7 +997,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			}
 			if msg == 4 {
 				stmt.cursorID = stmt.connection.session.Summary.CursorID
-				stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0
+				//stmt.disableCompression = stmt.connection.session.Summary.Flags&0x20 != 0
 				if stmt.connection.session.HasError() {
 					if stmt.connection.session.Summary.RetCode == 1403 {
 						stmt._hasMoreRows = false
@@ -2405,7 +2405,7 @@ func (stmt *Stmt) reset() {
 	stmt._hasBLOB = false
 	stmt._hasLONG = false
 	stmt.bulkExec = false
-	stmt.disableCompression = false
+	//stmt.disableCompression = false
 	stmt.arrayBindCount = 0
 }
 

@@ -149,3 +149,15 @@ func TestEncodeDouble(t *testing.T) {
 // 		t.Errorf("EncodeDate(%v) = %v, want %v", ti, got, want)
 // 	}
 // }
+
+func TestDecodeDate(t *testing.T) {
+	// 57 3c
+	// 0001
+	// 0101
+	data := []byte{0x78, 0x7b, 0xb, 0xa, 0x16, 0x31, 0x12, 0x30, 0xb4, 0xa0, 0xc0, 0x17, 0x3c}
+	date, err := DecodeDate(data)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Log(date)
+}

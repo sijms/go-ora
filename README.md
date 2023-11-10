@@ -18,7 +18,7 @@
   * using database/sql
   ```golang
   port := 1521
-  connStr := go_ora.BulidUrl("server", port, "service_name", "username", "password", nil)
+  connStr := go_ora.BuildUrl("server", port, "service_name", "username", "password", nil)
   conn, err := sql.Open("oracle", connStr)
   // check for error
   err = conn.Ping()
@@ -27,7 +27,7 @@
   * using package directly
   ```golang
   port := 1521
-  connStr := go_ora.BulidUrl("server", port, "service_name", "username", "password", nil)
+  connStr := go_ora.BuildUrl("server", port, "service_name", "username", "password", nil)
   conn, err := go_ora.NewConnection(connStr)
   // check for error
   err = conn.Open()
@@ -41,7 +41,7 @@ port := 1521
 urlOptions := map[string]string {
   "SID": "SID_VALUE",
 }
-connStr := go_ora.BulidUrl("server", port, "", "username", "password", urlOptions)
+connStr := go_ora.BuildUrl("server", port, "", "username", "password", urlOptions)
 conn, err := sql.Open("oracle", connStr)
 // check for error
 ```
@@ -52,7 +52,7 @@ server, port and service name will be collected from JDBC string
 urlOptions := map[string]string {
   "connStr": "JDBC string",
 }
-connStr := go_ora.BulidUrl("", 0, "", "username", "password", urlOptions)
+connStr := go_ora.BuildUrl("", 0, "", "username", "password", urlOptions)
 conn, err := sql.Open("oracle", connStr)
 // check for error
 ```

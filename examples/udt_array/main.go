@@ -183,7 +183,7 @@ func dropTable(conn *sql.DB) error {
 	return nil
 }
 
-func ceateUDTArray(conn *sql.DB) error {
+func createUDTArray(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec(`CREATE or REPLACE TYPE TEST_TYPE2 AS TABLE of TEST_TYPE1`)
 	if err != nil {
@@ -252,7 +252,7 @@ func main() {
 			fmt.Println("can't drop UDT: ", err)
 		}
 	}()
-	err = ceateUDTArray(conn)
+	err = createUDTArray(conn)
 	if err != nil {
 		fmt.Println("can't create UDT array: ", err)
 		return

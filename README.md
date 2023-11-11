@@ -559,12 +559,31 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
   // rest of your code
 ```
 
+* ### Session Parameters
+  * you can update session parameter after connection as follow
+  ```golang
+  db, err := sql.Open("oracle", connStr)
+  if err != nil {
+    // error handling
+  }
+  // pass database, key, value
+  err = go_ora.AddSessionParameter(db, "nls_language", "english")
+  if err != nil {
+    // error handling
+  }
+  ```
 [//]: # (### Go and Oracle type mapping + special types)
 
 [//]: # ()
 [//]: # (### Supported DBMS features)
 ### releases
 <details>
+
+### version 2.7.20
+* fix time not in timezone issue specially with oracle 19c
+* add function to set value for session parameters that will be applied for subsequent connections
+* fix issue #461
+* bug fixes and improvements
 
 ### version 2.7.18
 * Add 2 function `go_ora.NewDriver` and `go_ora.NewConnector`

@@ -72,7 +72,7 @@ func (driver *OracleDriver) init(conn *Connection) error {
 	// update session parameters
 	var err error
 	for key, value := range driver.sessionParam {
-		_, err = conn.Exec(fmt.Sprintf("alter session set %s=:1", key), value)
+		_, err = conn.Exec(fmt.Sprintf("alter session set %s='%s'", key, value))
 		if err != nil {
 			return err
 		}

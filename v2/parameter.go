@@ -51,48 +51,54 @@ const (
 	//SB1              TNSType = 3
 	//SB2              TNSType = 3
 	//SB4              TNSType = 3
-	FLOAT            TNSType = 4
-	NullStr          TNSType = 5
-	VarNum           TNSType = 6
-	LONG             TNSType = 8
-	VARCHAR          TNSType = 9
-	ROWID            TNSType = 11
-	DATE             TNSType = 12
-	VarRaw           TNSType = 15
-	BFloat           TNSType = 21
-	BDouble          TNSType = 22
-	RAW              TNSType = 23
-	LongRaw          TNSType = 24
-	UINT             TNSType = 68
-	LongVarChar      TNSType = 94
-	LongVarRaw       TNSType = 95
-	CHAR             TNSType = 96
-	CHARZ            TNSType = 97
-	IBFloat          TNSType = 100
-	IBDouble         TNSType = 101
-	REFCURSOR        TNSType = 102
-	OCIXMLType       TNSType = 108
-	XMLType          TNSType = 109
-	OCIRef           TNSType = 110
-	OCIClobLocator   TNSType = 112
-	OCIBlobLocator   TNSType = 113
-	OCIFileLocator   TNSType = 114
-	ResultSet        TNSType = 116
-	OCIString        TNSType = 155
-	OCIDate          TNSType = 156
-	TimeStampDTY     TNSType = 180
-	TimeStampTZ_DTY  TNSType = 181
-	IntervalYM_DTY   TNSType = 182
-	IntervalDS_DTY   TNSType = 183
-	TimeTZ           TNSType = 186
-	TIMESTAMP        TNSType = 187
-	TIMESTAMPTZ      TNSType = 188
-	IntervalYM       TNSType = 189
-	IntervalDS       TNSType = 190
-	UROWID           TNSType = 208
-	TimeStampLTZ_DTY TNSType = 231
-	TimeStampeLTZ    TNSType = 232
-	Boolean          TNSType = 0xFC
+	FLOAT                     TNSType = 4
+	NullStr                   TNSType = 5
+	VarNum                    TNSType = 6
+	PDN                       TNSType = 7
+	LONG                      TNSType = 8
+	VARCHAR                   TNSType = 9
+	ROWID                     TNSType = 11
+	DATE                      TNSType = 12
+	VarRaw                    TNSType = 15
+	BFloat                    TNSType = 21
+	BDouble                   TNSType = 22
+	RAW                       TNSType = 23
+	LongRaw                   TNSType = 24
+	TNS_JSON_TYPE_DATE        TNSType = 60
+	TNS_JSON_TYPE_INTERVAL_YM TNSType = 61
+	TNS_JSON_TYPE_INTERVAL_DS TNSType = 62
+	UINT                      TNSType = 68
+	LongVarChar               TNSType = 94
+	LongVarRaw                TNSType = 95
+	CHAR                      TNSType = 96
+	CHARZ                     TNSType = 97
+	IBFloat                   TNSType = 100
+	IBDouble                  TNSType = 101
+	REFCURSOR                 TNSType = 102
+	OCIXMLType                TNSType = 108
+	XMLType                   TNSType = 109
+	OCIRef                    TNSType = 110
+	OCIClobLocator            TNSType = 112
+	OCIBlobLocator            TNSType = 113
+	OCIFileLocator            TNSType = 114
+	ResultSet                 TNSType = 116
+	JSON                      TNSType = 119
+	TNS_DATA_TYPE_OAC122      TNSType = 120
+	OCIString                 TNSType = 155
+	OCIDate                   TNSType = 156
+	TimeStampDTY              TNSType = 180
+	TimeStampTZ_DTY           TNSType = 181
+	IntervalYM_DTY            TNSType = 182
+	IntervalDS_DTY            TNSType = 183
+	TimeTZ                    TNSType = 186
+	TIMESTAMP                 TNSType = 187
+	TIMESTAMPTZ               TNSType = 188
+	IntervalYM                TNSType = 189
+	IntervalDS                TNSType = 190
+	UROWID                    TNSType = 208
+	TimeStampLTZ_DTY          TNSType = 231
+	TimeStampeLTZ             TNSType = 232
+	Boolean                   TNSType = 0xFC
 )
 
 type ParameterType int
@@ -105,9 +111,13 @@ const (
 type ParameterInfo struct {
 	Name                 string
 	TypeName             string
+	SchemaName           string
+	DomainSchema         string
+	DomainName           string
 	Direction            ParameterDirection
 	IsNull               bool
 	AllowNull            bool
+	IsJson               bool
 	ColAlias             string
 	DataType             TNSType
 	IsXmlType            bool
@@ -130,6 +140,7 @@ type ParameterInfo struct {
 	getDataFromServer    bool
 	oaccollid            int
 	cusType              *customType
+	Annotations          map[string]string
 }
 
 // load get parameter information form network session
@@ -251,7 +262,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.AllowNull = num1 > 0
-	_, err = session.GetByte() //  session.GetInt(1, false, false)
+	_, err = session.GetByte() //  v7 length of name
 	if err != nil {
 		return err
 	}
@@ -260,7 +271,11 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.Name = session.StrConv.Decode(bName)
-	_, err = session.GetDlc()
+	bName, err = session.GetDlc() // schema name
+	if err != nil {
+		return err
+	}
+	par.SchemaName = strings.ToUpper(session.StrConv.Decode(bName))
 	bName, err = session.GetDlc()
 	if err != nil {
 		return err
@@ -285,7 +300,57 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if session.TTCVersion < 6 {
 		return nil
 	}
-	_, err = session.GetInt(4, true, true)
+	var uds_flags int
+	uds_flags, err = session.GetInt(4, true, true)
+	par.IsJson = (uds_flags & 0x100) > 0
+	if session.TTCVersion < 17 {
+		return nil
+	}
+	bName, err = session.GetDlc()
+	if err != nil {
+		return err
+	}
+	par.DomainSchema = strings.ToUpper(session.StrConv.Decode(bName))
+	bName, err = session.GetDlc()
+	if err != nil {
+		return err
+	}
+	par.DomainName = strings.ToUpper(session.StrConv.Decode(bName))
+	if session.TTCVersion < 20 {
+		return nil
+	}
+	numAnnotations, err := session.GetInt(4, true, true)
+	if err != nil {
+		return err
+	}
+	if numAnnotations > 0 {
+		par.Annotations = make(map[string]string)
+		_, err = session.GetByte()
+		if err != nil {
+			return err
+		}
+		numAnnotations, err = session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
+		_, err = session.GetByte()
+		if err != nil {
+			return err
+		}
+		for i := 0; i < numAnnotations; i++ {
+			bKey, bValue, _, err := session.GetKeyVal()
+			if err != nil {
+				return err
+			}
+			key := session.StrConv.Decode(bKey)
+			value := session.StrConv.Decode(bValue)
+			par.Annotations[key] = value
+		}
+		_, err = session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

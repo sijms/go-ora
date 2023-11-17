@@ -2161,34 +2161,92 @@ func (stmt *Stmt) useNamedParameters() error {
 		return err
 	}
 	var parCollection = make([]ParameterInfo, 0, len(names))
-	for x := 0; x < len(names); x++ {
-		// search if name is repeated
-		repeated := false
-		for y := x - 1; y >= 0; y-- {
-			if names[y] == names[x] {
-				repeated = true
-				//parCollection[x].Flag = 0x80
-				break
-			}
-		}
-		found := false
-		for _, par := range stmt.Pars {
-			if par.Name == names[x] {
-				if !repeated {
+	if stmt.stmtType == SELECT || stmt.stmtType == DML {
+		for x := 0; x < len(names); x++ {
+			found := false
+			for _, par := range stmt.Pars {
+				if par.Name == names[x] {
 					parCollection = append(parCollection, par)
+					found = true
+					break
 				}
-				found = true
-				break
+			}
+			if !found {
+				return fmt.Errorf("parameter %s is not defined in parameter list", names[x])
+			}
+			for y := x - 1; y >= 0; y-- {
+				if names[y] == names[x] {
+					parCollection[x].Flag = 0x80
+					break
+				}
 			}
 		}
-		if !found {
-			return fmt.Errorf("parameter %s is not defined in parameter list", names[x])
-		}
+	} else {
+		for x := 0; x < len(names); x++ {
+			// search if name is repeated
+			repeated := false
+			for y := x - 1; y >= 0; y-- {
+				if names[y] == names[x] {
+					repeated = true
+					//parCollection[x].Flag = 0x80
+					break
+				}
+			}
+			found := false
+			for _, par := range stmt.Pars {
+				if par.Name == names[x] {
+					if !repeated {
+						parCollection = append(parCollection, par)
+					}
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("parameter %s is not defined in parameter list", names[x])
+			}
 
+		}
 	}
+
 	stmt.Pars = parCollection
 	return nil
 }
+
+//func (stmt *Stmt) useNamedParameters() error {
+//	names, err := parseSqlText(stmt.text)
+//	if err != nil {
+//		return err
+//	}
+//	var parCollection = make([]ParameterInfo, 0, len(names))
+//	for x := 0; x < len(names); x++ {
+//		// search if name is repeated
+//		repeated := false
+//		for y := x - 1; y >= 0; y-- {
+//			if names[y] == names[x] {
+//				repeated = true
+//				//parCollection[x].Flag = 0x80
+//				break
+//			}
+//		}
+//		found := false
+//		for _, par := range stmt.Pars {
+//			if par.Name == names[x] {
+//				if !repeated {
+//					parCollection = append(parCollection, par)
+//				}
+//				found = true
+//				break
+//			}
+//		}
+//		if !found {
+//			return fmt.Errorf("parameter %s is not defined in parameter list", names[x])
+//		}
+//
+//	}
+//	stmt.Pars = parCollection
+//	return nil
+//}
 
 // Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {

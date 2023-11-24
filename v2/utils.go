@@ -428,18 +428,27 @@ func getLob(col interface{}, conn *Connection) (*Lob, error) {
 	case string:
 		stringVar = val
 	case Clob:
+		if !val.Valid {
+			return nil, nil
+		}
 		stringVar = val.String
 	case NVarChar:
 		stringVar = string(val)
 		charsetForm = 2
 		charsetID = conn.tcpNego.ServernCharset
 	case NClob:
-		stringVar = val.String
 		charsetForm = 2
 		charsetID = conn.tcpNego.ServernCharset
+		if !val.Valid {
+			return nil, nil
+		}
+		stringVar = val.String
 	case []byte:
 		byteVar = val
 	case Blob:
+		if !val.Valid {
+			return nil, nil
+		}
 		byteVar = val.Data
 	}
 	if len(stringVar) > 0 {

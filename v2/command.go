@@ -53,6 +53,7 @@ type defaultStmt struct {
 	arrayBindCount    int
 	containOutputPars bool
 	autoClose         bool
+	temporaryLobs     [][]byte
 }
 
 func (stmt *defaultStmt) CanAutoClose() bool {
@@ -367,7 +368,9 @@ func (stmt *Stmt) writePars() error {
 			session.WriteBytes(&buffer, 1, 0)
 		} else if par.Direction == Input &&
 			(par.DataType == OCIClobLocator || par.DataType == OCIBlobLocator || par.DataType == OCIFileLocator) {
-			session.WriteUint(&buffer, len(par.BValue), 2, true, true)
+			if len(par.BValue) > 0 {
+				session.WriteUint(&buffer, len(par.BValue), 2, true, true)
+			}
 			session.WriteClr(&buffer, par.BValue)
 		} else {
 			if par.cusType != nil {
@@ -430,23 +433,52 @@ func (stmt *Stmt) write() error {
 		//}
 		var err error
 		if stmt.bulkExec {
-			arrayValues := make([]driver.Value, len(stmt.Pars))
+			// take copy of parameter values
+			arrayValues := make([][][]byte, len(stmt.Pars))
 			for x := 0; x < len(stmt.Pars); x++ {
-				arrayValues[x] = stmt.Pars[x].Value
+				if stmt.Pars[x].Flag == 0x80 {
+					continue
+				}
+				if tempVal, ok := stmt.Pars[x].iPrimValue.([][]byte); ok {
+					arrayValues[x] = tempVal
+				} else {
+					return errors.New("")
+				}
 			}
 			for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
 				for parIndex, arrayValue := range arrayValues {
-					tempVal := reflect.ValueOf(arrayValue)
-					err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
-					if err != nil {
-						return err
+					if stmt.Pars[parIndex].Flag == 0x80 {
+						continue
 					}
+					stmt.Pars[parIndex].BValue = arrayValue[valueIndex]
 				}
 				err = stmt.writePars()
 				if err != nil {
 					return err
 				}
 			}
+
+			//for valueIndex, values := range arrayValue {
+			//	stmt.Pars[parIndex].BValue = values[valueIndex]
+			//}
+
+			// valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
+			// each value represented an array of []byte
+
+			//}
+			//for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
+			//	for parIndex, arrayValue := range arrayValues {
+			//		tempVal := reflect.ValueOf(arrayValue)
+			//		err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
+			//		if err != nil {
+			//			return err
+			//		}
+			//	}
+			//	err = stmt.writePars()
+			//	if err != nil {
+			//		return err
+			//	}
+			//}
 		} else {
 			err = stmt.writePars()
 			if err != nil {
@@ -460,29 +492,53 @@ func (stmt *Stmt) write() error {
 			return err
 		}
 		if stmt.bulkExec {
-			arrayValues := make([]driver.Value, len(stmt.Pars))
+
+			arrayValues := make([][][]byte, len(stmt.Pars))
 			for x := 0; x < len(stmt.Pars); x++ {
 				if stmt.Pars[x].Flag == 0x80 {
 					continue
 				}
-				arrayValues[x] = stmt.Pars[x].Value
+				if tempVal, ok := stmt.Pars[x].iPrimValue.([][]byte); ok {
+					arrayValues[x] = tempVal
+				} else {
+					return errors.New("incorrect array type")
+				}
 			}
 			for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
 				for parIndex, arrayValue := range arrayValues {
 					if stmt.Pars[parIndex].Flag == 0x80 {
 						continue
 					}
-					tempVal := reflect.ValueOf(arrayValue)
-					err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
-					if err != nil {
-						return err
-					}
+					stmt.Pars[parIndex].BValue = arrayValue[valueIndex]
 				}
 				err = stmt.writePars()
 				if err != nil {
 					return err
 				}
 			}
+			//arrayValues := make([]driver.Value, len(stmt.Pars))
+			//for x := 0; x < len(stmt.Pars); x++ {
+			//	if stmt.Pars[x].Flag == 0x80 {
+			//		continue
+			//	}
+			//	arrayValues[x] = stmt.Pars[x].Value
+			//}
+			//for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
+			//	for parIndex, arrayValue := range arrayValues {
+			//		if stmt.Pars[parIndex].Flag == 0x80 {
+			//			continue
+			//		}
+			//		tempVal := reflect.ValueOf(arrayValue)
+			//		err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
+			//		if err != nil {
+			//			return err
+			//		}
+			//	}
+			//	err = stmt.writePars()
+			//	if err != nil {
+			//		return err
+			//	}
+			//}
 		} else {
 			err = stmt.writePars()
 			if err != nil {
@@ -1030,11 +1086,11 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 }
 
 func (stmt *defaultStmt) freeTemporaryLobs() error {
-	var locators = collectLocators(stmt.Pars)
-	if len(locators) == 0 {
+	//var locators = collectLocators(stmt.Pars)
+	if len(stmt.temporaryLobs) == 0 {
 		return nil
 	}
-	stmt.connection.connOption.Tracer.Printf("Free %d Temporary Lobs", len(locators))
+	stmt.connection.connOption.Tracer.Printf("Free %d Temporary Lobs", len(stmt.temporaryLobs))
 	session := stmt.connection.session
 	freeTemp := func(locators [][]byte) {
 		totalLen := 0
@@ -1053,12 +1109,12 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	start := 0
 	end := 0
 	session.ResetBuffer()
-	for start < len(locators) {
+	for start < len(stmt.temporaryLobs) {
 		end = start + 25000
-		if end > len(locators) {
-			end = len(locators)
+		if end > len(stmt.temporaryLobs) {
+			end = len(stmt.temporaryLobs)
 		}
-		freeTemp(locators[start:end])
+		freeTemp(stmt.temporaryLobs[start:end])
 		start += end
 	}
 	session.PutBytes(0x3, 0x93, 0x0)
@@ -1069,7 +1125,6 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	return (&simpleObject{
 		connection: stmt.connection,
 	}).read()
-	//return (&Lob{connection: stmt.connection}).freeAllTemporary(locators)
 }
 
 //func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Value, error) {
@@ -1125,7 +1180,6 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 //		return resultClobString, nil
 //	}
 //}
-
 //func (stmt *defaultStmt) readLobsUDT(dataSet *DataSet) error {
 //	if stmt.containOutputPars {
 //		for _, par := range stmt.Pars {
@@ -1185,7 +1239,6 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 //	}
 //	return nil
 //}
-
 //func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
 //	if stmt._hasBLOB {
 //		if stmt.containOutputPars {
@@ -1426,18 +1479,10 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	}
 	tracer := stmt.connection.connOption.Tracer
 	tracer.Printf("Exec With Context:")
-	//args := make([]driver.Value, len(namedArgs))
-	//for x := 0; x < len(args); x++ {
-	//	args[x] = namedArgs[x].Value
-	//}
 	stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext()
-
-	//failOver := stmt.connection.connOption.Failover
-	//if failOver == 0 {
-	//	failOver = 1
-	//}
 	tracer.Printf("Exec:\n%s", stmt.text)
+	stmt.arrayBindCount = 0
 	result, err := stmt._exec(args)
 	if err != nil {
 		if isBadConn(err) {
@@ -1448,23 +1493,6 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 		return nil, err
 	}
 	return result, nil
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = stmt.connection.reConnect(err, writeTrials)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//		continue
-	//	}
-	//	break
-	//}
-	//if reconnect {
-	//	return nil, &network.OracleError{ErrCode: 3135}
-	//}
-	//return result, err
-	//return stmt.Exec(args)
 }
 func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 	structType := reflect.TypeOf(parValue)
@@ -2016,6 +2044,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 					}
 					// see if first item is struct
 					firstItem := tempVal.Index(0)
+					//lobData := make([]*Lob, stmt.arrayBindCount)
 					if firstItem.Kind() == reflect.Struct {
 						fieldCount := firstItem.NumField()
 						structArrayAsNamedPars := make([]driver.NamedValue, 0, fieldCount)
@@ -2040,18 +2069,46 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 							return stmt._exec(structArrayAsNamedPars)
 						}
 					}
-					par, err = stmt.NewParam(args[x].Name, firstItem.Interface(), 0, Input)
-					if err != nil {
-						return nil, err
+
+					//err := param.encodeValue(val, size, stmt.connection)
+					//if err != nil {
+					//	return nil, err
+					//}
+					//return param, err
+					//par, err = stmt.NewParam(args[x].Name, firstItem.Interface(), 0, Input)
+					//if err != nil {
+					//	return nil, err
+					//}
+
+					par = &ParameterInfo{
+						Name:      args[x].Name,
+						Direction: Input,
 					}
 					// calculate maxLen, maxCharLen and DataType
-					maxLen := par.MaxLen
-					maxCharLen := par.MaxCharLen
-					dataType := par.DataType
-					for y := 1; y < stmt.arrayBindCount; y++ {
+					//maxLen := par.MaxLen
+					//maxCharLen := par.MaxCharLen
+					//dataType := par.DataType
+					maxLen := 0
+					maxCharLen := 0
+					dataType := TNSType(0)
+					arrayValues := make([][]byte, stmt.arrayBindCount)
+					for y := 0; y < stmt.arrayBindCount; y++ {
 						err = par.encodeValue(tempVal.Index(y).Interface(), 0, stmt.connection)
 						if err != nil {
 							return nil, err
+						}
+						switch value := par.iPrimValue.(type) {
+						case *Lob:
+							if value != nil && value.sourceLocator != nil {
+								stmt.temporaryLobs = append(stmt.temporaryLobs, value.sourceLocator)
+							}
+						case *BFile:
+							if value != nil && value.lob.sourceLocator != nil {
+								stmt.temporaryLobs = append(stmt.temporaryLobs, value.lob.sourceLocator)
+							}
+						case []ParameterInfo:
+							temp := collectLocators(value)
+							stmt.temporaryLobs = append(stmt.temporaryLobs, temp...)
 						}
 						if maxLen < par.MaxLen {
 							maxLen = par.MaxLen
@@ -2059,15 +2116,29 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						if maxCharLen < par.MaxCharLen {
 							maxCharLen = par.MaxCharLen
 						}
-						if par.DataType != dataType && par.DataType != NCHAR {
-							dataType = par.DataType
+						// here i can take the binary value and store it into array
+						arrayValues[y] = par.BValue
+						if len(par.BValue) == 0 {
+							continue
 						}
+						dataType = par.DataType
+						//if y == 0 {
+						//	dataType = par.DataType
+						//} else {
+						//	if par.DataType != dataType && par.DataType != NCHAR {
+						//
+						//	}
+						//}
 					}
-					_ = par.encodeValue(tempVal.Index(0).Interface(), 0, stmt.connection)
+					// save arrayValues into primitive
+					par.iPrimValue = arrayValues
+					//_ = par.encodeValue(tempVal.Index(0).Interface(), 0, stmt.connection)
 					par.MaxLen = maxLen
 					par.MaxCharLen = maxCharLen
+					if int(par.DataType) == 0 {
+						par.DataType = NCHAR
+					}
 					par.DataType = dataType
-					par.Value = args[x].Value
 				} else {
 					if stmt.arrayBindCount > 0 {
 						return nil, errors.New("to activate bulk insert/merge all parameters should be arrays")
@@ -2255,13 +2326,10 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
 	}
 	tracer := stmt.connection.connOption.Tracer
-	//failOver := stmt.connection.connOption.Failover
-	//if failOver == 0 {
-	//	failOver = 1
-	//}
 	tracer.Printf("Exec:\n%s", stmt.text)
 	var result *QueryResult
 	var err error
+	stmt.arrayBindCount = 0
 	if len(args) == 0 {
 		result, err = stmt._exec(nil)
 	} else {
@@ -2279,21 +2347,6 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		}
 		return nil, err
 	}
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = stmt.connection.reConnect(err, writeTrials)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//		continue
-	//	}
-	//	break
-	//}
-	//if reconnect {
-	//	return nil, &network.OracleError{ErrCode: 3135}
-	//}
 	return result, err
 }
 
@@ -2326,19 +2379,31 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 	} else {
 		stmt.Pars = append(stmt.Pars, par)
 	}
+	// set temporary lobs
+	switch value := par.iPrimValue.(type) {
+	case *Lob:
+		if value != nil && value.sourceLocator != nil {
+			stmt.temporaryLobs = append(stmt.temporaryLobs, value.sourceLocator)
+		}
+	case *BFile:
+		if value != nil && value.lob.sourceLocator != nil {
+			stmt.temporaryLobs = append(stmt.temporaryLobs, value.lob.sourceLocator)
+		}
+	case []ParameterInfo:
+		temp := collectLocators(value)
+		stmt.temporaryLobs = append(stmt.temporaryLobs, temp...)
+	}
 }
 
 // addParam
-func (stmt *Stmt) addParam(name string, val driver.Value, size int, direction ParameterDirection) error {
-	par, err := stmt.NewParam(name, val, size, direction)
-	if err != nil {
-		return err
-	}
-	stmt.setParam(-1, *par)
-	return nil
-	//stmt.Pars = append(stmt.Pars, )
-}
-
+//func (stmt *Stmt) adram(name string, val driver.Value, size int, direction ParameterDirection) error {
+//	par, err := stmt.NewParam(name, val, size, direction)
+//	if err != nil {
+//		return err
+//	}
+//	stmt.setParam(-1, *par)
+//	return nil
+//}
 // AddRefCursorParam add new output parameter of type REF CURSOR
 //
 // note: better to use sql.Out structure see examples for more information

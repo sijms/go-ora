@@ -451,14 +451,13 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		if err != nil {
 			return err
 		}
+		par.iPrimValue = temp
 		if temp == nil {
-			if par.Direction == Input {
-				par.DataType = NCHAR
-			}
+			//if par.Direction == Input {
+			//	par.DataType = NCHAR
+			//}
 			par.MaxLen = 1
 			par.iPrimValue = nil
-		} else {
-			par.iPrimValue = temp
 		}
 	case OCIFileLocator:
 		if value, ok := val.(BFile); ok {

@@ -2,43 +2,72 @@ package go_ora
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/binary"
 	"errors"
 )
 
 type BFile struct {
+	dirName  string
+	fileName string
+	Valid    bool
 	isOpened bool
 	lob      Lob
 }
 
-func NewBFile(connection *Connection, dirName, fileName string) (*BFile, error) {
-	totalLen := 16 + len(dirName) + len(fileName) + 4
-	locatorBuffer := new(bytes.Buffer)
-	err := binary.Write(locatorBuffer, binary.BigEndian, uint16(totalLen-2))
+func CreateNullBFile() *BFile {
+	return &BFile{Valid: false}
+}
+func CreateBFile(db *sql.DB, dirName, fileName string) (*BFile, error) {
+	output := &BFile{fileName: fileName, dirName: dirName, Valid: true}
+	_, err := db.Exec("SELECT :1 FROM DUAL", output)
 	if err != nil {
 		return nil, err
 	}
-	locatorBuffer.Write([]byte{0, 1, 8, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0})
-	err = binary.Write(locatorBuffer, binary.BigEndian, uint16(len(dirName)))
-	if err != nil {
-		return nil, err
+	return output, nil
+}
+
+//	func NewBFile(connection *Connection, dirName, fileName string) (*BFile, error) {
+//		output := &BFile{fileName: fileName, dirName: dirName, Valid: true}
+//		err := output.init(connection)
+//		return output, err
+//	}
+func (file *BFile) init(conn *Connection) error {
+	if file.Valid {
+		dirName := conn.sStrConv.Encode(file.dirName)
+		fileName := conn.sStrConv.Encode(file.fileName)
+		totalLen := 16 + len(dirName) + len(fileName) + 4
+		locatorBuffer := new(bytes.Buffer)
+		err := binary.Write(locatorBuffer, binary.BigEndian, uint16(totalLen-2))
+		if err != nil {
+			return err
+		}
+		locatorBuffer.Write([]byte{0, 1, 8, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0})
+		err = binary.Write(locatorBuffer, binary.BigEndian, uint16(len(dirName)))
+		if err != nil {
+			return err
+		}
+		if len(dirName) > 0 {
+			locatorBuffer.Write(dirName)
+		}
+		err = binary.Write(locatorBuffer, binary.BigEndian, uint16(len(fileName)))
+		if err != nil {
+			return err
+		}
+		if len(fileName) > 0 {
+			locatorBuffer.Write(fileName)
+		}
+		file.lob.connection = conn
+		file.lob.sourceLocator = locatorBuffer.Bytes()
+		file.lob.sourceLen = locatorBuffer.Len()
 	}
-	if len(dirName) > 0 {
-		locatorBuffer.Write(connection.sStrConv.Encode(dirName))
-	}
-	err = binary.Write(locatorBuffer, binary.BigEndian, uint16(len(fileName)))
-	if err != nil {
-		return nil, err
-	}
-	if len(fileName) > 0 {
-		locatorBuffer.Write(connection.sStrConv.Encode(fileName))
-	}
-	return &BFile{lob: Lob{
-		connection:    connection,
-		sourceLocator: locatorBuffer.Bytes(),
-		sourceLen:     locatorBuffer.Len(),
-	},
-	}, nil
+	return nil
+}
+func (file *BFile) GetDirName() string {
+	return file.dirName
+}
+func (file *BFile) GetFileName() string {
+	return file.fileName
 }
 func (file *BFile) IsOpen() bool {
 	return file.isOpened
@@ -115,6 +144,14 @@ func (file *BFile) ReadBytesFromPos(pos, count int64) ([]byte, error) {
 }
 
 func (file *BFile) Scan(value interface{}) error {
+	if value == nil {
+		file.Valid = false
+		file.fileName = ""
+		file.dirName = ""
+		file.lob.sourceLocator = nil
+		file.lob.sourceLen = 0
+		return nil
+	}
 	switch temp := value.(type) {
 	case *BFile:
 		file = temp

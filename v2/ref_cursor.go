@@ -48,7 +48,8 @@ func (cursor *RefCursor) load() error {
 			if err != nil {
 				return err
 			}
-			if cursor.columns[x].DataType == OCIClobLocator || cursor.columns[x].DataType == OCIBlobLocator {
+			if cursor.columns[x].DataType == OCIClobLocator || cursor.columns[x].DataType == OCIBlobLocator ||
+				cursor.columns[x].DataType == OCIFileLocator {
 				cursor._hasBLOB = true
 			}
 			if cursor.columns[x].DataType == LONG || cursor.columns[x].DataType == LongRaw {

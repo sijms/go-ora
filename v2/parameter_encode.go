@@ -132,123 +132,6 @@ import (
 //		par.CharsetID = 0
 //	}
 
-func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
-	var err error
-	if par.iPrimValue == nil {
-		par.BValue = nil
-		return nil
-	}
-	switch value := par.iPrimValue.(type) {
-	case float64:
-		par.BValue, err = converters.EncodeDouble(value)
-		if err != nil {
-			return err
-		}
-	case int64:
-		par.BValue = converters.EncodeInt64(value)
-	case uint64:
-		par.BValue = converters.EncodeUint64(value)
-	case bool:
-		par.BValue = converters.EncodeBool(value)
-	case string:
-		conv, err := conn.getStrConv(par.CharsetID)
-		if err != nil {
-			return err
-		}
-		par.BValue = conv.Encode(value)
-		par.MaxLen = len(par.BValue)
-		if par.MaxLen == 0 {
-			par.MaxLen = 1
-		}
-	case time.Time:
-		switch par.DataType {
-		case DATE:
-			par.BValue = converters.EncodeDate(value)
-		case TIMESTAMP:
-			par.BValue = converters.EncodeTimeStamp(value, false)
-		case TimeStampTZ_DTY:
-
-			temp := converters.EncodeTimeStamp(value, true)
-			if conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion {
-				if temp[11]&0x80 != 0 {
-					temp[12] |= 1
-					if time.Time(value).IsDST() {
-						temp[12] |= 2
-					}
-				} else {
-					temp[11] |= 0x40
-				}
-			}
-			par.BValue = temp
-		}
-	case *Lob:
-		par.BValue = value.sourceLocator
-	case *BFile:
-		par.BValue = value.lob.sourceLocator
-	case []byte:
-		par.BValue = value
-	case []ParameterInfo:
-		if par.MaxNoOfArrayElements > 0 {
-			if len(value) > 0 {
-				arrayBuffer := bytes.Buffer{}
-				session := conn.session
-				//arrayBuffer.Write([]byte{1})
-				if par.DataType == XMLType {
-					// number of fields
-					arrayBuffer.Write([]byte{1, 3})
-					//session.WriteUint(&arrayBuffer, len(par.cusType.attribs), 2, true, true)
-					// number of elements
-					session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 2, true, false)
-					//arrayBuffer.Write([]byte{uint8(par.MaxNoOfArrayElements)})
-				} else {
-					session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
-				}
-				for _, tempPar := range value {
-					// get the binary representation of the item
-					err = tempPar.encodePrimValue(conn)
-					//if par.DataType == XMLType {
-					//	arrayBuffer.Write([]byte{0, 0, 0, 0xfe})
-					//}
-					if err != nil {
-						return err
-					}
-					if par.MaxCharLen < tempPar.MaxCharLen {
-						par.MaxCharLen = tempPar.MaxCharLen
-					}
-					if par.MaxLen < tempPar.MaxLen {
-						par.MaxLen = tempPar.MaxLen
-					}
-					// save binary representation to the buffer
-					session.WriteClr(&arrayBuffer, tempPar.BValue)
-				}
-				//if par.DataType == XMLType {
-				//	arrayBuffer.Write([]byte{0})
-				//}
-				par.BValue = arrayBuffer.Bytes()
-			}
-			// for array set maxsize of nchar and raw
-			if par.DataType == NCHAR {
-				par.MaxLen = conn.maxLen.nvarchar
-				par.MaxCharLen = par.MaxLen // / converters.MaxBytePerChar(par.CharsetID)
-			}
-			if par.DataType == RAW {
-				par.MaxLen = conn.maxLen.raw
-			}
-			if par.DataType == XMLType {
-				par.ToID = par.cusType.arrayTOID
-				par.BValue = encodeObject(conn.session, par.BValue, true)
-				par.Flag = 3
-				par.MaxNoOfArrayElements = 0
-			}
-		} else {
-			par.BValue = encodeObject(conn.session, par.BValue, false)
-		}
-	default:
-		return fmt.Errorf("unsupported primitive type: %v", reflect.TypeOf(par.iPrimValue).Name())
-	}
-	return nil
-}
-
 func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, conn *Connection) error {
 	if goType == nil {
 		par.DataType = NCHAR
@@ -461,10 +344,15 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		}
 	case OCIFileLocator:
 		if value, ok := val.(BFile); ok {
-			if par.Direction == Input && !value.isInit() {
-				return errors.New("BFile should be initialized first")
+			if value.Valid {
+				if par.Direction == Input && !value.isInit() {
+
+					return errors.New("BFile should be initialized first")
+				}
+				par.iPrimValue = &value
+			} else {
+				par.iPrimValue = nil
 			}
-			par.iPrimValue = &value
 		}
 	case REFCURSOR:
 		par.iPrimValue = nil
@@ -499,6 +387,124 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		}
 		par.iPrimValue = pars
 		par.BValue = objectBuffer.Bytes()
+	}
+	return nil
+}
+
+func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
+	var err error
+	if par.iPrimValue == nil {
+		par.BValue = nil
+		par.MaxLen = 1
+		return nil
+	}
+	switch value := par.iPrimValue.(type) {
+	case float64:
+		par.BValue, err = converters.EncodeDouble(value)
+		if err != nil {
+			return err
+		}
+	case int64:
+		par.BValue = converters.EncodeInt64(value)
+	case uint64:
+		par.BValue = converters.EncodeUint64(value)
+	case bool:
+		par.BValue = converters.EncodeBool(value)
+	case string:
+		conv, err := conn.getStrConv(par.CharsetID)
+		if err != nil {
+			return err
+		}
+		par.BValue = conv.Encode(value)
+		par.MaxLen = len(par.BValue)
+		if par.MaxLen == 0 {
+			par.MaxLen = 1
+		}
+	case time.Time:
+		switch par.DataType {
+		case DATE:
+			par.BValue = converters.EncodeDate(value)
+		case TIMESTAMP:
+			par.BValue = converters.EncodeTimeStamp(value, false)
+		case TimeStampTZ_DTY:
+
+			temp := converters.EncodeTimeStamp(value, true)
+			if conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion {
+				if temp[11]&0x80 != 0 {
+					temp[12] |= 1
+					if time.Time(value).IsDST() {
+						temp[12] |= 2
+					}
+				} else {
+					temp[11] |= 0x40
+				}
+			}
+			par.BValue = temp
+		}
+	case *Lob:
+		par.BValue = value.sourceLocator
+	case *BFile:
+		par.BValue = value.lob.sourceLocator
+	case []byte:
+		par.BValue = value
+	case []ParameterInfo:
+		if par.MaxNoOfArrayElements > 0 {
+			if len(value) > 0 {
+				arrayBuffer := bytes.Buffer{}
+				session := conn.session
+				//arrayBuffer.Write([]byte{1})
+				if par.DataType == XMLType {
+					// number of fields
+					arrayBuffer.Write([]byte{1, 3})
+					//session.WriteUint(&arrayBuffer, len(par.cusType.attribs), 2, true, true)
+					// number of elements
+					session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 2, true, false)
+					//arrayBuffer.Write([]byte{uint8(par.MaxNoOfArrayElements)})
+				} else {
+					session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, true)
+				}
+				for _, tempPar := range value {
+					// get the binary representation of the item
+					err = tempPar.encodePrimValue(conn)
+					//if par.DataType == XMLType {
+					//	arrayBuffer.Write([]byte{0, 0, 0, 0xfe})
+					//}
+					if err != nil {
+						return err
+					}
+					if par.MaxCharLen < tempPar.MaxCharLen {
+						par.MaxCharLen = tempPar.MaxCharLen
+					}
+					if par.MaxLen < tempPar.MaxLen {
+						par.MaxLen = tempPar.MaxLen
+					}
+					// save binary representation to the buffer
+					session.WriteClr(&arrayBuffer, tempPar.BValue)
+				}
+				//if par.DataType == XMLType {
+				//	arrayBuffer.Write([]byte{0})
+				//}
+				par.BValue = arrayBuffer.Bytes()
+			}
+			// for array set maxsize of nchar and raw
+			if par.DataType == NCHAR {
+				par.MaxLen = conn.maxLen.nvarchar
+				par.MaxCharLen = par.MaxLen // / converters.MaxBytePerChar(par.CharsetID)
+			}
+			if par.DataType == RAW {
+				par.MaxLen = conn.maxLen.raw
+			}
+			if par.DataType == XMLType {
+				par.ToID = par.cusType.arrayTOID
+				par.BValue = encodeObject(conn.session, par.BValue, true)
+				par.Flag = 3
+				par.MaxNoOfArrayElements = 0
+			}
+		} else {
+			par.BValue = encodeObject(conn.session, par.BValue, false)
+		}
+	default:
+		return fmt.Errorf("unsupported primitive type: %v", reflect.TypeOf(par.iPrimValue).Name())
 	}
 	return nil
 }

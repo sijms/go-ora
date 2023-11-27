@@ -972,7 +972,8 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				if dataSet.Cols[x].DataType == LONG || dataSet.Cols[x].DataType == LongRaw {
 					stmt._hasLONG = true
 				}
-				if dataSet.Cols[x].DataType == OCIClobLocator || dataSet.Cols[x].DataType == OCIBlobLocator {
+				if dataSet.Cols[x].DataType == OCIClobLocator || dataSet.Cols[x].DataType == OCIBlobLocator ||
+					dataSet.Cols[x].DataType == OCIFileLocator {
 					stmt._hasBLOB = true
 				}
 			}
@@ -1445,7 +1446,7 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) erro
 
 // get values of rows and output parameter according to DataType and binary value (bValue)
 func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
-	if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator {
+	if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator || param.DataType == OCIFileLocator {
 		stmt._hasBLOB = true
 	}
 	return param.decodeParameterValue(stmt.connection)
@@ -2363,6 +2364,15 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 		Name:      name,
 		Direction: direction,
 	}
+	// initialize bfile
+	if file, ok := val.(*BFile); ok {
+		if !file.isInit() {
+			err := file.init(stmt.connection)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	err := param.encodeValue(val, size, stmt.connection)
 	if err != nil {
 		return nil, err
@@ -2673,10 +2683,10 @@ func (stmt *defaultStmt) decodePrim(dataSet *DataSet) error {
 					}
 					dataSet.rows[rowIndex][colIndex] = tempByte
 				}
-			case BFile:
-				var tempByte []byte
-				err = setBFile(reflect.ValueOf(&tempByte).Elem(), val)
-				dataSet.rows[rowIndex][colIndex] = tempByte
+			//case BFile:
+			//	var tempByte []byte
+			//	err = setBFile(reflect.ValueOf(&tempByte).Elem(), val)
+			//	dataSet.rows[rowIndex][colIndex] = val
 			case []ParameterInfo:
 				if col.cusType != nil {
 					tempObject := reflect.New(col.cusType.typ)

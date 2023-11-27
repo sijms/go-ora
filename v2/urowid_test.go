@@ -51,7 +51,7 @@ func TestURowid(t *testing.T) {
 	stmt.scnForSnapshot = make([]int, 2)
 	stmt._hasBLOB = false
 	stmt._hasLONG = false
-	stmt.disableCompression = false
+	//stmt.disableCompression = false
 	stmt.arrayBindCount = 0
 	dataSet := new(DataSet)
 	err := stmt.read(dataSet)

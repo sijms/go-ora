@@ -3,6 +3,7 @@ package go_ora
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -1025,7 +1026,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 		return err
 	}
 	if par.BValue == nil {
-
 		return nil
 	}
 	switch par.DataType {
@@ -1114,11 +1114,31 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 			charsetID:     par.CharsetID,
 		}
 	case OCIFileLocator:
-		locator, err := session.GetClr()
+		var locator []byte
+		if !udt {
+			locator, err = session.GetClr()
+		} else {
+			locator = par.BValue
+		}
 		if err != nil {
 			return err
 		}
+		var dirName, fileName string
+		if len(locator) > 16 {
+			index := 16
+			length := int(binary.BigEndian.Uint16(locator[index : index+2]))
+			index += 2
+			dirName = conn.sStrConv.Decode(locator[index : index+length])
+			index += length
+			length = int(binary.BigEndian.Uint16(locator[index : index+2]))
+			index += 2
+			fileName = conn.sStrConv.Decode(locator[index : index+length])
+			index += length
+		}
 		par.oPrimValue = BFile{
+			dirName:  dirName,
+			fileName: fileName,
+			Valid:    len(locator) > 0,
 			isOpened: false,
 			lob: Lob{
 				sourceLocator: locator,

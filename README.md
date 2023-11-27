@@ -413,6 +413,26 @@ _, err := conn.Exec("BEGIN SELECT col1, col2 into :1, :2 FROM tb; END;",
 	go_ora.Out{Dest: &var2, size: 300000})
 ```
 
+* ### BFile (v2.7.23)
+  * BFile require oracle directory object name + file name
+  * create new BFile object by calling `CreateBFile`, `CreateBFile2` or `CreateNullBFile`
+  * `CreateBFile` create BFile using `*sql.DB` while `CreateBFile2` take `*go_ora.Connection`
+  * to create null BFile call `CreateNullBFile` or create object with `valid=false`
+  * you can read BFile value from database either by Query or Exec (output par) using *BFile object
+  * You can use object functions after creation or read from database, but you should test for null first
+  * BFile functions:
+    * Open: will open the file (file object returned from database unopened)
+    * Exists: check if the file exists
+    * GetLength: return file length
+    * Read: read entire file content
+    * ReadFromPos: start read from specific position till end of the file
+    * ReadBytesFromPos: read portion of the file
+    * Close: close file
+    * IsOpen: check if the file opened
+    * GetDirName: return directory object name
+    * GetFileName: return file name
+  * complete code for BFile found in [examples/bfile](https://github.com/sijms/go-ora/blob/master/examples/bfile/main.go)
+
 * ### Named Parameters
   * to use named parameters just wrap all you parameters inside `sql.Named`
   * if one of the parameters doesn't have name driver will switch to positional mode
@@ -578,6 +598,12 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 [//]: # (### Supported DBMS features)
 ### releases
 <details>
+
+### version 2.7.23
+* Update BFile code to support null value and use *sql.DB
+* Fix issue: BFile not working with lob pre-fetch mode
+* Improve Bulk insert by removing un-necessary calls for `EncodeValue` so Bulk insert now can support Lob objects
+* Fix issue related to refcursor
 
 ### version 2.7.20
 * fix time not in timezone issue specially with oracle 19c

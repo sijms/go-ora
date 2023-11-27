@@ -27,11 +27,12 @@ func CreateBFile(db *sql.DB, dirName, fileName string) (*BFile, error) {
 	return output, nil
 }
 
-//	func NewBFile(connection *Connection, dirName, fileName string) (*BFile, error) {
-//		output := &BFile{fileName: fileName, dirName: dirName, Valid: true}
-//		err := output.init(connection)
-//		return output, err
-//	}
+func CreateBFile2(connection *Connection, dirName, fileName string) (*BFile, error) {
+	output := &BFile{fileName: fileName, dirName: dirName, Valid: true}
+	err := output.init(connection)
+	return output, err
+}
+
 func (file *BFile) init(conn *Connection) error {
 	if file.Valid {
 		dirName := conn.sStrConv.Encode(file.dirName)

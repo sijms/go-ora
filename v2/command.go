@@ -688,7 +688,7 @@ func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 	//
 	//}
 	return stmt.decodePrim(dataSet)
-	return nil
+	//return nil
 }
 func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 	if stmt._noOfRowsToFetch == 25 {
@@ -1374,7 +1374,8 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) erro
 				return err
 			}
 		}
-		col.Value = cursor
+		//col.Value = cursor
+		col.oPrimValue = cursor
 		return nil
 	}
 	//if col.DataType == XMLType {

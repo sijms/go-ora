@@ -617,11 +617,6 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	}
 
 	tracer := stmt.connection.connOption.Tracer
-	//failOver := stmt.connection.connOption.Failover if failOver == 0 {
-	//	failOver = 1
-	//}
-
-	// if fetch fail cannot re-fetch only reconnect and return error
 	var err = stmt._fetch(dataSet)
 	if err != nil {
 		if isBadConn(err) {
@@ -631,43 +626,19 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 		}
 		return err
 	}
-	return nil
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = stmt.connection.reConnect(err, writeTrials)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return err
+	//for colIndex, col := range dataSet.Cols {
+	//	if col.DataType == REFCURSOR {
+	//		for rowIndex, row := range dataSet.rows {
+	//			if cursor, ok := row[colIndex].(*RefCursor); ok {
+	//				dataSet.rows[rowIndex][colIndex], err = cursor.Query()
+	//				if err != nil {
+	//					return err
+	//				}
+	//			}
 	//		}
-	//		continue
 	//	}
-	//	break
 	//}
-	//if reconnect {
-	//	return &network.OracleError{ErrCode: 3135}
-	//}
-	//return err
-	//if err != nil {
-	//	if errors.Is(err, io.EOF) {
-	//		stmt.connection.State = Closed
-	//		_ = stmt.connection.restore()
-	//	}
-	//	return err
-	//}
-
-	//if err != nil {
-	//	if errors.Is(err, io.EOF) {
-	//		stmt.connection.State = Closed
-	//		_ = stmt.connection.restore()
-	//	}
-	//	return err
-	//}
-
-	// reading lobs
-
-	//return nil
-	//return err
+	return nil
 }
 
 func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
@@ -2137,8 +2108,8 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 					//_ = par.encodeValue(tempVal.Index(0).Interface(), 0, stmt.connection)
 					par.MaxLen = maxLen
 					par.MaxCharLen = maxCharLen
-					if int(par.DataType) == 0 {
-						par.DataType = NCHAR
+					if int(dataType) == 0 {
+						dataType = NCHAR
 					}
 					par.DataType = dataType
 				} else {
@@ -2557,18 +2528,18 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 		return nil, err
 	}
 	// deal with ref cursor
-	for colIndex, col := range dataSet.Cols {
-		if col.DataType == REFCURSOR {
-			for rowIndex, row := range dataSet.rows {
-				if cursor, ok := row[colIndex].(*RefCursor); ok {
-					dataSet.rows[rowIndex][colIndex], err = cursor.Query()
-					if err != nil {
-						return nil, err
-					}
-				}
-			}
-		}
-	}
+	//for colIndex, col := range dataSet.Cols {
+	//	if col.DataType == REFCURSOR {
+	//		for rowIndex, row := range dataSet.rows {
+	//			if cursor, ok := row[colIndex].(*RefCursor); ok {
+	//				dataSet.rows[rowIndex][colIndex], err = cursor.Query()
+	//				if err != nil {
+	//					return nil, err
+	//				}
+	//			}
+	//		}
+	//	}
+	//}
 	// deal with lobs
 	if stmt._hasBLOB {
 		if stmt.connection.connOption.Lob == 0 {
@@ -2591,67 +2562,6 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	//err = stmt.readLobsUDT(dataSet)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//for colIndex, col := range dataSet.Cols {
-	//	if col.DataType == XMLType {
-	//		for _, row := range dataSet.rows {
-	//			if custVal, ok := row[colIndex].(customType); ok {
-	//				row[colIndex], err = custVal.getObject()
-	//				if err != nil {
-	//					return nil, err
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
-
-	//tracer := stmt.connection.connOption.Tracer
-	//failOver := stmt.connection.connOption.Failover
-	//if failOver == 0 {
-	//	failOver = 1
-	//}
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	if stmt.connection.State != Opened {
-	//		tracer.Print("reconnect trial #", writeTrials+1)
-	//		err = stmt.connection.Open()
-	//		if err != nil {
-	//			tracer.Print("Error: ", err)
-	//		}
-	//		continue
-	//	}
-	//	//stmt.reset()
-	//
-	//	if err != nil {
-	//		if errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE) {
-	//			tracer.Print("reconnect trial #", writeTrials+1)
-	//			stmt.connection.State = Closed
-	//			err = stmt.connection.Open()
-	//			if err != nil {
-	//				tracer.Print("Error: ", err)
-	//			}
-	//			continue
-	//		}
-	//		return nil, err
-	//	}
-	//
-	//	if err != nil {
-	//		if errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE) {
-	//			stmt.connection.connOption.Tracer.Print("reconnect trial #", writeTrials+1)
-	//			stmt.connection.State = Closed
-	//			err = stmt.connection.Open()
-	//			if err != nil {
-	//				tracer.Print("Error: ", err)
-	//			}
-	//			continue
-	//		}
-	//		return nil, err
-	//	}
-	//	break
-	//}
 	return dataSet, err
 }
 
@@ -2664,6 +2574,11 @@ func (stmt *defaultStmt) decodePrim(dataSet *DataSet) error {
 				continue
 			}
 			switch val := row[colIndex].(type) {
+			case *RefCursor:
+				dataSet.rows[rowIndex][colIndex], err = val.Query()
+				if err != nil {
+					return err
+				}
 			case Lob:
 				if col.DataType == OCIClobLocator {
 					var tempString = sql.NullString{"", false}
@@ -2684,10 +2599,6 @@ func (stmt *defaultStmt) decodePrim(dataSet *DataSet) error {
 					}
 					dataSet.rows[rowIndex][colIndex] = tempByte
 				}
-			//case BFile:
-			//	var tempByte []byte
-			//	err = setBFile(reflect.ValueOf(&tempByte).Elem(), val)
-			//	dataSet.rows[rowIndex][colIndex] = val
 			case []ParameterInfo:
 				if col.cusType != nil {
 					tempObject := reflect.New(col.cusType.typ)

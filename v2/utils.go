@@ -79,8 +79,13 @@ func parseSqlText(text string) ([]string, error) {
 				lineComment = true
 			}
 		case '\n':
+			//if lineComment {
+			//	lineComment = false
+			//}
 			if lineComment {
 				lineComment = false
+			} else {
+				textBuffer = append(textBuffer, ch) // oheurtel : keep the line feed character
 			}
 		default:
 			if skip || lineComment {

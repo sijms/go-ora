@@ -14,7 +14,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strconv"
@@ -22,7 +21,7 @@ import (
 	"unicode/utf16"
 )
 
-//type CertificateData
+// type CertificateData
 type wallet struct {
 	file          string
 	password      []byte
@@ -52,7 +51,7 @@ func NewWallet(filePath string) (*wallet, error) {
 
 // read will read the file data decrypting file chunk to get wallet information
 func (w *wallet) read() error {
-	fileData, err := ioutil.ReadFile(w.file)
+	fileData, err := os.ReadFile(w.file)
 	if err != nil {
 		return err
 	}

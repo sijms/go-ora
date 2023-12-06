@@ -10,7 +10,7 @@ import (
 	"hash"
 )
 
-type walletAlogrithm interface {
+type walletAlgorithm interface {
 	create() error
 	getIV() []byte
 	getBlock() cipher.Block

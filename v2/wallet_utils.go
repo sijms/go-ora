@@ -71,7 +71,7 @@ func produceHash(buff1, buff2, buff3 []byte, iter int) []byte {
 	return result
 }
 
-func decrypt(algo walletAlogrithm, input []byte) ([]byte, error) {
+func decrypt(algo walletAlgorithm, input []byte) ([]byte, error) {
 	blk := algo.getBlock()
 	iv := algo.getIV()
 	cbc := cipher.NewCBCDecrypter(blk, iv)

@@ -721,7 +721,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 				return nil, err
 			}
 		} else {
-			ret.w, err = NewWallet(path.Join(ret.WalletPath, "cwallet.sso"))
+			ret.w, err = newWallet(path.Join(ret.WalletPath, "cwallet.sso"))
 			if err != nil {
 				return nil, err
 			}

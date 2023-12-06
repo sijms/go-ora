@@ -39,8 +39,8 @@ type walletCredential struct {
 	password string
 }
 
-// NewWallet create new wallet object from file path
-func NewWallet(filePath string) (*wallet, error) {
+// newWallet create new wallet object from file path
+func newWallet(filePath string) (*wallet, error) {
 	ret := new(wallet)
 	ret.file = filePath
 	err := ret.read()
@@ -462,7 +462,7 @@ func (w *wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 		return
 	}
 	algorithm := temp.EncryptedContentInfo.ContentEncryptionAlgorithm.Algorithm.String()
-	var algo walletAlogrithm
+	var algo walletAlgorithm
 	switch algorithm {
 	case "1.2.840.113549.1.12.1.6":
 		err = errors.New("RC2 wallet decryption is not supported")
@@ -507,7 +507,7 @@ func (w *wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 			h = sha256.New
 		case kdfParams.Prf.Algorithm.Equal(oidHmacWithSHA1):
 			h = sha1.New
-		case kdfParams.Prf.Algorithm.Equal(asn1.ObjectIdentifier([]int{})):
+		case kdfParams.Prf.Algorithm.Equal([]int{}):
 			h = sha1.New
 		default:
 			err = errors.New("pbes2 prf " + kdfParams.Prf.Algorithm.String() + " is not supported")

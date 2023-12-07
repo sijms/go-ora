@@ -2091,7 +2091,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						}
 						// here i can take the binary value and store it into array
 						arrayValues[y] = par.BValue
-						if len(par.BValue) == 0 {
+						if len(par.BValue) == 0 && par.DataType == NCHAR {
 							continue
 						}
 						dataType = par.DataType

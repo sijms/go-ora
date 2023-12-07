@@ -178,13 +178,13 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		par.CharsetForm = 2
 		par.ContFlag = 16
 		par.CharsetID = conn.tcpNego.ServernCharset
-	case tyTime, tyNullTime:
-		par.DataType = DATE
-		par.MaxLen = converters.MAX_LEN_DATE
-	case tyTimeStamp, tyNullTimeStamp:
-		par.DataType = TIMESTAMP
-		par.MaxLen = converters.MAX_LEN_DATE
-	case tyTimeStampTZ, tyNullTimeStampTZ:
+	//case tyTime, tyNullTime:
+	//	par.DataType = DATE
+	//	par.MaxLen = converters.MAX_LEN_DATE
+	//case tyTimeStamp, tyNullTimeStamp:
+	//	par.DataType = TIMESTAMP
+	//	par.MaxLen = converters.MAX_LEN_DATE
+	case tyTime, tyNullTime, tyTimeStamp, tyNullTimeStamp, tyTimeStampTZ, tyNullTimeStampTZ:
 		par.DataType = TimeStampTZ_DTY
 		par.MaxLen = converters.MAX_LEN_TIMESTAMP
 	case tyBytes:

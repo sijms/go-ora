@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Deprecated: As of go-ora 2.7.25 this type replaced with time.Time.
 type TimeStamp time.Time
 
 func (val *TimeStamp) Value() (driver.Value, error) {
@@ -43,6 +44,7 @@ func (val *TimeStamp) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Deprecated: As of go-ora 2.7.25 this type replaced with sql.NullTime.
 type NullTimeStamp struct {
 	TimeStamp TimeStamp
 	Valid     bool

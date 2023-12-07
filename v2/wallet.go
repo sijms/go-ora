@@ -148,8 +148,6 @@ func (w *wallet) read() error {
 	} else {
 		return errors.New("invalid wallet header")
 	}
-	_ = os.WriteFile("wallet.bin", fileData[index:], os.ModePerm)
-	_ = os.WriteFile("password.bin", w.password, os.ModePerm)
 	err = w.readPKCS12(fileData[index:])
 	if err != nil {
 		if autoLoginLocal {
@@ -166,84 +164,6 @@ func (w *wallet) readPKCS12(data []byte) error {
 	}
 	return w.readCredentials(data)
 }
-
-//func (w *wallet) decrypt(encryptedData []byte) error {
-//	From := convertToBigEndianUtf16(w.password)
-//	//fillAndAlignBuffer := func(input []byte) []byte {
-//	//	output := append(make([]byte, 0, 64), input...)
-//	//	size := 64 - (len(input) % 64)
-//	//	if size != 64 {
-//	//		for size >= len(input) {
-//	//			output = append(output, input...)
-//	//			size -= len(input)
-//	//		}
-//	//	}
-//	//	if size > 0 {
-//	//		output = append(output, input[:size]...)
-//	//	}
-//	//	return output
-//	//}
-//	To2 := fillWithRepeats(From, 64)   //  append(make([]byte, 0, 64), From...)
-//	To3 := fillWithRepeats(w.salt, 64) // append(make([]byte, 0, 64), salt...)
-//	//produceHash := func(buff1, buff2, buff3 []byte, iter int) []byte {
-//	//	hash := crypto.SHA1.New()
-//	//	hash.Write(buff1)
-//	//	hash.Write(buff2)
-//	//	hash.Write(buff3)
-//	//	result := hash.Sum(nil)
-//	//	for x := 0; x < iter-1; x++ {
-//	//		hash.Reset()
-//	//		hash.Write(result)
-//	//		result = hash.Sum(nil)
-//	//	}
-//	//	return result
-//	//}
-//	hashKey1 := produceHash(bytes.Repeat([]byte{1}, 64), To3, To2, w.sha1Iteration)
-//	iv := append(make([]byte, 0), produceHash(bytes.Repeat([]byte{2}, 64), To3, To2, w.sha1Iteration)[:8]...)
-//	var key []byte
-//	switch w.algType {
-//	case 1:
-//		key = append(key, hashKey1[:5]...)
-//		return errors.New("RC2 wallet decryption is not supported")
-//	case 2:
-//		// key length = 24
-//		key = append(key, hashKey1...)
-//		To1 := fillWithRepeats(hashKey1, 64)
-//		num3 := 1
-//		num4 := 1
-//		num5 := 64
-//		for num5 > 0 {
-//			num5--
-//			num6 := num3 + int(To2[num5]) + int(To1[num5])
-//			To2[num5] = uint8(num6)
-//			num3 = num6 >> 8
-//			num7 := num4 + int(To3[num5]) + int(To1[num5])
-//			To3[num5] = uint8(num7)
-//			num4 = num7 >> 8
-//		}
-//		hashKey2 := produceHash(bytes.Repeat([]byte{1}, 64), To3, To2, w.sha1Iteration)
-//		key = append(key, hashKey2[:4]...)
-//		//fmt.Println(bytes.Equal(key, []byte{56, 91, 246, 64, 137, 26, 26, 12, 251, 136, 124, 85, 94, 207, 206, 250, 84, 246, 69, 165, 194, 0, 218, 46}))
-//		//fmt.Println(bytes.Equal(iv, []byte{110, 118, 222, 233, 79, 228, 184, 70}))
-//		blk, err := des.NewTripleDESCipher(key)
-//		if err != nil {
-//			return err
-//		}
-//		decr := cipher.NewCBCDecrypter(blk, iv)
-//		output := make([]byte, len(encryptedData))
-//		decr.CryptBlocks(output, encryptedData)
-//		// remove padding
-//		if int(output[len(output)-1]) <= blk.BlockSize() {
-//			num := int(output[len(output)-1])
-//			padding := bytes.Repeat([]byte{uint8(num)}, num)
-//			if bytes.Equal(output[len(output)-num:], padding) {
-//				output = output[:len(output)-num]
-//			}
-//		}
-//		return w.readCredentials(output)
-//	}
-//	return errors.New("unsupported algorithm type")
-//}
 
 // readCredentials read dsn, usernames and passwords into walletCredentials array
 func (w *wallet) readCredentials(input []byte) error {
@@ -451,7 +371,6 @@ func (w *wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 			"1.2.840.113549.1.7.6"))
 		return
 	}
-	//_ = os.WriteFile("wallet.bin", authenticatedSafe[index].Data.Bytes, os.ModePerm)
 	_, err = asn1.Unmarshal(authenticatedSafe[index].Content.Bytes, &temp)
 	if err != nil {
 		return

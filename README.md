@@ -599,6 +599,14 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 ### releases
 <details>
 
+### version 2.7.25
+* Add feature that enable the driver to read oracle 23c wallet
+* introduce passing time.Time{} for
+DATE, TIMESTAMP and TIMESTAMP WITH TIMEZONE data types
+so no need for go_ora.TimeStamp and go_ora.TimeStampTZ
+custom types and they will be deprecated
+* other bug fixes
+
 ### version 2.7.23
 * Update BFile code to support null value and use *sql.DB
 * Fix issue: BFile not working with lob pre-fetch mode

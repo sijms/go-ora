@@ -643,6 +643,12 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 
 func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 	session := stmt.connection.session
+	defer func() {
+		err := stmt.freeTemporaryLobs()
+		if err != nil {
+			stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
+		}
+	}()
 	session.ResetBuffer()
 	session.PutBytes(3, 5, 0)
 	session.PutInt(stmt.cursorID, 2, true, true)
@@ -1064,6 +1070,9 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	}
 	stmt.connection.connOption.Tracer.Printf("Free %d Temporary Lobs", len(stmt.temporaryLobs))
 	session := stmt.connection.session
+	defer func(input *[][]byte) {
+		*input = nil
+	}(&stmt.temporaryLobs)
 	freeTemp := func(locators [][]byte) {
 		totalLen := 0
 		for _, locator := range locators {
@@ -1098,171 +1107,6 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 		connection: stmt.connection,
 	}).read()
 }
-
-//func (stmt *defaultStmt) readLob(col ParameterInfo, locator []byte) (driver.Value, error) {
-//	if locator == nil {
-//		return nil, nil
-//	}
-//	lob := &Lob{
-//		connection:    stmt.connection,
-//		sourceLocator: locator,
-//		sourceLen:     len(locator),
-//	}
-//	dataSize, err := lob.getSize()
-//	if err != nil {
-//		return nil, err
-//	}
-//	lobData, err := lob.getData()
-//	if err != nil {
-//		return nil, err
-//	}
-//	if col.DataType == OCIBlobLocator {
-//		if dataSize != int64(len(lobData)) {
-//			return nil, errors.New("error reading lob data: data size mismatching")
-//		}
-//		return lobData, nil
-//	} else {
-//		conn := stmt.connection
-//		var strConv converters.IStringConverter
-//		//tempCharset := conn.strConv.GetLangID()
-//		if lob.variableWidthChar() {
-//			if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
-//				strConv, _ = conn.getStrConv(2002)
-//				//conn.strConv.SetLangID(2002)
-//			} else {
-//				strConv, _ = conn.getStrConv(2000)
-//				//conn.strConv.SetLangID(2000)
-//			}
-//		} else {
-//			strConv, err = conn.getStrConv(col.CharsetID)
-//			if err != nil {
-//				return nil, err
-//			}
-//			//if conn.connOption.CharsetID != 0 && col.CharsetForm == 1 {
-//			//	conn.strConv.SetLangID(conn.connOption.CharsetID)
-//			//} else {
-//			//	conn.strConv.SetLangID(col.CharsetID)
-//			//}
-//		}
-//		resultClobString := strConv.Decode(lobData)
-//		//conn.strConv.SetLangID(tempCharset)
-//		//if dataSize != int64(len([]rune(resultClobString))) {
-//		//	return nil, errors.New("error reading clob data")
-//		//}
-//		return resultClobString, nil
-//	}
-//}
-//func (stmt *defaultStmt) readLobsUDT(dataSet *DataSet) error {
-//	if stmt.containOutputPars {
-//		for _, par := range stmt.Pars {
-//			if par.DataType != XMLType || par.cusType == nil {
-//				continue
-//			}
-//			for _, attr := range par.cusType.attribs {
-//				if attr.DataType != OCIClobLocator && attr.DataType != OCIBlobLocator {
-//					continue
-//				}
-//				if lob, ok := attr.Value.(lobInterface); ok {
-//					locator := lob.getLocator()
-//					var err error
-//					if scan, ok := attr.Value.(sql.Scanner); ok {
-//						if locator == nil {
-//							err = scan.Scan(nil)
-//							if err != nil {
-//								return err
-//							}
-//						} else {
-//							var tempVal interface{}
-//							tempVal, err = stmt.readLob(attr, locator)
-//							if err != nil {
-//								return err
-//							}
-//							err = scan.Scan(tempVal)
-//							return err
-//						}
-//					}
-//				}
-//			}
-//		}
-//	}
-//	for colIndex, col := range dataSet.Cols {
-//		if col.DataType == XMLType {
-//			for _, row := range dataSet.rows {
-//				if val, ok := row[colIndex].(customType); ok {
-//					for attIndex, par := range val.attribs {
-//						if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
-//							if lob, ok := par.Value.(lobInterface); ok {
-//								locator := lob.getLocator()
-//								if locator == nil {
-//									val.attribs[attIndex].Value = nil
-//								} else {
-//									var err error
-//									val.attribs[attIndex].Value, err = stmt.readLob(par, locator)
-//									if err != nil {
-//										return err
-//									}
-//								}
-//							}
-//						}
-//					}
-//				}
-//			}
-//		}
-//	}
-//	return nil
-//}
-//func (stmt *defaultStmt) readLobs(dataSet *DataSet) error {
-//	if stmt._hasBLOB {
-//		if stmt.containOutputPars {
-//			for _, par := range stmt.Pars {
-//				if par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator {
-//					if lob, ok := par.Value.(lobInterface); ok {
-//						locator := lob.getLocator()
-//						var err error
-//						if scan, ok := par.Value.(sql.Scanner); ok {
-//							if locator == nil {
-//								err = scan.Scan(nil)
-//								if err != nil {
-//									return err
-//								}
-//							} else {
-//								var tempVal interface{}
-//								tempVal, err = stmt.readLob(par, locator)
-//								if err != nil {
-//									return err
-//								}
-//								err = scan.Scan(tempVal)
-//								if err != nil {
-//									return err
-//								}
-//							}
-//						}
-//					}
-//				}
-//			}
-//			return nil
-//		}
-//		for colIndex, col := range dataSet.Cols {
-//			if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
-//				for _, row := range dataSet.rows {
-//					if lob, ok := row[colIndex].(lobInterface); ok {
-//						locator := lob.getLocator()
-//						if locator == nil {
-//							row[colIndex] = nil
-//						} else {
-//							var err error
-//							row[colIndex], err = stmt.readLob(col, lob.getLocator())
-//							if err != nil {
-//								return err
-//							}
-//						}
-//					}
-//				}
-//			}
-//		}
-//	}
-//	return nil
-//}
 
 // requestCustomTypeInfo an experimental function to ask for UDT information
 func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
@@ -1349,71 +1193,8 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) erro
 		col.oPrimValue = cursor
 		return nil
 	}
-	//if col.DataType == XMLType {
-	//	if col.TypeName == "XMLTYPE" {
-	//		return errors.New("unsupported data type: XMLTYPE")
-	//	}
-	//	if col.cusType == nil {
-	//		return fmt.Errorf("unregister custom type: %s. call RegisterType first", col.TypeName)
-	//	}
-	//	_, err := session.GetDlc() // contain toid and some 0s
-	//	if err != nil {
-	//		return err
-	//	}
-	//	_, err = session.GetBytes(3) // 3 0s
-	//	if err != nil {
-	//		return err
-	//	}
-	//	_, err = session.GetInt(4, true, true)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	_, err = session.GetByte()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	_, err = session.GetByte()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	tempBytes, err := session.GetClr()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	newState := network.SessionState{InBuffer: tempBytes}
-	//	session.SaveState(&newState)
-	//	_, err = session.GetByte()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	ctl, err := session.GetInt(4, true, true)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if ctl == 0xFE {
-	//		_, err = session.GetInt(4, false, true)
-	//		if err != nil {
-	//			return err
-	//		}
-	//	}
-	//	for x := 0; x < len(col.cusType.attribs); x++ {
-	//		err = stmt.calculateColumnValue(&col.cusType.attribs[x], true)
-	//		if err != nil {
-	//			return err
-	//		}
-	//	}
-	//	_ = session.LoadState()
-	//	col.Value = *col.cusType
-	//paramValue := reflect.ValueOf(col.Value)
-	//if paramValue.Kind() == reflect.Ptr {
-	//	paramValue.Elem().Set(reflect.ValueOf(col.cusType.getObject()))
-	//} else {
-	//	col.Value = col.cusType.getObject()
-	//}
-	//return nil
-	//}
 
-	return col.decodeColumnValue(stmt.connection, udt)
+	return col.decodeColumnValue(stmt.connection, &stmt.temporaryLobs, udt)
 }
 
 // get values of rows and output parameter according to DataType and binary value (bValue)
@@ -1421,7 +1202,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator || param.DataType == OCIFileLocator {
 		stmt._hasBLOB = true
 	}
-	return param.decodeParameterValue(stmt.connection)
+	return param.decodeParameterValue(stmt.connection, &stmt.temporaryLobs)
 }
 
 // Close stmt cursor in the server
@@ -2141,7 +1922,10 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		}
 	}
 	defer func() {
-		_ = stmt.freeTemporaryLobs()
+		err = stmt.freeTemporaryLobs()
+		if err != nil {
+			stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
+		}
 	}()
 
 	session := stmt.connection.session
@@ -2256,41 +2040,6 @@ func (stmt *Stmt) useNamedParameters() error {
 	stmt.Pars = parCollection
 	return nil
 }
-
-//func (stmt *Stmt) useNamedParameters() error {
-//	names, err := parseSqlText(stmt.text)
-//	if err != nil {
-//		return err
-//	}
-//	var parCollection = make([]ParameterInfo, 0, len(names))
-//	for x := 0; x < len(names); x++ {
-//		// search if name is repeated
-//		repeated := false
-//		for y := x - 1; y >= 0; y-- {
-//			if names[y] == names[x] {
-//				repeated = true
-//				//parCollection[x].Flag = 0x80
-//				break
-//			}
-//		}
-//		found := false
-//		for _, par := range stmt.Pars {
-//			if par.Name == names[x] {
-//				if !repeated {
-//					parCollection = append(parCollection, par)
-//				}
-//				found = true
-//				break
-//			}
-//		}
-//		if !found {
-//			return fmt.Errorf("parameter %s is not defined in parameter list", names[x])
-//		}
-//
-//	}
-//	stmt.Pars = parCollection
-//	return nil
-//}
 
 // Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
@@ -2517,6 +2266,12 @@ func (stmt *Stmt) reset() {
 func (stmt *Stmt) _query() (*DataSet, error) {
 	var err error
 	var dataSet *DataSet
+	defer func() {
+		err = stmt.freeTemporaryLobs()
+		if err != nil {
+			stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
+		}
+	}()
 	stmt.connection.session.ResetBuffer()
 	err = stmt.write()
 	if err != nil {

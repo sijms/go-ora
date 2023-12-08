@@ -47,6 +47,7 @@ func newLob(connection *Connection) *Lob {
 		connection: connection,
 	}
 }
+
 func (lob *Lob) initialize() {
 	lob.bNullO2U = false
 	lob.sendSize = false
@@ -266,22 +267,22 @@ func (lob *Lob) open(mode, opID int) error {
 
 func (lob *Lob) close(opID int) error {
 	lob.connection.connOption.Tracer.Print("Close Lob: ")
-	if lob.isTemporary() {
-		if lob.sourceLocator[7]&8 == 8 {
-			return errors.New("TTC Error")
-		}
-		lob.sourceLocator[7] &= 0xE7
-		return nil
-	} else {
-		lob.initialize()
-		lob.connection.session.ResetBuffer()
-		lob.writeOp(opID)
-		err := lob.connection.session.Write()
-		if err != nil {
-			return err
-		}
-		return lob.read()
+	//if lob.isTemporary() {
+	//	if lob.sourceLocator[7]&8 == 8 {
+	//		return errors.New("TTC Error")
+	//	}
+	//	lob.sourceLocator[7] &= 0xE7
+	//	return nil
+	//} else {
+	lob.initialize()
+	lob.connection.session.ResetBuffer()
+	lob.writeOp(opID)
+	err := lob.connection.session.Write()
+	if err != nil {
+		return err
 	}
+	return lob.read()
+	//}
 }
 
 func (lob *Lob) writeOp(operationID int) {

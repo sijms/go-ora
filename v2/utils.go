@@ -685,6 +685,11 @@ func setLob(value reflect.Value, input Lob) error {
 	if err != nil {
 		return err
 	}
+	// close lob
+	//err = input.close(0x10000)
+	//if err != nil {
+	//	return err
+	//}
 	conn := input.connection
 	if len(lobData) == 0 {
 		return setNull(value)
@@ -1046,7 +1051,7 @@ func encodeObject(session *network.Session, objectData []byte, isArray bool) []b
 	return fieldsData.Bytes()
 }
 
-func decodeObject(conn *Connection, parent *ParameterInfo) error {
+func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]byte) error {
 	session := conn.session
 	newState := network.SessionState{InBuffer: parent.BValue}
 	session.SaveState(&newState)
@@ -1096,7 +1101,7 @@ func decodeObject(conn *Connection, parent *ParameterInfo) error {
 			if err != nil {
 				return err
 			}
-			err = decodeObject(conn, &tempPar)
+			err = decodeObject(conn, &tempPar, temporaryLobs)
 			if err != nil {
 				return err
 			}
@@ -1108,7 +1113,7 @@ func decodeObject(conn *Connection, parent *ParameterInfo) error {
 		for _, attrib := range parent.cusType.attribs {
 			tempPar := attrib
 			tempPar.Direction = parent.Direction
-			err = tempPar.decodePrimValue(conn, true)
+			err = tempPar.decodePrimValue(conn, temporaryLobs, true)
 			if err != nil {
 				return err
 			}

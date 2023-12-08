@@ -935,7 +935,7 @@ func (par *ParameterInfo) clone() ParameterInfo {
 	return tempPar
 }
 
-func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
+func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]byte, udt bool) error {
 	session := conn.session
 	var err error
 	par.oPrimValue = nil
@@ -950,7 +950,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 			pars := make([]ParameterInfo, 0, size)
 			for x := 0; x < size; x++ {
 				tempPar := par.clone()
-				err = tempPar.decodeParameterValue(conn)
+				err = tempPar.decodeParameterValue(conn, temporaryLobs)
 				if err != nil {
 					return err
 				}
@@ -1107,12 +1107,16 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 		if err != nil {
 			return err
 		}
-		par.oPrimValue = Lob{
+		lob := Lob{
 			sourceLocator: locator,
 			sourceLen:     len(locator),
 			connection:    conn,
 			charsetID:     par.CharsetID,
 		}
+		if lob.isTemporary() {
+			*temporaryLobs = append(*temporaryLobs, locator)
+		}
+		par.oPrimValue = lob
 	case OCIFileLocator:
 		var locator []byte
 		if !udt {
@@ -1156,7 +1160,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	case IntervalDS_DTY:
 		par.oPrimValue = converters.ConvertIntervalDS_DTY(par.BValue)
 	case XMLType:
-		err = decodeObject(conn, par)
+		err = decodeObject(conn, par, temporaryLobs)
 		if err != nil {
 			return err
 		}
@@ -1317,8 +1321,8 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 //	return tempVal, nil
 //}
 
-func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
-	return par.decodePrimValue(connection, false)
+func (par *ParameterInfo) decodeParameterValue(connection *Connection, temporaryLobs *[][]byte) error {
+	return par.decodePrimValue(connection, temporaryLobs, false)
 	//if err != nil {
 	//	return err
 	//}
@@ -1332,7 +1336,7 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
 	//return par.setParameterValue(tempVal)
 }
 
-func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) error {
+func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLobs *[][]byte, udt bool) error {
 	//var err error
 	if !udt && connection.connOption.Lob == 0 && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
 		session := connection.session
@@ -1394,5 +1398,5 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) er
 		return nil
 	}
 	//par.Value, err = par.decodeValue(connection, udt)
-	return par.decodePrimValue(connection, udt)
+	return par.decodePrimValue(connection, temporaryLobs, udt)
 }

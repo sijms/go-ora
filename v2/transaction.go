@@ -2,7 +2,7 @@ package go_ora
 
 import (
 	"context"
-	"github.com/sijms/go-ora/v2/network"
+	"database/sql/driver"
 )
 
 type Transaction struct {
@@ -12,7 +12,7 @@ type Transaction struct {
 
 func (tx *Transaction) Commit() error {
 	if tx.conn.State != Opened {
-		return &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return driver.ErrBadConn
 	}
 	tx.conn.autoCommit = true
 	tx.conn.session.ResetBuffer()
@@ -23,7 +23,7 @@ func (tx *Transaction) Commit() error {
 
 func (tx *Transaction) Rollback() error {
 	if tx.conn.State != Opened {
-		return &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return driver.ErrBadConn
 	}
 	tx.conn.autoCommit = true
 	tx.conn.session.ResetBuffer()

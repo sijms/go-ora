@@ -12,8 +12,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/sijms/go-ora/v2/network"
 )
 
 type StmtType int
@@ -643,12 +641,12 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 
 func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 	session := stmt.connection.session
-	defer func() {
-		err := stmt.freeTemporaryLobs()
-		if err != nil {
-			stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
-		}
-	}()
+	//defer func() {
+	//	err := stmt.freeTemporaryLobs()
+	//	if err != nil {
+	//		stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
+	//	}
+	//}()
 	session.ResetBuffer()
 	session.PutBytes(3, 5, 0)
 	session.PutInt(stmt.cursorID, 2, true, true)
@@ -1209,7 +1207,11 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 func (stmt *defaultStmt) Close() error {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
-		return &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return driver.ErrBadConn
+	}
+	err := stmt.freeTemporaryLobs()
+	if err != nil {
+		stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
 	}
 	if stmt.cursorID != 0 {
 		session := stmt.connection.session
@@ -1229,7 +1231,7 @@ func (stmt *defaultStmt) Close() error {
 func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return nil, driver.ErrBadConn
 	}
 	tracer := stmt.connection.connOption.Tracer
 	tracer.Printf("Exec With Context:")
@@ -1921,12 +1923,12 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			return nil, err
 		}
 	}
-	defer func() {
-		err = stmt.freeTemporaryLobs()
-		if err != nil {
-			stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
-		}
-	}()
+	//defer func() {
+	//	err = stmt.freeTemporaryLobs()
+	//	if err != nil {
+	//		stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
+	//	}
+	//}()
 
 	session := stmt.connection.session
 	session.ResetBuffer()
@@ -2045,7 +2047,7 @@ func (stmt *Stmt) useNamedParameters() error {
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return nil, driver.ErrBadConn
 	}
 	tracer := stmt.connection.connOption.Tracer
 	tracer.Printf("Exec:\n%s", stmt.text)
@@ -2079,7 +2081,7 @@ func (stmt *Stmt) CheckNamedValue(_ *driver.NamedValue) error {
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) (*ParameterInfo, error) {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return nil, driver.ErrBadConn
 	}
 	param := &ParameterInfo{
 		Name:      name,
@@ -2149,7 +2151,7 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return nil, driver.ErrBadConn
 	}
 	tracer := stmt.connection.connOption.Tracer
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
@@ -2241,7 +2243,7 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return nil, driver.ErrBadConn
 	}
 	tracer := stmt.connection.connOption.Tracer
 	tracer.Print("Query With Context:", stmt.text)
@@ -2266,12 +2268,12 @@ func (stmt *Stmt) reset() {
 func (stmt *Stmt) _query() (*DataSet, error) {
 	var err error
 	var dataSet *DataSet
-	defer func() {
-		err = stmt.freeTemporaryLobs()
-		if err != nil {
-			stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
-		}
-	}()
+	//defer func() {
+	//	err = stmt.freeTemporaryLobs()
+	//	if err != nil {
+	//		stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
+	//	}
+	//}()
 	stmt.connection.session.ResetBuffer()
 	err = stmt.write()
 	if err != nil {
@@ -2375,7 +2377,7 @@ func (stmt *defaultStmt) decodePrim(dataSet *DataSet) error {
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return nil, driver.ErrBadConn
 	}
 	tracer := stmt.connection.connOption.Tracer
 	tracer.Printf("Query:\n%s", stmt.text)

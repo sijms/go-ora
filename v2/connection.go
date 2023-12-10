@@ -1094,7 +1094,7 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 
 func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	if conn.State != Opened {
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return nil, driver.ErrBadConn
 	}
 	conn.connOption.Tracer.Print("Prepare With Context\n", query)
 	conn.session.StartContext(ctx)

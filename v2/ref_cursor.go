@@ -2,8 +2,6 @@ package go_ora
 
 import (
 	"database/sql/driver"
-
-	"github.com/sijms/go-ora/v2/network"
 )
 
 type RefCursor struct {
@@ -127,7 +125,7 @@ func (cursor *RefCursor) _query() (*DataSet, error) {
 }
 func (cursor *RefCursor) Query() (*DataSet, error) {
 	if cursor.connection.State != Opened {
-		return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return nil, driver.ErrBadConn
 	}
 	tracer := cursor.connection.connOption.Tracer
 	tracer.Printf("Query RefCursor: %d", cursor.cursorID)

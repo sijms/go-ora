@@ -2,9 +2,9 @@ package go_ora
 
 import (
 	"bytes"
+	"database/sql/driver"
 	"encoding/binary"
 	"fmt"
-	"github.com/sijms/go-ora/v2/network"
 )
 
 var (
@@ -167,7 +167,7 @@ func (bulk *BulkCopy) readStreamResponse() error {
 
 func (bulk *BulkCopy) prepareDirectPath() error {
 	if bulk.conn.State != Opened {
-		return &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+		return driver.ErrBadConn
 	}
 	if len(bulk.SchemaName) == 0 {
 		bulk.SchemaName = bulk.conn.connOption.UserID

@@ -34,6 +34,8 @@ func (err *OracleError) translate() {
 		err.ErrMsg = "ORA-00906: Missing left parenthesis"
 	case 907:
 		err.ErrMsg = "ORA-00907: Missing right parenthesis"
+	case 1013:
+		err.ErrMsg = "ORA-01013: user requested cancel of current operation"
 	case 12631:
 		err.ErrMsg = "ORA-12631: Username retrieval failed"
 	case 12564:

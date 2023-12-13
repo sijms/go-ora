@@ -8,11 +8,7 @@ import (
 )
 
 type RefusePacket struct {
-	packet Packet
-	//dataOffset uint16
-	//Len uint16
-	//packetType PacketType
-	//Flag uint8
+	Packet
 	Err          OracleError
 	SystemReason uint8
 	UserReason   uint8
@@ -20,7 +16,7 @@ type RefusePacket struct {
 }
 
 func (pck *RefusePacket) bytes() []byte {
-	output := pck.packet.bytes()
+	output := pck.Packet.bytes()
 	output[8] = pck.SystemReason
 	output[9] = pck.UserReason
 	data := []byte(pck.message)
@@ -29,9 +25,6 @@ func (pck *RefusePacket) bytes() []byte {
 	return output
 }
 
-func (pck *RefusePacket) getPacketType() PacketType {
-	return pck.packet.packetType
-}
 func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	if len(packetData) < 12 {
 		return nil
@@ -43,7 +36,7 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	}
 
 	return &RefusePacket{
-		packet: Packet{
+		Packet: Packet{
 			dataOffset: 12,
 			length:     uint32(binary.BigEndian.Uint16(packetData)),
 			packetType: PacketType(packetData[4]),

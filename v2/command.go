@@ -1046,14 +1046,14 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			//return errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
 		}
 	}
-	if session.IsBreak() {
-		err := (&simpleObject{
-			connection: stmt.connection,
-		}).read()
-		if err != nil {
-			return err
-		}
-	}
+	//if session.IsBreak() {
+	//	err := (&simpleObject{
+	//		connection: stmt.connection,
+	//	}).read()
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 	if stmt.connection.connOption.Tracer.IsOn() {
 		dataSet.Trace(stmt.connection.connOption.Tracer)
 	}
@@ -1216,7 +1216,7 @@ func (stmt *defaultStmt) Close() error {
 	if stmt.cursorID != 0 {
 		session := stmt.connection.session
 		session.ResetBuffer()
-		session.PutBytes(17, 105, 0, 1, 1, 1)
+		session.PutBytes(0x11, 0x69, 0, 1, 1, 1)
 		session.PutInt(stmt.cursorID, 4, true, true)
 		return (&simpleObject{
 			connection:  stmt.connection,

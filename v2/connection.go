@@ -550,6 +550,10 @@ func (conn *Connection) Close() (err error) {
 	//var err error = nil
 	if conn.session != nil {
 		//err = conn.Logoff()
+		err = conn.session.WriteFinalPacket()
+		if err != nil {
+			return err
+		}
 		conn.session.Disconnect()
 		conn.session = nil
 	}
@@ -1049,10 +1053,12 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
-	defer func() {
-		_ = stmt.Close()
-	}()
-	return stmt.ExecContext(ctx, args)
+	result, err := stmt.ExecContext(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	err = stmt.Close()
+	return result, err
 }
 
 func (conn *Connection) CheckNamedValue(_ *driver.NamedValue) error {
@@ -1087,8 +1093,9 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 	stmt.autoClose = true
 	rows, err := stmt.QueryContext(ctx, args)
 	if err != nil {
-		_ = stmt.Close()
+		return nil, err
 	}
+	err = stmt.Close()
 	return rows, err
 }
 

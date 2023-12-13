@@ -5,23 +5,14 @@ import (
 	"fmt"
 )
 
-//type AcceptPacket Packet
+// type AcceptPacket Packet
 type AcceptPacket struct {
-	packet     Packet
-	sessionCtx SessionContext
-	buffer     []byte
+	Packet
+	buffer []byte
 }
 
 func (pck *AcceptPacket) bytes() []byte {
-	// ptkSize := 41
-	// if pck.sessionCtx.Version < 315 {
-	// 	ptkSize = 32
-	// }
-	output := pck.packet.bytes()
-	//output := make([]byte, pck.dataOffset)
-	//binary.BigEndian.PutUint16(output[0:], pck.packet.length)
-	//output[4] = uint8(pck.packet.packetType)
-	//output[5] = pck.packet.flag
+	output := pck.Packet.bytes()
 	binary.BigEndian.PutUint16(output[8:], pck.sessionCtx.Version)
 	binary.BigEndian.PutUint16(output[10:], pck.sessionCtx.Options)
 	if pck.sessionCtx.Version < 315 {
@@ -34,16 +25,17 @@ func (pck *AcceptPacket) bytes() []byte {
 
 	binary.BigEndian.PutUint16(output[16:], pck.sessionCtx.Histone)
 	binary.BigEndian.PutUint16(output[18:], uint16(len(pck.buffer)))
-	binary.BigEndian.PutUint16(output[20:], pck.packet.dataOffset)
+	binary.BigEndian.PutUint16(output[20:], pck.dataOffset)
 	output[22] = pck.sessionCtx.ACFL0
 	output[23] = pck.sessionCtx.ACFL1
 	// s
 	output = append(output, pck.buffer...)
 	return output
 }
-func (pck *AcceptPacket) getPacketType() PacketType {
-	return pck.packet.packetType
-}
+
+//func (pck *AcceptPacket) getPacketType() PacketType {
+//	return pck.packet.packetType
+//}
 
 //func NewAcceptPacket(sessionCtx SessionContext, acceptData []byte) *AcceptPacket {
 //	sessionCtx.Histone = 1
@@ -76,41 +68,41 @@ func newAcceptPacketFromData(packetData []byte, connOption *ConnectionOption) *A
 		reconAdd = string(packetData[reconAddStart:(reconAddStart + reconAddLen)])
 	}
 	pck := AcceptPacket{
-		packet: Packet{
+		Packet: Packet{
+			sessionCtx: &SessionContext{
+				ConnOption:          connOption,
+				SID:                 nil,
+				Version:             binary.BigEndian.Uint16(packetData[8:]),
+				LoVersion:           0,
+				Options:             0,
+				NegotiatedOptions:   binary.BigEndian.Uint16(packetData[10:]),
+				OurOne:              0,
+				Histone:             binary.BigEndian.Uint16(packetData[16:]),
+				ReconAddr:           reconAdd,
+				ACFL0:               packetData[22],
+				ACFL1:               packetData[23],
+				SessionDataUnit:     uint32(binary.BigEndian.Uint16(packetData[12:])),
+				TransportDataUnit:   uint32(binary.BigEndian.Uint16(packetData[14:])),
+				UsingAsyncReceivers: false,
+				IsNTConnected:       false,
+				OnBreakReset:        false,
+				GotReset:            false,
+			},
 			dataOffset: binary.BigEndian.Uint16(packetData[20:]),
 			length:     uint32(binary.BigEndian.Uint16(packetData)),
 			packetType: PacketType(packetData[4]),
 			flag:       packetData[5],
 		},
-		sessionCtx: SessionContext{
-			ConnOption:          connOption,
-			SID:                 nil,
-			Version:             binary.BigEndian.Uint16(packetData[8:]),
-			LoVersion:           0,
-			Options:             0,
-			NegotiatedOptions:   binary.BigEndian.Uint16(packetData[10:]),
-			OurOne:              0,
-			Histone:             binary.BigEndian.Uint16(packetData[16:]),
-			ReconAddr:           reconAdd,
-			ACFL0:               packetData[22],
-			ACFL1:               packetData[23],
-			SessionDataUnit:     uint32(binary.BigEndian.Uint16(packetData[12:])),
-			TransportDataUnit:   uint32(binary.BigEndian.Uint16(packetData[14:])),
-			UsingAsyncReceivers: false,
-			IsNTConnected:       false,
-			OnBreakReset:        false,
-			GotReset:            false,
-		},
 	}
-	pck.buffer = packetData[int(pck.packet.dataOffset):]
+	pck.buffer = packetData[int(pck.dataOffset):]
 	if pck.sessionCtx.Version >= 315 {
 		pck.sessionCtx.SessionDataUnit = binary.BigEndian.Uint32(packetData[32:])
 		pck.sessionCtx.TransportDataUnit = binary.BigEndian.Uint32(packetData[36:])
 	}
-	if (pck.packet.flag & 1) > 0 {
+	if (pck.flag & 1) > 0 {
 		fmt.Println("contain SID data")
-		pck.packet.length -= 16
-		pck.sessionCtx.SID = packetData[int(pck.packet.length):]
+		pck.length -= 16
+		pck.sessionCtx.SID = packetData[int(pck.length):]
 	}
 	if pck.sessionCtx.TransportDataUnit < pck.sessionCtx.SessionDataUnit {
 		pck.sessionCtx.SessionDataUnit = pck.sessionCtx.TransportDataUnit

@@ -436,9 +436,9 @@ func (lob *Lob) read() error {
 			if err != nil {
 				return err
 			}
-			if session.IsBreak() {
-				session.RestoreIndex()
-			}
+			//if session.IsBreak() {
+			//	session.RestoreIndex()
+			//}
 		default:
 			err = lob.connection.readResponse(msg)
 			if err != nil {
@@ -460,14 +460,14 @@ func (lob *Lob) read() error {
 			//return errors.New(fmt.Sprintf("TTC error: received code %d during LOB reading", msg))
 		}
 	}
-	if session.IsBreak() {
-		err := (&simpleObject{
-			connection: lob.connection,
-		}).read()
-		if err != nil {
-			return err
-		}
-	}
+	//if session.IsBreak() {
+	//	err := (&simpleObject{
+	//		connection: lob.connection,
+	//	}).read()
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 	return nil
 }
 

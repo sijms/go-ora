@@ -2,21 +2,26 @@ package network
 
 import "encoding/binary"
 
+const (
+	marker_type_break     = 1
+	marker_type_reset     = 2
+	marker_type_interrupt = 3
+)
+
 type MarkerPacket struct {
 	Packet
-	markerData uint8
 	markerType uint8
 }
 
 func (pck *MarkerPacket) bytes() []byte {
 	if pck.sessionCtx.handshakeComplete && pck.sessionCtx.Version >= 315 {
-		return []byte{0, 0x0, 0, 0xB, 0xC, 0, 0, 0, pck.markerType, 0, pck.markerData}
+		return []byte{0, 0x0, 0, 0xB, 0xC, 0, 0, 0, 1, 0, pck.markerType}
 	} else {
-		return []byte{0, 0xB, 0, 0, 0xC, 0, 0, 0, pck.markerType, 0, pck.markerData}
+		return []byte{0, 0xB, 0, 0, 0xC, 0, 0, 0, 1, 0, pck.markerType}
 	}
 }
 
-func newMarkerPacket(markerData uint8, sessionCtx *SessionContext) *MarkerPacket {
+func newMarkerPacket(markerType uint8, sessionCtx *SessionContext) *MarkerPacket {
 	return &MarkerPacket{
 		Packet: Packet{
 			sessionCtx: sessionCtx,
@@ -25,8 +30,7 @@ func newMarkerPacket(markerData uint8, sessionCtx *SessionContext) *MarkerPacket
 			packetType: MARKER,
 			flag:       0x20,
 		},
-		markerType: 1,
-		markerData: markerData,
+		markerType: markerType,
 	}
 }
 func newMarkerPacketFromData(packetData []byte, sessionCtx *SessionContext) *MarkerPacket {
@@ -40,8 +44,7 @@ func newMarkerPacketFromData(packetData []byte, sessionCtx *SessionContext) *Mar
 			packetType: PacketType(packetData[4]),
 			flag:       packetData[5],
 		},
-		markerType: packetData[8],
-		markerData: packetData[10],
+		markerType: packetData[10],
 	}
 	if sessionCtx.handshakeComplete && sessionCtx.Version >= 315 {
 		pck.length = binary.BigEndian.Uint32(packetData)

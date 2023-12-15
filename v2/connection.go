@@ -1055,6 +1055,7 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 	stmt.autoClose = true
 	result, err := stmt.ExecContext(ctx, args)
 	if err != nil {
+		_ = stmt.Close()
 		return nil, err
 	}
 	err = stmt.Close()
@@ -1115,6 +1116,12 @@ func (conn *Connection) readResponse(msgCode uint8) error {
 	var err error
 	switch msgCode {
 	case 4:
+		if conn.session.IsBreak() {
+			if conn.session.RestoreIndex() {
+				_, _ = conn.session.GetByte()
+			}
+			conn.session.ResetBreak()
+		}
 		conn.session.Summary, err = network.NewSummary(session)
 		if err != nil {
 			return err

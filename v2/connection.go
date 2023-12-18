@@ -11,7 +11,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/sijms/go-ora/v2/advanced_nego"
@@ -98,7 +97,7 @@ type Connection struct {
 		date      int
 		timestamp int
 	}
-	bad       atomic.Bool
+	bad       bool
 	dbTimeLoc *time.Location
 }
 
@@ -1249,12 +1248,11 @@ func (conn *Connection) readResponse(msgCode uint8) error {
 }
 
 func (conn *Connection) setBad() {
-	conn.bad.Swap(true)
-	//conn.bad = true
+	conn.bad = true
 }
 
 func (conn *Connection) ResetSession(ctx context.Context) error {
-	if conn.bad.Load() {
+	if conn.bad {
 		return driver.ErrBadConn
 	}
 	return nil

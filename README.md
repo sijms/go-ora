@@ -76,6 +76,7 @@ urlOptions := map[string] string {
 }
 connStr := go_ora.BuildUrl("server", port, "service_name", "username", "password", urlOptions)
 ```
+
 * ### OS Auth (for windows)
 connect to oracle using OS user instead of oracle user
 username and password parameters passed empty to `BuildUrl`
@@ -98,49 +99,56 @@ urlOptions := map[string]string {
 port := 1521
 connStr := go_ora.BuildUrl("server", port, "service_name", "", "", urlOptions)
 ```
-* ### Client Auth
-you should have server and client certificate store in wallets + working TCPS communication
-> create oracle user as follows:
-```sql
-CREATE USER "SSLCLIENT" IDENTIFIED EXTERNALLY AS 'CN=ORCLCLIENT';
-```
-> configure sqlnet.ora in the server to use client authentication
-```sql
-SQLNET.AUTHENTICATION_SERVICES=(TCPS,NTS)
-SSL_CLIENT_AUTHENTICATION=TRUE
-```
-> connect
-```golang
-urlOptions := map[string]string {
-"TRACE FILE": "trace.log",
-"AUTH TYPE":  "TCPS",
-"SSL": "enable",
-"SSL VERIFY": "FALSE",
-"WALLET": "PATH TO WALLET"
-}
-connStr := go_ora.BuildUrl("server", 2484, "service", "", "", urlOptions)
-```
-* ### KERBEROS5 Auth
-> note that kerberos need an intact dns system
 
-> to test kerberos you need 3 machine
+* ### Proxy Auth
+  if you need to connect with proxy user pass following connection string
+  ```
+  oracle://proxy_user:proxy_password@host:port/service?proxy client name=schema_owner
+  ```
+
+* ### Client Auth
+  you should have server and client certificate store in wallets + working TCPS communication
+  > create oracle user as follows:
+  ```sql
+  CREATE USER "SSLCLIENT" IDENTIFIED EXTERNALLY AS 'CN=ORCLCLIENT';
+  ```
+  > configure sqlnet.ora in the server to use client authentication
+
+  ```sql
+  SQLNET.AUTHENTICATION_SERVICES=(TCPS,NTS)
+  SSL_CLIENT_AUTHENTICATION=TRUE
+  ```
+  > connect
+  ```golang
+  urlOptions := map[string]string {
+  "TRACE FILE": "trace.log",
+  "AUTH TYPE":  "TCPS",
+  "SSL": "enable",
+  "SSL VERIFY": "FALSE",
+  "WALLET": "PATH TO WALLET"
+  }
+  connStr := go_ora.BuildUrl("server", 2484, "service", "", "", urlOptions)
+  ```
+
+* ### KERBEROS5 Auth
+  > note that kerberos need an intact dns system and 3 separate machines to test it
 * kerberos server you can use this link to install [on ubuntu](https://ubuntu.com/server/docs/service-kerberos)
 * oracle server you can configure it from this [link](https://docs.oracle.com/cd/E11882_01/network.112/e40393/asokerb.htm#ASOAG9636)
 * client which contain our gocode using package [gokrb5](https://github.com/jcmturner/gokrb5)
 * Complete code found in [examples/kerberos](https://github.com/sijms/go-ora/blob/master/examples/kerberos/main.go)
-```golang
-urlOptions := map[string]string{
-    "AUTH TYPE":  "KERBEROS",
-}
-// note empty password
-connStr := go_ora.BuildUrl("server", 1521, "service", "krb_user", "", urlOptions)
-
-type KerberosAuth struct{}
-func (kerb KerberosAuth) Authenticate(server, service string) ([]byte, error) {
-    // see implementation in examples/kerberos
-}
-advanced_nego.SetKerberosAuth(&KerberosAuth{})
-```
+  ```golang
+  urlOptions := map[string]string{
+      "AUTH TYPE":  "KERBEROS",
+  }
+  // note empty password
+  connStr := go_ora.BuildUrl("server", 1521, "service", "krb_user", "", urlOptions)
+  
+  type KerberosAuth struct{}
+  func (kerb KerberosAuth) Authenticate(server, service string) ([]byte, error) {
+      // see implementation in examples/kerberos
+  }
+  advanced_nego.SetKerberosAuth(&KerberosAuth{})
+  ```
 before run the code you should run command `kinit user`
 ## Other Connection Options
 
@@ -599,6 +607,11 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 ### releases
 <details>
 
+### version 2.8.0
+* use buffered input during network read to avoid network data loss (occur with slow connections).
+* fix charset mapping for charset id 846.
+* add support for charset id 840
+* re-code timeouts and connection break to get clean non-panic exit when context is timout and operation is cancelled
 ### version 2.7.25
 * Add feature that enable the driver to read oracle 23c wallet
 * introduce passing time.Time{} for

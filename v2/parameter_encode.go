@@ -395,7 +395,7 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 	var err error
 	if par.iPrimValue == nil {
 		par.BValue = nil
-		par.MaxLen = 1
+		//par.MaxLen = 1
 		return nil
 	}
 	switch value := par.iPrimValue.(type) {

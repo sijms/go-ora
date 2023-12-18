@@ -33,7 +33,11 @@ func MaxBytePerChar(charsetID int) int {
 	case 0x33F:
 		return 3
 	case 0x340:
-		return 2
+		fallthrough
+	case 0x348:
+		fallthrough
+	case 0x34E:
+		fallthrough
 	case 0x352:
 		fallthrough
 	case 0x353:
@@ -174,11 +178,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 			index += 2
 		}
 		return string(utf16.Decode(output))
-	case 0x33D:
-		fallthrough
-	case 0x352:
-		fallthrough
-	case 0x353:
+	case 0x33D, 0x348, 0x34E, 0x352, 0x353:
 		index := 0
 		result := 0
 		output := make([]uint16, 0, len(input))
@@ -242,9 +242,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 			output = append(output, uint16(char))
 		}
 		return string(utf16.Decode(output))
-	case 0x33E:
-		fallthrough
-	case 0x33F:
+	case 0x33E, 0x33F:
 		index := 0
 		num6 := 0
 		charWidth := 0

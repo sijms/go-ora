@@ -1093,9 +1093,8 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 	stmt.autoClose = true
 	rows, err := stmt.QueryContext(ctx, args)
 	if err != nil {
-		return nil, err
+		_ = stmt.Close()
 	}
-	err = stmt.Close()
 	return rows, err
 }
 

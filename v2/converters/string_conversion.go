@@ -22,6 +22,7 @@ type StringConverter struct {
 	dBuffer   []int
 	dBuffer2  []int
 	eBuffer   map[int]int
+	leading   map[int]int
 }
 
 func MaxBytePerChar(charsetID int) int {
@@ -136,6 +137,19 @@ func (conv *StringConverter) Encode(input string) []byte {
 	}
 }
 
+func (conv *StringConverter) toUnicodeChar(ch, leading int) int {
+	index1, index2 := (ch>>8)&0xFF+leading, ch&0xFF
+	char1 := conv.dBuffer[index1]
+	if char1 == 0xFFFF {
+		return conv.dReplace
+	}
+	output := conv.dBuffer2[char1+index2]
+	if output == 0xFFFF {
+		return conv.dReplace
+	}
+	return output
+}
+
 func (conv *StringConverter) Decode(input []byte) string {
 	if len(input) == 0 {
 		return ""
@@ -178,71 +192,134 @@ func (conv *StringConverter) Decode(input []byte) string {
 			index += 2
 		}
 		return string(utf16.Decode(output))
-	case 0x33D, 0x348, 0x34E, 0x352, 0x353:
+	case 0x341, 0x34A: //TLBConvShift
 		index := 0
 		result := 0
 		output := make([]uint16, 0, len(input))
+		shiftIn := true
 		for index < len(input) {
-			if input[index] > 127 {
+			if input[index] == 15 {
+				shiftIn = true
+				continue
+			} else if input[index] == 14 {
+				shiftIn = false
+				continue
+			}
+			if shiftIn {
+				result = int(input[index])
+				index++
+			} else {
 				if index+1 >= len(input) {
 					return string(input)
 				}
 				result = int(binary.BigEndian.Uint16(input[index:]))
-				index++
-			} else {
-				result = int(input[index])
+				index += 2
 			}
-			index++
-			index1, index2 := (result>>8)&0xFF, result&0xFF
-			char1 := conv.dBuffer[index1]
-			if char1 == 0xFFFF {
-				output = append(output, uint16(conv.dReplace))
-				continue
-			}
-			char := conv.dBuffer2[char1+index2]
-			if char == 0xFFFF {
-				output = append(output, uint16(conv.dReplace))
-				continue
-			}
+			char := conv.toUnicodeChar(result, 0)
 			if uint(char) > 0xFFFF {
 				output = append(output, uint16(char>>16))
 			}
 			output = append(output, uint16(char))
 		}
 		return string(utf16.Decode(output))
-	case 0x354:
+	case 0x35C: // TLBConvZHTEUC
 		index := 0
 		result := 0
 		output := make([]uint16, 0, len(input))
 		for index < len(input) {
-			if input[index] > 128 {
+			leading := 0
+			result = int(input[index])
+			index++
+			if result > 127 {
 				if index+1 >= len(input) {
 					return string(input)
 				}
 				result = int(binary.BigEndian.Uint16(input[index:]))
 				index++
-			} else {
-				result = int(input[index])
+				for key, value := range conv.leading {
+					if result == key {
+						leading = value
+						if index+2 >= len(input) {
+							return string(input)
+						}
+						result = int(binary.BigEndian.Uint32(input[index:]))
+						index += 2
+						break
+					}
+				}
 			}
-			index++
-			index1, index2 := (result>>8)&0xFF, result&0xFF
-			char1 := conv.dBuffer[index1]
-			if char1 == 0xFFFF {
-				output = append(output, uint16(conv.dReplace))
-				continue
-			}
-			char := conv.dBuffer2[char1+index2]
-			if char == 0xFFFF {
-				output = append(output, uint16(conv.dReplace))
-				continue
-			}
+			char := conv.toUnicodeChar(result, leading)
 			if uint(char) > 0xFFFF {
 				output = append(output, uint16(char>>16))
 			}
 			output = append(output, uint16(char))
 		}
 		return string(utf16.Decode(output))
-	case 0x33E, 0x33F:
+	case 0x33D, 0x348, 0x34D, 0x34E, 0x352, 0x353, 0x35D, 0x3E0: // TLBConv12Byte
+		index := 0
+		result := 0
+		output := make([]uint16, 0, len(input))
+		for index < len(input) {
+			result = int(input[index])
+			index++
+			if result > 127 {
+				if index+1 >= len(input) {
+					return string(input)
+				}
+				result = int(binary.BigEndian.Uint16(input[index:]))
+				index++
+			}
+			char := conv.toUnicodeChar(result, 0)
+			//index1, index2 := (result>>8)&0xFF, result&0xFF
+			//char1 := conv.dBuffer[index1]
+			//if char1 == 0xFFFF {
+			//	output = append(output, uint16(conv.dReplace))
+			//	continue
+			//}
+			//char := conv.dBuffer2[char1+index2]
+			//if char == 0xFFFF {
+			//	output = append(output, uint16(conv.dReplace))
+			//	continue
+			//}
+			if uint(char) > 0xFFFF {
+				output = append(output, uint16(char>>16))
+			}
+			output = append(output, uint16(char))
+		}
+		return string(utf16.Decode(output))
+	case 0x354: // TLBConvGBK
+		index := 0
+		result := 0
+		output := make([]uint16, 0, len(input))
+		for index < len(input) {
+			result = int(input[index])
+			index++
+			if result > 128 {
+				if index+1 >= len(input) {
+					return string(input)
+				}
+				result = int(binary.BigEndian.Uint16(input[index:]))
+				index++
+			}
+			char := conv.toUnicodeChar(result, 0)
+			//index1, index2 := (result>>8)&0xFF, result&0xFF
+			//char1 := conv.dBuffer[index1]
+			//if char1 == 0xFFFF {
+			//	output = append(output, uint16(conv.dReplace))
+			//	continue
+			//}
+			//char := conv.dBuffer2[char1+index2]
+			//if char == 0xFFFF {
+			//	output = append(output, uint16(conv.dReplace))
+			//	continue
+			//}
+			if uint(char) > 0xFFFF {
+				output = append(output, uint16(char>>16))
+			}
+			output = append(output, uint16(char))
+		}
+		return string(utf16.Decode(output))
+	case 0x33E, 0x33F: // TLBConvJAEUC
 		index := 0
 		num6 := 0
 		charWidth := 0
@@ -284,33 +361,33 @@ func (conv *StringConverter) Decode(input []byte) string {
 			output = append(output, uint16(char))
 		}
 		return string(utf16.Decode(output))
-	case 0x340:
+	case 0x340, 0x342, 0x346: // TLBConvSJIS
 		index := 0
 		result := 0
 		output := make([]uint16, 0, len(input))
 		for index < len(input) {
-			if input[index] > 223 || input[index] > 127 && input[index] < 161 {
+			result = int(input[index])
+			index++
+			if result > 223 || result > 127 && result < 161 {
 				if index+1 >= len(input) {
 					return string(input)
 				}
 				result = int(binary.BigEndian.Uint16(input[index:]))
 				index++
-			} else {
-				result = int(input[index])
 			}
-			index++
-			index1 := (result >> 8) & 0xFF
-			index2 := result & 0xFF
-			char1 := conv.dBuffer[index1]
-			if char1 == 0xFFFF {
-				output = append(output, uint16(conv.dReplace))
-				continue
-			}
-			char := conv.dBuffer2[char1+index2]
-			if char == 0xFFFF {
-				output = append(output, uint16(conv.dReplace))
-				continue
-			}
+			char := conv.toUnicodeChar(result, 0)
+			//index1 := (result >> 8) & 0xFF
+			//index2 := result & 0xFF
+			//char1 := conv.dBuffer[index1]
+			//if char1 == 0xFFFF {
+			//	output = append(output, uint16(conv.dReplace))
+			//	continue
+			//}
+			//char := conv.dBuffer2[char1+index2]
+			//if char == 0xFFFF {
+			//	output = append(output, uint16(conv.dReplace))
+			//	continue
+			//}
 			if uint(char) > 0xFFFF {
 				output = append(output, uint16(char>>16))
 			}

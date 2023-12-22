@@ -607,6 +607,9 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 ### releases
 <details>
 
+### version 2.8.2
+* now most of charsets are supported. still some of them are not fully tested.
+* fix issue related to nested pointers
 ### version 2.8.0
 * use buffered input during network read to avoid network data loss (occur with slow connections).
 * fix charset mapping for charset id 846.

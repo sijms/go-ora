@@ -614,10 +614,9 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 * re-code timeouts and connection break to get clean non-panic exit when context is timout and operation is cancelled
 ### version 2.7.25
 * Add feature that enable the driver to read oracle 23c wallet
-* introduce passing time.Time{} for
+* introduce passing time.Time{} as input parameter for
 DATE, TIMESTAMP and TIMESTAMP WITH TIMEZONE data types
-so no need for go_ora.TimeStamp and go_ora.TimeStampTZ
-custom types and they will be deprecated
+note still output parameters need these types
 * other bug fixes
 
 ### version 2.7.23

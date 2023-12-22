@@ -137,7 +137,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		par.DataType = NCHAR
 		return nil
 	}
-	if goType.Kind() == reflect.Ptr {
+	for goType.Kind() == reflect.Ptr {
 		goType = goType.Elem()
 	}
 	if goType != tyBytes && (goType.Kind() == reflect.Array || goType.Kind() == reflect.Slice) {

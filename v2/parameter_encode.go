@@ -226,6 +226,9 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 					par.DataType = NCHAR
 					return nil
 				}
+				if val != value {
+					return par.setDataType(reflect.TypeOf(val), val, conn)
+				}
 			}
 		}
 
@@ -237,9 +240,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		//	par.DataType = NCHAR
 		//	return nil
 		//}
-		//if val != value {
-		//	return par.setDataType(reflect.TypeOf(val), val, conn)
-		//}
+
 		if goType.Kind() == reflect.Struct {
 			// see if the struct is support valuer interface
 

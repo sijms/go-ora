@@ -555,6 +555,16 @@ func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}
 	if fieldValue.Kind() == reflect.Interface {
 		fieldValue.Set(reflect.ValueOf(input))
 	}
+	if fieldValue.CanAddr() {
+		if scan, ok := fieldValue.Addr().Interface().(sql.Scanner); ok {
+			return scan.Scan(input)
+		}
+	} else {
+		if scan, ok := fieldValue.Interface().(sql.Scanner); ok {
+			return scan.Scan(input)
+		}
+	}
+
 	switch val := input.(type) {
 	case int64:
 		return setNumber(fieldValue, float64(val))

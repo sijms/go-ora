@@ -486,12 +486,9 @@ func setBytes(value reflect.Value, input []byte) error {
 		}
 		return setBytes(value.Elem(), input)
 	}
-	switch value.Kind() {
-	case reflect.String:
-		value.SetString(string(input))
-		return nil
-	}
 	switch value.Type() {
+	case tyString:
+		value.SetString(string(input))
 	case tyBytes:
 		value.SetBytes(input)
 	case tyNVarChar:
@@ -507,6 +504,17 @@ func setBytes(value reflect.Value, input []byte) error {
 	case tyNullNVarChar:
 		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(input), true}))
 	default:
+		if temp, ok := value.Interface().(sql.Scanner); ok {
+			if temp != nil && !reflect.ValueOf(temp).IsNil() {
+				return temp.Scan(input)
+			}
+		}
+		if value.CanAddr() {
+			if temp, ok := value.Addr().Interface().(sql.Scanner); ok {
+				err := temp.Scan(input)
+				return err
+			}
+		}
 		return fmt.Errorf("can not assign []byte to type: %v", value.Type().Name())
 	}
 	return nil
@@ -518,12 +526,9 @@ func setTime(value reflect.Value, input time.Time) error {
 		}
 		return setTime(value.Elem(), input)
 	}
-	switch value.Kind() {
-	case reflect.String:
-		value.SetString(input.Format(time.RFC3339))
-		return nil
-	}
 	switch value.Type() {
+	case tyString:
+		value.SetString(input.Format(time.RFC3339))
 	case tyTime:
 		value.Set(reflect.ValueOf(input))
 	case tyTimeStamp:
@@ -539,6 +544,17 @@ func setTime(value reflect.Value, input time.Time) error {
 	case tyNullTimeStampTZ:
 		value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ(input), true}))
 	default:
+		if temp, ok := value.Interface().(sql.Scanner); ok {
+			if temp != nil && !reflect.ValueOf(temp).IsNil() {
+				return temp.Scan(input)
+			}
+		}
+		if value.CanAddr() {
+			if temp, ok := value.Addr().Interface().(sql.Scanner); ok {
+				err := temp.Scan(input)
+				return err
+			}
+		}
 		return fmt.Errorf("can not assign time to type: %v", value.Type().Name())
 	}
 	return nil
@@ -555,6 +571,16 @@ func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}
 	if fieldValue.Kind() == reflect.Interface {
 		fieldValue.Set(reflect.ValueOf(input))
 	}
+	//if fieldValue.CanAddr() {
+	//	if scan, ok := fieldValue.Addr().Interface().(sql.Scanner); ok {
+	//		return scan.Scan(input)
+	//	}
+	//} else {
+	//	if scan, ok := fieldValue.Interface().(sql.Scanner); ok {
+	//		return scan.Scan(input)
+	//	}
+	//}
+
 	switch val := input.(type) {
 	case int64:
 		return setNumber(fieldValue, float64(val))
@@ -606,6 +632,17 @@ func setBFile(value reflect.Value, input BFile) error {
 	case tyBFile:
 		value.Set(reflect.ValueOf(input))
 	default:
+		if temp, ok := value.Interface().(sql.Scanner); ok {
+			if temp != nil && !reflect.ValueOf(temp).IsNil() {
+				return temp.Scan(input)
+			}
+		}
+		if value.CanAddr() {
+			if temp, ok := value.Addr().Interface().(sql.Scanner); ok {
+				err := temp.Scan(input)
+				return err
+			}
+		}
 		return fmt.Errorf("can't assign BFILE to type: %v", value.Type().Name())
 	}
 	return nil
@@ -685,11 +722,6 @@ func setLob(value reflect.Value, input Lob) error {
 	if err != nil {
 		return err
 	}
-	// close lob
-	//err = input.close(0x10000)
-	//if err != nil {
-	//	return err
-	//}
 	conn := input.connection
 	if len(lobData) == 0 {
 		return setNull(value)
@@ -711,16 +743,13 @@ func setLob(value reflect.Value, input Lob) error {
 		return ret, nil
 	}
 	var strConv converters.IStringConverter
-	switch value.Kind() {
-	case reflect.String:
+	switch value.Type() {
+	case tyString:
 		strConv, err = getStrConv()
 		if err != nil {
 			return err
 		}
 		value.SetString(strConv.Decode(lobData))
-		return nil
-	}
-	switch value.Type() {
 	case tyNullString:
 		strConv, err = getStrConv()
 		if err != nil {
@@ -765,6 +794,17 @@ func setLob(value reflect.Value, input Lob) error {
 	case tyBytes:
 		value.Set(reflect.ValueOf(lobData))
 	default:
+		if temp, ok := value.Interface().(sql.Scanner); ok {
+			if temp != nil && !reflect.ValueOf(temp).IsNil() {
+				return temp.Scan(lobData)
+			}
+		}
+		if value.CanAddr() {
+			if temp, ok := value.Addr().Interface().(sql.Scanner); ok {
+				err := temp.Scan(lobData)
+				return err
+			}
+		}
 		return fmt.Errorf("can't assign LOB to type: %v", value.Type().Name())
 	}
 	return nil
@@ -808,19 +848,15 @@ func setString(value reflect.Value, input string) error {
 		}
 		return floatErr
 	}
-	switch value.Kind() {
-	case reflect.String:
-		value.SetString(input)
-		return nil
-	case reflect.Bool:
+	switch value.Type() {
+	case tyBool:
 		if strings.ToLower(input) == "true" {
 			value.SetBool(true)
 		} else {
 			value.SetBool(false)
 		}
-		return nil
-	}
-	switch value.Type() {
+	case tyString:
+		value.SetString(input)
 	case tyNullString:
 		value.Set(reflect.ValueOf(sql.NullString{input, true}))
 	case tyNullByte:
@@ -890,6 +926,17 @@ func setString(value reflect.Value, input string) error {
 	case tyNClob:
 		value.Set(reflect.ValueOf(NClob{String: input, Valid: true}))
 	default:
+		if temp, ok := value.Interface().(sql.Scanner); ok {
+			if temp != nil && !reflect.ValueOf(temp).IsNil() {
+				return temp.Scan(input)
+			}
+		}
+		if value.CanAddr() {
+			if temp, ok := value.Addr().Interface().(sql.Scanner); ok {
+				err := temp.Scan(input)
+				return err
+			}
+		}
 		return fmt.Errorf("can not assign string to type: %v", value.Type().Name())
 	}
 	return nil
@@ -933,15 +980,11 @@ func setNumber(value reflect.Value, input float64) error {
 		value.SetFloat(input)
 		return nil
 	}
-	switch value.Kind() {
-	case reflect.Bool:
-		value.SetBool(input != 0)
-		return nil
-	case reflect.String:
-		value.SetString(fmt.Sprintf("%v", input))
-		return nil
-	}
 	switch value.Type() {
+	case tyBool:
+		value.SetBool(input != 0)
+	case tyString:
+		value.SetString(fmt.Sprintf("%v", input))
 	case tyNullString:
 		value.Set(reflect.ValueOf(sql.NullString{fmt.Sprintf("%v", input), true}))
 	case tyNullByte:
@@ -959,6 +1002,17 @@ func setNumber(value reflect.Value, input float64) error {
 	case tyNullNVarChar:
 		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(fmt.Sprintf("%v", input)), true}))
 	default:
+		if temp, ok := value.Interface().(sql.Scanner); ok {
+			if temp != nil && !reflect.ValueOf(temp).IsNil() {
+				return temp.Scan(input)
+			}
+		}
+		if value.CanAddr() {
+			if temp, ok := value.Addr().Interface().(sql.Scanner); ok {
+				err := temp.Scan(input)
+				return err
+			}
+		}
 		return fmt.Errorf("can not assign number to type: %v", value.Type().Name())
 	}
 	return nil

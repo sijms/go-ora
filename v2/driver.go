@@ -89,15 +89,22 @@ func SetStringConverter(db GetDriverInterface, charset, nCharset converters.IStr
 		driver.nStrConv = nCharset
 	}
 }
+func DelSessionParam(db *sql.DB, key string) {
+	if drv, ok := db.Driver().(*OracleDriver); ok {
+		drv.mu.Lock()
+		defer drv.mu.Unlock()
+		delete(drv.sessionParam, key)
+	}
+}
 func AddSessionParam(db *sql.DB, key, value string) error {
 	_, err := db.Exec(fmt.Sprintf("alter session set %s='%s'", key, value))
 	if err != nil {
 		return err
 	}
-	if driver, ok := db.Driver().(*OracleDriver); ok {
-		driver.mu.Lock()
-		defer driver.mu.Unlock()
-		driver.sessionParam[key] = value
+	if drv, ok := db.Driver().(*OracleDriver); ok {
+		drv.mu.Lock()
+		defer drv.mu.Unlock()
+		drv.sessionParam[key] = value
 	}
 	return nil
 }

@@ -607,7 +607,7 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 ### releases
 <details>
 
-### version 2.8.3
+### version 2.8.4
 * fix regression occur with custom types that support valuer and scanner interfaces
 * fix regression occur with struct par that contain pointer (output)
 * fix issue related to struct pars contain LOBs

@@ -607,6 +607,13 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 ### releases
 <details>
 
+### version 2.8.3
+* fix regression occur with custom types that support valuer and scanner interfaces
+* fix regression occur with struct par that contain pointer (output)
+* fix issue related to struct pars contain LOBs
+* add DelSessionParam to remove session parameters when it is not needed
+* add messageSize for Dequeue function in dbms.AQ 
+* add tests for module, features and issues
 ### version 2.8.2
 * now most of charsets are supported. still some of them are not fully tested.
 * fix issue related to nested pointers

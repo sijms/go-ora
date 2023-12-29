@@ -1386,7 +1386,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 	addOutputField := func(name, _type string, size int, dir ParameterDirection, fieldIndex int) (tempPar *ParameterInfo, err error) {
 		field := tempVal.Field(fieldIndex)
 		fieldValue := field.Interface()
-		fieldType := tempType.Field(fieldIndex).Type
+		fieldType := field.Type()
 		hasNullValue := false
 		if fieldType.Kind() == reflect.Ptr {
 			if tempVal.Field(fieldIndex).IsNil() {
@@ -1489,9 +1489,12 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 				}
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-		default:
+		case "":
 			if field.Kind() == reflect.Ptr {
-				tempPar, err = stmt.NewParam(name, fieldValue, size, dir)
+				if field.IsNil() {
+					field.Set(reflect.New(fieldType))
+				}
+				tempPar, err = stmt.NewParam(name, field.Interface(), size, dir)
 			} else {
 				if field.CanAddr() {
 					tempPar, err = stmt.NewParam(name, field.Addr().Interface(), size, dir)
@@ -1499,6 +1502,8 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 					err = fmt.Errorf("can't take address for field: %s", name)
 				}
 			}
+		default:
+			err = fmt.Errorf("unknown type: %s for parameter: %s", _type, name)
 		}
 		return
 		//if _, ok := fieldValue.(driver.Valuer); ok {

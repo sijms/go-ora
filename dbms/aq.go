@@ -101,7 +101,7 @@ dbms_aqadm.stop_queue(queue_name => :QUEUE_NAME,
 	return err
 }
 
-func (aq *AQ) Dequeue(message driver.Value) (messageID []byte, err error) {
+func (aq *AQ) Dequeue(message driver.Value, messageSize int) (messageID []byte, err error) {
 	err = aq.validate()
 	if err != nil {
 		return
@@ -119,7 +119,7 @@ BEGIN
 		msgid => :MSG_ID);
 END;`
 	_, err = aq.conn.Exec(sqlText, sql.Named("QUEUE_NAME", aq.Name),
-		sql.Named("MSG", sql.Out{Dest: message}),
+		sql.Named("MSG", go_ora.Out{Dest: message, Size: messageSize}),
 		sql.Named("MSG_ID", go_ora.Out{Dest: &messageID, Size: 100}))
 	return
 }

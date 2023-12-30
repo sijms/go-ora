@@ -2,9 +2,11 @@ package TestIssues
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	go_ora "github.com/sijms/go-ora/v2"
 	"os"
+	"reflect"
 	"strconv"
 )
 
@@ -68,4 +70,25 @@ func execCmd(db *sql.DB, stmts ...string) error {
 		}
 	}
 	return nil
+}
+
+func queryStruct(row *sql.Row, s any) error {
+	sValue := reflect.ValueOf(s)
+	if sValue.Kind() != reflect.Ptr {
+		return errors.New("you should pass pointer")
+	}
+	if sValue.IsNil() {
+		return errors.New("you should pass non nil value")
+	}
+	if sValue.Elem().Kind() != reflect.Struct {
+		return errors.New("only accept pointer to struct")
+	}
+	sValue = sValue.Elem()
+	fieldCount := sValue.NumField()
+	scanValue := make([]any, fieldCount)
+	for x := 0; x < fieldCount; x++ {
+		fieldValue := sValue.Field(x)
+		scanValue[x] = fieldValue.Addr().Interface()
+	}
+	return row.Scan(scanValue...)
 }

@@ -12,7 +12,7 @@ import (
 
 func TestArray(t *testing.T) {
 	var insert = func(db *sql.DB) error {
-		sqlText := `INSERT INTO TEMP_TABLE_357(ID, NAME, VAL, LDATE, DATA) VALUES(:ID, :NAME, :VAL, :LDATE, :DATA)`
+		sqlText := `INSERT INTO TTB_MAIN(ID, NAME, VAL, LDATE, DATA) VALUES(:ID, :NAME, :VAL, :LDATE, :DATA)`
 		length := 10
 		type TempStruct struct {
 			Id   int             `db:"ID"`
@@ -43,10 +43,10 @@ func TestArray(t *testing.T) {
 
 	var createPackage = func(db *sql.DB) error {
 		sqlText := `create or replace package GOORA_TEMP_PKG as
-	type t_visit_id is table of TEMP_TABLE_357.id%type index by binary_integer;
-    type t_visit_name is table of TEMP_TABLE_357.name%type index by binary_integer;
-	type t_visit_val is table of TEMP_TABLE_357.val%type index by binary_integer;
-    type t_visit_date is table of TEMP_TABLE_357.ldate%type index by binary_integer;
+	type t_visit_id is table of TTB_MAIN.id%type index by binary_integer;
+    type t_visit_name is table of TTB_MAIN.name%type index by binary_integer;
+	type t_visit_val is table of TTB_MAIN.val%type index by binary_integer;
+    type t_visit_date is table of TTB_MAIN.ldate%type index by binary_integer;
     
 	procedure test_get1(p_visit_id t_visit_id, l_cursor out SYS_REFCURSOR);
     procedure test_get2(p_visit_id t_visit_id, p_visit_name out t_visit_name,
@@ -61,14 +61,14 @@ end GOORA_TEMP_PKG;
 	procedure test_get1(p_visit_id t_visit_id, l_cursor out SYS_REFCURSOR) as 
 		temp t_visit_id := p_visit_id;
 	begin
-		OPEN l_cursor for select id, name, val, ldate from TEMP_TABLE_357 
+		OPEN l_cursor for select id, name, val, ldate from TTB_MAIN 
 		    where id in (select column_value from table(temp));
 	end test_get1;
     
     procedure test_get2(p_visit_id t_visit_id, p_visit_name out t_visit_name,
         p_visit_val out t_visit_val, p_visit_date out t_visit_date) as
         temp t_visit_id := p_visit_id;
-        cursor tempCur is select id, name, val, ldate from TEMP_TABLE_357
+        cursor tempCur is select id, name, val, ldate from TTB_MAIN
             where id in (select column_value from table(temp));
         tempRow tempCur%rowtype;
         idx number := 1;

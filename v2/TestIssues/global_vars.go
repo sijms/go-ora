@@ -21,8 +21,13 @@ var urlOptions = map[string]string{
 	"lob fetch":  "pre",
 }
 
+type Execuer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	Prepare(query string) (*sql.Stmt, error)
+}
+
 func createMainTable(db *sql.DB) error {
-	sqlText := `CREATE TABLE TEMP_TABLE_357(
+	sqlText := `CREATE TABLE TTB_MAIN(
 	ID	number(10)	NOT NULL,
 	NAME		VARCHAR(500),
 	VAL			number(10,2),
@@ -34,7 +39,7 @@ func createMainTable(db *sql.DB) error {
 }
 
 func dropMainTable(db *sql.DB) error {
-	return execCmd(db, "drop table TEMP_TABLE_357 purge")
+	return execCmd(db, "drop table TTB_MAIN purge")
 }
 
 func getDB() (*sql.DB, error) {

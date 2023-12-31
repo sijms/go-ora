@@ -21,7 +21,7 @@ func TestIssue213(t *testing.T) {
 
 	ctx1 := context.Background()
 
-	ctx2, cancel := context.WithTimeout(ctx1, 1*time.Second)
+	ctx2, cancel := context.WithTimeout(ctx1, 3*time.Second)
 	if err = db.PingContext(ctx2); err != nil {
 		t.Log(err)
 		cancel()

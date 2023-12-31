@@ -30,7 +30,7 @@ func TestIssue307(t *testing.T) {
 		}
 	}()
 	var id int
-	_, err = db.Exec("INSERT INTO TEMP_TABLE_357(ID, NAME, LDATE) VALUES(:1, :2, :3) RETURNING ID INTO :4",
+	_, err = db.Exec("INSERT INTO TTB_MAIN(ID, NAME, LDATE) VALUES(:1, :2, :3) RETURNING ID INTO :4",
 		1, "TEST", time.Now(), go_ora.Out{Dest: &id})
 	if err != nil {
 		t.Error(err)

@@ -23,7 +23,7 @@ func TestIssue430(t *testing.T) {
 			data[x].Val = 100.23 + 1
 			data[x].Date = time.Now()
 		}
-		_, err := db.Exec("INSERT INTO TEMP_TABLE_357 (ID, NAME, VAL, LDATE) VALUES(:ID, :NAME, :VAL, :LDATE)", data)
+		_, err := db.Exec("INSERT INTO TTB_MAIN (ID, NAME, VAL, LDATE) VALUES(:ID, :NAME, :VAL, :LDATE)", data)
 		if err != nil {
 			return err
 		}
@@ -37,7 +37,7 @@ func TestIssue430(t *testing.T) {
 			Date time.Time `db:"LDATE,,,output"`
 		}{}
 		_, err := db.Exec(`BEGIN
-SELECT ID, NAME, VAL, LDATE INTO :ID, :NAME, :VAL, :LDATE FROM TEMP_TABLE_357 WHERE ID = 1;
+SELECT ID, NAME, VAL, LDATE INTO :ID, :NAME, :VAL, :LDATE FROM TTB_MAIN WHERE ID = 1;
 END;`, &result)
 		if err != nil {
 			return err

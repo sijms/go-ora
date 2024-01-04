@@ -180,7 +180,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		par.CharsetID = conn.tcpNego.ServernCharset
 	case tyTime, tyNullTime:
 		if par.Direction == Input {
-			par.DataType = TimeStampTZ_DTY
+			par.DataType = TIMESTAMP
 			par.MaxLen = converters.MAX_LEN_TIMESTAMP
 		} else {
 			par.DataType = DATE
@@ -188,7 +188,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		}
 	case tyTimeStamp, tyNullTimeStamp:
 		if par.Direction == Input {
-			par.DataType = TimeStampTZ_DTY
+			par.DataType = TIMESTAMP
 			par.MaxLen = converters.MAX_LEN_TIMESTAMP
 		} else {
 			par.DataType = TIMESTAMP
@@ -370,31 +370,26 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 	case XMLType:
 		rValue := reflect.ValueOf(val)
 		var objectBuffer bytes.Buffer
-		pars := make([]ParameterInfo, 0, 10)
-		for _, attrib := range par.cusType.attribs {
-			if fieldIndex, ok := par.cusType.fieldMap[attrib.Name]; ok {
-				//tempPar := ParameterInfo{Direction: par.Direction, DataType: attrib.DataType}
-				tempPar := attrib.clone()
-				tempPar.Direction = par.Direction
-				tempPar.Value = rValue.Field(fieldIndex).Interface()
-				err = tempPar.encodeWithType(connection)
-				if err != nil {
-					return err
-				}
-				err = tempPar.encodePrimValue(connection)
-				if err != nil {
-					return err
+		pars := getUDTAttributes(par.cusType, rValue)
 
-				}
-				if tempPar.DataType == OCIFileLocator && tempPar.MaxLen == 0 {
-					tempPar.MaxLen = 4000
-				}
-				if tempPar.Direction == Output {
-					tempPar.BValue = nil
-				}
-				pars = append(pars, tempPar)
-				connection.session.WriteClr(&objectBuffer, tempPar.BValue)
+		for _, attrib := range pars {
+			attrib.Direction = par.Direction
+			err = attrib.encodeWithType(connection)
+			if err != nil {
+				return err
 			}
+			err = attrib.encodePrimValue(connection)
+			if err != nil {
+				return err
+
+			}
+			if attrib.DataType == OCIFileLocator && attrib.MaxLen == 0 {
+				attrib.MaxLen = 4000
+			}
+			if attrib.Direction == Output {
+				attrib.BValue = nil
+			}
+			connection.session.WriteClr(&objectBuffer, attrib.BValue)
 		}
 		par.iPrimValue = pars
 		par.BValue = objectBuffer.Bytes()

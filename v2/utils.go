@@ -1104,7 +1104,41 @@ func encodeObject(session *network.Session, objectData []byte, isArray bool) []b
 	fieldsData.Write(objectData)
 	return fieldsData.Bytes()
 }
-
+func putUDTAttributes(input *customType, pars []ParameterInfo, index int) ([]ParameterInfo, int) {
+	oPrimValue := make([]ParameterInfo, 0, len(input.attribs))
+	for _, attrib := range input.attribs {
+		if attrib.cusType == nil {
+			oPrimValue = append(oPrimValue, pars[index])
+			index++
+		} else {
+			var tempValue []ParameterInfo
+			tempValue, index = putUDTAttributes(attrib.cusType, pars, index)
+			attrib.oPrimValue = tempValue
+			oPrimValue = append(oPrimValue, attrib)
+		}
+	}
+	return oPrimValue, index
+}
+func getUDTAttributes(input *customType, value reflect.Value) []ParameterInfo {
+	output := make([]ParameterInfo, 0, 10)
+	for _, attrib := range input.attribs {
+		fieldValue := reflect.Value{}
+		if value.IsValid() && value.Kind() == reflect.Struct {
+			if fieldIndex, ok := input.fieldMap[attrib.Name]; ok {
+				fieldValue = value.Field(fieldIndex)
+			}
+		}
+		if attrib.cusType != nil {
+			output = append(output, getUDTAttributes(attrib.cusType, fieldValue)...)
+		} else {
+			if fieldValue.IsValid() {
+				attrib.Value = fieldValue.Interface()
+			}
+			output = append(output, attrib)
+		}
+	}
+	return output
+}
 func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]byte) error {
 	session := conn.session
 	newState := network.SessionState{InBuffer: parent.BValue}
@@ -1163,17 +1197,18 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 		}
 		parent.oPrimValue = pars
 	case 0x84:
-		pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
-		for _, attrib := range parent.cusType.attribs {
-			tempPar := attrib
-			tempPar.Direction = parent.Direction
-			err = tempPar.decodePrimValue(conn, temporaryLobs, true)
+		//pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
+		// collect all attributes in one list
+		pars := getUDTAttributes(parent.cusType, reflect.Value{})
+		for index, _ := range pars {
+			pars[index].Direction = parent.Direction
+			err = pars[index].decodePrimValue(conn, temporaryLobs, true)
 			if err != nil {
 				return err
 			}
-			pars = append(pars, tempPar)
 		}
-		parent.oPrimValue = pars
+		// fill pars in its place in sub types
+		parent.oPrimValue, _ = putUDTAttributes(parent.cusType, pars, 0)
 	}
 	_ = session.LoadState()
 	return nil

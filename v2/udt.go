@@ -326,6 +326,16 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 //	return nil
 //}
 
+func (cust *customType) getFieldIndex(name string) int {
+	for x := 0; x < cust.typ.NumField(); x++ {
+		fieldID, _, _, _ := extractTag(cust.typ.Field(x).Tag.Get("udt"))
+		if strings.ToUpper(fieldID) == strings.ToUpper(name) {
+			return x
+		}
+	}
+	return -1
+}
+
 // loadFieldMap read struct tag that supplied with golang type object passed in RegisterType
 // function
 func (cust *customType) loadFieldMap() {
@@ -363,34 +373,33 @@ func (cust *customType) loadFieldMap() {
 // getObject return an object of Golang type supplied in RegisterType function
 // the object is filled with data from attrib []ParameterInfo
 // which is filled inside Stmt during data reading
-func (cust *customType) getObject() (interface{}, error) {
-	typ := cust.typ
-	obj := reflect.New(typ)
-	for _, attrib := range cust.attribs {
-		if fieldIndex, ok := cust.fieldMap[attrib.Name]; ok {
-			if attrib.Value != nil {
-				//tempField := obj.Elem().Field(fieldIndex)
-
-				//err := setValue(&tempField, attrib.Value)
-				//if err != nil {
-				//	panic(err)
-				//}
-				tempPar := ParameterInfo{Value: obj.Elem().Field(fieldIndex).Interface()}
-				err := tempPar.setParameterValue(attrib.Value)
-				if err != nil {
-					return nil, err
-				}
-				err = setFieldValue(obj.Elem().Field(fieldIndex), tempPar.cusType, tempPar.Value)
-				if err != nil {
-					return nil, err
-				}
-				//obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(tempPar.Value))
-			}
-		}
-	}
-	return obj.Elem().Interface(), nil
-}
-
+//func (cust *customType) getObject() (interface{}, error) {
+//	typ := cust.typ
+//	obj := reflect.New(typ)
+//	for _, attrib := range cust.attribs {
+//		if fieldIndex, ok := cust.fieldMap[attrib.Name]; ok {
+//			if attrib.Value != nil {
+//				//tempField := obj.Elem().Field(fieldIndex)
+//
+//				//err := setValue(&tempField, attrib.Value)
+//				//if err != nil {
+//				//	panic(err)
+//				//}
+//				tempPar := ParameterInfo{Value: obj.Elem().Field(fieldIndex).Interface()}
+//				err := tempPar.setParameterValue(attrib.Value)
+//				if err != nil {
+//					return nil, err
+//				}
+//				err = setFieldValue(obj.Elem().Field(fieldIndex), attrib.cusType, attrib.Value)
+//				if err != nil {
+//					return nil, err
+//				}
+//				//obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(tempPar.Value))
+//			}
+//		}
+//	}
+//	return obj.Elem().Interface(), nil
+//}
 //func (cust *customType) getFieldRepr(index int, input_value interface{}) ([]byte, error) {
 //	attrib := cust.attribs[index]
 //	//typ := reflect.TypeOf(val)

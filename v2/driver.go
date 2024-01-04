@@ -167,7 +167,8 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 		}
 		sqlText = `SELECT ATTR_NAME, ATTR_TYPE_NAME, LENGTH, ATTR_NO 
 					FROM ALL_TYPE_ATTRS 
-					WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
+					WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2
+					ORDER BY ATTR_NO`
 		rows, err := conn.Query(sqlText, strings.ToUpper(owner), strings.ToUpper(typeName))
 		if err != nil {
 			return err
@@ -183,13 +184,14 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 			if err != nil {
 				return err
 			}
-			for int(attOrder) > len(cust.attribs) {
-				cust.attribs = append(cust.attribs, ParameterInfo{
-					Direction: Input,
-					Flag:      3,
-				})
-			}
-			param := &cust.attribs[attOrder-1]
+			//for int(attOrder) > len(cust.attribs) {
+			//	cust.attribs = append(cust.attribs, ParameterInfo{
+			//		Direction: Input,
+			//		Flag:      3,
+			//	})
+			//}
+			//param := &cust.attribs[attOrder-1]
+			param := ParameterInfo{Direction: Input, Flag: 3}
 			param.Name = attName.String
 			param.TypeName = attTypeName.String
 			switch strings.ToUpper(attTypeName.String) {
@@ -240,6 +242,7 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 				for name, value := range driver.cusTyp {
 					if name == strings.ToUpper(attTypeName.String) {
 						found = true
+						//param.DataType = XMLType
 						param.cusType = new(customType)
 						*param.cusType = value
 						param.ToID = value.toid
@@ -257,6 +260,7 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 					return fmt.Errorf("unsupported attribute type: %s", attTypeName.String)
 				}
 			}
+			cust.attribs = append(cust.attribs, param)
 		}
 		if len(cust.attribs) == 0 {
 			return fmt.Errorf("unknown or empty type: %s", typeName)

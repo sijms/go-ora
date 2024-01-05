@@ -46,7 +46,7 @@ var (
 	tyPLBool          = reflect.TypeOf((*PLBool)(nil)).Elem()
 )
 
-func parseSqlText(text string) ([]string, error) {
+func refineSqlText(text string) string {
 	index := 0
 	length := len(text)
 	skip := false
@@ -94,7 +94,10 @@ func parseSqlText(text string) ([]string, error) {
 			textBuffer = append(textBuffer, text[index])
 		}
 	}
-	refinedSql := strings.TrimSpace(string(textBuffer))
+	return strings.TrimSpace(string(textBuffer))
+}
+func parseSqlText(text string) ([]string, error) {
+	refinedSql := refineSqlText(text)
 	reg, err := regexp.Compile(`:(\w+)`)
 	if err != nil {
 		return nil, err

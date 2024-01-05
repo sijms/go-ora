@@ -344,7 +344,8 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	// returning clause
 	var err error
 	if ret.stmtType != PLSQL {
-		ret._hasReturnClause, err = regexp.MatchString(`\bRETURNING\b\s+(\w+\s*,\s*)*\s*\w+\s+\bINTO\b`, uCmdText)
+		//ret._hasReturnClause, err = regexp.MatchString(`\bRETURNING\b\s+(\w+\s*,\s*)*\s*\w+\s+\bINTO\b`, uCmdText)
+		ret._hasReturnClause, err = regexp.MatchString(`\bRETURNING\b\s+.*\s+\bINTO\b`, uCmdText)
 		if err != nil {
 			ret._hasReturnClause = false
 		}

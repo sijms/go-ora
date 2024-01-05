@@ -607,6 +607,20 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 ### releases
 <details>
 
+### version 2.8.5
+* add support for nested user defined types (UDT)
+* add test file for nested UDT
+* fix issue related to passing time with timezone as default input parameter for DATE, TIMESTAMP, TIMESTAMP with timezone
+now user should define which type will be used according to oracle data type
+
+| go type | oracle type |
+|------ | -------|
+|time.Time | DATE|
+|go_ora.TimeStamp | TIMESTAMP|
+|go_ora.TimeStampTZ | TIMESTAMP WITH TIME ZONE|
+
+* fix issue related to returning clause
+
 ### version 2.8.4
 * fix regression occur with custom types that support valuer and scanner interfaces
 * fix regression occur with struct par that contain pointer (output)

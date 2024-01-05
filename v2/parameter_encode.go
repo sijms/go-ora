@@ -179,24 +179,33 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		par.ContFlag = 16
 		par.CharsetID = conn.tcpNego.ServernCharset
 	case tyTime, tyNullTime:
-		if par.Direction == Input {
-			par.DataType = TIMESTAMP
-			par.MaxLen = converters.MAX_LEN_TIMESTAMP
-		} else {
-			par.DataType = DATE
-			par.MaxLen = converters.MAX_LEN_DATE
-		}
+		par.DataType = DATE
+		par.MaxLen = converters.MAX_LEN_DATE
 	case tyTimeStamp, tyNullTimeStamp:
-		if par.Direction == Input {
-			par.DataType = TIMESTAMP
-			par.MaxLen = converters.MAX_LEN_TIMESTAMP
-		} else {
-			par.DataType = TIMESTAMP
-			par.MaxLen = converters.MAX_LEN_DATE
-		}
+		par.DataType = TIMESTAMP
+		par.MaxLen = converters.MAX_LEN_DATE
 	case tyTimeStampTZ, tyNullTimeStampTZ:
 		par.DataType = TimeStampTZ_DTY
 		par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	//case tyTime, tyNullTime:
+	//	if par.Direction == Input {
+	//		par.DataType = TIMESTAMP
+	//		par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	//	} else {
+	//		par.DataType = DATE
+	//		par.MaxLen = converters.MAX_LEN_DATE
+	//	}
+	//case tyTimeStamp, tyNullTimeStamp:
+	//	if par.Direction == Input {
+	//		par.DataType = TIMESTAMP
+	//		par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	//	} else {
+	//		par.DataType = TIMESTAMP
+	//		par.MaxLen = converters.MAX_LEN_DATE
+	//	}
+	//case tyTimeStampTZ, tyNullTimeStampTZ:
+	//	par.DataType = TimeStampTZ_DTY
+	//	par.MaxLen = converters.MAX_LEN_TIMESTAMP
 	case tyBytes:
 		par.DataType = RAW
 	case tyClob:
@@ -433,7 +442,6 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 		case TIMESTAMP:
 			par.BValue = converters.EncodeTimeStamp(value, false)
 		case TimeStampTZ_DTY:
-
 			temp := converters.EncodeTimeStamp(value, true)
 			if conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion {
 				if temp[11]&0x80 != 0 {

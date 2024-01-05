@@ -334,3 +334,13 @@ func TestSetNull(t *testing.T) {
 		t.Error("expected empty get: ", xxx)
 	}
 }
+
+func TestParseSqlText(t *testing.T) {
+	data, err := parseSqlText(`INSERT INTO TTB_NESTED_UDT(ID, DATA1, SEP1, DATA2, SEP2) 
+VALUES(:ID, :DATA1, :SEP1, :DATA2, :SEP2)`)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(data)
+}

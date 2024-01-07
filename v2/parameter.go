@@ -1,13 +1,11 @@
 package go_ora
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -384,542 +382,542 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	return nil
 }
 
-func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
-	if par.Value == nil {
-		par.Value = newValue
-		return nil
-	}
-
-	if temp, ok := par.Value.(sql.Scanner); ok {
-		if temp != nil && !reflect.ValueOf(temp).IsNil() {
-			return temp.Scan(newValue)
-		}
-	}
-	switch value := par.Value.(type) {
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		par.Value = newValue
-	case float32, float64, string, []byte:
-		par.Value = newValue
-	case bool:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		par.Value = temp != 0
-	case *int:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = int(temp)
-	case *int8:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = int8(temp)
-	case *int16:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = int16(temp)
-	case *int32:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = int32(temp)
-	case *int64:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = temp
-	case *uint:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = uint(temp)
-	case *uint8:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = uint8(temp)
-	case *uint16:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = uint16(temp)
-	case *uint32:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = uint32(temp)
-	case *uint64:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = uint64(temp)
-	case *float32:
-		temp, err := getFloat(newValue)
-		if err != nil {
-			return err
-		}
-		*value = float32(temp)
-	case *float64:
-		temp, err := getFloat(newValue)
-		if err != nil {
-			return err
-		}
-		*value = temp
-	case time.Time:
-		if tempNewVal, ok := newValue.(time.Time); ok {
-			par.Value = tempNewVal
-		} else {
-			return errors.New("time.Time col/par need time.Time value")
-		}
-	case *time.Time:
-		if tempNewVal, ok := newValue.(time.Time); ok {
-			*value = tempNewVal
-		} else {
-			return errors.New("*time.Time col/par need time.Time value")
-		}
-	case TimeStamp:
-		if tempNewVal, ok := newValue.(TimeStamp); ok {
-			par.Value = tempNewVal
-		} else if tempNewVal, ok := newValue.(time.Time); ok {
-			par.Value = TimeStamp(tempNewVal)
-		} else {
-			return errors.New("TimeStamp col/par need TimeStamp or time.Time value")
-		}
-	case *TimeStamp:
-		if tempNewVal, ok := newValue.(TimeStamp); ok {
-			*value = tempNewVal
-		} else if tempNewVal, ok := newValue.(time.Time); ok {
-			*value = TimeStamp(tempNewVal)
-		} else {
-			return errors.New("*TimeStamp col/par need TimeStamp or time.Time value")
-		}
-	case BFile:
-		if tempNewVal, ok := newValue.(BFile); ok {
-			par.Value = tempNewVal
-		} else {
-			return errors.New("BFile col/par requires BFile value")
-		}
-	case *BFile:
-		var tempVal BFile
-		if tempNewVal, ok := newValue.(BFile); ok {
-			tempVal = tempNewVal
-		} else {
-			return errors.New("*BFile col/par requires BFile value")
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case Clob:
-		if tempNewVal, ok := newValue.(Clob); ok {
-			par.Value = tempNewVal
-		} else {
-			return errors.New("Clob col/par requires Clob value")
-		}
-
-	case *Clob:
-		var tempVal Clob
-		if tempNewVal, ok := newValue.(Clob); ok {
-			tempVal = tempNewVal
-		} else {
-			return errors.New("*Clob col/par requires Clob value")
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case NClob:
-		if tempNewVal, ok := newValue.(NClob); ok {
-			par.Value = tempNewVal
-		} else {
-			return errors.New("NClob col/par requires NClob value")
-		}
-	case *NClob:
-		var tempVal NClob
-		if tempNewVal, ok := newValue.(NClob); ok {
-			tempVal = tempNewVal
-		} else {
-			return errors.New("*NClob col/par requires NClob value")
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case Blob:
-		if tempNewVal, ok := newValue.(Blob); ok {
-			par.Value = tempNewVal
-		} else {
-			return errors.New("Blob clo/par requires Blob value")
-		}
-	case *Blob:
-		var tempVal Blob
-		if tempNewVal, ok := newValue.(Blob); ok {
-			tempVal = tempNewVal
-		} else {
-			return errors.New("*Blob col/par requires Blob value")
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case *[]byte:
-		var tempVal []byte
-		if tempNewVal, ok := newValue.([]byte); ok {
-			tempVal = tempNewVal
-		} else {
-			return errors.New("[]byte col/par requires []byte or nil value")
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case *string:
-		*value = getString(newValue)
-	case *bool:
-		temp, err := getInt(newValue)
-		if err != nil {
-			return err
-		}
-		*value = temp != 0
-	case NVarChar:
-		par.Value = NVarChar(getString(newValue))
-	case *NVarChar:
-		*value = NVarChar(getString(newValue))
-	case sql.NullByte:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			value.Byte = uint8(temp)
-		}
-		par.Value = value
-	case sql.NullInt16:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			value.Int16 = int16(temp)
-		}
-		par.Value = value
-	case sql.NullInt32:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			value.Int32 = int32(temp)
-		}
-		par.Value = value
-	case sql.NullInt64:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			value.Int64 = temp
-		}
-		par.Value = value
-	case sql.NullBool:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			value.Bool = temp != 0
-		}
-		par.Value = value
-	case sql.NullFloat64:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			temp, err := getFloat(newValue)
-			if err != nil {
-				return err
-			}
-			value.Float64 = temp
-		}
-		par.Value = value
-	case *sql.NullByte:
-		var tempValue sql.NullByte
-		if newValue == nil {
-			tempValue.Valid = false
-		} else {
-			tempValue.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			tempValue.Byte = uint8(temp)
-		}
-		if value == nil {
-			par.Value = &tempValue
-		} else {
-			*value = tempValue
-		}
-	case *sql.NullInt16:
-		var tempValue sql.NullInt16
-		if newValue == nil {
-			tempValue.Valid = false
-		} else {
-			tempValue.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			tempValue.Int16 = int16(temp)
-		}
-		if value == nil {
-			par.Value = &tempValue
-		} else {
-			*value = tempValue
-		}
-	case *sql.NullInt32:
-		var tempValue sql.NullInt32
-		if newValue == nil {
-			tempValue.Valid = false
-		} else {
-			tempValue.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			tempValue.Int32 = int32(temp)
-		}
-		if value == nil {
-			par.Value = &tempValue
-		} else {
-			*value = tempValue
-		}
-	case *sql.NullInt64:
-		var tempValue sql.NullInt64
-		if newValue == nil {
-			tempValue.Valid = false
-		} else {
-			tempValue.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			tempValue.Int64 = temp
-		}
-		if value == nil {
-			par.Value = &tempValue
-		} else {
-			*value = tempValue
-		}
-	case *sql.NullFloat64:
-		var tempValue sql.NullFloat64
-		if newValue == nil {
-			tempValue.Valid = false
-		} else {
-			tempValue.Valid = true
-			temp, err := getFloat(newValue)
-			if err != nil {
-				return err
-			}
-			tempValue.Float64 = temp
-		}
-		if value == nil {
-			par.Value = &tempValue
-		} else {
-			*value = tempValue
-		}
-	case *sql.NullBool:
-		var tempValue sql.NullBool
-		if newValue == nil {
-			tempValue.Valid = false
-		} else {
-			tempValue.Valid = true
-			temp, err := getInt(newValue)
-			if err != nil {
-				return err
-			}
-			tempValue.Bool = temp != 0
-		}
-		if value == nil {
-			par.Value = &tempValue
-		} else {
-			*value = tempValue
-		}
-	case sql.NullTime:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			if tempNewVal, ok := newValue.(time.Time); ok {
-				value.Time = tempNewVal
-			} else {
-				return errors.New("sql.NullTime col/par need time.Time or Nil value")
-			}
-		}
-		par.Value = value
-	case *sql.NullTime:
-		var tempVal sql.NullTime
-		if newValue == nil {
-			tempVal.Valid = false
-		} else {
-			tempVal.Valid = true
-			if tempNewVal, ok := newValue.(time.Time); ok {
-				tempVal.Time = tempNewVal
-			} else {
-				return errors.New("*sql.NullTime col/par need time.Time or Nil value")
-			}
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case NullTimeStampTZ:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			if tempNewVal, ok := newValue.(TimeStampTZ); ok {
-				value.TimeStampTZ = tempNewVal
-			} else if tempNewVal, ok := newValue.(time.Time); ok {
-				value.TimeStampTZ = TimeStampTZ(tempNewVal)
-			} else {
-				return errors.New("NullTimeStampTZ col/par need TimeStamp, time.Time or Nil value")
-			}
-		}
-		par.Value = value
-	case *NullTimeStampTZ:
-		var tempVal NullTimeStampTZ
-		if newValue == nil {
-			tempVal.Valid = false
-		} else {
-			tempVal.Valid = true
-			if tempNewVal, ok := newValue.(TimeStampTZ); ok {
-				tempVal.TimeStampTZ = tempNewVal
-			} else if tempNewVal, ok := newValue.(time.Time); ok {
-				tempVal.TimeStampTZ = TimeStampTZ(tempNewVal)
-			} else {
-				return errors.New("*NullTimeStampTZ col/par need TimeStampTZ, time.Time or Nil value")
-			}
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case NullTimeStamp:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			if tempNewVal, ok := newValue.(TimeStamp); ok {
-				value.TimeStamp = tempNewVal
-			} else if tempNewVal, ok := newValue.(time.Time); ok {
-				value.TimeStamp = TimeStamp(tempNewVal)
-			} else {
-				return errors.New("NullTimeStamp col/par need TimeStampTZ, time.Time or Nil value")
-			}
-		}
-		par.Value = value
-	case *NullTimeStamp:
-		var tempVal NullTimeStamp
-		if newValue == nil {
-			tempVal.Valid = false
-		} else {
-			tempVal.Valid = true
-			if tempNewVal, ok := newValue.(TimeStamp); ok {
-				tempVal.TimeStamp = tempNewVal
-			} else if tempNewVal, ok := newValue.(time.Time); ok {
-				tempVal.TimeStamp = TimeStamp(tempNewVal)
-			} else {
-				return errors.New("*NullTimeStamp col/par need TimeStamp, time.Time or Nil value")
-			}
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case sql.NullString:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			value.String = getString(newValue)
-		}
-		par.Value = value
-	case *sql.NullString:
-		var tempVal sql.NullString
-		if newValue == nil {
-			tempVal.Valid = false
-		} else {
-			tempVal.Valid = true
-			tempVal.String = getString(newValue)
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	case NullNVarChar:
-		if newValue == nil {
-			value.Valid = false
-		} else {
-			value.Valid = true
-			value.NVarChar = NVarChar(getString(newValue))
-		}
-		par.Value = value
-	case *NullNVarChar:
-		var tempVal NullNVarChar
-		if newValue == nil {
-			tempVal.Valid = false
-		} else {
-			tempVal.Valid = true
-			tempVal.NVarChar = NVarChar(getString(newValue))
-		}
-		if value == nil {
-			par.Value = &tempVal
-		} else {
-			*value = tempVal
-		}
-	default:
-		typ := reflect.TypeOf(par.Value)
-		return errors.New("unsupported type: " + typ.Name())
-	}
-	return nil
-}
+//func (par *ParameterInfo) setParameterValue(newValue driver.Value) error {
+//	if par.Value == nil {
+//		par.Value = newValue
+//		return nil
+//	}
+//
+//	if temp, ok := par.Value.(sql.Scanner); ok {
+//		if temp != nil && !reflect.ValueOf(temp).IsNil() {
+//			return temp.Scan(newValue)
+//		}
+//	}
+//	switch value := par.Value.(type) {
+//	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+//		par.Value = newValue
+//	case float32, float64, string, []byte:
+//		par.Value = newValue
+//	case bool:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		par.Value = temp != 0
+//	case *int:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = int(temp)
+//	case *int8:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = int8(temp)
+//	case *int16:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = int16(temp)
+//	case *int32:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = int32(temp)
+//	case *int64:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = temp
+//	case *uint:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = uint(temp)
+//	case *uint8:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = uint8(temp)
+//	case *uint16:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = uint16(temp)
+//	case *uint32:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = uint32(temp)
+//	case *uint64:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = uint64(temp)
+//	case *float32:
+//		temp, err := getFloat(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = float32(temp)
+//	case *float64:
+//		temp, err := getFloat(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = temp
+//	case time.Time:
+//		if tempNewVal, ok := newValue.(time.Time); ok {
+//			par.Value = tempNewVal
+//		} else {
+//			return errors.New("time.Time col/par need time.Time value")
+//		}
+//	case *time.Time:
+//		if tempNewVal, ok := newValue.(time.Time); ok {
+//			*value = tempNewVal
+//		} else {
+//			return errors.New("*time.Time col/par need time.Time value")
+//		}
+//	case TimeStamp:
+//		if tempNewVal, ok := newValue.(TimeStamp); ok {
+//			par.Value = tempNewVal
+//		} else if tempNewVal, ok := newValue.(time.Time); ok {
+//			par.Value = TimeStamp(tempNewVal)
+//		} else {
+//			return errors.New("TimeStamp col/par need TimeStamp or time.Time value")
+//		}
+//	case *TimeStamp:
+//		if tempNewVal, ok := newValue.(TimeStamp); ok {
+//			*value = tempNewVal
+//		} else if tempNewVal, ok := newValue.(time.Time); ok {
+//			*value = TimeStamp(tempNewVal)
+//		} else {
+//			return errors.New("*TimeStamp col/par need TimeStamp or time.Time value")
+//		}
+//	case BFile:
+//		if tempNewVal, ok := newValue.(BFile); ok {
+//			par.Value = tempNewVal
+//		} else {
+//			return errors.New("BFile col/par requires BFile value")
+//		}
+//	case *BFile:
+//		var tempVal BFile
+//		if tempNewVal, ok := newValue.(BFile); ok {
+//			tempVal = tempNewVal
+//		} else {
+//			return errors.New("*BFile col/par requires BFile value")
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	case Clob:
+//		if tempNewVal, ok := newValue.(Clob); ok {
+//			par.Value = tempNewVal
+//		} else {
+//			return errors.New("Clob col/par requires Clob value")
+//		}
+//
+//	case *Clob:
+//		var tempVal Clob
+//		if tempNewVal, ok := newValue.(Clob); ok {
+//			tempVal = tempNewVal
+//		} else {
+//			return errors.New("*Clob col/par requires Clob value")
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	case NClob:
+//		if tempNewVal, ok := newValue.(NClob); ok {
+//			par.Value = tempNewVal
+//		} else {
+//			return errors.New("NClob col/par requires NClob value")
+//		}
+//	case *NClob:
+//		var tempVal NClob
+//		if tempNewVal, ok := newValue.(NClob); ok {
+//			tempVal = tempNewVal
+//		} else {
+//			return errors.New("*NClob col/par requires NClob value")
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	case Blob:
+//		if tempNewVal, ok := newValue.(Blob); ok {
+//			par.Value = tempNewVal
+//		} else {
+//			return errors.New("Blob clo/par requires Blob value")
+//		}
+//	case *Blob:
+//		var tempVal Blob
+//		if tempNewVal, ok := newValue.(Blob); ok {
+//			tempVal = tempNewVal
+//		} else {
+//			return errors.New("*Blob col/par requires Blob value")
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	case *[]byte:
+//		var tempVal []byte
+//		if tempNewVal, ok := newValue.([]byte); ok {
+//			tempVal = tempNewVal
+//		} else {
+//			return errors.New("[]byte col/par requires []byte or nil value")
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	case *string:
+//		*value = getString(newValue)
+//	case *bool:
+//		temp, err := getInt(newValue)
+//		if err != nil {
+//			return err
+//		}
+//		*value = temp != 0
+//	case NVarChar:
+//		par.Value = NVarChar(getString(newValue))
+//	case *NVarChar:
+//		*value = NVarChar(getString(newValue))
+//	case sql.NullByte:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			value.Byte = uint8(temp)
+//		}
+//		par.Value = value
+//	case sql.NullInt16:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			value.Int16 = int16(temp)
+//		}
+//		par.Value = value
+//	case sql.NullInt32:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			value.Int32 = int32(temp)
+//		}
+//		par.Value = value
+//	case sql.NullInt64:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			value.Int64 = temp
+//		}
+//		par.Value = value
+//	case sql.NullBool:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			value.Bool = temp != 0
+//		}
+//		par.Value = value
+//	case sql.NullFloat64:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			temp, err := getFloat(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			value.Float64 = temp
+//		}
+//		par.Value = value
+//	case *sql.NullByte:
+//		var tempValue sql.NullByte
+//		if newValue == nil {
+//			tempValue.Valid = false
+//		} else {
+//			tempValue.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			tempValue.Byte = uint8(temp)
+//		}
+//		if value == nil {
+//			par.Value = &tempValue
+//		} else {
+//			*value = tempValue
+//		}
+//	case *sql.NullInt16:
+//		var tempValue sql.NullInt16
+//		if newValue == nil {
+//			tempValue.Valid = false
+//		} else {
+//			tempValue.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			tempValue.Int16 = int16(temp)
+//		}
+//		if value == nil {
+//			par.Value = &tempValue
+//		} else {
+//			*value = tempValue
+//		}
+//	case *sql.NullInt32:
+//		var tempValue sql.NullInt32
+//		if newValue == nil {
+//			tempValue.Valid = false
+//		} else {
+//			tempValue.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			tempValue.Int32 = int32(temp)
+//		}
+//		if value == nil {
+//			par.Value = &tempValue
+//		} else {
+//			*value = tempValue
+//		}
+//	case *sql.NullInt64:
+//		var tempValue sql.NullInt64
+//		if newValue == nil {
+//			tempValue.Valid = false
+//		} else {
+//			tempValue.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			tempValue.Int64 = temp
+//		}
+//		if value == nil {
+//			par.Value = &tempValue
+//		} else {
+//			*value = tempValue
+//		}
+//	case *sql.NullFloat64:
+//		var tempValue sql.NullFloat64
+//		if newValue == nil {
+//			tempValue.Valid = false
+//		} else {
+//			tempValue.Valid = true
+//			temp, err := getFloat(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			tempValue.Float64 = temp
+//		}
+//		if value == nil {
+//			par.Value = &tempValue
+//		} else {
+//			*value = tempValue
+//		}
+//	case *sql.NullBool:
+//		var tempValue sql.NullBool
+//		if newValue == nil {
+//			tempValue.Valid = false
+//		} else {
+//			tempValue.Valid = true
+//			temp, err := getInt(newValue)
+//			if err != nil {
+//				return err
+//			}
+//			tempValue.Bool = temp != 0
+//		}
+//		if value == nil {
+//			par.Value = &tempValue
+//		} else {
+//			*value = tempValue
+//		}
+//	case sql.NullTime:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			if tempNewVal, ok := newValue.(time.Time); ok {
+//				value.Time = tempNewVal
+//			} else {
+//				return errors.New("sql.NullTime col/par need time.Time or Nil value")
+//			}
+//		}
+//		par.Value = value
+//	case *sql.NullTime:
+//		var tempVal sql.NullTime
+//		if newValue == nil {
+//			tempVal.Valid = false
+//		} else {
+//			tempVal.Valid = true
+//			if tempNewVal, ok := newValue.(time.Time); ok {
+//				tempVal.Time = tempNewVal
+//			} else {
+//				return errors.New("*sql.NullTime col/par need time.Time or Nil value")
+//			}
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	case NullTimeStampTZ:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			if tempNewVal, ok := newValue.(TimeStampTZ); ok {
+//				value.TimeStampTZ = tempNewVal
+//			} else if tempNewVal, ok := newValue.(time.Time); ok {
+//				value.TimeStampTZ = TimeStampTZ(tempNewVal)
+//			} else {
+//				return errors.New("NullTimeStampTZ col/par need TimeStamp, time.Time or Nil value")
+//			}
+//		}
+//		par.Value = value
+//	case *NullTimeStampTZ:
+//		var tempVal NullTimeStampTZ
+//		if newValue == nil {
+//			tempVal.Valid = false
+//		} else {
+//			tempVal.Valid = true
+//			if tempNewVal, ok := newValue.(TimeStampTZ); ok {
+//				tempVal.TimeStampTZ = tempNewVal
+//			} else if tempNewVal, ok := newValue.(time.Time); ok {
+//				tempVal.TimeStampTZ = TimeStampTZ(tempNewVal)
+//			} else {
+//				return errors.New("*NullTimeStampTZ col/par need TimeStampTZ, time.Time or Nil value")
+//			}
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	case NullTimeStamp:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			if tempNewVal, ok := newValue.(TimeStamp); ok {
+//				value.TimeStamp = tempNewVal
+//			} else if tempNewVal, ok := newValue.(time.Time); ok {
+//				value.TimeStamp = TimeStamp(tempNewVal)
+//			} else {
+//				return errors.New("NullTimeStamp col/par need TimeStampTZ, time.Time or Nil value")
+//			}
+//		}
+//		par.Value = value
+//	case *NullTimeStamp:
+//		var tempVal NullTimeStamp
+//		if newValue == nil {
+//			tempVal.Valid = false
+//		} else {
+//			tempVal.Valid = true
+//			if tempNewVal, ok := newValue.(TimeStamp); ok {
+//				tempVal.TimeStamp = tempNewVal
+//			} else if tempNewVal, ok := newValue.(time.Time); ok {
+//				tempVal.TimeStamp = TimeStamp(tempNewVal)
+//			} else {
+//				return errors.New("*NullTimeStamp col/par need TimeStamp, time.Time or Nil value")
+//			}
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	case sql.NullString:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			value.String = getString(newValue)
+//		}
+//		par.Value = value
+//	case *sql.NullString:
+//		var tempVal sql.NullString
+//		if newValue == nil {
+//			tempVal.Valid = false
+//		} else {
+//			tempVal.Valid = true
+//			tempVal.String = getString(newValue)
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	case NullNVarChar:
+//		if newValue == nil {
+//			value.Valid = false
+//		} else {
+//			value.Valid = true
+//			value.NVarChar = NVarChar(getString(newValue))
+//		}
+//		par.Value = value
+//	case *NullNVarChar:
+//		var tempVal NullNVarChar
+//		if newValue == nil {
+//			tempVal.Valid = false
+//		} else {
+//			tempVal.Valid = true
+//			tempVal.NVarChar = NVarChar(getString(newValue))
+//		}
+//		if value == nil {
+//			par.Value = &tempVal
+//		} else {
+//			*value = tempVal
+//		}
+//	default:
+//		typ := reflect.TypeOf(par.Value)
+//		return errors.New("unsupported type: " + typ.Name())
+//	}
+//	return nil
+//}
 
 func (par *ParameterInfo) clone() ParameterInfo {
 	tempPar := ParameterInfo{}
@@ -1083,19 +1081,45 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		} else {
 			par.oPrimValue = converters.DecodeNumber(par.BValue)
 		}
-	case TimeStampDTY, TimeStampeLTZ, TimeStampLTZ_DTY, TIMESTAMPTZ, TimeStampTZ_DTY:
-		fallthrough
-	case TIMESTAMP, DATE:
+	case DATE, TIMESTAMP, TimeStampDTY:
 		tempTime, err := converters.DecodeDate(par.BValue)
 		if err != nil {
 			return err
 		}
-		if par.DataType == DATE && conn.dbTimeLoc != time.UTC {
+		if conn.dbTimeLoc != nil && conn.dbTimeLoc != time.UTC {
 			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
 				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbTimeLoc)
 		} else {
 			par.oPrimValue = tempTime
 		}
+	case TIMESTAMPTZ, TimeStampTZ_DTY:
+		tempTime, err := converters.DecodeDate(par.BValue)
+		if err != nil {
+			return err
+		}
+		par.oPrimValue = tempTime
+
+	case TimeStampeLTZ, TimeStampLTZ_DTY:
+		tempTime, err := converters.DecodeDate(par.BValue)
+		if err != nil {
+			return err
+		}
+		par.oPrimValue = tempTime
+		if conn.dbTimeLoc != nil && conn.dbTimeLoc != time.UTC {
+			par.oPrimValue = tempTime.In(conn.dbTimeLoc)
+		}
+	//case TimeStampDTY, TimeStampeLTZ, TimeStampLTZ_DTY, TIMESTAMPTZ, TimeStampTZ_DTY:
+	//	fallthrough
+	//case TIMESTAMP, DATE:
+	//	tempTime, err := converters.DecodeDate(par.BValue)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	if (par.DataType == DATE || par.DataType == TIMESTAMP || par.DataType == TimeStampDTY) && conn.dbTimeLoc != time.UTC {
+	//
+	//	} else {
+	//
+	//	}
 	case OCIClobLocator, OCIBlobLocator:
 		var locator []byte
 		if !udt {

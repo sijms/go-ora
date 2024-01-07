@@ -1127,15 +1127,19 @@ func EncodeDate(ti time.Time) []byte {
 }
 
 func EncodeTimeStamp(ti time.Time, withTZ bool) []byte {
+	value := ti
+	if withTZ {
+		value = ti.UTC()
+	}
 	ret := make([]byte, 11)
-	ret[0] = uint8(ti.Year()/100 + 100)
-	ret[1] = uint8(ti.Year()%100 + 100)
-	ret[2] = uint8(ti.Month())
-	ret[3] = uint8(ti.Day())
-	ret[4] = uint8(ti.Hour() + 1)
-	ret[5] = uint8(ti.Minute() + 1)
-	ret[6] = uint8(ti.Second() + 1)
-	binary.BigEndian.PutUint32(ret[7:11], uint32(ti.Nanosecond()))
+	ret[0] = uint8(value.Year()/100 + 100)
+	ret[1] = uint8(value.Year()%100 + 100)
+	ret[2] = uint8(value.Month())
+	ret[3] = uint8(value.Day())
+	ret[4] = uint8(value.Hour() + 1)
+	ret[5] = uint8(value.Minute() + 1)
+	ret[6] = uint8(value.Second() + 1)
+	binary.BigEndian.PutUint32(ret[7:11], uint32(value.Nanosecond()))
 	if withTZ {
 		zoneLoc := ti.Location()
 		zoneID := 0

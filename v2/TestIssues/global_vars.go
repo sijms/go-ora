@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"time"
 )
 
 // var db *sql.DB
@@ -75,6 +76,15 @@ func execCmd(db *sql.DB, stmts ...string) error {
 		}
 	}
 	return nil
+}
+
+func isEqualTime(t1, t2 time.Time) bool {
+	return t1.Year() == t2.Year() &&
+		t1.Month() == t2.Month() &&
+		t1.Day() == t2.Day() &&
+		t1.Hour() == t2.Hour() &&
+		t1.Minute() == t2.Minute() &&
+		t1.Second() == t2.Second()
 }
 
 func queryStruct(row *sql.Row, s any) error {

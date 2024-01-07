@@ -179,11 +179,13 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		par.ContFlag = 16
 		par.CharsetID = conn.tcpNego.ServernCharset
 	case tyTime, tyNullTime:
-		par.DataType = DATE
-		par.MaxLen = converters.MAX_LEN_DATE
+		//par.DataType = DATE
+		//par.MaxLen = converters.MAX_LEN_DATE
+		fallthrough
 	case tyTimeStamp, tyNullTimeStamp:
-		par.DataType = TIMESTAMP
-		par.MaxLen = converters.MAX_LEN_DATE
+		//par.DataType = TIMESTAMP
+		//par.MaxLen = converters.MAX_LEN_DATE
+		fallthrough
 	case tyTimeStampTZ, tyNullTimeStampTZ:
 		par.DataType = TimeStampTZ_DTY
 		par.MaxLen = converters.MAX_LEN_TIMESTAMP
@@ -326,10 +328,7 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 	case DATE:
 		fallthrough
 	case TIMESTAMP:
-		par.iPrimValue, err = getDate(val)
-		if err != nil {
-			return err
-		}
+		fallthrough
 	case TimeStampTZ_DTY:
 		par.iPrimValue, err = getDate(val)
 		if err != nil {

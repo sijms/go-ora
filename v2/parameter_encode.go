@@ -439,20 +439,26 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 		case DATE:
 			par.BValue = converters.EncodeDate(value)
 		case TIMESTAMP:
-			par.BValue = converters.EncodeTimeStamp(value, false)
+			par.BValue = converters.EncodeTimeStamp(value, false, true)
 		case TimeStampTZ_DTY:
-			temp := converters.EncodeTimeStamp(value, true)
-			if conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion {
-				if temp[11]&0x80 != 0 {
-					temp[12] |= 1
-					if time.Time(value).IsDST() {
-						temp[12] |= 2
-					}
-				} else {
-					temp[11] |= 0x40
-				}
-			}
-			par.BValue = temp
+			par.BValue = converters.EncodeTimeStamp(value, true, conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion)
+			//var temp []byte
+			//if conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion {
+			//	temp = converters.EncodeTimeStamp(value, true)
+			//	if temp[11]&0x80 != 0 {
+			//		temp[12] |= 1
+			//		if time.Time(value).IsDST() {
+			//			temp[12] |= 2
+			//		}
+			//	} else {
+			//		temp[11] |= 0x40
+			//	}
+			//} else {
+			//	utc := value.UTC()
+			//	input := time.Date(utc.Year(), utc.Month(), utc.Day(), utc.Hour(), utc.Minute(), utc.Second(), utc.Nanosecond(), value.Location())
+			//	temp = converters.EncodeTimeStamp(input, true)
+			//}
+			//par.BValue = temp
 		}
 	case *Lob:
 		par.BValue = value.sourceLocator

@@ -1126,9 +1126,9 @@ func EncodeDate(ti time.Time) []byte {
 	return ret
 }
 
-func EncodeTimeStamp(ti time.Time, withTZ bool) []byte {
+func EncodeTimeStamp(ti time.Time, withTZ, sendAsLocalTime bool) []byte {
 	value := ti
-	if withTZ {
+	if !sendAsLocalTime {
 		value = ti.UTC()
 	}
 	ret := make([]byte, 11)
@@ -1167,6 +1167,16 @@ func EncodeTimeStamp(ti time.Time, withTZ bool) []byte {
 			zone1 := uint8(offset/3600) + 20
 			zone2 := uint8((offset/60)%60) + 60
 			ret = append(ret, zone1, zone2)
+		}
+		if sendAsLocalTime {
+			if ret[11]&0x80 != 0 {
+				ret[12] |= 1
+				if time.Time(value).IsDST() {
+					ret[12] |= 2
+				}
+			} else {
+				ret[11] |= 0x40
+			}
 		}
 
 	}

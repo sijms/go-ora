@@ -500,7 +500,9 @@ func (nego *DataTypeNego) read(session *network.Session) error {
 		}
 		level++
 	}
-
+	//fmt.Println("server timezone version: ", nego.serverTZVersion)
+	//fmt.Println("client timezone version: ", nego.clientTZVersion)
+	//fmt.Println("server timezone: ", nego.DBTimeZone)
 	return nil
 }
 func (nego *DataTypeNego) write(session *network.Session) error {

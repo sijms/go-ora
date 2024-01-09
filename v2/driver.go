@@ -240,7 +240,7 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 			default:
 				found := false
 				for name, value := range driver.cusTyp {
-					if name == strings.ToUpper(attTypeName.String) {
+					if strings.EqualFold(name, attTypeName.String) {
 						found = true
 						//param.DataType = XMLType
 						param.cusType = new(customType)
@@ -248,7 +248,7 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 						param.ToID = value.toid
 						break
 					}
-					if value.arrayTypeName == strings.ToUpper(attTypeName.String) {
+					if strings.EqualFold(value.arrayTypeName, attTypeName.String) {
 						found = true
 						param.cusType = new(customType)
 						*param.cusType = value

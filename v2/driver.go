@@ -245,14 +245,17 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 						//param.DataType = XMLType
 						param.cusType = new(customType)
 						*param.cusType = value
+						param.cusType.isArray = false
 						param.ToID = value.toid
 						break
 					}
 					if strings.EqualFold(value.arrayTypeName, attTypeName.String) {
 						found = true
 						param.cusType = new(customType)
+						param.DataType = XMLType
 						*param.cusType = value
-						param.ToID = value.toid
+						param.cusType.isArray = true
+						param.ToID = value.arrayTOID
 						break
 					}
 				}

@@ -1110,14 +1110,14 @@ func encodeObject(session *network.Session, objectData []byte, isArray bool) []b
 func putUDTAttributes(input *customType, pars []ParameterInfo, index int) ([]ParameterInfo, int) {
 	oPrimValue := make([]ParameterInfo, 0, len(input.attribs))
 	for _, attrib := range input.attribs {
-		if attrib.cusType == nil {
-			oPrimValue = append(oPrimValue, pars[index])
-			index++
-		} else {
+		if attrib.cusType != nil && !attrib.cusType.isArray {
 			var tempValue []ParameterInfo
 			tempValue, index = putUDTAttributes(attrib.cusType, pars, index)
 			attrib.oPrimValue = tempValue
 			oPrimValue = append(oPrimValue, attrib)
+		} else {
+			oPrimValue = append(oPrimValue, pars[index])
+			index++
 		}
 	}
 	return oPrimValue, index
@@ -1131,7 +1131,7 @@ func getUDTAttributes(input *customType, value reflect.Value) []ParameterInfo {
 				fieldValue = value.Field(fieldIndex)
 			}
 		}
-		if attrib.cusType != nil {
+		if attrib.cusType != nil && !attrib.cusType.isArray {
 			output = append(output, getUDTAttributes(attrib.cusType, fieldValue)...)
 		} else {
 			if fieldValue.IsValid() {
@@ -1205,6 +1205,7 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 		pars := getUDTAttributes(parent.cusType, reflect.Value{})
 		for index, _ := range pars {
 			pars[index].Direction = parent.Direction
+			pars[index].parent = parent
 			err = pars[index].decodePrimValue(conn, temporaryLobs, true)
 			if err != nil {
 				return err

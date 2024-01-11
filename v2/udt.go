@@ -18,6 +18,7 @@ type customType struct {
 	typ           reflect.Type
 	toid          []byte // type oid
 	arrayTOID     []byte
+	isArray       bool
 	fieldMap      map[string]int
 }
 

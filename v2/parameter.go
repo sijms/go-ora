@@ -139,6 +139,7 @@ type ParameterInfo struct {
 	getDataFromServer    bool
 	oaccollid            int
 	cusType              *customType
+	parent               *ParameterInfo
 	Annotations          map[string]string
 }
 
@@ -965,7 +966,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		}
 		return nil
 	}
-	if par.DataType == XMLType {
+	if par.DataType == XMLType && par.parent == nil {
 		if par.TypeName == "XMLTYPE" {
 			return errors.New("unsupported data type: XMLTYPE")
 		}
@@ -1019,7 +1020,34 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 	if par.DataType == RAW && par.MaxLen == 0 {
 		return nil
 	}
-	par.BValue, err = session.GetClr()
+	if par.DataType == XMLType && par.cusType != nil && par.cusType.isArray {
+		nb, err := session.GetByte()
+		var size int
+		if err != nil {
+			return err
+		}
+		switch nb {
+		case 0:
+			fallthrough
+		case 0xFF:
+			size = 0
+		case 0xFE:
+			size, err = session.GetInt(4, false, true)
+			if err != nil {
+				return err
+			}
+		default:
+			size = int(nb)
+		}
+		if size > 0 {
+			par.BValue, err = session.GetBytes(size)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		par.BValue, err = session.GetClr()
+	}
 	if err != nil {
 		return err
 	}
@@ -1176,7 +1204,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			},
 		}
 	case IBFloat:
-		par.oPrimValue = float64(converters.ConvertBinaryFloat(par.BValue))
+		par.oPrimValue = converters.ConvertBinaryFloat(par.BValue)
 	case IBDouble:
 		par.oPrimValue = converters.ConvertBinaryDouble(par.BValue)
 	case IntervalYM_DTY:

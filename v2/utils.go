@@ -1142,6 +1142,17 @@ func getUDTAttributes(input *customType, value reflect.Value) []ParameterInfo {
 	}
 	return output
 }
+
+func isArrayValue(val interface{}) bool {
+	tyVal := reflect.TypeOf(val)
+	for tyVal.Kind() == reflect.Ptr {
+		tyVal = tyVal.Elem()
+	}
+	if tyVal != tyBytes && (tyVal.Kind() == reflect.Array || tyVal.Kind() == reflect.Slice) {
+		return true
+	}
+	return false
+}
 func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]byte) error {
 	session := conn.session
 	newState := network.SessionState{InBuffer: parent.BValue}

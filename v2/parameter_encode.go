@@ -154,6 +154,10 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 			}
 		}
 		err = par.setDataType(goType.Elem(), inVal, conn)
+		if par.cusType != nil {
+			par.cusType.isArray = true
+			par.ToID = par.cusType.arrayTOID
+		}
 		par.Flag = 0x43
 		par.MaxNoOfArrayElements = 1
 		return err
@@ -382,6 +386,10 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 
 		for _, attrib := range pars {
 			attrib.Direction = par.Direction
+			// see if the attrib.Value is array?
+			if isArrayValue(attrib.Value) {
+				attrib.MaxNoOfArrayElements = 1
+			}
 			err = attrib.encodeWithType(connection)
 			if err != nil {
 				return err
@@ -397,7 +405,18 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 			if attrib.Direction == Output {
 				attrib.BValue = nil
 			}
-			connection.session.WriteClr(&objectBuffer, attrib.BValue)
+			if attrib.DataType == XMLType && attrib.cusType != nil && attrib.cusType.isArray {
+				dataSize := len(attrib.BValue)
+				if dataSize > 0xFC {
+					objectBuffer.WriteByte(0xFE)
+					connection.session.WriteUint(&objectBuffer, dataSize, 4, true, false)
+				} else {
+					objectBuffer.WriteByte(uint8(dataSize))
+				}
+				objectBuffer.Write(attrib.BValue)
+			} else {
+				connection.session.WriteClr(&objectBuffer, attrib.BValue)
+			}
 		}
 		par.iPrimValue = pars
 		par.BValue = objectBuffer.Bytes()
@@ -498,7 +517,19 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 						par.MaxLen = tempPar.MaxLen
 					}
 					// save binary representation to the buffer
-					session.WriteClr(&arrayBuffer, tempPar.BValue)
+					if tempPar.DataType == XMLType && tempPar.cusType != nil && tempPar.cusType.isArray {
+						dataSize := len(tempPar.BValue)
+						if dataSize > 0xFC {
+							arrayBuffer.WriteByte(0xFE)
+							session.WriteUint(&arrayBuffer, dataSize, 4, true, false)
+						} else {
+							arrayBuffer.WriteByte(uint8(dataSize))
+						}
+						arrayBuffer.Write(tempPar.BValue)
+					} else {
+						session.WriteClr(&arrayBuffer, tempPar.BValue)
+					}
+					//session.WriteClr(&arrayBuffer, tempPar.BValue)
 				}
 				//if par.DataType == XMLType {
 				//	arrayBuffer.Write([]byte{0})

@@ -1020,7 +1020,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 	if par.DataType == RAW && par.MaxLen == 0 {
 		return nil
 	}
-	if par.DataType == XMLType && par.cusType != nil && par.cusType.isArray {
+	if par.parent != nil && par.DataType == XMLType && par.cusType != nil && par.cusType.isArray {
 		nb, err := session.GetByte()
 		var size int
 		if err != nil {

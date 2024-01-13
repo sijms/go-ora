@@ -377,17 +377,6 @@ func (stmt *Stmt) writePars() error {
 				size := len(par.BValue)
 				session.WriteUint(&buffer, size, 4, true, true)
 				session.WriteBytes(&buffer, 1, 1)
-				//if par.cusType.isArray {
-				//	dataSize := len(par.BValue)
-				//	if dataSize > 0xFC {
-				//		buffer.WriteByte(0xFE)
-				//		session.WriteUint(&buffer, dataSize, 4, true, false)
-				//	} else {
-				//		buffer.WriteByte(uint8(dataSize))
-				//	}
-				//} else {
-				//	session.WriteClr(&buffer, par.BValue)
-				//}
 				session.WriteClr(&buffer, par.BValue)
 			} else {
 				if par.MaxNoOfArrayElements > 0 {

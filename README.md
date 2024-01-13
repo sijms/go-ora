@@ -607,6 +607,16 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 ### releases
 <details>
 
+### version 2.8.6
+* add support for nested user define type (UDT) array. 
+* add testing file (TestIssue/nested_udt_array_test.go) with 2 level nesting
+* fix issue related to date with time zone which occur with some oracle servers
+* correct reading of oracle date with local time zone as output col/par.
+* more testing is done for oracle date/time types now you can pass time.Time{}
+as input/output for oracle date/time types except:
+  * associative array which require strict oracle type
+* add testing file (TestIssue/time_test.go)
+
 ### version 2.8.5
 * add support for nested user defined types (UDT)
 * add test file for nested UDT

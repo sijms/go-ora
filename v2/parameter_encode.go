@@ -11,127 +11,6 @@ import (
 	"github.com/sijms/go-ora/v2/converters"
 )
 
-//func (par *ParameterInfo) setForNull() {
-//	par.DataType = NCHAR
-//	par.BValue = nil
-//	par.ContFlag = 0
-//	par.MaxCharLen = 0
-//	par.MaxLen = 1
-//	par.CharsetForm = 1
-//}
-//
-//func (par *ParameterInfo) setForNumber() {
-//	par.DataType = NUMBER
-//	par.ContFlag = 0
-//	par.MaxCharLen = 0
-//	par.MaxLen = converters.MAX_LEN_NUMBER
-//	par.CharsetForm = 0
-//	par.CharsetID = 0
-//}
-//func (par *ParameterInfo) setForTime() {
-//	par.DataType = DATE
-//	par.ContFlag = 0
-//	par.MaxLen = converters.MAX_LEN_DATE
-//	par.CharsetID = 0
-//	par.CharsetForm = 0
-//}
-//func (par *ParameterInfo) setForRefCursor() {
-//	par.BValue = nil
-//	par.MaxCharLen = 0
-//	par.MaxLen = 1
-//	par.DataType = REFCURSOR
-//	par.ContFlag = 0
-//	par.CharsetForm = 0
-//}
-//func (par *ParameterInfo) setForUDT() {
-//	par.Flag = 3
-//	par.Version = 1
-//	par.DataType = XMLType
-//	par.CharsetID = 0
-//	par.CharsetForm = 0
-//	par.MaxLen = 2000
-//}
-//func (par *ParameterInfo) encodeInt(value int64) {
-//	par.setForNumber()
-//	par.BValue = converters.EncodeInt64(value)
-//}
-
-//func (par *ParameterInfo) encodeFloat(value float64) error {
-//	par.setForNumber()
-//	var err error
-//	par.BValue, err = converters.EncodeDouble(value)
-//	return err
-//}
-
-//func (par *ParameterInfo) encodeString(value string, converter converters.IStringConverter, size int) {
-//	par.DataType = NCHAR
-//	par.ContFlag = 16
-//	par.MaxCharLen = len([]rune(value))
-//	if len(value) == 0 {
-//		par.BValue = nil
-//	} else {
-//		par.BValue = converter.Encode(value)
-//	}
-//	if size > len(value) {
-//		par.MaxCharLen = size
-//	}
-//	if par.Direction == Input {
-//		if par.BValue == nil {
-//			par.MaxLen = 1
-//		} else {
-//			par.MaxLen = len(par.BValue)
-//			par.MaxCharLen = par.MaxLen
-//		}
-//	} else {
-//		par.MaxLen = par.MaxCharLen * converters.MaxBytePerChar(par.CharsetID)
-//	}
-//}
-//
-//func (par *ParameterInfo) encodeTime(value time.Time) {
-//	par.setForTime()
-//	par.BValue = converters.EncodeDate(value)
-//}
-
-//	func (par *ParameterInfo) encodeTimeStampTZ(value TimeStampTZ, conn *Connection) {
-//		par.setForTime()
-//		par.DataType = TimeStampTZ_DTY
-//		par.MaxLen = converters.MAX_LEN_TIMESTAMP
-//		temp := converters.EncodeTimeStamp(time.Time(value), true)
-//		if conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion {
-//			if temp[11]&0x80 != 0 {
-//				temp[12] |= 1
-//				if time.Time(value).IsDST() {
-//					temp[12] |= 2
-//				}
-//			} else {
-//				temp[11] |= 0x40
-//			}
-//		}
-//		par.BValue = temp
-//	}
-//
-//	func (par *ParameterInfo) encodeTimeStamp(value TimeStamp) {
-//		par.setForTime()
-//		par.DataType = TIMESTAMP
-//		par.BValue = converters.EncodeTimeStamp(time.Time(value), false)
-//	}
-//
-//	func (par *ParameterInfo) encodeRaw(value []byte, size int) {
-//		par.BValue = value
-//		par.DataType = RAW
-//		par.MaxLen = len(value)
-//		if size > par.MaxLen {
-//			par.MaxLen = size
-//		}
-//		if par.MaxLen == 0 {
-//			par.MaxLen = 1
-//		}
-//		par.ContFlag = 0
-//		par.MaxCharLen = 0
-//		par.CharsetForm = 0
-//		par.CharsetID = 0
-//	}
-
 func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, conn *Connection) error {
 	if goType == nil {
 		par.DataType = NCHAR
@@ -183,13 +62,21 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		par.ContFlag = 16
 		par.CharsetID = conn.tcpNego.ServernCharset
 	case tyTime, tyNullTime:
-		//par.DataType = DATE
-		//par.MaxLen = converters.MAX_LEN_DATE
-		fallthrough
+		if par.Flag&0x43 > 0 {
+			par.DataType = DATE
+			par.MaxLen = converters.MAX_LEN_DATE
+		} else {
+			par.DataType = TimeStampTZ_DTY
+			par.MaxLen = converters.MAX_LEN_TIMESTAMP
+		}
 	case tyTimeStamp, tyNullTimeStamp:
-		//par.DataType = TIMESTAMP
-		//par.MaxLen = converters.MAX_LEN_DATE
-		fallthrough
+		if par.Flag&0x43 > 0 {
+			par.DataType = TIMESTAMP
+			par.MaxLen = converters.MAX_LEN_DATE
+		} else {
+			par.DataType = TimeStampTZ_DTY
+			par.MaxLen = converters.MAX_LEN_TIMESTAMP
+		}
 	case tyTimeStampTZ, tyNullTimeStampTZ:
 		par.DataType = TimeStampTZ_DTY
 		par.MaxLen = converters.MAX_LEN_TIMESTAMP

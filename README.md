@@ -11,6 +11,12 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+
+# Sponsers
+<p>
+  <a href="https://jb.gg/OpenSourceSupport" rel="noopener sponsored" target="_blank"><img height="128" width="128" src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png?_gl=1*txv9x8*_ga*MzY1MjAzNDI2LjE3MDAzMDc5NTg.*_ga_9J976DJZ68*MTcwNTE3NzM4My4zLjEuMTcwNTE3Nzg1MC40OS4wLjA.&_ga=2.97733338.412104364.1705177384-365203426.1700307958" alt="JetBrains" title="Essential tools for software developers and teams" loading="lazy" /></a>
+</p>
+
 # How To Use
 ## Connect to Database
 * ### Simple Connection

@@ -44,6 +44,7 @@ var (
 	tyNullTimeStampTZ = reflect.TypeOf((*NullTimeStampTZ)(nil)).Elem()
 	tyRefCursor       = reflect.TypeOf((*RefCursor)(nil)).Elem()
 	tyPLBool          = reflect.TypeOf((*PLBool)(nil)).Elem()
+	tyObject          = reflect.TypeOf((*Object)(nil)).Elem()
 )
 
 func refineSqlText(text string) string {
@@ -74,9 +75,11 @@ func refineSqlText(text string) string {
 		case '"':
 			skip = !skip
 		case '-':
-			if index+1 < length && text[index+1] == '-' {
-				index += 1
-				lineComment = true
+			if !skip {
+				if index+1 < length && text[index+1] == '-' {
+					index += 1
+					lineComment = true
+				}
 			}
 		case '\n':
 			//if lineComment {
@@ -1059,11 +1062,19 @@ func collectLocators(pars []ParameterInfo) [][]byte {
 	return output
 }
 
-//func initializePtr(v interface{}) {
-//	rv := reflect.ValueOf(v).Elem()
-//	rv.Set(reflect.New(rv.Type().Elem()))
-//}
-
+//	func initializePtr(v interface{}) {
+//		rv := reflect.ValueOf(v).Elem()
+//		rv.Set(reflect.New(rv.Type().Elem()))
+//	}
+func getTOID2(conn *sql.DB, owner, typeName string) ([]byte, error) {
+	var toid []byte
+	err := conn.QueryRow(`SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`,
+		strings.ToUpper(owner), strings.ToUpper(typeName)).Scan(&toid)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = fmt.Errorf("type: %s is not present or wrong type name", typeName)
+	}
+	return toid, err
+}
 func getTOID(conn *Connection, owner, typeName string) ([]byte, error) {
 	sqlText := `SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 	stmt := NewStmt(sqlText, conn)
@@ -1184,7 +1195,13 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 		}
 		pars := make([]ParameterInfo, 0, itemsLen)
 		for x := 0; x < itemsLen; x++ {
-			tempPar := parent.clone()
+			var tempPar ParameterInfo
+			if parent.cusType.isRegularArray() {
+				tempPar = parent.cusType.attribs[0]
+			} else {
+				tempPar = parent.clone()
+			}
+
 			tempPar.Direction = parent.Direction
 			ctlByte, err := session.GetByte()
 			if err != nil {
@@ -1203,7 +1220,11 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 			if err != nil {
 				return err
 			}
-			err = decodeObject(conn, &tempPar, temporaryLobs)
+			if parent.cusType.isRegularArray() {
+				err = tempPar.decodeParameterValue(conn, temporaryLobs)
+			} else {
+				err = decodeObject(conn, &tempPar, temporaryLobs)
+			}
 			if err != nil {
 				return err
 			}

@@ -203,130 +203,6 @@ FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
 	return nil
 }
 
-// RegisterType2 same as RegisterType but get user defined type data
-// with pl/sql package function: dbms_pickler.get_type_shape
-//
-// DataType of UDT field that can be manipulated by this function are: NUMBER,
-// VARCHAR2, NVARCHAR2, TIMESTAMP, DATE AND RAW
-//func (conn *Connection) RegisterType2(typeName string, typeObj interface{}) error {
-//	if typeObj == nil {
-//		return errors.New("type object cannot be nil")
-//	}
-//	typ := reflect.TypeOf(typeObj)
-//	switch typ.Kind() {
-//	case reflect.Ptr:
-//		return errors.New("unsupported type object: Ptr")
-//	case reflect.Array:
-//		return errors.New("unsupported type object: Array")
-//	case reflect.Chan:
-//		return errors.New("unsupported type object: Chan")
-//	case reflect.Map:
-//		return errors.New("unsupported type object: Map")
-//	case reflect.Slice:
-//		return errors.New("unsupported type object: Slice")
-//	}
-//	if typ.Kind() != reflect.Struct {
-//		return errors.New("type object should be of structure type")
-//	}
-//	cust := customType{typ: typ, fieldMap: map[string]int{}}
-//	sqlText := `
-//DECLARE
-//    toid raw(128);
-//    vers number;
-//    tds long raw;
-//    instantiable varchar(100);
-//    supertype_owner varchar(100);
-//    supertype_name varchar(100);
-//    attr_rc sys_refcursor;
-//    subtype_rc sys_refcursor;
-//    retVal number;
-//BEGIN
-//	:retVal := dbms_pickler.get_type_shape(:typeName, toid, vers, tds,
-//        instantiable, supertype_owner, supertype_name, :att_rc, subtype_rc);
-//END;`
-//	stmt := NewStmt(sqlText, conn)
-//	defer func(stmt *Stmt) {
-//		_ = stmt.Close()
-//	}(stmt)
-//	var cursor RefCursor
-//	var ret int64
-//	_, err := stmt.Exec([]driver.Value{Out{Dest: &ret}, typeName, Out{Dest: &cursor}})
-//	if err != nil {
-//		return err
-//	}
-//	if ret != 0 {
-//		return errors.New(fmt.Sprint("unknown type: ", typeName))
-//	}
-//	defer func(cursor *RefCursor) {
-//		_ = cursor.Close()
-//	}(&cursor)
-//	rows, err := cursor.Query()
-//	if err != nil {
-//		return err
-//	}
-//	var (
-//		attName     string
-//		attOrder    int64
-//		attTypeName string
-//	)
-//	for rows.Next_() {
-//		err = rows.Scan(&attName, &attOrder, &attTypeName)
-//		if err != nil {
-//			return err
-//		}
-//		for int(attOrder) > len(cust.attribs) {
-//			cust.attribs = append(cust.attribs, ParameterInfo{
-//				Direction:   Input,
-//				Flag:        3,
-//				CharsetID:   conn.tcpNego.ServerCharset,
-//				CharsetForm: 1,
-//			})
-//		}
-//		param := &cust.attribs[attOrder-1]
-//		param.Name = attName
-//		param.TypeName = attTypeName
-//		switch strings.ToUpper(attTypeName) {
-//		case "NUMBER":
-//			param.DataType = NUMBER
-//			param.ContFlag = 0
-//			param.MaxCharLen = 0
-//			param.MaxLen = 22
-//			param.CharsetForm = 0
-//		case "VARCHAR2":
-//			param.DataType = NCHAR
-//			param.CharsetForm = 1
-//			param.ContFlag = 16
-//			param.MaxCharLen = 1000
-//			param.MaxLen = 1000 * converters.MaxBytePerChar(param.CharsetID)
-//		case "NVARCHAR2":
-//			param.DataType = NCHAR
-//			param.CharsetForm = 2
-//			param.ContFlag = 16
-//			param.MaxCharLen = 1000
-//			param.CharsetID = conn.tcpNego.ServernCharset
-//			param.MaxLen = 1000 * converters.MaxBytePerChar(param.CharsetID)
-//		case "TIMESTAMP":
-//			fallthrough
-//		case "DATE":
-//			param.DataType = DATE
-//			param.ContFlag = 0
-//			param.MaxLen = 11
-//			param.MaxCharLen = 11
-//		case "RAW":
-//			param.DataType = RAW
-//			param.ContFlag = 0
-//			param.MaxLen = 1000
-//			param.MaxCharLen = 0
-//			param.CharsetForm = 0
-//		default:
-//			return errors.New(fmt.Sprint("unsupported attribute type: ", attTypeName))
-//		}
-//	}
-//	cust.loadFieldMap()
-//	conn.cusTyp[strings.ToUpper(typeName)] = cust
-//	return nil
-//}
-
 func (cust *customType) getFieldIndex(name string) int {
 	for x := 0; x < cust.typ.NumField(); x++ {
 		fieldID, _, _, _ := extractTag(cust.typ.Field(x).Tag.Get("udt"))
@@ -349,80 +225,39 @@ func (cust *customType) loadFieldMap() {
 		}
 		fieldID = strings.ToUpper(fieldID)
 		cust.fieldMap[fieldID] = x
-		//tag := f.Tag.Get("oracle")
-		//if len(tag) == 0 {
-		//	continue
-		//}
-		//tag = strings.Trim(tag, "\"")
-		//parts := strings.Split(tag, ",")
-		//for _, part := range parts {
-		//	subs := strings.Split(part, ":")
-		//	if len(subs) == 0 {
-		//		continue
-		//	}
-		//	if strings.TrimSpace(strings.ToLower(subs[0])) == "name" {
-		//		if len(subs) == 1 {
-		//			continue
-		//		}
-		//		fieldID := strings.TrimSpace(strings.ToUpper(subs[1]))
-		//		cust.fieldMap[fieldID] = x
-		//	}
-		//}
 	}
 }
 
-// getObject return an object of Golang type supplied in RegisterType function
-// the object is filled with data from attrib []ParameterInfo
-// which is filled inside Stmt during data reading
-//func (cust *customType) getObject() (interface{}, error) {
-//	typ := cust.typ
-//	obj := reflect.New(typ)
-//	for _, attrib := range cust.attribs {
-//		if fieldIndex, ok := cust.fieldMap[attrib.Name]; ok {
-//			if attrib.Value != nil {
-//				//tempField := obj.Elem().Field(fieldIndex)
-//
-//				//err := setValue(&tempField, attrib.Value)
-//				//if err != nil {
-//				//	panic(err)
-//				//}
-//				tempPar := ParameterInfo{Value: obj.Elem().Field(fieldIndex).Interface()}
-//				err := tempPar.setParameterValue(attrib.Value)
-//				if err != nil {
-//					return nil, err
-//				}
-//				err = setFieldValue(obj.Elem().Field(fieldIndex), attrib.cusType, attrib.Value)
-//				if err != nil {
-//					return nil, err
-//				}
-//				//obj.Elem().Field(fieldIndex).Set(reflect.ValueOf(tempPar.Value))
-//			}
-//		}
-//	}
-//	return obj.Elem().Interface(), nil
-//}
-//func (cust *customType) getFieldRepr(index int, input_value interface{}) ([]byte, error) {
-//	attrib := cust.attribs[index]
-//	//typ := reflect.TypeOf(val)
-//	val := reflect.ValueOf(input_value)
-//	typ := val.Type()
-//	switch attrib.DataType {
-//	case NUMBER:
-//		switch typ.Kind() {
-//		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-//			fallthrough
-//		case reflect.Int, reflect.Int32, reflect.Int16, reflect.Int64, reflect.Int8:
-//			return converters.EncodeInt64(reflect.ValueOf(val).Int()), nil
-//		case reflect.Float32, reflect.Float64:
-//			return converters.EncodeDouble(reflect.ValueOf(val).Float())
-//		default:
-//			return nil, fmt.Errorf("field %d require NUMBER data type", index)
-//		}
-//	case DATE:
-//		if typ == reflect.TypeOf(time.Time{}) {
-//			//return converters.EncodeDate(val.Interface())
-//		}
-//
-//	}
-//	return nil, nil
-//}
+func (cust *customType) isRegularArray() bool {
+	return cust.isArray && cust.typ == nil
+}
+
+type Object struct {
+	Owner       string
+	Name        string
+	Value       interface{}
+	itemMaxSize int
+}
+
+// NewObject call this function to wrap oracle object types or arrayso
+func NewObject(owner, name string, value interface{}) *Object {
+	return &Object{
+		Owner:       owner,
+		Name:        name,
+		Value:       value,
+		itemMaxSize: 0,
+	}
+}
+
+// NewArrayObject call this function for creation of array of regular type
+// for example sql: create or replace TYPE SLICE AS TABLE OF varchar2(500)
+// in this case itemMaxSize will be 500.
+// if you use this function to define array of object type itemMaxSize is not used
+func NewArrayObject(owner, name string, itemMaxSize int, value interface{}) *Object {
+	return &Object{
+		Owner:       owner,
+		Name:        name,
+		Value:       value,
+		itemMaxSize: itemMaxSize,
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/sijms/go-ora/v2/converters"
@@ -18,6 +19,33 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 	}
 	for goType.Kind() == reflect.Ptr {
 		goType = goType.Elem()
+	}
+	if goType == tyObject {
+		val, err := getValue(value)
+		if err != nil {
+			return err
+		}
+		if obj, ok := val.(Object); ok {
+			par.DataType = XMLType
+			par.Value = obj.Value
+			// set custom type
+			for _, cusTyp := range conn.cusTyp {
+				if strings.EqualFold(cusTyp.name, obj.Name) {
+					par.cusType = new(customType)
+					*par.cusType = cusTyp
+					par.ToID = cusTyp.toid
+					break
+				}
+				if strings.EqualFold(cusTyp.arrayTypeName, obj.Name) {
+					par.cusType = new(customType)
+					*par.cusType = cusTyp
+					par.ToID = cusTyp.arrayTOID
+					par.cusType.isArray = true
+					break
+				}
+			}
+			return nil
+		}
 	}
 	if goType != tyBytes && (goType.Kind() == reflect.Array || goType.Kind() == reflect.Slice) {
 		val, err := getValue(value)
@@ -269,8 +297,27 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 	case XMLType:
 		rValue := reflect.ValueOf(val)
 		var objectBuffer bytes.Buffer
-		pars := getUDTAttributes(par.cusType, rValue)
-
+		var pars []ParameterInfo
+		if par.cusType.isRegularArray() { // array of regular type
+			// examine rValue as array
+			if rValue.IsValid() && rValue.Type() != tyBytes && rValue.Kind() == reflect.Array || rValue.Kind() == reflect.Slice {
+				for x := 0; x < rValue.Len(); x++ {
+					var tempPar = par.cusType.attribs[0].clone()
+					if rValue.Index(x).CanInterface() {
+						tempPar.Value = rValue.Index(x).Interface()
+					}
+					err = tempPar.encodeWithType(connection)
+					if err != nil {
+						return err
+					}
+					pars = append(pars, tempPar)
+				}
+			} else {
+				return errors.New("parameter defined as array of regular type and value not an array")
+			}
+		} else {
+			pars = getUDTAttributes(par.cusType, rValue)
+		}
 		for _, attrib := range pars {
 			attrib.Direction = par.Direction
 			// see if the attrib.Value is array?
@@ -446,7 +493,6 @@ func (par *ParameterInfo) init() {
 func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Connection) error {
 	par.init()
 	par.Value = val
-
 	err := par.setDataType(reflect.TypeOf(val), val, connection)
 	if err != nil {
 		return err

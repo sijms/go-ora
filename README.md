@@ -537,6 +537,7 @@ regular type supported
   as input/output parameters
   * [examples/regular_type_array](https://github.com/sijms/go-ora/blob/master/examples/regular_type_array/main.go) a complete example for all supported regullar type arrays
   * [examples/null_udt](https://github.com/sijms/go-ora/blob/master/examples/null_udt/main.go) example represent null object as input and output
+  * [examples/varray](https://github.com/sijms/go-ora/blob/master/examples/varray/main.go) for varray types
 
 * ### RefCursor
 > as an output parameter

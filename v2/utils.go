@@ -682,18 +682,23 @@ func setUDTObject(value reflect.Value, cust *customType, input []ParameterInfo) 
 		return setUDTObject(value.Elem(), cust, input)
 	}
 	if value.Kind() == reflect.Slice || value.Kind() == reflect.Array {
-		arrayObj := reflect.MakeSlice(reflect.SliceOf(cust.typ), 0, len(input))
-		for _, par := range input {
-			if temp, ok := par.oPrimValue.([]ParameterInfo); ok {
-				tempObj2 := reflect.New(cust.typ)
-				err := setFieldValue(tempObj2.Elem(), par.cusType, temp)
-				if err != nil {
-					return err
-				}
-				arrayObj = reflect.Append(arrayObj, tempObj2.Elem())
-			}
-		}
-		value.Set(arrayObj)
+		return setArray(value, input)
+		//if cust.isRegularArray() {
+		//
+		//} else {
+		//	arrayObj := reflect.MakeSlice(reflect.SliceOf(cust.typ), 0, len(input))
+		//	for _, par := range input {
+		//		if temp, ok := par.oPrimValue.([]ParameterInfo); ok {
+		//			tempObj2 := reflect.New(cust.typ)
+		//			err := setFieldValue(tempObj2.Elem(), par.cusType, temp)
+		//			if err != nil {
+		//				return err
+		//			}
+		//			arrayObj = reflect.Append(arrayObj, tempObj2.Elem())
+		//		}
+		//	}
+		//	value.Set(arrayObj)
+		//}
 	} else {
 		tempObj := reflect.New(cust.typ)
 		for _, par := range input {
@@ -1042,25 +1047,26 @@ func isBadConn(err error) bool {
 	return false
 }
 
-func collectLocators(pars []ParameterInfo) [][]byte {
-	output := make([][]byte, 0, 10)
-	for _, par := range pars {
-		switch value := par.iPrimValue.(type) {
-		case *Lob:
-			if value != nil && value.sourceLocator != nil {
-				output = append(output, value.sourceLocator)
-			}
-		case *BFile:
-			if value != nil && value.lob.sourceLocator != nil {
-				output = append(output, value.lob.sourceLocator)
-			}
-		case []ParameterInfo:
-			temp := collectLocators(value)
-			output = append(output, temp...)
-		}
-	}
-	return output
-}
+//func collectLocators(pars []ParameterInfo) [][]byte {
+//	output := make([][]byte, 0, 10)
+//	for _, par := range pars {
+//		output = append(output, par.collectLocator()...)
+//switch value := par.iPrimValue.(type) {
+//case *Lob:
+//	if value != nil && value.sourceLocator != nil {
+//		output = append(output, value.sourceLocator)
+//	}
+//case *BFile:
+//	if value != nil && value.lob.sourceLocator != nil {
+//		output = append(output, value.lob.sourceLocator)
+//	}
+//case []ParameterInfo:
+//	temp := collectLocators(value)
+//	output = append(output, temp...)
+//}
+//	}
+//	return output
+//}
 
 //	func initializePtr(v interface{}) {
 //		rv := reflect.ValueOf(v).Elem()
@@ -1142,12 +1148,17 @@ func getUDTAttributes(input *customType, value reflect.Value) []ParameterInfo {
 				fieldValue = value.Field(fieldIndex)
 			}
 		}
+		// if attribute is a nested type and not array
 		if attrib.cusType != nil && !attrib.cusType.isArray {
 			output = append(output, getUDTAttributes(attrib.cusType, fieldValue)...)
 		} else {
+			if isArrayValue(fieldValue) {
+				attrib.MaxNoOfArrayElements = 1
+			}
 			if fieldValue.IsValid() {
 				attrib.Value = fieldValue.Interface()
 			}
+
 			output = append(output, attrib)
 		}
 	}
@@ -1156,6 +1167,9 @@ func getUDTAttributes(input *customType, value reflect.Value) []ParameterInfo {
 
 func isArrayValue(val interface{}) bool {
 	tyVal := reflect.TypeOf(val)
+	if tyVal == nil {
+		return false
+	}
 	for tyVal.Kind() == reflect.Ptr {
 		tyVal = tyVal.Elem()
 	}
@@ -1166,86 +1180,208 @@ func isArrayValue(val interface{}) bool {
 }
 func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]byte) error {
 	session := conn.session
-	newState := network.SessionState{InBuffer: parent.BValue}
-	session.SaveState(&newState)
-	objectType, err := session.GetByte()
-	if err != nil {
-		return err
-	}
-	ctl, err := session.GetInt(4, true, true)
-	if err != nil {
-		return err
-	}
-	if ctl == 0xFE {
-		_, err = session.GetInt(4, false, true)
+	if parent.parent == nil {
+		newState := network.SessionState{InBuffer: parent.BValue}
+		session.SaveState(&newState)
+		defer session.LoadState()
+		objectType, err := session.GetByte()
 		if err != nil {
 			return err
 		}
-	}
-	switch objectType {
-	case 0x88:
-		_ /*attribsLen*/, err := session.GetInt(2, true, true)
+		ctl, err := session.GetInt(4, true, true)
 		if err != nil {
 			return err
 		}
-
-		itemsLen, err := session.GetInt(2, false, true)
-		if err != nil {
-			return err
-		}
-		pars := make([]ParameterInfo, 0, itemsLen)
-		for x := 0; x < itemsLen; x++ {
-			var tempPar ParameterInfo
-			if parent.cusType.isRegularArray() {
-				tempPar = parent.cusType.attribs[0]
-			} else {
-				tempPar = parent.clone()
-			}
-
-			tempPar.Direction = parent.Direction
-			ctlByte, err := session.GetByte()
+		if ctl == 0xFE {
+			_, err = session.GetInt(4, false, true)
 			if err != nil {
 				return err
 			}
-			var objectBufferSize int
-			if ctlByte == 0xFE {
-				objectBufferSize, err = session.GetInt(4, false, true)
+		}
+		switch objectType {
+		case 0x88:
+			_ /*attribsLen*/, err := session.GetInt(2, true, true)
+			if err != nil {
+				return err
+			}
+
+			itemsLen, err := session.GetInt(2, false, true)
+			if err != nil {
+				return err
+			}
+			pars := make([]ParameterInfo, 0, itemsLen)
+			for x := 0; x < itemsLen; x++ {
+				var tempPar = parent.cusType.attribs[0]
+				//if parent.cusType.isRegularArray() {
+				//
+				//} else {
+				//	tempPar = parent.clone()
+				//}
+
+				tempPar.Direction = parent.Direction
+				if tempPar.DataType == XMLType {
+					ctlByte, err := session.GetByte()
+					if err != nil {
+						return err
+					}
+					var objectBufferSize int
+					if ctlByte == 0xFE {
+						objectBufferSize, err = session.GetInt(4, false, true)
+						if err != nil {
+							return err
+						}
+					} else {
+						objectBufferSize = int(ctlByte)
+					}
+					tempPar.BValue, err = session.GetBytes(objectBufferSize)
+					if err != nil {
+						return err
+					}
+					err = decodeObject(conn, &tempPar, temporaryLobs)
+				} else {
+					err = tempPar.decodePrimValue(conn, temporaryLobs, true)
+				}
 				if err != nil {
 					return err
 				}
+				pars = append(pars, tempPar)
+			}
+			parent.oPrimValue = pars
+		case 0x84:
+			//pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
+			// collect all attributes in one list
+			//pars := getUDTAttributes(parent.cusType, reflect.Value{})
+			pars := make([]ParameterInfo, 0, 10)
+			for _, attrib := range parent.cusType.attribs {
+				attrib.Direction = parent.Direction
+				attrib.parent = parent
+				// check if this an object or array and comming value is nil
+				if attrib.DataType == XMLType {
+					temp, err := session.Peek(1)
+					if err != nil {
+						return err
+
+					}
+					if temp[0] == 0xFD || temp[0] == 0xFF {
+						_, err = session.GetByte()
+						if err != nil {
+							return err
+						}
+					} else {
+						if attrib.cusType.isArray {
+							attrib.parent = nil
+							nb, err := session.GetByte()
+							if err != nil {
+								return err
+							}
+							var size int
+							switch nb {
+							case 0:
+								size = 0
+							case 0xFE:
+								size, err = session.GetInt(4, false, true)
+								if err != nil {
+									return err
+								}
+							default:
+								size = int(nb)
+							}
+							if size > 0 {
+								attrib.BValue, err = session.GetBytes(size)
+								if err != nil {
+									return err
+								}
+							}
+						}
+						err = decodeObject(conn, &attrib, temporaryLobs)
+						if err != nil {
+							return err
+						}
+					}
+				} else {
+					err := attrib.decodePrimValue(conn, temporaryLobs, true)
+					if err != nil {
+						return err
+					}
+				}
+				//err = attrib.decodePrimValue(conn, temporaryLobs, true)
+				//if err != nil {
+				//	return err
+				//}
+				pars = append(pars, attrib)
+			}
+			parent.oPrimValue = pars
+			//for index, _ := range pars {
+			//	pars[index].Direction = parent.Direction
+			//	pars[index].parent = parent
+			//	// if we get 0xFD this means null object
+			//	err = pars[index].decodePrimValue(conn, temporaryLobs, true)
+			//	if err != nil {
+			//		return err
+			//	}
+			//}
+			// fill pars in its place in sub types
+			//parent.oPrimValue, _ = putUDTAttributes(parent.cusType, pars, 0)
+		}
+	} else {
+		pars := make([]ParameterInfo, 0, 10)
+		for _, attrib := range parent.cusType.attribs {
+			attrib.Direction = parent.Direction
+			attrib.parent = parent
+			// check if this an object or array and comming value is nil
+			if attrib.DataType == XMLType {
+				temp, err := session.Peek(1)
+				if err != nil {
+					return err
+
+				}
+				if temp[0] == 0xFD || temp[0] == 0xFF {
+					_, err = session.GetByte()
+					if err != nil {
+						return err
+					}
+				} else {
+					if attrib.cusType.isArray {
+						attrib.parent = nil
+						nb, err := session.GetByte()
+						if err != nil {
+							return err
+						}
+						var size int
+						switch nb {
+						case 0:
+							size = 0
+						case 0xFE:
+							size, err = session.GetInt(4, false, true)
+							if err != nil {
+								return err
+							}
+						default:
+							size = int(nb)
+						}
+						if size > 0 {
+							attrib.BValue, err = session.GetBytes(size)
+							if err != nil {
+								return err
+							}
+						}
+					}
+					err = decodeObject(conn, &attrib, temporaryLobs)
+					if err != nil {
+						return err
+					}
+				}
 			} else {
-				objectBufferSize = int(ctlByte)
+				err := attrib.decodePrimValue(conn, temporaryLobs, true)
+				if err != nil {
+					return err
+				}
 			}
-			tempPar.BValue, err = session.GetBytes(objectBufferSize)
-			if err != nil {
-				return err
-			}
-			if parent.cusType.isRegularArray() {
-				err = tempPar.decodeParameterValue(conn, temporaryLobs)
-			} else {
-				err = decodeObject(conn, &tempPar, temporaryLobs)
-			}
-			if err != nil {
-				return err
-			}
-			pars = append(pars, tempPar)
+
+			pars = append(pars, attrib)
 		}
 		parent.oPrimValue = pars
-	case 0x84:
-		//pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
-		// collect all attributes in one list
-		pars := getUDTAttributes(parent.cusType, reflect.Value{})
-		for index, _ := range pars {
-			pars[index].Direction = parent.Direction
-			pars[index].parent = parent
-			err = pars[index].decodePrimValue(conn, temporaryLobs, true)
-			if err != nil {
-				return err
-			}
-		}
-		// fill pars in its place in sub types
-		parent.oPrimValue, _ = putUDTAttributes(parent.cusType, pars, 0)
 	}
-	_ = session.LoadState()
+
 	return nil
 }

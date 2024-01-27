@@ -701,25 +701,33 @@ func (session *Session) processMarker() error {
 	//}
 }
 
+func (session *Session) Peek(numBytes int) ([]byte, error) {
+	oldIndex := session.index
+	ret, err := session.read(numBytes)
+	session.index = oldIndex
+	return ret, err
+}
+
 // Read numBytes of data from input buffer if requested data is larger
 // than input buffer session will get the remaining from network stream
 func (session *Session) read(numBytes int) ([]byte, error) {
+	requiredLen := numBytes
+	tracer := session.Context.ConnOption.Tracer
 	for session.index+numBytes > len(session.inBuffer) {
 		pck, err := session.readPacket()
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
 				var breakErr error
-				session.Context.ConnOption.Tracer.Print("Read Timeout")
+				tracer.Print("Read Timeout")
 				pck, breakErr = session.BreakConnection()
 				if breakErr != nil {
 					//return nil, err
-					session.Context.ConnOption.Tracer.Print("Connection Break With Error: ", breakErr)
+					tracer.Print("Connection Break With Error: ", breakErr)
 					return nil, err
 				}
 			} else {
 				return nil, err
 			}
-
 		}
 
 		if session.IsBreak() {
@@ -744,7 +752,6 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 			return nil, fmt.Errorf("receive abnormal packet type %d instead of data packet", pck.getPacketType())
 		}
 		//pcks := []PacketInterface{pck}
-
 		//for _, pck := range pcks {
 		//	if dataPck, ok := pck.(*DataPacket); ok {
 		//		session.inBuffer = append(session.inBuffer, dataPck.buffer...)
@@ -790,6 +797,9 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 	//}
 	ret := session.inBuffer[session.index : session.index+numBytes]
 	session.index += numBytes
+	if len(ret) < requiredLen {
+		return nil, errors.New("buffer underrun during read operation")
+	}
 	return ret, nil
 }
 
@@ -1506,7 +1516,7 @@ func (session *Session) GetClr() (output []byte, err error) {
 	if err != nil {
 		return
 	}
-	if nb == 0 || nb == 0xFF {
+	if nb == 0 || nb == 0xFF || nb == 0xFD {
 		output = nil
 		err = nil
 		return
@@ -1727,6 +1737,16 @@ func (session *Session) WriteInt(buffer *bytes.Buffer, number interface{}, size 
 			buffer.Write(temp)
 		}
 	}
+}
+
+func (session *Session) WriteFixedClr(buffer *bytes.Buffer, data []byte) {
+	if len(data) > 0xFC {
+		buffer.WriteByte(0xFE)
+		session.WriteUint(buffer, len(data), 4, true, false)
+	} else {
+		buffer.WriteByte(uint8(len(data)))
+	}
+	buffer.Write(data)
 }
 
 func (session *Session) WriteClr(buffer *bytes.Buffer, data []byte) {

@@ -934,6 +934,26 @@ func (par *ParameterInfo) clone() ParameterInfo {
 	return tempPar
 }
 
+func (par *ParameterInfo) collectLocators() [][]byte {
+	switch value := par.iPrimValue.(type) {
+	case *Lob:
+		if value != nil && value.sourceLocator != nil {
+			return [][]byte{value.sourceLocator}
+		}
+	case *BFile:
+		if value != nil && value.lob.sourceLocator != nil {
+			return [][]byte{value.lob.sourceLocator}
+		}
+	case []ParameterInfo:
+		output := make([][]byte, 0, 10)
+		for _, temp := range value {
+			output = append(output, temp.collectLocators()...)
+		}
+		return output
+	}
+	return [][]byte{}
+}
+
 func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]byte, udt bool) error {
 	session := conn.session
 	var err error
@@ -981,17 +1001,26 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		if err != nil {
 			return err
 		}
-		_, err = session.GetInt(4, true, true)
+		var size int
+		size, err = session.GetInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetByte()
+		_, err = session.GetBytes(2) // 0x1 0x1
 		if err != nil {
 			return err
 		}
-		_, err = session.GetByte()
-		if err != nil {
-			return err
+		if size == 0 {
+			// the object is null
+			_, err = session.GetBytes(2) // 0x81 0x01
+			if err != nil {
+				return err
+			}
+			par.oPrimValue = nil
+			par.IsNull = true
+			return nil
+		} else {
+			par.IsNull = false
 		}
 	}
 	if par.DataType == ROWID {
@@ -1020,40 +1049,14 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 	if par.DataType == RAW && par.MaxLen == 0 {
 		return nil
 	}
-	if par.parent != nil && par.DataType == XMLType && par.cusType != nil && par.cusType.isArray {
-		nb, err := session.GetByte()
-		var size int
-		if err != nil {
-			return err
-		}
-		switch nb {
-		case 0:
-			fallthrough
-		case 0xFF:
-			size = 0
-		case 0xFE:
-			size, err = session.GetInt(4, false, true)
-			if err != nil {
-				return err
-			}
-		default:
-			size = int(nb)
-		}
-		if size > 0 {
-			par.BValue, err = session.GetBytes(size)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		par.BValue, err = session.GetClr()
-	}
+	par.BValue, err = session.GetClr()
 	if err != nil {
 		return err
 	}
 	if par.BValue == nil {
 		return nil
 	}
+	//}
 	switch par.DataType {
 	case NCHAR, CHAR, LONG:
 		strConv, err := conn.getStrConv(par.CharsetID)
@@ -1104,7 +1107,11 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			if strings.Contains(tempFloat, ".") {
 				par.oPrimValue, err = strconv.ParseFloat(tempFloat, 64)
 			} else {
-				par.oPrimValue, err = strconv.ParseInt(tempFloat, 10, 64)
+				if strings.Contains(tempFloat, "-") {
+					par.oPrimValue, err = strconv.ParseInt(tempFloat, 10, 64)
+				} else {
+					par.oPrimValue, err = strconv.ParseUint(tempFloat, 10, 64)
+				}
 			}
 		} else {
 			par.oPrimValue = converters.DecodeNumber(par.BValue)
@@ -1126,7 +1133,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			return err
 		}
 		par.oPrimValue = tempTime
-
 	case TimeStampeLTZ, TimeStampLTZ_DTY:
 		tempTime, err := converters.DecodeDate(par.BValue)
 		if err != nil {

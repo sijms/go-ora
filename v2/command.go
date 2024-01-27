@@ -373,11 +373,25 @@ func (stmt *Stmt) writePars() error {
 			session.WriteClr(&buffer, par.BValue)
 		} else {
 			if par.cusType != nil {
+				//fmt.Printf("%#v\n", par.ToID)
+				//session.WriteBytes(&buffer, 0x1, 0x24, 0x24, 0, 0x22, 0x2, 0x8)
+				//session.WriteBytes(&buffer, par.ToID...)
+				//session.WriteBytes(&buffer, bytes.Repeat([]byte{0}, 13)...)
+				//session.WriteBytes(&buffer, 1, 0, 1)
 				session.WriteBytes(&buffer, 0, 0, 0, 0)
+				//if bytes.Equal(par.BValue, []byte{0xFF}) {
+				//	par.BValue = []byte{0x88, 0x1, 3}
+				//}
 				size := len(par.BValue)
+				//if size == 1 && (bytes.Equal(par.BValue, []byte{0xFD}) || bytes.Equal(par.BValue, []byte{0xFF})) {
+				//	// null object
+				//	session.WriteBytes(&buffer, 0, 1, 1, 0x81, 1)
+				//
+				//} else {
 				session.WriteUint(&buffer, size, 4, true, true)
 				session.WriteBytes(&buffer, 1, 1)
 				session.WriteClr(&buffer, par.BValue)
+				//}
 			} else {
 				if par.MaxNoOfArrayElements > 0 {
 					if par.BValue == nil {
@@ -400,6 +414,10 @@ func (stmt *Stmt) writePars() error {
 
 // write stmt data to network stream
 func (stmt *Stmt) write() error {
+	// add temporay lobs first
+	for _, par := range stmt.Pars {
+		stmt.temporaryLobs = append(stmt.temporaryLobs, par.collectLocators()...)
+	}
 	session := stmt.connection.session
 	if !stmt.parse && !stmt.reSendParDef {
 		exeOf := 0
@@ -791,6 +809,9 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 								if err != nil {
 									return err
 								}
+								if stmt.Pars[x].DataType == XMLType && stmt.Pars[x].IsNull {
+									continue
+								}
 								_, err = session.GetInt(2, true, true)
 								if err != nil {
 									return err
@@ -1069,9 +1090,9 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	}
 	stmt.connection.connOption.Tracer.Printf("Free %d Temporary Lobs", len(stmt.temporaryLobs))
 	session := stmt.connection.session
-	defer func(input *[][]byte) {
-		*input = nil
-	}(&stmt.temporaryLobs)
+	//defer func(input *[][]byte) {
+	//	*input = nil
+	//}(&stmt.temporaryLobs)
 	freeTemp := func(locators [][]byte) {
 		totalLen := 0
 		for _, locator := range locators {
@@ -1091,6 +1112,7 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	session.ResetBuffer()
 	for start < len(stmt.temporaryLobs) {
 		end = start + 25000
+		//end = start + 25
 		if end > len(stmt.temporaryLobs) {
 			end = len(stmt.temporaryLobs)
 		}
@@ -1849,19 +1871,20 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						if err != nil {
 							return nil, err
 						}
-						switch value := par.iPrimValue.(type) {
-						case *Lob:
-							if value != nil && value.sourceLocator != nil {
-								stmt.temporaryLobs = append(stmt.temporaryLobs, value.sourceLocator)
-							}
-						case *BFile:
-							if value != nil && value.lob.sourceLocator != nil {
-								stmt.temporaryLobs = append(stmt.temporaryLobs, value.lob.sourceLocator)
-							}
-						case []ParameterInfo:
-							temp := collectLocators(value)
-							stmt.temporaryLobs = append(stmt.temporaryLobs, temp...)
-						}
+						stmt.temporaryLobs = append(stmt.temporaryLobs, par.collectLocators()...)
+						//switch value := par.iPrimValue.(type) {
+						//case *Lob:
+						//	if value != nil && value.sourceLocator != nil {
+						//		stmt.temporaryLobs = append(stmt.temporaryLobs, value.sourceLocator)
+						//	}
+						//case *BFile:
+						//	if value != nil && value.lob.sourceLocator != nil {
+						//		stmt.temporaryLobs = append(stmt.temporaryLobs, value.lob.sourceLocator)
+						//	}
+						//case []ParameterInfo:
+						//	temp := collectLocators(value)
+						//	stmt.temporaryLobs = append(stmt.temporaryLobs, temp...)
+						//}
 						if maxLen < par.MaxLen {
 							maxLen = par.MaxLen
 						}
@@ -1919,13 +1942,6 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			return nil, err
 		}
 	}
-	//defer func() {
-	//	err = stmt.freeTemporaryLobs()
-	//	if err != nil {
-	//		stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
-	//	}
-	//}()
-
 	session := stmt.connection.session
 	session.ResetBuffer()
 	err = stmt.write()
@@ -2109,19 +2125,20 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 		stmt.Pars = append(stmt.Pars, par)
 	}
 	// set temporary lobs
-	switch value := par.iPrimValue.(type) {
-	case *Lob:
-		if value != nil && value.sourceLocator != nil {
-			stmt.temporaryLobs = append(stmt.temporaryLobs, value.sourceLocator)
-		}
-	case *BFile:
-		if value != nil && value.lob.sourceLocator != nil {
-			stmt.temporaryLobs = append(stmt.temporaryLobs, value.lob.sourceLocator)
-		}
-	case []ParameterInfo:
-		temp := collectLocators(value)
-		stmt.temporaryLobs = append(stmt.temporaryLobs, temp...)
-	}
+
+	//switch value := par.iPrimValue.(type) {
+	//case *Lob:
+	//	if value != nil && value.sourceLocator != nil {
+	//		stmt.temporaryLobs = append(stmt.temporaryLobs, value.sourceLocator)
+	//	}
+	//case *BFile:
+	//	if value != nil && value.lob.sourceLocator != nil {
+	//		stmt.temporaryLobs = append(stmt.temporaryLobs, value.lob.sourceLocator)
+	//	}
+	//case []ParameterInfo:
+	//	temp := collectLocators(value)
+	//	stmt.temporaryLobs = append(stmt.temporaryLobs, temp...)
+	//}
 }
 
 // addParam
@@ -2270,6 +2287,7 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	//		stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
 	//	}
 	//}()
+
 	stmt.connection.session.ResetBuffer()
 	err = stmt.write()
 	if err != nil {

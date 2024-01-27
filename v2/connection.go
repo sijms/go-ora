@@ -1071,8 +1071,7 @@ func (conn *Connection) QueryRowContext(ctx context.Context, query string, args 
 	rows, err := stmt.QueryContext(ctx, args)
 	dataSet := rows.(*DataSet)
 	if err != nil {
-		dataSet.lasterr = err
-		return dataSet
+		return &DataSet{lasterr: err}
 	}
 	dataSet.Next_()
 	return dataSet

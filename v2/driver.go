@@ -109,68 +109,85 @@ func AddSessionParam(db *sql.DB, key, value string) error {
 	return nil
 }
 
-/*
-RegisterRegularTypeArray call this function to register array of regular type defined with
+//func RegisterRegularTypeArray(conn *sql.DB, regularTypeName, arrayTypeName string, itemMaxSize int) error {
+//	err := conn.Ping()
+//	if err != nil {
+//		return err
+//	}
+//
+//	if drv, ok := conn.Driver().(*OracleDriver); ok {
+//		return RegisterRegularTypeArrayWithOwner(conn, drv.UserId, regularTypeName, arrayTypeName, itemMaxSize)
+//	}
+//	return errors.New("the driver used is not a go-ora driver type")
+//}
+//func RegisterRegularTypeArrayWithOwner(conn *sql.DB, owner, regularTypeName, arrayTypeName string, itemMaxSize int) error {
+//	drv := conn.Driver().(*OracleDriver)
+//	regularTypeName = strings.TrimSpace(regularTypeName)
+//	arrayTypeName = strings.TrimSpace(arrayTypeName)
+//	if len(regularTypeName) == 0 {
+//		return errors.New("typeName shouldn't be empty")
+//	}
+//	if len(arrayTypeName) == 0 {
+//		return errors.New("array type name shouldn't be empty")
+//	}
+//	cust := customType{
+//		owner:         owner,
+//		name:          regularTypeName,
+//		arrayTypeName: arrayTypeName,
+//		isArray:       true,
+//	}
+//	var err error
+//	cust.arrayTOID, err = getTOID2(conn, owner, arrayTypeName)
+//	if err != nil {
+//		return err
+//	}
+//	param := ParameterInfo{Direction: Input, Flag: 3, TypeName: regularTypeName, MaxLen: 1, MaxCharLen: 1}
+//	switch strings.ToUpper(regularTypeName) {
+//	case "NUMBER":
+//		param.DataType = NUMBER
+//	case "VARCHAR2":
+//		param.DataType = NCHAR
+//		param.CharsetForm = 1
+//		param.ContFlag = 16
+//		param.CharsetID = drv.sStrConv.GetLangID()
+//	case "NVARCHAR2":
+//		param.DataType = NCHAR
+//		param.CharsetForm = 2
+//		param.ContFlag = 16
+//		param.CharsetID = drv.nStrConv.GetLangID()
+//	case "TIMESTAMP":
+//		param.DataType = TimeStampDTY
+//	case "DATE":
+//		param.DataType = DATE
+//	case "TIMESTAMP WITH LOCAL TIME ZONE":
+//		param.DataType = TimeStampLTZ_DTY
+//	//case "TIMESTAMP WITH TIME ZONE":
+//	//	param.DataType = TimeStampTZ_DTY
+//	//	param.MaxLen = converters.MAX_LEN_TIMESTAMP
+//	case "RAW":
+//		param.DataType = RAW
+//	case "BLOB":
+//		param.DataType = OCIBlobLocator
+//	case "CLOB":
+//		param.DataType = OCIClobLocator
+//		param.CharsetForm = 1
+//		param.ContFlag = 16
+//		param.CharsetID = drv.sStrConv.GetLangID()
+//	case "NCLOB":
+//		param.DataType = OCIClobLocator
+//		param.CharsetForm = 2
+//		param.ContFlag = 16
+//		param.CharsetID = drv.nStrConv.GetLangID()
+//	default:
+//		return fmt.Errorf("unsupported regular type: %s", regularTypeName)
+//	}
+//	cust.attribs = append(cust.attribs, param)
+//	drv.mu.Lock()
+//	defer drv.mu.Unlock()
+//	drv.cusTyp[strings.ToUpper(arrayTypeName)] = cust
+//	return nil
+//}
 
-sql: create or replace TYPE SLICE AS TABLE OF varchar2(500)
-
-in the above example regularTypeName: VARCHAR2 arrayTypeName: SLICE and itemMaxSize: 500
-*/
-func RegisterRegularTypeArray(conn *sql.DB, regularTypeName, arrayTypeName string, itemMaxSize int) error {
-	err := conn.Ping()
-	if err != nil {
-		return err
-	}
-
-	if drv, ok := conn.Driver().(*OracleDriver); ok {
-		return RegisterRegularTypeArrayWithOwner(conn, drv.UserId, regularTypeName, arrayTypeName, itemMaxSize)
-	}
-	return errors.New("the driver used is not a go-ora driver type")
-}
-
-/*RegisterRegularTypeArrayWithOwner same as RegisterRegularTypeArray in addition to define type owner */
-func RegisterRegularTypeArrayWithOwner(conn *sql.DB, owner, regularTypeName, arrayTypeName string, itemMaxSize int) error {
-	drv := conn.Driver().(*OracleDriver)
-	regularTypeName = strings.TrimSpace(regularTypeName)
-	arrayTypeName = strings.TrimSpace(arrayTypeName)
-	if len(regularTypeName) == 0 {
-		return errors.New("typeName shouldn't be empty")
-	}
-	if len(arrayTypeName) == 0 {
-		return errors.New("array type name shouldn't be empty")
-	}
-	cust := customType{
-		owner:         owner,
-		name:          regularTypeName,
-		arrayTypeName: arrayTypeName,
-		isArray:       true,
-	}
-	var err error
-	cust.arrayTOID, err = getTOID2(conn, owner, arrayTypeName)
-	if err != nil {
-		return err
-	}
-	param := ParameterInfo{Direction: Input, Flag: 3, TypeName: regularTypeName}
-	switch strings.ToUpper(regularTypeName) {
-	case "VARCHAR2":
-		if itemMaxSize == 0 {
-			return errors.New("item max size should be entered for varchar type")
-		}
-		param.DataType = NCHAR
-		param.CharsetForm = 1
-		param.ContFlag = 16
-		param.MaxCharLen = itemMaxSize
-		param.CharsetID = drv.sStrConv.GetLangID()
-		param.MaxLen = itemMaxSize
-		cust.attribs = append(cust.attribs, param)
-	default:
-		return fmt.Errorf("unsupported regular type: %s", regularTypeName)
-	}
-	drv.mu.Lock()
-	defer drv.mu.Unlock()
-	drv.cusTyp[strings.ToUpper(arrayTypeName)] = cust
-	return nil
-}
 func RegisterType(conn *sql.DB, typeName, arrayTypeName string, typeObj interface{}) error {
 	// ping first to avoid error when calling register type after open connection
 	err := conn.Ping()
@@ -188,12 +205,14 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 	if len(owner) == 0 {
 		return errors.New("owner can't be empty")
 	}
-	if drv, ok := conn.Driver().(*OracleDriver); ok {
+	drv := conn.Driver().(*OracleDriver)
 
-		if typeObj == nil {
-			return errors.New("type object cannot be nil")
-		}
-		typ := reflect.TypeOf(typeObj)
+	//if typeObj == nil {
+	//	return errors.New("type object cannot be nil")
+	//}
+	var typ reflect.Type
+	if typeObj != nil {
+		typ = reflect.TypeOf(typeObj)
 		switch typ.Kind() {
 		case reflect.Ptr:
 			return errors.New("unsupported type object: Ptr")
@@ -206,19 +225,61 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 		case reflect.Slice:
 			return errors.New("unsupported type object: Slice")
 		}
-		typeName = strings.TrimSpace(typeName)
-		arrayTypeName = strings.TrimSpace(arrayTypeName)
+	}
+	typeName = strings.TrimSpace(typeName)
+	arrayTypeName = strings.TrimSpace(arrayTypeName)
+	if len(typeName) == 0 {
+		return errors.New("typeName shouldn't be empty")
+	}
 
-		cust := customType{
-			owner:         owner,
-			name:          typeName,
-			arrayTypeName: arrayTypeName,
-			typ:           typ,
-			arrayTOID:     nil,
-		}
-		var err error
-		if len(typeName) == 0 {
-			return errors.New("typeName shouldn't be empty")
+	cust := customType{
+		owner: owner,
+		name:  typeName,
+		//arrayTypeName: arrayTypeName,
+		typ: typ,
+	}
+	arrayCust := customType{owner: owner, name: arrayTypeName, isArray: true}
+	var err error
+	arrayParam := ParameterInfo{Direction: Input, Flag: 3, TypeName: typeName, MaxLen: 1, MaxCharLen: 1}
+	switch strings.ToUpper(typeName) {
+	case "NUMBER":
+		arrayParam.DataType = NUMBER
+	case "VARCHAR2":
+		arrayParam.DataType = NCHAR
+		arrayParam.CharsetForm = 1
+		arrayParam.ContFlag = 16
+		arrayParam.CharsetID = drv.sStrConv.GetLangID()
+	case "NVARCHAR2":
+		arrayParam.DataType = NCHAR
+		arrayParam.CharsetForm = 2
+		arrayParam.ContFlag = 16
+		arrayParam.CharsetID = drv.nStrConv.GetLangID()
+	case "TIMESTAMP":
+		arrayParam.DataType = TimeStampDTY
+	case "DATE":
+		arrayParam.DataType = DATE
+	case "TIMESTAMP WITH LOCAL TIME ZONE":
+		arrayParam.DataType = TimeStampLTZ_DTY
+	//case "TIMESTAMP WITH TIME ZONE":
+	//	arrayParam.DataType = TimeStampTZ_DTY
+	//	arrayParam.MaxLen = converters.MAX_LEN_TIMESTAMP
+	case "RAW":
+		arrayParam.DataType = RAW
+	case "BLOB":
+		arrayParam.DataType = OCIBlobLocator
+	case "CLOB":
+		arrayParam.DataType = OCIClobLocator
+		arrayParam.CharsetForm = 1
+		arrayParam.ContFlag = 16
+		arrayParam.CharsetID = drv.sStrConv.GetLangID()
+	case "NCLOB":
+		arrayParam.DataType = OCIClobLocator
+		arrayParam.CharsetForm = 2
+		arrayParam.ContFlag = 16
+		arrayParam.CharsetID = drv.nStrConv.GetLangID()
+	default:
+		if cust.typ == nil {
+			return errors.New("type object cannot be nil")
 		}
 		if typ.Kind() != reflect.Struct {
 			return errors.New("type object should be of structure type")
@@ -227,12 +288,6 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 		cust.toid, err = getTOID2(conn, owner, typeName)
 		if err != nil {
 			return err
-		}
-		if len(cust.arrayTypeName) > 0 {
-			cust.arrayTOID, err = getTOID2(conn, owner, arrayTypeName)
-			if err != nil {
-				return err
-			}
 		}
 		sqlText := `SELECT ATTR_NAME, ATTR_TYPE_NAME, LENGTH, ATTR_NO 
 					FROM ALL_TYPE_ATTRS 
@@ -275,10 +330,17 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 				param.CharsetID = drv.nStrConv.GetLangID()
 				param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
 			case "TIMESTAMP":
-				fallthrough
+				param.DataType = TimeStampDTY
+				param.MaxLen = converters.MAX_LEN_DATE
 			case "DATE":
 				param.DataType = DATE
-				param.MaxLen = 11
+				param.MaxLen = converters.MAX_LEN_DATE
+			case "TIMESTAMP WITH LOCAL TIME ZONE":
+				param.DataType = TimeStampLTZ_DTY
+				param.MaxLen = converters.MAX_LEN_DATE
+			case "TIMESTAMP WITH TIME ZONE":
+				param.DataType = TimeStampTZ_DTY
+				param.MaxLen = converters.MAX_LEN_TIMESTAMP
 			case "RAW":
 				param.DataType = RAW
 				param.MaxLen = int(length.Int64)
@@ -304,22 +366,21 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 				for name, value := range drv.cusTyp {
 					if strings.EqualFold(name, attTypeName.String) {
 						found = true
-						//param.DataType = XMLType
+						param.DataType = XMLType
 						param.cusType = new(customType)
 						*param.cusType = value
-						param.cusType.isArray = false
 						param.ToID = value.toid
 						break
 					}
-					if strings.EqualFold(value.arrayTypeName, attTypeName.String) {
-						found = true
-						param.cusType = new(customType)
-						param.DataType = XMLType
-						*param.cusType = value
-						param.cusType.isArray = true
-						param.ToID = value.arrayTOID
-						break
-					}
+					//if strings.EqualFold(value.arrayTypeName, attTypeName.String) {
+					//	found = true
+					//	param.cusType = new(customType)
+					//	param.DataType = XMLType
+					//	*param.cusType = value
+					//	param.cusType.isArray = true
+					//	param.ToID = value.arrayTOID
+					//	break
+					//}
 				}
 				if !found {
 					return fmt.Errorf("unsupported attribute type: %s", attTypeName.String)
@@ -330,11 +391,26 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 		if len(cust.attribs) == 0 {
 			return fmt.Errorf("unknown or empty type: %s", typeName)
 		}
+		arrayParam.DataType = XMLType
+		arrayParam.cusType = new(customType)
+		*arrayParam.cusType = cust
+
 		cust.loadFieldMap()
 		drv.mu.Lock()
-		defer drv.mu.Unlock()
 		drv.cusTyp[strings.ToUpper(typeName)] = cust
-		return nil
+		drv.mu.Unlock()
 	}
-	return errors.New("the driver used is not a go-ora driver type")
+	if len(arrayTypeName) > 0 {
+		var err error
+		arrayCust.toid, err = getTOID2(conn, owner, arrayTypeName)
+		if err != nil {
+			return err
+		}
+		arrayCust.attribs = append(arrayCust.attribs, arrayParam)
+		drv.mu.Lock()
+		drv.cusTyp[strings.ToUpper(arrayTypeName)] = arrayCust
+		drv.mu.Unlock()
+	}
+
+	return nil
 }

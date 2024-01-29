@@ -69,7 +69,7 @@ func TestNestedUDTArray(t *testing.T) {
 			return fmt.Errorf("expected child2.Name: %s and got: %s at index: %d",
 				fmt.Sprintf("child2_%d%s", index+1, extraText), input.Name, index)
 		}
-		if !isEqualTime(input.Date, refDate) {
+		if !isEqualTime(input.Date, refDate, false) {
 			return fmt.Errorf("expected child2.Date: %v and got: %v at index: %d",
 				refDate, input.Date, index)
 		}

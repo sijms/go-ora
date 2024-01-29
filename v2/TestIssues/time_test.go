@@ -36,16 +36,16 @@ CREATE TABLE TTB_TIME(
 		if err != nil {
 			return err
 		}
-		if !isEqualTime(date1, date) {
+		if !isEqualTime(date1, date, false) {
 			return fmt.Errorf("date value expected %v and got %v", date, date1)
 		}
-		if !isEqualTime(date2, date) {
+		if !isEqualTime(date2, date, true) {
 			return fmt.Errorf("timestamp value expected %v and got %v", date, date2)
 		}
-		if !isEqualTime(date3, date.In(loc)) {
+		if !isEqualTime(date3, date.In(loc), true) {
 			return fmt.Errorf("timestamp with time zone value expected %v and got %v", date.In(loc), date3)
 		}
-		if !isEqualTime(date4, date) {
+		if !isEqualTime(date4.In(time.Local), date, true) {
 			return fmt.Errorf("timestamp with local time zone expected %v and got %v", date, date4)
 		}
 		return nil

@@ -520,16 +520,16 @@ passing typeName, arrayTypeName (for that type or empty) and empty instance of s
 > * driver support nested type start from (v2.8.5)
 > * for array of regular type (v2.8.7) pass regular type name, arrayTypeName and nil for object instance
 > * regular type supported
->  * number
->  * varchar2
->  * nvarchar2
->  * date
->  * timestamp
->  * timestamp with local time zone
->  * RAW
->  * BLOB
->  * CLOB
->  * NCLOB
+>   * number
+>   * varchar2
+>   * nvarchar2
+>   * date
+>   * timestamp
+>   * timestamp with local time zone
+>   * RAW
+>   * BLOB
+>   * CLOB
+>   * NCLOB
 > * to pass oracle object as a parameter efficiently use `go_ora.Object{Owner: owner, Name: name, Value: val}`
 > * regular type array should be passed wrapped inside go_ora.Object otherwise it will be interpreted as associative array
 > * complete code is found in 

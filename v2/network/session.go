@@ -396,7 +396,7 @@ func (session *Session) BreakConnection(discardRemaining bool) (PacketInterface,
 			return nil, err
 		}
 	}
-	return session.readPacket()
+	return nil, errors.New("connection break")
 	//session.ResetBuffer()
 	//if done {
 	//	err = session.writePacket(newMarkerPacket(2, session.Context))

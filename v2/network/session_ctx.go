@@ -43,7 +43,7 @@ func NewSessionContext(connOption *ConnectionOption) *SessionContext {
 		TransportDataUnit: connOption.TransportDataUnitSize,
 		Version:           317,
 		LoVersion:         300,
-		Options:           1 | 1024 | 2048, /*1024 for urgent data transport*/
+		Options:           1 | 1024&^connOption.DisableUrgentDataTransport | 2048, /*1024 for urgent data transport*/
 		OurOne:            1,
 		ConnOption:        connOption,
 	}

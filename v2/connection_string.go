@@ -620,6 +620,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			if err != nil {
 				return nil, err
 			}
+		case "DISABLE URGENT DATA TRANSPORT":
+			ret.connOption.DisableUrgentDataTransport = 1024
 		default:
 			return nil, fmt.Errorf("unknown URL option: %s", key)
 			//else if tempVal == "IMPLICIT" || tempVal == "AUTO" {

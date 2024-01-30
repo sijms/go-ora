@@ -99,6 +99,7 @@ type Connection struct {
 	}
 	bad       bool
 	dbTimeLoc *time.Location
+	disconnect chan struct{}
 }
 
 type OracleConnector struct {
@@ -414,6 +415,17 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		}
 	}
 	session := conn.session
+
+	conn.disconnect = make(chan struct{})
+	go func() {
+		select {
+		case <-conn.disconnect:
+			return
+		case <-ctx.Done():
+			_, _ = session.BreakConnection(false)
+		}
+	}()
+
 	err := session.Connect(ctx)
 	if err != nil {
 		return err
@@ -559,6 +571,11 @@ func (conn *Connection) Close() (err error) {
 	conn.State = Closed
 	conn.connOption.Tracer.Print("Connection Closed")
 	_ = conn.connOption.Tracer.Close()
+
+	if conn.disconnect != nil {
+		close(conn.disconnect)
+	}
+
 	return
 }
 

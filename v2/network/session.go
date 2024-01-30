@@ -368,7 +368,7 @@ func (session *Session) RestoreIndex() bool {
 }
 
 // BreakConnection elicit connetion break to cancel the current operation
-func (session *Session) BreakConnection() (PacketInterface, error) {
+func (session *Session) BreakConnection(discardRemaining bool) (PacketInterface, error) {
 	tracer := session.Context.ConnOption.Tracer
 	tracer.Print("Break Connection")
 	session.breakConn = true
@@ -378,7 +378,7 @@ func (session *Session) BreakConnection() (PacketInterface, error) {
 	done := false
 
 	// first discard remaining bytes
-	if session.remainingBytes > 0 {
+	if discardRemaining && session.remainingBytes > 0 {
 		_, err = session.readPacket()
 		if err != nil {
 			return nil, err
@@ -719,7 +719,7 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
 				var breakErr error
 				tracer.Print("Read Timeout")
-				pck, breakErr = session.BreakConnection()
+				pck, breakErr = session.BreakConnection(true)
 				if breakErr != nil {
 					//return nil, err
 					tracer.Print("Connection Break With Error: ", breakErr)
@@ -986,7 +986,11 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return nil, err
 	case MARKER:
-		return newMarkerPacketFromData(packetData, session.Context), nil
+		mp := newMarkerPacketFromData(packetData, session.Context)
+		if session.IsBreak() {
+			return mp, errors.New("connection break " + string(packetData))
+		}
+		return mp, nil
 		//switch pck.markerType {
 		//case 0:
 		//	session.breakConn = true

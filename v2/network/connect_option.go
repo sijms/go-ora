@@ -71,11 +71,12 @@ type ConnectionOption struct {
 	DatabaseInfo
 	SessionInfo
 	AdvNegoSeviceInfo
-	Tracer       trace.Tracer
-	PrefetchRows int
-	Failover     int
-	RetryTime    int
-	Lob          int
+	Tracer                     trace.Tracer
+	PrefetchRows               int
+	Failover                   int
+	RetryTime                  int
+	Lob                        int
+	DisableUrgentDataTransport uint16
 }
 
 func extractServers(connStr string) ([]ServerAddr, error) {

@@ -99,7 +99,6 @@ type Connection struct {
 	}
 	bad       bool
 	dbTimeLoc *time.Location
-	disconnect chan struct{}
 }
 
 type OracleConnector struct {
@@ -266,7 +265,8 @@ func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
 func (conn *Connection) Ping(ctx context.Context) error {
 	conn.connOption.Tracer.Print("Ping")
 	conn.session.ResetBuffer()
-	conn.session.StartContext(ctx)
+	done := conn.session.StartContext(ctx)
+	defer close(done)
 	defer conn.session.EndContext()
 	return (&simpleObject{
 		connection:  conn,
@@ -416,16 +416,6 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	session := conn.session
 
-	conn.disconnect = make(chan struct{})
-	go func() {
-		select {
-		case <-conn.disconnect:
-			return
-		case <-ctx.Done():
-			_, _ = session.BreakConnection(false)
-		}
-	}()
-
 	err := session.Connect(ctx)
 	if err != nil {
 		return err
@@ -571,10 +561,6 @@ func (conn *Connection) Close() (err error) {
 	conn.State = Closed
 	conn.connOption.Tracer.Print("Connection Closed")
 	_ = conn.connOption.Tracer.Close()
-
-	if conn.disconnect != nil {
-		close(conn.disconnect)
-	}
 
 	return
 }
@@ -1068,6 +1054,7 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 
 func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	stmt := NewStmt(query, conn)
+
 	stmt.autoClose = true
 	result, err := stmt.ExecContext(ctx, args)
 	if err != nil {
@@ -1119,7 +1106,8 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 		return nil, driver.ErrBadConn
 	}
 	conn.connOption.Tracer.Print("Prepare With Context\n", query)
-	conn.session.StartContext(ctx)
+	done := conn.session.StartContext(ctx)
+	defer close(done)
 	defer conn.session.EndContext()
 	return NewStmt(query, conn), nil
 }

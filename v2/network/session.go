@@ -179,9 +179,22 @@ func (session *Session) ResetBuffer() {
 	session.resetRead()
 }
 
-func (session *Session) StartContext(ctx context.Context) {
+func (session *Session) StartContext(ctx context.Context) chan struct{} {
 	session.oldCtx = session.ctx
 	session.ctx = ctx
+
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-done:
+			return
+		case <-ctx.Done():
+			if err := session.BreakConnection(false); err != nil {
+				fmt.Println(err)
+			}
+		}
+	}()
+	return done
 }
 func (session *Session) EndContext() {
 	session.ctx = session.oldCtx
@@ -368,7 +381,7 @@ func (session *Session) RestoreIndex() bool {
 }
 
 // BreakConnection elicit connetion break to cancel the current operation
-func (session *Session) BreakConnection(discardRemaining bool) (PacketInterface, error) {
+func (session *Session) BreakConnection(discardRemaining bool) error {
 	tracer := session.Context.ConnOption.Tracer
 	tracer.Print("Break Connection")
 	session.breakConn = true
@@ -381,22 +394,23 @@ func (session *Session) BreakConnection(discardRemaining bool) (PacketInterface,
 	if discardRemaining && session.remainingBytes > 0 {
 		_, err = session.readPacket()
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	if session.Context.NegotiatedOptions&0x400 > 0 {
 		done, err = sendOOB(session.conn)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	if !done {
 		err = session.writePacket(newMarkerPacket(marker_type_interrupt, session.Context))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return nil, errors.New("connection break")
+
+	return nil
 	//session.ResetBuffer()
 	//if done {
 	//	err = session.writePacket(newMarkerPacket(2, session.Context))
@@ -427,7 +441,8 @@ func (session *Session) BreakConnection(discardRemaining bool) (PacketInterface,
 // then send connect packet to the server and
 // receive either accept, redirect or refuse packet
 func (session *Session) Connect(ctx context.Context) error {
-	session.StartContext(ctx)
+	done := session.StartContext(ctx)
+	defer close(done)
 	defer session.EndContext()
 	connOption := session.Context.ConnOption
 	session.Disconnect()
@@ -719,7 +734,7 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
 				var breakErr error
 				tracer.Print("Read Timeout")
-				pck, breakErr = session.BreakConnection(true)
+				breakErr = session.BreakConnection(true)
 				if breakErr != nil {
 					//return nil, err
 					tracer.Print("Connection Break With Error: ", breakErr)
@@ -923,6 +938,13 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	packetData := session.lastPacket.Bytes()
 	pckType := PacketType(packetData[4])
 	flag := packetData[5]
+
+	//pc, _, _, ok := runtime.Caller(1)
+	//details := runtime.FuncForPC(pc)
+	//if ok {
+	//	fmt.Println("packet type", pckType, details.Name())
+	//}
+
 	session.isFinalPacketRead = flag&0x20 > 0
 	//log.Printf("Response: %#v\n\n", packetData)
 	switch pckType {
@@ -987,9 +1009,9 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		return nil, err
 	case MARKER:
 		mp := newMarkerPacketFromData(packetData, session.Context)
-		if session.IsBreak() {
-			return mp, errors.New("connection break " + string(packetData))
-		}
+		//if session.IsBreak() {
+		//	return mp, errors.New("### connection break " + string(packetData))
+		//}
 		return mp, nil
 		//switch pck.markerType {
 		//case 0:

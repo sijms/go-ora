@@ -1258,7 +1258,8 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	}
 	tracer := stmt.connection.connOption.Tracer
 	tracer.Printf("Exec With Context:")
-	stmt.connection.session.StartContext(ctx)
+	done := stmt.connection.session.StartContext(ctx)
+	defer close(done)
 	defer stmt.connection.session.EndContext()
 	tracer.Printf("Exec:\n%s", stmt.text)
 	stmt.arrayBindCount = 0
@@ -2261,7 +2262,8 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	tracer := stmt.connection.connOption.Tracer
 	tracer.Print("Query With Context:", stmt.text)
 
-	stmt.connection.session.StartContext(ctx)
+	done := stmt.connection.session.StartContext(ctx)
+	defer close(done)
 	defer stmt.connection.session.EndContext()
 	return stmt.Query_(namedArgs)
 }

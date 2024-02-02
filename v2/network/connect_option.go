@@ -28,6 +28,7 @@ type ClientInfo struct {
 	DriverName  string
 	PID         int
 	UseKerberos bool
+	EnableOOB   bool
 	Language    string
 	Territory   string
 	CharsetID   int

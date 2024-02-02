@@ -38,13 +38,17 @@ type SessionContext struct {
 }
 
 func NewSessionContext(connOption *ConnectionOption) *SessionContext {
-	return &SessionContext{
+	ctx := &SessionContext{
 		SessionDataUnit:   connOption.SessionDataUnitSize,
 		TransportDataUnit: connOption.TransportDataUnitSize,
 		Version:           317,
 		LoVersion:         300,
-		Options:           1 | 1024 | 2048, /*1024 for urgent data transport*/
+		Options:           1 | 2048, /*1024 for urgent data transport*/
 		OurOne:            1,
 		ConnOption:        connOption,
 	}
+	if connOption.EnableOOB {
+		ctx.Options |= 1024
+	}
+	return ctx
 }

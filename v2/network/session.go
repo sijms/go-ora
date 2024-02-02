@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"database/sql/driver"
 	"encoding/binary"
 	"encoding/pem"
 	"errors"
@@ -981,6 +982,11 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			if session.Context.ConnOption.SSL && (dataPck.dataFlag&0x8000 > 0 || dataPck.flag&0x80 > 0) {
 				session.negotiate()
 				session.reader = bufio.NewReaderSize(session.sslConn, read_buffer_size)
+			}
+			if dataPck.dataFlag == 0x40 {
+				// close connection
+				session.Disconnect()
+				err = driver.ErrBadConn
 			}
 			session.inBuffer = append(session.inBuffer, dataPck.buffer...)
 		}

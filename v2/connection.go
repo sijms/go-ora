@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/trace"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -319,58 +321,33 @@ func (conn *Connection) getStrConv(charsetID int) (converters.IStringConverter, 
 //	return conn.strConv.Encode(text)
 //}
 
-//func (conn *Connection) Logoff() error {
-//	conn.connOption.Tracer.Print("Logoff")
-//	session := conn.session
-//	session.ResetBuffer()
-//	session.PutBytes(0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11, 0x1, 0, 0, 0, 0x1, 0, 0, 0, 0, 0, 0x1, 0, 0, 0, 0, 0,
-//		3, 9, 0)
-//	err := session.Write()
-//	if err != nil {
-//		return err
-//	}
-//	loop := true
-//	for loop {
-//		msg, err := session.GetByte()
-//		if err != nil {
-//			return err
-//		}
-//		switch msg {
-//		case 4:
-//			session.Summary, err = network.NewSummary(session)
-//			if err != nil {
-//				return err
-//			}
-//			loop = false
-//		case 9:
-//			if session.HasEOSCapability {
-//				if session.Summary == nil {
-//					session.Summary = new(network.SummaryObject)
-//				}
-//				session.Summary.EndOfCallStatus, err = session.GetInt(4, true, true)
-//				if err != nil {
-//					return err
-//				}
-//			}
-//			if session.HasFSAPCapability {
-//				if session.Summary == nil {
-//					session.Summary = new(network.SummaryObject)
-//				}
-//				session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
-//				if err != nil {
-//					return err
-//				}
-//			}
-//			loop = false
-//		default:
-//			return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 4, 9", msg))
-//		}
-//	}
-//	if session.HasError() {
-//		return errors.New(session.GetError())
-//	}
-//	return nil
-//}
+func (conn *Connection) Logoff() error {
+	conn.connOption.Tracer.Print("Logoff")
+	session := conn.session
+	session.ResetBuffer()
+	//session.PutBytes(0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11, 0x1, 0, 0, 0, 0x1, 0, 0, 0, 0, 0, 0x1, 0, 0, 0, 0, 0,
+	//	3, 9, 0)
+	session.PutBytes(3, 9, 0)
+	err := session.Write()
+	if err != nil {
+		return err
+	}
+	loop := true
+	for loop {
+		msg, err := session.GetByte()
+		if err != nil {
+			return err
+		}
+		err = conn.readResponse(msg)
+		if err != nil {
+			return err
+		}
+		if msg == 4 || msg == 9 {
+			loop = false
+		}
+	}
+	return nil
+}
 
 // Open the connection = bring it online
 func (conn *Connection) Open() error {
@@ -395,6 +372,18 @@ func (conn *Connection) Open() error {
 
 // OpenWithContext open the connection with timeout context
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
+	if len(conn.conStr.traceDir) > 0 {
+		if err := os.MkdirAll(conn.conStr.traceDir, os.ModePerm); err == nil {
+			now := time.Now()
+			traceFileName := fmt.Sprintf("traces/trace_%d_%02d_%02d_%02d_%02d_%02d_%d.log",
+				now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(),
+				now.Nanosecond())
+			if tr, err := os.Create(traceFileName); err == nil {
+				conn.connOption.Tracer = trace.NewTraceWriter(tr)
+			}
+		}
+
+	}
 	tracer := conn.connOption.Tracer
 	switch conn.conStr.DBAPrivilege {
 	case SYSDBA:
@@ -545,13 +534,17 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 
 // Close the connection by disconnect network session
 func (conn *Connection) Close() (err error) {
-	conn.connOption.Tracer.Print("Close")
+	tracer := conn.connOption.Tracer
+	tracer.Print("Close")
 	//var err error = nil
 	if conn.session != nil {
-		//err = conn.Logoff()
+		err = conn.Logoff()
+		if err != nil {
+			tracer.Print("Logoff with error: ", err)
+		}
 		err = conn.session.WriteFinalPacket()
 		if err != nil {
-			return err
+			tracer.Print("Write Final Packet With Error: ", err)
 		}
 		conn.session.Disconnect()
 		conn.session = nil

@@ -306,24 +306,6 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	ret.scnForSnapshot = make([]int, 2)
 	// get stmt type
 	uCmdText := strings.ToUpper(refineSqlText(text))
-	//for {
-	//	uCmdText = strings.TrimSpace(uCmdText) // trim leading white-space
-	//	if strings.HasPrefix(uCmdText, "--") {
-	//		i := strings.Index(uCmdText, "\n")
-	//		if i <= 0 {
-	//			break
-	//		}
-	//		uCmdText = uCmdText[i+1:]
-	//	} else if strings.HasPrefix(uCmdText, "/*") {
-	//		i := strings.Index(uCmdText, "*/")
-	//		if i <= 0 {
-	//			break
-	//		}
-	//		uCmdText = uCmdText[i+2:]
-	//	} else {
-	//		break
-	//	}
-	//}
 	if strings.HasPrefix(uCmdText, "(") {
 		uCmdText = uCmdText[1:]
 	}

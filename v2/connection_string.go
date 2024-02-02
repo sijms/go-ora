@@ -337,6 +337,7 @@ type ConnectionString struct {
 	DBAPrivilege DBAPrivilege
 	password     string
 	Trace        string // Trace file
+	traceDir     string
 	WalletPath   string
 	walletPass   string
 	w            *wallet
@@ -575,6 +576,18 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			ret.connOption.SessionInfo.Timeout = time.Second * time.Duration(to)
 		case "TRACE FILE":
 			ret.Trace = val[0]
+		case "TRACE DIR":
+			fallthrough
+		case "TRACE FOLDER":
+			fallthrough
+		case "TRACE DIRECTORY":
+			ret.traceDir = val[0]
+		case "USE_OOB":
+			fallthrough
+		case "ENABLE_OOB":
+			fallthrough
+		case "ENABLE URGENT DATA TRANSPORT":
+			ret.connOption.EnableOOB = true
 		case "PREFETCH_ROWS":
 			ret.connOption.PrefetchRows, err = strconv.Atoi(val[0])
 			if err != nil {

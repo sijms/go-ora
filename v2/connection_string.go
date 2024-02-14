@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -633,6 +634,8 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			if err != nil {
 				return nil, err
 			}
+		case "PROGRAM":
+			ret.connOption.ClientInfo.ProgramName = val[0]
 		default:
 			return nil, fmt.Errorf("unknown URL option: %s", key)
 			//else if tempVal == "IMPLICIT" || tempVal == "AUTO" {
@@ -828,13 +831,11 @@ func (connStr *ConnectionString) validate() error {
 		}
 	}
 	connStr.connOption.HostName, _ = os.Hostname()
-	idx = strings.LastIndex(os.Args[0], "/")
-	idx++
-	if idx < 0 {
-		idx = 0
-	}
+
 	connStr.connOption.ProgramPath = os.Args[0]
-	connStr.connOption.ProgramName = os.Args[0][idx:]
+	if connStr.connOption.ProgramName == "" {
+		connStr.connOption.ProgramName = filepath.Base(os.Args[0])
+	}
 	connStr.connOption.DriverName = "OracleClientGo"
 	connStr.connOption.PID = os.Getpid()
 	return nil

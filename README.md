@@ -647,6 +647,8 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 data size increased from 32KB to 1GB
 * fix issue in bulk insert when pass data types
 * add `lob fetch=stream` which is equal to `lob fetch=post`
+* testing file [prefetch large blob](https://github.com/sijms/go-ora/blob/v2.8.8/v2/TestIssues/prefetch_large_blob_test.go)
+
 ### version 2.8.7
 * add support for regular type array
 * add support for nested null object and array

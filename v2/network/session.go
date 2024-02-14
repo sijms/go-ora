@@ -220,8 +220,10 @@ func (session *Session) initRead() error {
 	//}
 	if session.sslConn != nil {
 		err = session.sslConn.SetReadDeadline(timeout)
-	} else {
+	} else if session.conn != nil {
 		err = session.conn.SetReadDeadline(timeout)
+	} else {
+		return errors.New("attempt to set timeout on closed connection")
 	}
 	return err
 }
@@ -237,8 +239,10 @@ func (session *Session) initWrite() error {
 	//}
 	if session.sslConn != nil {
 		err = session.sslConn.SetWriteDeadline(timeout)
-	} else {
+	} else if session.conn != nil {
 		err = session.conn.SetWriteDeadline(timeout)
+	} else {
+		return errors.New("attempt to set timeout on closed connection")
 	}
 	return err
 }
@@ -861,8 +865,10 @@ func (session *Session) writePacket(pck PacketInterface) error {
 	}
 	if session.sslConn != nil {
 		_, err = session.sslConn.Write(tmp)
-	} else {
+	} else if session.conn != nil {
 		_, err = session.conn.Write(tmp)
+	} else {
+		return errors.New("attempt to write on closed connection")
 	}
 	return err
 }
@@ -983,10 +989,12 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			if err != nil {
 				return nil, err
 			}
-			if session.Context.ConnOption.SSL {
+			if session.sslConn != nil {
 				_, err = session.sslConn.Write(pck.bytes())
-			} else {
+			} else if session.conn != nil {
 				_, err = session.conn.Write(pck.bytes())
+			} else {
+				return nil, errors.New("attempt to write on closed connection")
 			}
 			if err != nil {
 				return nil, err

@@ -22,7 +22,8 @@ type lobInterface interface {
 type Blob struct {
 	locator []byte
 	Data    []byte
-	//Valid   bool
+	// deprecated
+	Valid bool
 }
 
 type Lob struct {

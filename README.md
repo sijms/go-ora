@@ -641,6 +641,12 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 ### releases
 <details>
 
+### version 2.8.8
+* introduce new connection break using go-routines thanks to @rheilek
+* return BLOB as longRAW and CLOB,NCLOB as LONG in lob prefetch mode so supported 
+data size increased from 32KB to 1GB
+* fix issue in bulk insert when pass data types
+* add `lob fetch=stream` which is equal to `lob fetch=post`
 ### version 2.8.7
 * add support for regular type array
 * add support for nested null object and array

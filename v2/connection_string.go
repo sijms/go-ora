@@ -618,10 +618,10 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			tempVal := strings.ToUpper(val[0])
 			if tempVal == "PRE" {
 				ret.connOption.Lob = 0
-			} else if tempVal == "POST" {
+			} else if tempVal == "POST" || tempVal == "STREAM" {
 				ret.connOption.Lob = 1
 			} else {
-				return nil, errors.New("LOB FETCH value should be: PRE(default) or POST")
+				return nil, errors.New("LOB FETCH value should be: PRE(default) or POST or STREAM")
 			}
 		case "LANGUAGE":
 			ret.connOption.Language = val[0]

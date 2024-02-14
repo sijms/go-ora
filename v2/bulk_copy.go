@@ -48,8 +48,9 @@ func (bulk *BulkCopy) AddRow(values ...interface{}) error {
 			Flag:        3,
 			CharsetID:   bulk.conn.tcpNego.ServerCharset,
 			CharsetForm: 1,
+			Value:       val,
 		}
-		err := par.encodeValue(val, 0, bulk.conn)
+		err := par.encodeValue(0, bulk.conn)
 		if err != nil {
 			return err
 		}
@@ -146,7 +147,7 @@ func (bulk *BulkCopy) readStreamResponse() error {
 				}
 			}
 		default:
-			err = bulk.conn.readResponse(msg)
+			err = bulk.conn.readMsg(msg)
 			if err != nil {
 				return err
 			}
@@ -299,7 +300,7 @@ func (bulk *BulkCopy) readPrepareResponse() error {
 				bulk.dbaBits = 0
 			}
 		default:
-			err = bulk.conn.readResponse(msg)
+			err = bulk.conn.readMsg(msg)
 			if err != nil {
 				return err
 			}
@@ -365,7 +366,7 @@ func (bulk *BulkCopy) readFinalResponse() error {
 				}
 			}
 		default:
-			err = bulk.conn.readResponse(msg)
+			err = bulk.conn.readMsg(msg)
 			if err != nil {
 				return err
 			}

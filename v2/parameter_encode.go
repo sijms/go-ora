@@ -510,10 +510,9 @@ func (par *ParameterInfo) init() {
 	par.oPrimValue = nil
 }
 
-func (par *ParameterInfo) encodeValue(val driver.Value, size int, connection *Connection) error {
+func (par *ParameterInfo) encodeValue(size int, connection *Connection) error {
 	par.init()
-	par.Value = val
-	err := par.setDataType(reflect.TypeOf(val), val, connection)
+	err := par.setDataType(reflect.TypeOf(par.Value), par.Value, connection)
 	if err != nil {
 		return err
 	}

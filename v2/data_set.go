@@ -30,12 +30,13 @@ type DataSet struct {
 	rowCount        int
 	uACBufferLength int
 	maxRowSize      int
-	Cols            []ParameterInfo
-	rows            []Row
-	currentRow      Row
-	lasterr         error
-	index           int
-	parent          StmtInterface
+	//Cols            []ParameterInfo
+	cols       *[]ParameterInfo
+	rows       []Row
+	currentRow Row
+	lasterr    error
+	index      int
+	parent     StmtInterface
 }
 
 // load Loading dataset information from network session
@@ -87,16 +88,17 @@ func (dataSet *DataSet) setBitVector(bitVector []byte) {
 		for x := 0; x < len(bitVector); x++ {
 			for i := 0; i < 8; i++ {
 				if (x*8)+i < dataSet.columnCount {
-					dataSet.Cols[(x*8)+i].getDataFromServer = bitVector[x]&(1<<i) > 0
+					(*dataSet.cols)[(x*8)+i].getDataFromServer = bitVector[x]&(1<<i) > 0
 				}
 			}
 		}
 	} else {
-		for x := 0; x < len(dataSet.Cols); x++ {
-			dataSet.Cols[x].getDataFromServer = true
+		if dataSet.cols != nil {
+			for x := 0; x < len(*dataSet.cols); x++ {
+				(*dataSet.cols)[x].getDataFromServer = true
+			}
 		}
 	}
-
 }
 
 func (dataSet *DataSet) Close() error {
@@ -150,7 +152,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 				if len(name) == 0 {
 					continue
 				}
-				colInfo := dataSet.Cols[srcIndex+processedFields]
+				colInfo := (*dataSet.cols)[srcIndex+processedFields]
 				if strings.ToUpper(colInfo.Name) != strings.ToUpper(name) {
 					continue
 				}
@@ -192,7 +194,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 // error means error occur during operation
 func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) error {
 	value := dataSet.currentRow[colIndex]
-	col := dataSet.Cols[colIndex]
+	col := (*dataSet.cols)[colIndex]
 	if value == nil {
 		return setNull(obj)
 	}
@@ -364,12 +366,12 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 
 // Columns return a string array that represent columns names
 func (dataSet *DataSet) Columns() []string {
-	if len(dataSet.Cols) == 0 {
+	if len(*dataSet.cols) == 0 {
 		return nil
 	}
-	ret := make([]string, len(dataSet.Cols))
-	for x := 0; x < len(dataSet.Cols); x++ {
-		ret[x] = dataSet.Cols[x].Name
+	ret := make([]string, len(*dataSet.cols))
+	for x := 0; x < len(*dataSet.cols); x++ {
+		ret[x] = (*dataSet.cols)[x].Name
 	}
 	return ret
 }
@@ -380,7 +382,7 @@ func (dataSet *DataSet) Trace(t trace.Tracer) {
 			break
 		}
 		t.Printf("Row %d", r)
-		for c, col := range dataSet.Cols {
+		for c, col := range *dataSet.cols {
 			t.Printf("  %-20s: %v", col.Name, row[c])
 		}
 	}
@@ -388,34 +390,34 @@ func (dataSet *DataSet) Trace(t trace.Tracer) {
 
 // ColumnTypeDatabaseTypeName return Col DataType name
 func (dataSet *DataSet) ColumnTypeDatabaseTypeName(index int) string {
-	return dataSet.Cols[index].DataType.String()
+	return (*dataSet.cols)[index].DataType.String()
 }
 
 // ColumnTypeLength return length of column type
 func (dataSet *DataSet) ColumnTypeLength(index int) (int64, bool) {
-	switch dataSet.Cols[index].DataType {
+	switch (*dataSet.cols)[index].DataType {
 	case NCHAR, CHAR:
-		return int64(dataSet.Cols[index].MaxCharLen), true
+		return int64((*dataSet.cols)[index].MaxCharLen), true
 	}
 	return int64(0), false
 }
 
 // ColumnTypeNullable return if column allow null or not
 func (dataSet *DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {
-	return dataSet.Cols[index].AllowNull, true
+	return (*dataSet.cols)[index].AllowNull, true
 }
 
 // ColumnTypePrecisionScale return the precision and scale for numeric types
 func (dataSet *DataSet) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
-	switch dataSet.Cols[index].DataType {
+	switch (*dataSet.cols)[index].DataType {
 	case NUMBER:
-		return int64(dataSet.Cols[index].Precision), int64(dataSet.Cols[index].Scale), true
+		return int64((*dataSet.cols)[index].Precision), int64((*dataSet.cols)[index].Scale), true
 	}
 	return int64(0), int64(0), false
 }
 
 func (dataSet *DataSet) ColumnTypeScanType(index int) reflect.Type {
-	col := dataSet.Cols[index]
+	col := (*dataSet.cols)[index]
 	switch col.DataType {
 	case NUMBER:
 		if col.Precision > 0 {

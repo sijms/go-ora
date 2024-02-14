@@ -39,24 +39,20 @@ type SessionState struct {
 }
 
 type Session struct {
-	ctx            context.Context
-	oldCtx         context.Context
-	conn           net.Conn
-	sslConn        *tls.Conn
-	reader         *bufio.Reader
-	remainingBytes int
-	lastPacket     bytes.Buffer
-	//connOption        ConnectionOption
+	ctx               context.Context
+	oldCtx            context.Context
+	conn              net.Conn
+	sslConn           *tls.Conn
+	reader            *bufio.Reader
+	remainingBytes    int
+	lastPacket        bytes.Buffer
 	Context           *SessionContext
 	sendPcks          []PacketInterface
 	inBuffer          []byte
 	outBuffer         bytes.Buffer
 	index             int
 	breakIndex        int
-	isFinalPacketRead bool
-	//key               []byte
-	//salt              []byte
-	//verifierType      int
+	doneContext       chan struct{}
 	TimeZone          []byte
 	TTCVersion        uint8
 	HasEOSCapability  bool
@@ -68,15 +64,15 @@ type Session struct {
 	UseBigScn         bool
 	ClrChunkSize      int
 	breakConn         bool
-	resetConn         bool
-	SSL               struct {
+	Connected         bool
+	//resetConn         bool
+	SSL struct {
 		CertificateRequest []*x509.CertificateRequest
 		PrivateKeys        []*rsa.PrivateKey
 		Certificates       []*x509.Certificate
 		roots              *x509.CertPool
 		tlsCertificates    []tls.Certificate
 	}
-	//certificates      []*x509.Certificate
 }
 
 func NewSessionWithInputBufferForDebug(input []byte) *Session {
@@ -183,8 +179,33 @@ func (session *Session) ResetBuffer() {
 func (session *Session) StartContext(ctx context.Context) {
 	session.oldCtx = session.ctx
 	session.ctx = ctx
+	session.doneContext = make(chan struct{})
+	go func() {
+		var err error
+		var tracer = session.Context.ConnOption.Tracer
+		select {
+		case <-session.doneContext:
+			return
+		case <-ctx.Done():
+			if session.Connected {
+				if err = session.BreakConnection(); err != nil {
+					tracer.Print("Connection Break Error: ", err)
+				}
+			} else {
+				err = session.WriteFinalPacket()
+				if err != nil {
+					tracer.Print("Write Final Packet With Error: ", err)
+				}
+				session.Disconnect()
+			}
+		}
+	}()
 }
 func (session *Session) EndContext() {
+	if session.doneContext != nil {
+		close(session.doneContext)
+		session.doneContext = nil
+	}
 	session.ctx = session.oldCtx
 }
 
@@ -194,9 +215,9 @@ func (session *Session) initRead() error {
 	if session.Context.ConnOption.Timeout > 0 {
 		timeout = time.Now().Add(session.Context.ConnOption.Timeout)
 	}
-	if deadline, ok := session.ctx.Deadline(); ok && !session.IsBreak() {
-		timeout = deadline
-	}
+	//if deadline, ok := session.ctx.Deadline(); ok && !session.IsBreak() {
+	//	timeout = deadline
+	//}
 	if session.sslConn != nil {
 		err = session.sslConn.SetReadDeadline(timeout)
 	} else {
@@ -211,9 +232,9 @@ func (session *Session) initWrite() error {
 	if session.Context.ConnOption.Timeout > 0 {
 		timeout = time.Now().Add(session.Context.ConnOption.Timeout)
 	}
-	if deadline, ok := session.ctx.Deadline(); ok && !session.IsBreak() {
-		timeout = deadline
-	}
+	//if deadline, ok := session.ctx.Deadline(); ok && !session.IsBreak() {
+	//	timeout = deadline
+	//}
 	if session.sslConn != nil {
 		err = session.sslConn.SetWriteDeadline(timeout)
 	} else {
@@ -369,35 +390,35 @@ func (session *Session) RestoreIndex() bool {
 }
 
 // BreakConnection elicit connetion break to cancel the current operation
-func (session *Session) BreakConnection() (PacketInterface, error) {
+func (session *Session) BreakConnection() error {
 	tracer := session.Context.ConnOption.Tracer
 	tracer.Print("Break Connection")
-	session.breakConn = true
-	session.resetConn = false
 	var err error
+	//first discard remaining bytes
+	//if session.remainingBytes > 0 {
+	//	_, err = session.readPacket()
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//}
 
 	done := false
-
-	// first discard remaining bytes
-	if session.remainingBytes > 0 {
-		_, err = session.readPacket()
-		if err != nil {
-			return nil, err
-		}
-	}
 	if session.Context.NegotiatedOptions&0x400 > 0 {
 		done, err = sendOOB(session.conn)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	if !done {
 		err = session.writePacket(newMarkerPacket(marker_type_interrupt, session.Context))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return session.readPacket()
+	session.breakConn = true
+	return nil
+	//return session.readPacket()
+
 	//session.ResetBuffer()
 	//if done {
 	//	err = session.writePacket(newMarkerPacket(2, session.Context))
@@ -427,9 +448,7 @@ func (session *Session) BreakConnection() (PacketInterface, error) {
 // check if the client need to use SSL
 // then send connect packet to the server and
 // receive either accept, redirect or refuse packet
-func (session *Session) Connect(ctx context.Context) error {
-	session.StartContext(ctx)
-	defer session.EndContext()
+func (session *Session) Connect() error {
 	connOption := session.Context.ConnOption
 	session.Disconnect()
 	connOption.Tracer.Print("Connect")
@@ -459,9 +478,9 @@ func (session *Session) Connect(ctx context.Context) error {
 		}
 		addr := host.networkAddr()
 		if len(session.Context.ConnOption.UnixAddress) > 0 {
-			session.conn, err = dialer.DialContext(ctx, "unix", session.Context.ConnOption.UnixAddress)
+			session.conn, err = dialer.DialContext(session.ctx, "unix", session.Context.ConnOption.UnixAddress)
 		} else {
-			session.conn, err = dialer.DialContext(ctx, "tcp", addr)
+			session.conn, err = dialer.DialContext(session.ctx, "tcp", addr)
 		}
 
 		if err != nil {
@@ -525,7 +544,7 @@ func (session *Session) Connect(ctx context.Context) error {
 			connOption.AddServer(srv)
 		}
 		host = connOption.GetActiveServer(true)
-		return session.Connect(ctx)
+		return session.Connect()
 	}
 	if refusePacket, ok := pck.(*RefusePacket); ok {
 		refusePacket.extractErrCode()
@@ -541,7 +560,7 @@ func (session *Session) Connect(ctx context.Context) error {
 			session.Disconnect()
 			return &refusePacket.Err
 		}
-		return session.Connect(ctx)
+		return session.Connect()
 	}
 	return errors.New("connection refused by the server due to unknown reason")
 }
@@ -712,36 +731,59 @@ func (session *Session) Peek(numBytes int) ([]byte, error) {
 // Read numBytes of data from input buffer if requested data is larger
 // than input buffer session will get the remaining from network stream
 func (session *Session) read(numBytes int) ([]byte, error) {
+	var err error
+	var pck PacketInterface
+	//tracer := session.Context.ConnOption.Tracer
+
 	requiredLen := numBytes
-	tracer := session.Context.ConnOption.Tracer
+
+	//first discard remaining bytes
+	//if session.remainingBytes > 0 {
+	//	_, err = session.readPacket()
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//}
 	for session.index+numBytes > len(session.inBuffer) {
-		pck, err := session.readPacket()
+		// if break connection send break message
+		if session.IsBreak() {
+			//_, err = session.BreakConnection()
+			//if err != nil {
+			//	return nil, err
+			//}
+			session.ResetBreak()
+		}
+		pck, err = session.readPacket()
 		if err != nil {
-			if e, ok := err.(net.Error); ok && e.Timeout() {
-				var breakErr error
-				tracer.Print("Read Timeout")
-				pck, breakErr = session.BreakConnection()
-				if breakErr != nil {
-					//return nil, err
-					tracer.Print("Connection Break With Error: ", breakErr)
-					return nil, err
-				}
-			} else {
-				return nil, err
-			}
+			//if e, ok := err.(net.Error); ok && e.Timeout() {
+			//	var breakErr error
+			//	tracer.Print("Read Timeout")
+			//	pck, breakErr = session.BreakConnection()
+			//	if breakErr != nil {
+			//		//return nil, err
+			//		tracer.Print("Connection Break With Error: ", breakErr)
+			//		return nil, err
+			//	}
+			//} else {
+			//	return nil, err
+			//}
+			return nil, err
 		}
 
-		if session.IsBreak() {
-			for pck == nil {
-				pck, err = session.readPacket()
-				if err != nil {
-					return nil, err
-				}
-			}
-		} else {
-			if pck == nil {
-				continue
-			}
+		//if session.IsBreak() {
+		//	for pck == nil {
+		//		pck, err = session.readPacket()
+		//		if err != nil {
+		//			return nil, err
+		//		}
+		//	}
+		//} else {
+		//	if pck == nil {
+		//		continue
+		//	}
+		//}
+		if pck == nil {
+			continue
 		}
 		if _, ok := pck.(*MarkerPacket); ok {
 			session.breakIndex = len(session.inBuffer)
@@ -749,6 +791,9 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
+			session.index = session.breakIndex
+			//session.ResetBreak()
+			return nil, ErrConnReset
 		} else {
 			return nil, fmt.Errorf("receive abnormal packet type %d instead of data packet", pck.getPacketType())
 		}
@@ -760,12 +805,12 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 		//		return nil, errors.New("the packet received is not data packet")
 		//	}
 		//}
-		if session.IsBreak() {
-			if session.index+numBytes > len(session.inBuffer) {
-				numBytes = len(session.inBuffer) - session.index
-			}
-			break
-		}
+		//if session.IsBreak() {
+		//	if session.index+numBytes > len(session.inBuffer) {
+		//		numBytes = len(session.inBuffer) - session.index
+		//	}
+		//	break
+		//}
 	}
 	//for session.index+numBytes > len(session.inBuffer) {
 	//	tempPck, err := session.readPacket()
@@ -824,13 +869,13 @@ func (session *Session) writePacket(pck PacketInterface) error {
 
 // HasError Check if the session has error or not
 func (session *Session) HasError() bool {
-	return session.Summary != nil && session.Summary.RetCode != 0
+	return session.Summary != nil && (session.Summary.RetCode != 0 && session.Summary.RetCode != 1403)
 }
 
 // GetError Return the error in form or OracleError
 func (session *Session) GetError() *OracleError {
 	err := &OracleError{}
-	if session.Summary != nil && session.Summary.RetCode != 0 {
+	if session.HasError() {
 		err.ErrCode = session.Summary.RetCode
 		if session.StrConv != nil {
 			err.ErrMsg = session.StrConv.Decode(session.Summary.ErrorMessage)
@@ -924,7 +969,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	packetData := session.lastPacket.Bytes()
 	pckType := PacketType(packetData[4])
 	flag := packetData[5]
-	session.isFinalPacketRead = flag&0x20 > 0
+	//session.isFinalPacketRead = flag&0x20 > 0
 	//log.Printf("Response: %#v\n\n", packetData)
 	switch pckType {
 	case RESEND:
@@ -1532,6 +1577,9 @@ func (session *Session) GetClr() (output []byte, err error) {
 	var tempBuffer bytes.Buffer
 	if chunkSize == 0xFE {
 		for chunkSize > 0 {
+			//if session.IsBreak() {
+			//	break
+			//}
 			if session.UseBigClrChunks {
 				chunkSize, err = session.GetInt(4, true, true)
 			} else {

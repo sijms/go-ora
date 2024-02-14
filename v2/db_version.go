@@ -7,14 +7,14 @@ import (
 )
 
 type DBVersion struct {
-	Info               string
-	Text               string
-	Number             uint16
-	MajorVersion       int
-	MinorVersion       int
-	PatchsetVersion    int
-	isDb10gR20OrHigher bool
-	isDb11gR10OrHigher bool
+	Info            string
+	Text            string
+	Number          uint16
+	MajorVersion    int
+	MinorVersion    int
+	PatchsetVersion int
+	//isDb10gR20OrHigher bool
+	//isDb11gR10OrHigher bool
 }
 
 // GetDBVersion write a request to get database version the read
@@ -62,11 +62,11 @@ func GetDBVersion(session *network.Session) (*DBVersion, error) {
 		MinorVersion:    int(number >> 20 & 0xF),
 		PatchsetVersion: int(number >> 8 & 0xF),
 	}
-	if ret.MajorVersion > 10 || (ret.MajorVersion == 10 && ret.MinorVersion >= 2) {
-		ret.isDb10gR20OrHigher = true
-	}
-	if ret.MajorVersion > 11 || (ret.MajorVersion == 11 && ret.MinorVersion >= 1) {
-		ret.isDb11gR10OrHigher = true
-	}
+	//if ret.MajorVersion > 10 || (ret.MajorVersion == 10 && ret.MinorVersion >= 2) {
+	//	ret.isDb10gR20OrHigher = true
+	//}
+	//if ret.MajorVersion > 11 || (ret.MajorVersion == 11 && ret.MinorVersion >= 1) {
+	//	ret.isDb11gR10OrHigher = true
+	//}
 	return ret, nil
 }

@@ -1,6 +1,9 @@
 package network
 
-import "strconv"
+import (
+	"errors"
+	"strconv"
+)
 
 type OracleError struct {
 	ErrCode int
@@ -61,3 +64,11 @@ func (err *OracleError) Bad() bool {
 		return false
 	}
 }
+
+// type ErrConnReset struct {
+// }
+var ErrConnReset = errors.New("connection break due to context timeout")
+
+//func (err *ErrConnReset) Error() string {
+//	return "connection reset"
+//}

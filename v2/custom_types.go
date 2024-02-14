@@ -159,10 +159,7 @@ func (val *Clob) UnmarshalJSON(data []byte) error {
 }
 
 func (val Blob) MarshalJSON() ([]byte, error) {
-	if val.Valid {
-		return json.Marshal(val.Data)
-	}
-	return json.Marshal(nil)
+	return json.Marshal(val.Data)
 }
 
 func (val *Blob) UnmarshalJSON(data []byte) error {
@@ -171,10 +168,7 @@ func (val *Blob) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	if temp == nil {
-		val.Valid = false
-	} else {
-		val.Valid = true
+	if temp != nil {
 		val.Data = *temp
 	}
 	return nil

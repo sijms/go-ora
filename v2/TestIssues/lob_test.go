@@ -50,13 +50,13 @@ func TestLob(t *testing.T) {
 				temp.Data1.Valid = false
 				temp.Data2.Valid = false
 				temp.Data3 = nil
-				temp.Data4.Valid = false
+				temp.Data4.Data = nil
 			} else {
 				temp.Data1 = sql.NullString{"this is a test", true}
 				temp.Data2.String, temp.Data2.Valid = clob, true
 
 				temp.Data3 = []byte("this is a test")
-				temp.Data4.Data, temp.Data4.Valid = blob, true
+				temp.Data4.Data = blob
 
 			}
 			input[x-1] = temp
@@ -126,7 +126,7 @@ END;`
 			return err
 		}
 		if id%2 == 0 {
-			if temp.Data1.Valid == true || temp.Data2.Valid == true || temp.Data3 != nil || temp.Data4.Valid == true {
+			if temp.Data1.Valid == true || temp.Data2.Valid == true || temp.Data3 != nil || temp.Data4.Data != nil {
 				return errors.New("expected null and got a value")
 			}
 		} else {

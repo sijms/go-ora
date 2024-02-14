@@ -177,7 +177,7 @@ end;`, go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
 				input4[x] = sql.NullTime{Valid: false}
 				//input5[x] = sql.NullTime{Valid: false}
 				input6[x] = nil
-				input7[x] = go_ora.Blob{Valid: false}
+				input7[x] = go_ora.Blob{Data: nil}
 				input8[x] = go_ora.Clob{Valid: false}
 				input9[x] = go_ora.NClob{Valid: false}
 			} else {
@@ -187,7 +187,7 @@ end;`, go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
 				input4[x] = sql.NullTime{time.Now(), true}
 				//input5[x] = sql.NullTime{Time: time.Now(), Valid: true}
 				input6[x] = []byte("test_")
-				input7[x] = go_ora.Blob{Data: []byte("BLOB"), Valid: true}
+				input7[x] = go_ora.Blob{Data: []byte("BLOB")}
 				input8[x] = go_ora.Clob{String: "CLOB_", Valid: true}
 				input9[x] = go_ora.NClob{String: "NCLOB_안녕하세요AAA", Valid: true}
 			}
@@ -285,7 +285,7 @@ END;`, length,
 				if output6[x] != nil {
 					return fmt.Errorf(nullErrorFormat, "DateArray", output6)
 				}
-				if output7[x].Valid {
+				if output7[x].Data != nil {
 					return fmt.Errorf(nullErrorFormat, "BlobArray", output7[x].Data)
 				}
 				if output8[x].Valid {

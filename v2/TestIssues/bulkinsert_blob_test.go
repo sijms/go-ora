@@ -13,12 +13,9 @@ func TestBulkinsertBlob(t *testing.T) {
 	var dropTable = func(db *sql.DB) error { return execCmd(db, `DROP TABLE TTB_465 PURGE`) }
 	var insert = func(db *sql.DB, data []byte) error {
 		datas := make([]go_ora.Blob, 3)
-		datas[0].Data = data
-		datas[0].Valid = false
+		datas[0].Data = nil
 		datas[1].Data = data
-		datas[1].Valid = true
 		datas[2].Data = data
-		datas[2].Valid = true
 		_, err := db.Exec("INSERT INTO TTB_465 VALUES(:1)", datas)
 		return err
 	}

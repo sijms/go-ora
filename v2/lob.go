@@ -22,7 +22,7 @@ type lobInterface interface {
 type Blob struct {
 	locator []byte
 	Data    []byte
-	Valid   bool
+	//Valid   bool
 }
 
 type Lob struct {
@@ -440,7 +440,7 @@ func (lob *Lob) read() error {
 			//	session.RestoreIndex()
 			//}
 		default:
-			err = lob.connection.readResponse(msg)
+			err = lob.connection.readMsg(msg)
 			if err != nil {
 				return err
 			}
@@ -633,9 +633,9 @@ func (val *Clob) Scan(value interface{}) error {
 }
 
 func (val *Blob) Scan(value interface{}) error {
-	val.Valid = true
+	//val.Valid = true
 	if value == nil {
-		val.Valid = false
+		//val.Valid = false
 		val.Data = nil
 		return nil
 	}
@@ -648,7 +648,6 @@ func (val *Blob) Scan(value interface{}) error {
 		val.Data = temp
 	case types.Nil:
 		val.Data = nil
-		val.Valid = false
 	default:
 		return errors.New("go-ora: Blob column type require Blob or []byte values")
 	}

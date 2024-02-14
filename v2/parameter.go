@@ -1066,7 +1066,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		par.oPrimValue = strConv.Decode(par.BValue)
 	case Boolean:
 		par.oPrimValue = converters.DecodeBool(par.BValue)
-	case RAW:
+	case RAW, LongRaw:
 		par.oPrimValue = par.BValue
 	case NUMBER:
 		if par.Scale == 0 && par.Precision == 0 {
@@ -1437,6 +1437,9 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLob
 				}
 			}
 			par.BValue, err = session.GetClr()
+			if err != nil {
+				return err
+			}
 			if par.DataType == OCIClobLocator {
 				strConv, err := connection.getStrConv(par.CharsetID)
 				if err != nil {

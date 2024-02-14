@@ -457,9 +457,6 @@ func getLob(col interface{}, conn *Connection) (*Lob, error) {
 	case []byte:
 		byteVar = val
 	case Blob:
-		if !val.Valid {
-			return nil, nil
-		}
 		byteVar = val.Data
 	}
 	if len(stringVar) > 0 {
@@ -500,7 +497,7 @@ func setBytes(value reflect.Value, input []byte) error {
 	case tyNVarChar:
 		value.Set(reflect.ValueOf(NVarChar(input)))
 	case tyBlob:
-		value.Set(reflect.ValueOf(Blob{Data: input, Valid: true}))
+		value.Set(reflect.ValueOf(Blob{Data: input}))
 	case tyClob:
 		value.Set(reflect.ValueOf(Clob{String: string(input), Valid: true}))
 	case tyNClob:
@@ -800,7 +797,6 @@ func setLob(value reflect.Value, input Lob) error {
 	case tyBlob:
 		value.Set(reflect.ValueOf(Blob{
 			Data:    lobData,
-			Valid:   true,
 			locator: input.sourceLocator}))
 	case tyBytes:
 		value.Set(reflect.ValueOf(lobData))
@@ -1384,4 +1380,96 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 	}
 
 	return nil
+}
+
+func parseInputField(structValue reflect.Value, name, _type string, fieldIndex int) (tempPar *ParameterInfo, err error) {
+	tempPar = &ParameterInfo{
+		Name:      name,
+		Direction: Input,
+	}
+	fieldValue := structValue.Field(fieldIndex)
+	for fieldValue.Type().Kind() == reflect.Ptr {
+		if fieldValue.IsNil() {
+			tempPar.Value = nil
+			return
+		}
+		fieldValue = fieldValue.Elem()
+	}
+	if !fieldValue.IsValid() {
+		tempPar.Value = nil
+		return
+	}
+	if fieldValue.CanInterface() && fieldValue.Interface() == nil {
+		tempPar.Value = nil
+		return
+	}
+	typeErr := fmt.Errorf("error passing field %s as type %s", fieldValue.Type().Name, _type)
+	switch _type {
+	case "number":
+		//var fieldVal float64
+		tempPar.Value, err = getFloat(fieldValue.Interface())
+		if err != nil {
+			err = typeErr
+			return
+		}
+	case "varchar":
+		tempPar.Value = getString(fieldValue.Interface())
+	case "nvarchar":
+		tempPar.Value = NVarChar(getString(fieldValue.Interface()))
+	case "date":
+		tempPar.Value, err = getDate(fieldValue.Interface())
+		if err != nil {
+			err = typeErr
+			return
+		}
+	case "timestamp":
+		var fieldVal time.Time
+		fieldVal, err = getDate(fieldValue.Interface())
+		if err != nil {
+			err = typeErr
+			return
+		}
+		tempPar.Value = TimeStamp(fieldVal)
+	case "timestamptz":
+		var fieldVal time.Time
+		fieldVal, err = getDate(fieldValue.Interface())
+		if err != nil {
+			err = typeErr
+			return
+		}
+		tempPar.Value = TimeStampTZ(fieldVal)
+	case "raw":
+		tempPar.Value, err = getBytes(fieldValue.Interface())
+		if err != nil {
+			err = typeErr
+			return
+		}
+	case "clob":
+		fieldVal := getString(fieldValue.Interface())
+		if len(fieldVal) == 0 {
+			tempPar.Value = Clob{Valid: false}
+		} else {
+			tempPar.Value = Clob{String: fieldVal, Valid: true}
+		}
+	case "nclob":
+		fieldVal := getString(fieldValue.Interface())
+		if len(fieldVal) == 0 {
+			tempPar.Value = NClob{Valid: false}
+		} else {
+			tempPar.Value = NClob{String: fieldVal, Valid: true}
+		}
+	case "blob":
+		var fieldVal []byte
+		fieldVal, err = getBytes(fieldValue.Interface())
+		if err != nil {
+			err = typeErr
+			return
+		}
+		tempPar.Value = Blob{Data: fieldVal}
+	case "":
+		tempPar.Value = fieldValue.Interface()
+	default:
+		err = typeErr
+	}
+	return
 }

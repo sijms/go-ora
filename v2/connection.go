@@ -332,13 +332,33 @@ func (conn *Connection) Logoff() error {
 	if err != nil {
 		return err
 	}
+	return conn.read()
+	//loop := true
+	//for loop {
+	//	msg, err := session.GetByte()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	err = conn.readMsg(msg)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	if msg == 4 || msg == 9 {
+	//		loop = false
+	//	}
+	//}
+	//return nil
+}
+
+func (conn *Connection) read() error {
 	loop := true
+	session := conn.session
 	for loop {
 		msg, err := session.GetByte()
 		if err != nil {
 			return err
 		}
-		err = conn.readResponse(msg)
+		err = conn.readMsg(msg)
 		if err != nil {
 			return err
 		}
@@ -403,7 +423,10 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		}
 	}
 	session := conn.session
-	err := session.Connect(ctx)
+	// start check for context
+	session.StartContext(ctx)
+	defer session.EndContext()
+	err := session.Connect()
 	if err != nil {
 		return err
 	}
@@ -450,6 +473,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	conn.session.Connected = true
 	tracer.Print("Connected")
 	tracer.Print("Database Version: ", conn.dBVersion.Text)
 	sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)
@@ -601,15 +625,6 @@ func (conn *Connection) doAuth() error {
 			return err
 		}
 		switch msg {
-		case 4:
-			conn.session.Summary, err = network.NewSummary(conn.session)
-			if err != nil {
-				return err
-			}
-			if conn.session.HasError() {
-				return conn.session.GetError()
-			}
-			stop = true
 		case 8:
 			dictLen, err := conn.session.GetInt(2, true, true)
 			if err != nil {
@@ -623,35 +638,18 @@ func (conn *Connection) doAuth() error {
 				}
 				conn.SessionProperties[string(key)] = string(val)
 			}
-		case 15:
-			warning, err := network.NewWarningObject(conn.session)
-			if err != nil {
-				return err
-			}
-			if warning != nil {
-				fmt.Println(warning)
-			}
-		case 23:
-			opCode, err := conn.session.GetByte()
-			if err != nil {
-				return err
-			}
-			if opCode == 5 {
-				err = conn.loadNLSData()
-				if err != nil {
-					return err
-				}
-			} else {
-				err = conn.getServerNetworkInformation(opCode)
-				if err != nil {
-					return err
-				}
-			}
 		//case 27:
 		//	this.ProcessImplicitResultSet(ref implicitRSList);
 		//	continue;
 		default:
-			return errors.New(fmt.Sprintf("message code error: received code %d", msg))
+			err = conn.readMsg(msg)
+			if err != nil {
+				return err
+			}
+			if msg == 4 || msg == 9 {
+				stop = true
+			}
+			//return errors.New(fmt.Sprintf("message code error: received code %d", msg))
 		}
 	}
 
@@ -987,7 +985,8 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 			if index == 0 {
 				continue
 			}
-			err = par.encodeValue(val, 0, conn)
+			par.Value = val
+			err = par.encodeValue(0, conn)
 			if err != nil {
 				return nil, err
 			}
@@ -1004,8 +1003,8 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 				dataType = par.DataType
 			}
 		}
-
-		_ = par.encodeValue(col[0], 0, conn)
+		par.Value = col[0]
+		_ = par.encodeValue(0, conn)
 		par.MaxLen = maxLen
 		par.MaxCharLen = maxCharLen
 		par.DataType = dataType
@@ -1016,7 +1015,8 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 	err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
 	for x := 0; x < rowNum; x++ {
 		for idx, col := range columns {
-			err = stmt.Pars[idx].encodeValue(col[x], 0, conn)
+			stmt.Pars[idx].Value = col[x]
+			err = stmt.Pars[idx].encodeValue(0, conn)
 			if err != nil {
 				return nil, err
 			}
@@ -1100,23 +1100,26 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 	return NewStmt(query, conn), nil
 }
 
-func (conn *Connection) readResponse(msgCode uint8) error {
+func (conn *Connection) readMsg(msgCode uint8) error {
 	session := conn.session
 	tracer := conn.connOption.Tracer
 	var err error
 	switch msgCode {
 	case 4:
-		if conn.session.IsBreak() {
-			if conn.session.RestoreIndex() {
-				_, _ = conn.session.GetByte()
-			}
-			conn.session.ResetBreak()
-		}
+		//if conn.session.IsBreak() {
+		//	if conn.session.RestoreIndex() {
+		//		_, _ = conn.session.GetByte()
+		//	}
+		//	conn.session.ResetBreak()
+		//}
 		conn.session.Summary, err = network.NewSummary(session)
 		if err != nil {
 			return err
 		}
 		tracer.Printf("Summary: RetCode:%d, Error Message:%q", session.Summary.RetCode, string(session.Summary.ErrorMessage))
+		if conn.session.HasError() {
+			return conn.session.GetError()
+		}
 	case 8:
 		size, err := session.GetInt(2, true, true)
 		if err != nil {

@@ -153,7 +153,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 					continue
 				}
 				colInfo := (*dataSet.cols)[srcIndex+processedFields]
-				if strings.ToUpper(colInfo.Name) != strings.ToUpper(name) {
+				if !strings.EqualFold(colInfo.Name, name) {
 					continue
 				}
 				err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), srcIndex+processedFields)
@@ -167,7 +167,6 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 				srcIndex = srcIndex + processedFields - 1
 				continue
 			}
-
 		}
 		// else
 		err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem(), srcIndex)
@@ -193,39 +192,40 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 // for non-supported type
 // error means error occur during operation
 func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) error {
-	value := dataSet.currentRow[colIndex]
+	//value := dataSet.currentRow[colIndex]
 	col := (*dataSet.cols)[colIndex]
-	if value == nil {
-		return setNull(obj)
-	}
-	if obj.Kind() == reflect.Interface {
-		obj.Set(reflect.ValueOf(value))
-		return nil
-	}
-	switch val := value.(type) {
-	case int64:
-		return setNumber(obj, float64(val))
-	case float64:
-		return setNumber(obj, val)
-	case string:
-		return setString(obj, val)
-	case time.Time:
-		return setTime(obj, val)
-	case []byte:
-		return setBytes(obj, val)
-	case bool:
-		if val {
-			return setNumber(obj, 1)
-		} else {
-			return setNumber(obj, 0)
-		}
-	default:
-		if col.cusType != nil && col.cusType.typ == obj.Type() {
-			obj.Set(reflect.ValueOf(value))
-			return nil
-		}
-		return fmt.Errorf("can't assign value: %v to object of type: %v", value, obj.Type().Name())
-	}
+	//if value == nil {
+	//	return setNull(obj)
+	//}
+	//if obj.Kind() == reflect.Interface {
+	//	obj.Set(reflect.ValueOf(value))
+	//	return nil
+	//}
+	return setFieldValue(obj, col.cusType, dataSet.currentRow[colIndex])
+	//switch val := value.(type) {
+	//case int64:
+	//	return setNumber(obj, float64(val))
+	//case float64:
+	//	return setNumber(obj, val)
+	//case string:
+	//	return setString(obj, val)
+	//case time.Time:
+	//	return setTime(obj, val)
+	//case []byte:
+	//	return setBytes(obj, val)
+	//case bool:
+	//	if val {
+	//		return setNumber(obj, 1)
+	//	} else {
+	//		return setNumber(obj, 0)
+	//	}
+	//default:
+	//	if col.cusType != nil && col.cusType.typ == obj.Type() {
+	//		obj.Set(reflect.ValueOf(value))
+	//		return nil
+	//	}
+	//	return fmt.Errorf("can't assign value: %v to object of type: %v", value, obj.Type().Name())
+	//}
 	//err := setFieldValue(obj, col.cusType, dataSet.currentRow[colIndex])
 	//if err != nil {
 	//	return err

@@ -570,9 +570,11 @@ func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}
 	}
 	if fieldValue.Kind() == reflect.Ptr && fieldValue.Elem().Kind() == reflect.Interface {
 		fieldValue.Elem().Set(reflect.ValueOf(input))
+		return nil
 	}
 	if fieldValue.Kind() == reflect.Interface {
 		fieldValue.Set(reflect.ValueOf(input))
+		return nil
 	}
 	//if fieldValue.CanAddr() {
 	//	if scan, ok := fieldValue.Addr().Interface().(sql.Scanner); ok {

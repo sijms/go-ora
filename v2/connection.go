@@ -426,7 +426,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	// start check for context
 	session.StartContext(ctx)
 	defer session.EndContext()
-	err := session.Connect()
+	err := session.Connect(ctx)
 	if err != nil {
 		return err
 	}

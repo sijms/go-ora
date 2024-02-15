@@ -39,8 +39,8 @@ type SessionState struct {
 }
 
 type Session struct {
-	ctx               context.Context
-	oldCtx            context.Context
+	//ctx               context.Context
+	//oldCtx            context.Context
 	conn              net.Conn
 	sslConn           *tls.Conn
 	reader            *bufio.Reader
@@ -52,7 +52,7 @@ type Session struct {
 	outBuffer         bytes.Buffer
 	index             int
 	breakIndex        int
-	doneContext       chan struct{}
+	doneContext       []chan struct{}
 	TimeZone          []byte
 	TTCVersion        uint8
 	HasEOSCapability  bool
@@ -85,7 +85,7 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 		Tracer: trace.NilTracer(),
 	}
 	return &Session{
-		ctx:        context.Background(),
+		//ctx:        context.Background(),
 		conn:       nil,
 		inBuffer:   input,
 		index:      0,
@@ -100,7 +100,7 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 func NewSession(connOption *ConnectionOption) *Session {
 
 	return &Session{
-		ctx:             context.Background(),
+		//ctx:             context.Background(),
 		conn:            nil,
 		inBuffer:        nil,
 		index:           0,
@@ -177,14 +177,15 @@ func (session *Session) ResetBuffer() {
 }
 
 func (session *Session) StartContext(ctx context.Context) {
-	session.oldCtx = session.ctx
-	session.ctx = ctx
-	session.doneContext = make(chan struct{})
-	go func() {
+	//session.oldCtx = session.ctx
+	//session.ctx = ctx
+	done := make(chan struct{})
+	session.doneContext = append(session.doneContext, done)
+	go func(done chan struct{}) {
 		var err error
 		var tracer = session.Context.ConnOption.Tracer
 		select {
-		case <-session.doneContext:
+		case <-done:
 			return
 		case <-ctx.Done():
 			if session.Connected {
@@ -199,14 +200,27 @@ func (session *Session) StartContext(ctx context.Context) {
 				session.Disconnect()
 			}
 		}
-	}()
+	}(done)
 }
 func (session *Session) EndContext() {
-	if session.doneContext != nil {
-		close(session.doneContext)
-		session.doneContext = nil
+	index := len(session.doneContext) - 1
+	if index >= 0 {
+		done := session.doneContext[index]
+		if done != nil {
+			close(done)
+			done = nil
+		}
 	}
-	session.ctx = session.oldCtx
+	if index == 0 {
+		session.doneContext = nil
+	} else {
+		session.doneContext = session.doneContext[:index]
+	}
+	//if session.doneContext != nil {
+	//	close(session.doneContext)
+	//	session.doneContext = nil
+	//}
+	//session.ctx = session.oldCtx
 }
 
 func (session *Session) initRead() error {
@@ -452,7 +466,7 @@ func (session *Session) BreakConnection() error {
 // check if the client need to use SSL
 // then send connect packet to the server and
 // receive either accept, redirect or refuse packet
-func (session *Session) Connect() error {
+func (session *Session) Connect(ctx context.Context) error {
 	connOption := session.Context.ConnOption
 	session.Disconnect()
 	connOption.Tracer.Print("Connect")
@@ -482,9 +496,9 @@ func (session *Session) Connect() error {
 		}
 		addr := host.networkAddr()
 		if len(session.Context.ConnOption.UnixAddress) > 0 {
-			session.conn, err = dialer.DialContext(session.ctx, "unix", session.Context.ConnOption.UnixAddress)
+			session.conn, err = dialer.DialContext(ctx, "unix", session.Context.ConnOption.UnixAddress)
 		} else {
-			session.conn, err = dialer.DialContext(session.ctx, "tcp", addr)
+			session.conn, err = dialer.DialContext(ctx, "tcp", addr)
 		}
 
 		if err != nil {
@@ -548,7 +562,7 @@ func (session *Session) Connect() error {
 			connOption.AddServer(srv)
 		}
 		host = connOption.GetActiveServer(true)
-		return session.Connect()
+		return session.Connect(ctx)
 	}
 	if refusePacket, ok := pck.(*RefusePacket); ok {
 		refusePacket.extractErrCode()
@@ -564,7 +578,7 @@ func (session *Session) Connect() error {
 			session.Disconnect()
 			return &refusePacket.Err
 		}
-		return session.Connect()
+		return session.Connect(ctx)
 	}
 	return errors.New("connection refused by the server due to unknown reason")
 }

@@ -459,12 +459,10 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	//if len(conn.connOption.UserID) > 0 && len(conn.conStr.password) > 0 {
-	//
-	//} else {
-	//	err = conn.doOsAuth()
-	//}
 	err = conn.doAuth()
+	if errors.Is(err, network.ErrConnReset) {
+		err = conn.read()
+	}
 	if err != nil {
 		return err
 	}

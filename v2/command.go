@@ -250,9 +250,9 @@ func (stmt *defaultStmt) writeDefine() error {
 					// change data type in the original array
 					stmt.columns[index].DataType = LongRaw
 				} else {
-					col.DataType = LONG
+					col.DataType = LongVarChar
 					// change data type in the original array
-					stmt.columns[index].DataType = LONG
+					stmt.columns[index].DataType = LongVarChar
 				}
 			} else {
 				col.ContFlag |= 0x2000000
@@ -355,8 +355,7 @@ func (stmt *Stmt) writePars() error {
 		}
 		if par.DataType == REFCURSOR {
 			session.WriteBytes(&buffer, 1, 0)
-		} else if par.Direction == Input &&
-			(par.DataType == OCIClobLocator || par.DataType == OCIBlobLocator || par.DataType == OCIFileLocator) {
+		} else if par.Direction == Input && par.isLobType() {
 			if len(par.BValue) > 0 {
 				session.WriteUint(&buffer, len(par.BValue), 2, true, true)
 			}
@@ -609,7 +608,7 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 		for _, col := range stmt.columns {
 			if col.DataType == OCIClobLocator || col.DataType == OCIBlobLocator {
 				maxRowSize += 86
-			} else if col.DataType == LONG || col.DataType == LongRaw {
+			} else if col.DataType == LONG || col.DataType == LongRaw || col.DataType == LongVarChar {
 				maxRowSize += 2
 			} else if col.DataType == OCIFileLocator {
 				maxRowSize += 86
@@ -686,12 +685,10 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 		//m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
 		maxRowSize := 0
 		for _, col := range stmt.columns {
-			if col.DataType == OCIClobLocator || col.DataType == OCIBlobLocator {
+			if col.isLobType() {
 				maxRowSize += 86
-			} else if col.DataType == LONG || col.DataType == LongRaw {
+			} else if col.isLongType() {
 				maxRowSize += 2
-			} else if col.DataType == OCIFileLocator {
-				maxRowSize += 86
 			} else {
 				maxRowSize += col.MaxLen
 			}
@@ -871,7 +868,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 							if err != nil {
 								return err
 							}
-							if col.DataType == LONG || col.DataType == LongRaw {
+							if col.isLongType() {
 								_, err = session.GetInt(4, true, true)
 								if err != nil {
 									return err
@@ -1001,11 +998,10 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 				if err != nil {
 					return err
 				}
-				if stmt.columns[x].DataType == LONG || stmt.columns[x].DataType == LongRaw {
+				if stmt.columns[x].isLongType() {
 					stmt._hasLONG = true
 				}
-				if stmt.columns[x].DataType == OCIClobLocator || stmt.columns[x].DataType == OCIBlobLocator ||
-					stmt.columns[x].DataType == OCIFileLocator {
+				if stmt.columns[x].isLobType() {
 					stmt._hasBLOB = true
 				}
 			}

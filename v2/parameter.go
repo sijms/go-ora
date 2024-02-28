@@ -954,6 +954,12 @@ func (par *ParameterInfo) collectLocators() [][]byte {
 	return [][]byte{}
 }
 
+func (par *ParameterInfo) isLongType() bool {
+	return par.DataType == LONG || par.DataType == LongRaw || par.DataType == LongVarChar || par.DataType == LongVarRaw
+}
+func (par *ParameterInfo) isLobType() bool {
+	return par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator || par.DataType == OCIFileLocator
+}
 func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]byte, udt bool) error {
 	session := conn.session
 	var err error
@@ -1058,7 +1064,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 	}
 	//}
 	switch par.DataType {
-	case NCHAR, CHAR, LONG:
+	case NCHAR, CHAR, LONG, LongVarChar:
 		strConv, err := conn.getStrConv(par.CharsetID)
 		if err != nil {
 			return err

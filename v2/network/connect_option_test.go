@@ -35,6 +35,8 @@ func TestUpdateDatabaseInfo(t *testing.T) {
  (DESCRIPTION=(CONNECT_TIMEOUT=5)(ADDRESS=(PROTOCOL=TCP)
   (HOST=active_instance)(PORT=1521))
   (CONNECT_DATA=(SERVICE_NAME=SERVICE)(SERVER=DEDICATED))))`
+
+	text = `DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=host.com)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=service))(SECURITY=(SSL_SERVER_CERT_DN="CN=cname,O=org,L=location")))`
 	text = strings.ReplaceAll(text, "\r", "")
 	text = strings.ReplaceAll(text, "\n", "")
 	var op = &ConnectionOption{}

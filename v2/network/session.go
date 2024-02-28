@@ -15,6 +15,7 @@ import (
 	"net"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sijms/go-ora/v2/trace"
@@ -41,6 +42,7 @@ type SessionState struct {
 type Session struct {
 	//ctx               context.Context
 	//oldCtx            context.Context
+	mu                sync.Mutex
 	conn              net.Conn
 	sslConn           *tls.Conn
 	reader            *bufio.Reader
@@ -181,11 +183,13 @@ func (session *Session) StartContext(ctx context.Context) {
 	//session.ctx = ctx
 	done := make(chan struct{})
 	session.doneContext = append(session.doneContext, done)
-	go func(done chan struct{}) {
+	go func(idone chan struct{}, mu *sync.Mutex) {
+		mu.Lock()
+		defer mu.Unlock()
 		var err error
 		var tracer = session.Context.ConnOption.Tracer
 		select {
-		case <-done:
+		case <-idone:
 			return
 		case <-ctx.Done():
 			if session.Connected {
@@ -200,7 +204,7 @@ func (session *Session) StartContext(ctx context.Context) {
 				session.Disconnect()
 			}
 		}
-	}(done)
+	}(done, &session.mu)
 }
 func (session *Session) EndContext() {
 	index := len(session.doneContext) - 1

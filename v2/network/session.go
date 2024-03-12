@@ -117,6 +117,8 @@ func NewSession(connOption *ConnectionOption) *Session {
 // SaveState save current session state and accept new state
 // if new state is nil the session will be resetted
 func (session *Session) SaveState(newState *SessionState) {
+	session.mu.Lock()
+	defer session.mu.Unlock()
 	session.states = append(session.states, SessionState{
 		summary:   session.Summary,
 		sendPcks:  session.sendPcks,
@@ -173,6 +175,8 @@ func (session *Session) resetRead() {
 
 // ResetBuffer empty in and out buffer and set read index to 0
 func (session *Session) ResetBuffer() {
+	session.mu.Lock()
+	defer session.mu.Unlock()
 	session.Summary = nil
 	session.resetWrite()
 	session.resetRead()
@@ -184,8 +188,8 @@ func (session *Session) StartContext(ctx context.Context) {
 	done := make(chan struct{})
 	session.doneContext = append(session.doneContext, done)
 	go func(idone chan struct{}, mu *sync.Mutex) {
-		mu.Lock()
-		defer mu.Unlock()
+		//mu.Lock()
+		//defer mu.Unlock()
 		var err error
 		var tracer = session.Context.ConnOption.Tracer
 		select {
@@ -333,7 +337,9 @@ func (session *Session) negotiate() {
 }
 
 func (session *Session) ResetBreak() {
+	session.mu.Lock()
 	session.breakConn = false
+	session.mu.Unlock()
 }
 
 // IsBreak tell if the connection break elicit
@@ -437,10 +443,11 @@ func (session *Session) BreakConnection() error {
 			return err
 		}
 	}
+	session.mu.Lock()
 	session.breakConn = true
+	session.mu.Unlock()
 	return nil
 	//return session.readPacket()
-
 	//session.ResetBuffer()
 	//if done {
 	//	err = session.writePacket(newMarkerPacket(2, session.Context))
@@ -550,8 +557,10 @@ func (session *Session) Connect(ctx context.Context) error {
 	}
 
 	if acceptPacket, ok := pck.(*AcceptPacket); ok {
+		session.mu.Lock()
 		*session.Context = *acceptPacket.sessionCtx
 		session.Context.handshakeComplete = true
+		session.mu.Unlock()
 		connOption.Tracer.Print("Handshake Complete")
 		return nil
 	}
@@ -662,7 +671,9 @@ func (session *Session) Write() error {
 func (session *Session) processMarker() error {
 	var err error
 	// send reset connection
+	session.mu.Lock()
 	session.resetWrite()
+	session.mu.Unlock()
 	marker := newMarkerPacket(marker_type_reset, session.Context)
 	err = session.writePacket(marker)
 	if err != nil {
@@ -873,6 +884,8 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 
 // Write a packet to the network stream
 func (session *Session) writePacket(pck PacketInterface) error {
+	session.mu.Lock()
+	defer session.mu.Unlock()
 	session.sendPcks = append(session.sendPcks, pck)
 	tracer := session.Context.ConnOption.Tracer
 	tmp := pck.bytes()
@@ -1001,22 +1014,47 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			session.negotiate()
 			session.reader = bufio.NewReaderSize(session.sslConn, read_buffer_size)
 		}
-		for _, pck := range session.sendPcks {
-			//log.Printf("Request: %#v\n\n", pck.bytes())
-			err := session.initWrite()
-			if err != nil {
-				return nil, err
+		var resend = func() error {
+			session.mu.Lock()
+			defer session.mu.Unlock()
+			for _, pck := range session.sendPcks {
+				err := session.initWrite()
+				if err != nil {
+					return err
+				}
+				if session.sslConn != nil {
+					_, err = session.sslConn.Write(pck.bytes())
+				} else if session.conn != nil {
+					_, err = session.conn.Write(pck.bytes())
+				} else {
+					err = errors.New("attempt to write on closed connection")
+				}
+				if err != nil {
+					return err
+				}
 			}
-			if session.sslConn != nil {
-				_, err = session.sslConn.Write(pck.bytes())
-			} else if session.conn != nil {
-				_, err = session.conn.Write(pck.bytes())
-			} else {
-				return nil, errors.New("attempt to write on closed connection")
-			}
-			if err != nil {
-				return nil, err
-			}
+			return nil
+		}
+		//for _, pck := range session.sendPcks {
+		//	//log.Printf("Request: %#v\n\n", pck.bytes())
+		//	err := session.initWrite()
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	if session.sslConn != nil {
+		//		_, err = session.sslConn.Write(pck.bytes())
+		//	} else if session.conn != nil {
+		//		_, err = session.conn.Write(pck.bytes())
+		//	} else {
+		//		return nil, errors.New("attempt to write on closed connection")
+		//	}
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//}
+		err = resend()
+		if err != nil {
+			return nil, err
 		}
 		return session.readPacket()
 	case ACCEPT:

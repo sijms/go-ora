@@ -100,12 +100,12 @@ const (
 	Boolean                   TNSType = 0xFC
 )
 
-type ParameterType int
+//type ParameterType int
 
-const (
-	Number ParameterType = 1
-	String ParameterType = 2
-)
+//const (
+//	Number ParameterType = 1
+//	String ParameterType = 2
+//)
 
 type ParameterInfo struct {
 	Name                 string

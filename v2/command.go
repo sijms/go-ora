@@ -1277,6 +1277,13 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	stmt.arrayBindCount = 0
 	result, err := stmt._exec(args)
 	if errors.Is(err, network.ErrConnReset) {
+		if stmt._hasReturnClause {
+			dataSet := &DataSet{}
+			err = stmt.read(dataSet)
+			if !errors.Is(err, network.ErrConnReset) {
+				return nil, err
+			}
+		}
 		err = stmt.connection.read()
 		session := stmt.connection.session
 		if session.Summary != nil {

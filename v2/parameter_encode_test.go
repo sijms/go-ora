@@ -69,7 +69,7 @@ func TestEncodeValue(t *testing.T) {
 	// test number
 	par := &ParameterInfo{Direction: Input}
 	var err error
-	err = par.encodeValue(nil, -1, conn)
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -83,8 +83,8 @@ func TestEncodeValue(t *testing.T) {
 		t.Error(err)
 		return
 	}
-
-	err = par.encodeValue(5, -1, conn)
+	par.Value = 5
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -101,7 +101,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(10.9, -1, conn)
+	par.Value = 10.9
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -118,8 +119,9 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
+	par.Value = true
 	// test bool = true
-	err = par.encodeValue(true, -1, conn)
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -136,8 +138,9 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
+	par.Value = false
 	// test bool = true
-	err = par.encodeValue(false, -1, conn)
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -154,8 +157,9 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
+	par.Value = sql.NullBool{false, true}
 	// NullBool = false
-	err = par.encodeValue(sql.NullBool{false, true}, -1, conn)
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -172,8 +176,9 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
+	par.Value = sql.NullBool{true, false}
 	// NullBool = null
-	err = par.encodeValue(sql.NullBool{true, false}, -1, conn)
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -188,8 +193,9 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
+	par.Value = sql.NullInt32{25, true}
 	// NullInt32
-	err = par.encodeValue(sql.NullInt32{25, true}, -1, conn)
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -206,7 +212,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(sql.NullInt32{25, false}, -1, conn)
+	par.Value = sql.NullInt32{25, false}
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -222,7 +229,8 @@ func TestEncodeValue(t *testing.T) {
 	}
 
 	stringVal := "this is a test"
-	err = par.encodeValue(stringVal, -1, conn)
+	par.Value = stringVal
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -243,7 +251,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(sql.NullString{stringVal, false}, -1, conn)
+	par.Value = sql.NullString{stringVal, false}
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -261,7 +270,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(NVarChar(stringVal), -1, conn)
+	par.Value = NVarChar(stringVal)
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -282,7 +292,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(NullNVarChar{NVarChar(stringVal), false}, -1, conn)
+	par.Value = NullNVarChar{NVarChar(stringVal), false}
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -301,7 +312,8 @@ func TestEncodeValue(t *testing.T) {
 	}
 
 	timeVal := time.Date(2023, 5, 28, 23, 38, 11, 500, time.Local)
-	err = par.encodeValue(timeVal, -1, conn)
+	par.Value = timeVal
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -320,7 +332,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(sql.NullTime{time.Now(), false}, -1, conn)
+	par.Value = sql.NullTime{timeVal, false}
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -335,7 +348,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(TimeStamp(timeVal), -1, conn)
+	par.Value = TimeStamp(timeVal)
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -354,7 +368,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(NullTimeStamp{TimeStamp(time.Now()), false}, -1, conn)
+	par.Value = NullTimeStamp{TimeStamp(time.Now()), false}
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -369,7 +384,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(TimeStampTZ(timeVal), -1, conn)
+	par.Value = TimeStampTZ(timeVal)
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -388,7 +404,8 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	err = par.encodeValue(NullTimeStampTZ{TimeStampTZ(time.Now()), false}, -1, conn)
+	par.Value = NullTimeStampTZ{TimeStampTZ(time.Now()), false}
+	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return

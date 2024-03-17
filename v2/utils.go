@@ -1424,7 +1424,7 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 		tempPar.Value = nil
 		return
 	}
-	typeErr := fmt.Errorf("error passing field %s as type %s", fieldValue.Type().Name, _type)
+	typeErr := fmt.Errorf("error passing field %s as type %s", fieldValue.Type().Name(), _type)
 	switch _type {
 	case "number":
 		//var fieldVal float64

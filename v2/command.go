@@ -1309,12 +1309,18 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 						fieldValue := structVal.Field(i)
 						fieldType := structVal.Field(i).Type()
 						switch tempVal := par.Value.(type) {
-						case *sql.NullFloat64:
-							if tempVal.Valid {
-								err = setNumber(fieldValue, tempVal.Float64)
-							} else {
+						case *Number:
+							if tempVal == nil {
 								fieldValue.Set(reflect.Zero(fieldType))
+							} else {
+								err = setNumber(fieldValue, tempVal)
 							}
+						//case *sql.NullFloat64:
+						//	if tempVal.Valid {
+						//		err = setNumber(fieldValue, tempVal.Float64)
+						//	} else {
+						//		fieldValue.Set(reflect.Zero(fieldType))
+						//	}
 						case *sql.NullString:
 							if tempVal.Valid {
 								err = setString(fieldValue, tempVal.String)
@@ -1436,14 +1442,13 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
 		switch _type {
 		case "number":
-			var fieldVal = &sql.NullFloat64{}
+			var fieldVal *Number
 			if !hasNullValue {
-				fieldVal.Float64, err = getFloat(fieldValue)
+				fieldVal, err = NewNumber(fieldValue)
 				if err != nil {
 					err = typeErr
 					return
 				}
-				fieldVal.Valid = true
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "varchar":

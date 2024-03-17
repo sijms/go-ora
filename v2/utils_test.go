@@ -152,97 +152,98 @@ func TestGetInt(t *testing.T) {
 		t.Error(err)
 	}
 }
-func TestGetFloat(t *testing.T) {
-	checkGetFloat := func(testedValue interface{}, expectedValue float64) error {
-		val, err := getFloat(testedValue)
-		if err != nil {
-			return err
-		}
-		if val != expectedValue {
-			return fmt.Errorf("passing %v to getFloat and recieve %v", testedValue, val)
-		}
-		return nil
-	}
-	// passing nil
-	err := checkGetFloat(nil, 0)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing float
-	err = checkGetFloat(3.35, 3.35)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing float32
-	err = checkGetFloat(float32(5.78), 5.78)
-	if err != nil {
-		t.Error(err)
-	}
-	//passing int
-	err = checkGetFloat(5, 5)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing int64
-	err = checkGetFloat(int64(7), 7)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing *float
-	tempFloat := float32(5.78)
-	err = checkGetFloat(&tempFloat, 5.78)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing *int
-	tempInt := 9
-	err = checkGetFloat(&tempInt, 9)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing NullFlat
-	err = checkGetFloat(sql.NullFloat64{5.43, true}, 5.43)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing NullInt
-	err = checkGetFloat(sql.NullInt64{2, true}, 2)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing *NullFloat
-	err = checkGetFloat(&sql.NullFloat64{8.44, true}, 8.44)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing *NullInt
-	err = checkGetFloat(&sql.NullInt64{10, true}, 10)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing string
-	err = checkGetFloat("10.8", 10.8)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing *string
-	tempString := "11.70"
-	err = checkGetFloat(&tempString, 11.7)
-	if err != nil {
-		t.Error(err)
-	}
 
-	// passing NullString
-	err = checkGetFloat(sql.NullString{"12.8", true}, 12.8)
-	if err != nil {
-		t.Error(err)
-	}
-	// passing *NullString
-	err = checkGetFloat(&sql.NullString{"13.2", true}, 13.2)
-	if err != nil {
-		t.Error(err)
-	}
-}
+//func TestGetFloat(t *testing.T) {
+//	checkGetFloat := func(testedValue interface{}, expectedValue float64) error {
+//		val, err := getFloat(testedValue)
+//		if err != nil {
+//			return err
+//		}
+//		if val != expectedValue {
+//			return fmt.Errorf("passing %v to getFloat and recieve %v", testedValue, val)
+//		}
+//		return nil
+//	}
+//	// passing nil
+//	err := checkGetFloat(nil, 0)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing float
+//	err = checkGetFloat(3.35, 3.35)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing float32
+//	err = checkGetFloat(float32(5.78), 5.78)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	//passing int
+//	err = checkGetFloat(5, 5)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing int64
+//	err = checkGetFloat(int64(7), 7)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing *float
+//	tempFloat := float32(5.78)
+//	err = checkGetFloat(&tempFloat, 5.78)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing *int
+//	tempInt := 9
+//	err = checkGetFloat(&tempInt, 9)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing NullFlat
+//	err = checkGetFloat(sql.NullFloat64{5.43, true}, 5.43)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing NullInt
+//	err = checkGetFloat(sql.NullInt64{2, true}, 2)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing *NullFloat
+//	err = checkGetFloat(&sql.NullFloat64{8.44, true}, 8.44)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing *NullInt
+//	err = checkGetFloat(&sql.NullInt64{10, true}, 10)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing string
+//	err = checkGetFloat("10.8", 10.8)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing *string
+//	tempString := "11.70"
+//	err = checkGetFloat(&tempString, 11.7)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//
+//	// passing NullString
+//	err = checkGetFloat(sql.NullString{"12.8", true}, 12.8)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//	// passing *NullString
+//	err = checkGetFloat(&sql.NullString{"13.2", true}, 13.2)
+//	if err != nil {
+//		t.Error(err)
+//	}
+//}
 
 func TestSetString(t *testing.T) {
 	var intVar int

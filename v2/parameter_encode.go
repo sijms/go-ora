@@ -95,6 +95,9 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 	}
 
 	switch goType {
+	case tyNumber:
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
 	case tyPLBool:
 		par.DataType = Boolean
 		par.MaxLen = converters.MAX_LEN_BOOL
@@ -272,7 +275,7 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 			return err
 		}
 	case NUMBER:
-		par.iPrimValue, err = getNumber(val)
+		par.iPrimValue, err = NewNumber(val)
 		if err != nil {
 			return err
 		}
@@ -379,15 +382,17 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 		} else {
 			par.BValue = nil
 		}
-	case float64:
-		par.BValue, err = converters.EncodeDouble(value)
-		if err != nil {
-			return err
-		}
-	case int64:
-		par.BValue = converters.EncodeInt64(value)
-	case uint64:
-		par.BValue = converters.EncodeUint64(value)
+	//case float64:
+	//	par.BValue, err = converters.EncodeDouble(value)
+	//	if err != nil {
+	//		return err
+	//	}
+	//case int64:
+	//	par.BValue = converters.EncodeInt64(value)
+	//case uint64:
+	//	par.BValue = converters.EncodeUint64(value)
+	case *Number:
+		par.BValue = value.data
 	case bool:
 		par.BValue = converters.EncodeBool(value)
 	case string:

@@ -45,6 +45,7 @@ var (
 	tyRefCursor       = reflect.TypeOf((*RefCursor)(nil)).Elem()
 	tyPLBool          = reflect.TypeOf((*PLBool)(nil)).Elem()
 	tyObject          = reflect.TypeOf((*Object)(nil)).Elem()
+	tyNumber          = reflect.TypeOf((*Number)(nil)).Elem()
 )
 
 func refineSqlText(text string) string {
@@ -259,85 +260,49 @@ func getBool(col interface{}) (bool, error) {
 	rValue := reflect.ValueOf(col)
 	return rValue.Bool(), nil
 }
-func getNumber(col interface{}) (interface{}, error) {
-	var err error
-	col, err = getValue(col)
-	if err != nil {
-		return int64(0), err
-	}
-	if col == nil {
-		return int64(0), nil
-	}
-	rType := reflect.TypeOf(col)
-	rValue := reflect.ValueOf(col)
-	if tSigned(rType) {
-		return rValue.Int(), nil
-	}
-	if tUnsigned(rType) {
-		return rValue.Uint(), nil
-	}
-	if f32, ok := col.(float32); ok {
-		return strconv.ParseFloat(fmt.Sprint(f32), 64)
-	}
-	if tFloat(rType) {
-		return rValue.Float(), nil
-	}
-	switch rType.Kind() {
-	case reflect.Bool:
-		if rValue.Bool() {
-			return int64(1), nil
-		} else {
-			return int64(0), nil
-		}
-	case reflect.String:
-		tempFloat, err := strconv.ParseFloat(rValue.String(), 64)
-		if err != nil {
-			return 0, err
-		}
-		return tempFloat, nil
-	default:
-		return 0, errors.New("conversion of unsupported type to number")
-	}
-}
+
+//func getNumber(col interface{}) (*Number, error) {
+//
+//}
 
 // get prim float64 from supported types
-func getFloat(col interface{}) (float64, error) {
-	var err error
-	col, err = getValue(col)
-	if err != nil {
-		return 0, err
-	}
-	if col == nil {
-		return 0, nil
-	}
-	rType := reflect.TypeOf(col)
-	rValue := reflect.ValueOf(col)
-	if tInteger(rType) {
-		return float64(rValue.Int()), nil
-	}
-	if f32, ok := col.(float32); ok {
-		return strconv.ParseFloat(fmt.Sprint(f32), 64)
-	}
-	if tFloat(rType) {
-		return rValue.Float(), nil
-	}
-	switch rType.Kind() {
-	case reflect.Bool:
-		if rValue.Bool() {
-			return 1, nil
-		} else {
-			return 0, nil
-		}
-	case reflect.String:
-		tempFloat, err := strconv.ParseFloat(rValue.String(), 64)
-		if err != nil {
-			return 0, err
-		}
-		return tempFloat, nil
-	default:
-		return 0, errors.New("conversion of unsupported type to float")
-	}
-}
+//func getFloat(col interface{}) (float64, error) {
+//	var err error
+//	col, err = getValue(col)
+//	if err != nil {
+//		return 0, err
+//	}
+//	if col == nil {
+//		return 0, nil
+//	}
+//	rType := reflect.TypeOf(col)
+//	rValue := reflect.ValueOf(col)
+//	if tInteger(rType) {
+//		return float64(rValue.Int()), nil
+//	}
+//	if f32, ok := col.(float32); ok {
+//		return strconv.ParseFloat(fmt.Sprint(f32), 64)
+//	}
+//	if tFloat(rType) {
+//		return rValue.Float(), nil
+//	}
+//	switch rType.Kind() {
+//	case reflect.Bool:
+//		if rValue.Bool() {
+//			return 1, nil
+//		} else {
+//			return 0, nil
+//		}
+//	case reflect.String:
+//		tempFloat, err := strconv.ParseFloat(rValue.String(), 64)
+//		if err != nil {
+//			return 0, err
+//		}
+//		return tempFloat, nil
+//	default:
+//		return 0, errors.New("conversion of unsupported type to float")
+//	}
+//}
 
 // get prim int64 value from supported types
 func getInt(col interface{}) (int64, error) {
@@ -587,10 +552,14 @@ func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}
 	//}
 
 	switch val := input.(type) {
-	case int64:
-		return setNumber(fieldValue, float64(val))
-	case float64:
-		return setNumber(fieldValue, val)
+	case int64, float64:
+		num, err := NewNumber(val)
+		if err != nil {
+			return err
+		}
+		return setNumber(fieldValue, num)
+	//case float64:
+	//	return setNumber(fieldValue, val)
 	case string:
 		return setString(fieldValue, val)
 	case time.Time:
@@ -858,6 +827,12 @@ func setString(value reflect.Value, input string) error {
 		return floatErr
 	}
 	switch value.Type() {
+	case tyNumber:
+		tempNum, err := NewNumberFromString(input)
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(*tempNum))
 	case tyBool:
 		if strings.ToLower(input) == "true" {
 			value.SetBool(true)
@@ -970,7 +945,7 @@ func setString(value reflect.Value, input string) error {
 //		}
 //	}
 
-func setNumber(value reflect.Value, input float64) error {
+func setNumber(value reflect.Value, input *Number) error {
 	if value.Kind() == reflect.Ptr {
 		if value.IsNil() {
 			value.Set(reflect.New(value.Type().Elem()))
@@ -978,38 +953,82 @@ func setNumber(value reflect.Value, input float64) error {
 		return setNumber(value.Elem(), input)
 	}
 	if tSigned(value.Type()) {
-		value.SetInt(int64(input))
+		temp, err := input.Int64()
+		if err != nil {
+			return err
+		}
+		value.SetInt(temp)
 		return nil
 	}
 	if tUnsigned(value.Type()) {
-		value.SetUint(uint64(input))
+		temp, err := input.Uint64()
+		if err != nil {
+			return err
+		}
+		value.SetUint(temp)
 		return nil
 	}
 	if tFloat(value.Type()) {
-		value.SetFloat(input)
+		temp, err := input.Float64()
+		if err != nil {
+			return err
+		}
+		value.SetFloat(temp)
 		return nil
 	}
 	switch value.Type() {
 	case tyBool:
-		value.SetBool(input != 0)
+		value.SetBool(!input.isZero())
 	case tyString:
-		value.SetString(fmt.Sprintf("%v", input))
+		temp, err := input.String()
+		if err != nil {
+			return err
+		}
+		value.SetString(temp)
 	case tyNullString:
-		value.Set(reflect.ValueOf(sql.NullString{fmt.Sprintf("%v", input), true}))
+		temp, err := input.String()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(sql.NullString{temp, true}))
 	case tyNullByte:
-		value.Set(reflect.ValueOf(sql.NullByte{uint8(input), true}))
+		temp, err := input.Int64()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(sql.NullByte{uint8(temp), true}))
 	case tyNullInt16:
-		value.Set(reflect.ValueOf(sql.NullInt16{int16(input), true}))
+		temp, err := input.Int64()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(sql.NullInt16{int16(temp), true}))
 	case tyNullInt32:
-		value.Set(reflect.ValueOf(sql.NullInt32{int32(input), true}))
+		temp, err := input.Int64()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(sql.NullInt32{int32(temp), true}))
 	case tyNullInt64:
-		value.Set(reflect.ValueOf(sql.NullInt64{int64(input), true}))
+		temp, err := input.Int64()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(sql.NullInt64{temp, true}))
 	case tyNullFloat64:
-		value.Set(reflect.ValueOf(sql.NullFloat64{input, true}))
+		temp, err := input.Float64()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(sql.NullFloat64{temp, true}))
 	case tyNullBool:
-		value.Set(reflect.ValueOf(sql.NullBool{input != 0, true}))
+		value.Set(reflect.ValueOf(sql.NullBool{!input.isZero(), true}))
 	case tyNullNVarChar:
-		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(fmt.Sprintf("%v", input)), true}))
+		temp, err := input.String()
+		if err != nil {
+			return err
+		}
+		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(temp), true}))
 	default:
 		if temp, ok := value.Interface().(sql.Scanner); ok {
 			if temp != nil && !reflect.ValueOf(temp).IsNil() {
@@ -1409,7 +1428,7 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 	switch _type {
 	case "number":
 		//var fieldVal float64
-		tempPar.Value, err = getFloat(fieldValue.Interface())
+		tempPar.Value, err = NewNumber(fieldValue.Interface()) //getFloat(fieldValue.Interface())
 		if err != nil {
 			err = typeErr
 			return

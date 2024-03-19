@@ -1281,6 +1281,9 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 			dataSet := &DataSet{}
 			err = stmt.read(dataSet)
 			if !errors.Is(err, network.ErrConnReset) {
+				if isBadConn(err) {
+					stmt.connection.setBad()
+				}
 				return nil, err
 			}
 		}
@@ -1294,7 +1297,6 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 		if isBadConn(err) {
 			//tracer.Print("Error: ", err)
 			stmt.connection.setBad()
-			return nil, err
 		}
 		return nil, err
 	}

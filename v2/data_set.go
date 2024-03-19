@@ -54,9 +54,12 @@ func (dataSet *DataSet) load(session *network.Session) error {
 		return err
 	}
 	columnCount += num * 0x100
-	if columnCount > dataSet.columnCount {
+	if dataSet.columnCount == 0 {
 		dataSet.columnCount = columnCount
 	}
+	//if columnCount > dataSet.columnCount {
+	//	dataSet.columnCount = columnCount
+	//}
 	if len(dataSet.currentRow) != dataSet.columnCount {
 		dataSet.currentRow = make(Row, dataSet.columnCount)
 	}

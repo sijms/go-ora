@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"sync"
 )
 
 type DataPacket struct {
@@ -23,9 +24,11 @@ func (pck *DataPacket) bytes() []byte {
 	return ret.Bytes()
 }
 
-func newDataPacket(initialData []byte, sessionCtx *SessionContext) (*DataPacket, error) {
+func newDataPacket(initialData []byte, sessionCtx *SessionContext, mu *sync.Mutex) (*DataPacket, error) {
 	//var outputData []byte = initialData
 	var err error
+	mu.Lock()
+	defer mu.Unlock()
 	if sessionCtx.AdvancedService.HashAlgo != nil {
 		hashData := sessionCtx.AdvancedService.HashAlgo.Compute(initialData)
 		initialData = append(initialData, hashData...)

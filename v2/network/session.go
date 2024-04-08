@@ -679,6 +679,18 @@ func (session *Session) processMarker() error {
 	if err != nil {
 		return err
 	}
+	if session.Context.AdvancedService.HashAlgo != nil {
+		err = session.Context.AdvancedService.HashAlgo.Init()
+		if err != nil {
+			return err
+		}
+	}
+	if session.Context.AdvancedService.CryptAlgo != nil {
+		err = session.Context.AdvancedService.CryptAlgo.Reset()
+		if err != nil {
+			return err
+		}
+	}
 	_, err = session.readPacket()
 	if err != nil {
 		return err
@@ -700,18 +712,6 @@ func (session *Session) processMarker() error {
 	//	}
 	//}
 
-	if session.Context.AdvancedService.HashAlgo != nil {
-		err = session.Context.AdvancedService.HashAlgo.Init()
-		if err != nil {
-			return err
-		}
-	}
-	if session.Context.AdvancedService.CryptAlgo != nil {
-		err = session.Context.AdvancedService.CryptAlgo.Reset()
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 	//breakConn, resetConn := false, false
 

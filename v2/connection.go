@@ -395,7 +395,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	if len(conn.conStr.traceDir) > 0 {
 		if err := os.MkdirAll(conn.conStr.traceDir, os.ModePerm); err == nil {
 			now := time.Now()
-			traceFileName := fmt.Sprintf("traces/trace_%d_%02d_%02d_%02d_%02d_%02d_%d.log",
+			traceFileName := fmt.Sprintf("%s/trace_%d_%02d_%02d_%02d_%02d_%02d_%d.log", conn.conStr.traceDir,
 				now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(),
 				now.Nanosecond())
 			if tr, err := os.Create(traceFileName); err == nil {

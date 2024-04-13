@@ -61,7 +61,9 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext, mu *sync.Mute
 	}, nil
 }
 
-func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext) (*DataPacket, error) {
+func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, mu *sync.Mutex) (*DataPacket, error) {
+	mu.Lock()
+	defer mu.Unlock()
 	if len(packetData) < 0xA || PacketType(packetData[4]) != DATA {
 		return nil, errors.New("Not data packet")
 	}

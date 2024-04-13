@@ -54,15 +54,6 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Con
 			return nil, err
 		}
 		switch messageCode {
-		//case 4:
-		//	session.Summary, err = network.NewSummary(session)
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//	if session.HasError() {
-		//		return nil, session.GetError()
-		//	}
-		//	loop = false
 		case 8:
 			dictLen, err := session.GetInt(4, true, true)
 			if err != nil {

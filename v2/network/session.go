@@ -175,13 +175,16 @@ func (session *Session) resetRead() {
 
 // ResetBuffer empty in and out buffer and set read index to 0
 func (session *Session) ResetBuffer() {
-	session.mu.Lock()
-	defer session.mu.Unlock()
 	session.Summary = nil
 	session.resetWrite()
 	session.resetRead()
 }
 
+func (session *Session) SetConnected() {
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	session.Connected = true
+}
 func (session *Session) StartContext(ctx context.Context) {
 	//session.oldCtx = session.ctx
 	//session.ctx = ctx
@@ -196,7 +199,10 @@ func (session *Session) StartContext(ctx context.Context) {
 		case <-idone:
 			return
 		case <-ctx.Done():
-			if session.Connected {
+			session.mu.Lock()
+			connected := session.Connected
+			session.mu.Unlock()
+			if connected {
 				if err = session.BreakConnection(); err != nil {
 					tracer.Print("Connection Break Error: ", err)
 				}
@@ -607,7 +613,9 @@ func (session *Session) WriteFinalPacket() error {
 
 // Disconnect close the network and release resources
 func (session *Session) Disconnect() {
-	session.ResetBuffer()
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	//session.ResetBuffer()
 	if session.sslConn != nil {
 		_ = session.sslConn.Close()
 		session.sslConn = nil
@@ -924,12 +932,17 @@ func (session *Session) GetError() *OracleError {
 }
 
 func (session *Session) readAll(size int) error {
+	session.mu.Lock()
+	defer session.mu.Unlock()
 	index := 0
 	tempBuffer := make([]byte, size)
 	var err error
 	var temp int
 	session.remainingBytes = size
 	for index < size {
+		if session.conn == nil || session.sslConn == nil {
+			return errors.New("closed connection")
+		}
 		err = session.initRead()
 		if err != nil {
 			return err
@@ -1068,7 +1081,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		if uint16(pck.length) <= pck.dataOffset {
 			err = session.readPacketData()
 			packetData = session.lastPacket.Bytes()
-			dataPck, err := newDataPacketFromData(packetData, session.Context)
+			dataPck, err := newDataPacketFromData(packetData, session.Context, &session.mu)
 			if err != nil {
 				return nil, err
 			}
@@ -1086,7 +1099,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return pck, nil
 	case DATA:
-		dataPck, err := newDataPacketFromData(packetData, session.Context)
+		dataPck, err := newDataPacketFromData(packetData, session.Context, &session.mu)
 		if dataPck != nil {
 			if session.Context.ConnOption.SSL && (dataPck.dataFlag&0x8000 > 0 || dataPck.flag&0x80 > 0) {
 				session.negotiate()

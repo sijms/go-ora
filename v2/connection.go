@@ -471,7 +471,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	conn.session.Connected = true
+	conn.session.SetConnected()
 	tracer.Print("Connected")
 	tracer.Print("Database Version: ", conn.dBVersion.Text)
 	sessionID, err := strconv.ParseUint(conn.SessionProperties["AUTH_SESSION_ID"], 10, 32)

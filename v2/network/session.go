@@ -940,7 +940,7 @@ func (session *Session) readAll(size int) error {
 	var temp int
 	session.remainingBytes = size
 	for index < size {
-		if session.conn == nil || session.sslConn == nil {
+		if session.conn == nil && session.sslConn == nil {
 			return errors.New("closed connection")
 		}
 		err = session.initRead()

@@ -242,7 +242,7 @@ func (stmt *defaultStmt) writeDefine() error {
 		if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
 			num = 0
 			//temp.ContFlag |= 0x2000000
-			if stmt.connection.connOption.Lob == 0 {
+			if stmt.connection.connOption.Lob == 0 && !col.IsJson {
 				num = 0x3FFFFFFF
 				//col.MaxCharLen = 0
 				if col.DataType == OCIBlobLocator {
@@ -257,7 +257,7 @@ func (stmt *defaultStmt) writeDefine() error {
 			} else {
 				col.ContFlag |= 0x2000000
 				//num = 0x7FFFFFFF
-				//col.MaxCharLen = 0x8000
+				col.MaxCharLen = 0x8000
 			}
 		} else {
 			col.ContFlag = 0
@@ -580,9 +580,9 @@ func (stmt *Stmt) getExeOption() int {
 	if !stmt.parse && !stmt.execute {
 		op |= 0x40
 	}
-	if len(stmt.Pars) > 0 && !stmt.define {
+	if len(stmt.Pars) > 0 {
 		op |= 0x8
-		if stmt.stmtType == PLSQL || stmt._hasReturnClause {
+		if stmt.stmtType == PLSQL || (stmt._hasReturnClause && !stmt.reSendParDef) {
 			op |= 0x400
 		}
 	}
@@ -2373,7 +2373,7 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	//	}
 	//}
 	// deal with lobs
-	if stmt._hasBLOB && stmt.connection.connOption.Lob == 0 {
+	if (stmt._hasBLOB || stmt._hasLONG) && stmt.connection.connOption.Lob == 0 {
 		stmt.define = true
 		stmt.execute = false
 		stmt.parse = false

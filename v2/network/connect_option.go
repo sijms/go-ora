@@ -62,7 +62,7 @@ type SessionInfo struct {
 	SSLVerify             bool
 	Dialer                DialerContext
 }
-type AdvNegoSeviceInfo struct {
+type AdvNegoServiceInfo struct {
 	AuthService     []string
 	EncServiceLevel int
 	IntServiceLevel int
@@ -71,22 +71,24 @@ type ConnectionOption struct {
 	ClientInfo
 	DatabaseInfo
 	SessionInfo
-	AdvNegoSeviceInfo
+	AdvNegoServiceInfo
 	Tracer       trace.Tracer
+	TraceDir     string
 	PrefetchRows int
-	Failover     int
-	RetryTime    int
 	Lob          int
+	//Failover     int
+	//RetryTime    int
+
 }
 
 func extractServers(connStr string) ([]ServerAddr, error) {
-	r, err := regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w,\.,\-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(COMMUNITY)\s*=\s*([\w,\.,\-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\)\s*)+\)`)
+	r, err := regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w.-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(COMMUNITY)\s*=\s*([\w.-]+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\)\s*)+\)`)
 	if err != nil {
 		return nil, err
 	}
 	ret := make([]ServerAddr, 0, 5)
-	matchs := r.FindAllStringSubmatch(connStr, -1)
-	for _, match := range matchs {
+	matches := r.FindAllStringSubmatch(connStr, -1)
+	for _, match := range matches {
 		server := ServerAddr{
 			Port: 1521,
 		}
@@ -116,71 +118,71 @@ func extractServers(connStr string) ([]ServerAddr, error) {
 	return ret, nil
 }
 
-func (op *ConnectionOption) updateSSL(server *ServerAddr) error {
+func (si *SessionInfo) updateSSL(server *ServerAddr) error {
 	if server != nil {
 		if strings.ToLower(server.Protocol) == "tcps" {
-			op.SSL = true
+			si.SSL = true
 			return nil
 		} else if strings.ToLower(server.Protocol) == "tcp" {
-			op.SSL = false
+			si.SSL = false
 			return nil
 		}
 	}
-	if strings.ToLower(op.Protocol) == "tcp" {
-		op.SSL = false
-	} else if strings.ToLower(op.Protocol) == "tcps" {
-		op.SSL = true
+	if strings.ToLower(si.Protocol) == "tcp" {
+		si.SSL = false
+	} else if strings.ToLower(si.Protocol) == "tcps" {
+		si.SSL = true
 	} else {
-		return fmt.Errorf("unknown or missing protocol: %s", op.Protocol)
+		return fmt.Errorf("unknown or missing protocol: %s", si.Protocol)
 	}
 	return nil
 }
 
-func (op *ConnectionOption) UpdateDatabaseInfo(connStr string) error {
+func (info *DatabaseInfo) UpdateDatabaseInfo(connStr string) error {
 	connStr = strings.ReplaceAll(connStr, "\r", "")
 	connStr = strings.ReplaceAll(connStr, "\n", "")
-	op.connStr = connStr
+	info.connStr = connStr
 	var err error
-	op.Servers, err = extractServers(connStr)
+	info.Servers, err = extractServers(connStr)
 	if err != nil {
 		return err
 	}
-	if len(op.Servers) == 0 {
+	if len(info.Servers) == 0 {
 		return errors.New("no address passed in connection string")
 	}
-	r, err := regexp.Compile(`(?i)\(\s*SERVICE_NAME\s*=\s*([\w,\.,\-]+)\s*\)`)
+	r, err := regexp.Compile(`(?i)\(\s*SERVICE_NAME\s*=\s*([\w.\-]+)\s*\)`)
 	if err != nil {
 		return err
 	}
 	match := r.FindStringSubmatch(connStr)
 	if len(match) > 1 {
-		op.DatabaseInfo.ServiceName = match[1]
+		info.ServiceName = match[1]
 	}
-	r, err = regexp.Compile(`(?i)\(\s*SID\s*=\s*([\w,\.,\-]+)\s*\)`)
+	r, err = regexp.Compile(`(?i)\(\s*SID\s*=\s*([\w.\-]+)\s*\)`)
 	if err != nil {
 		return err
 	}
 	match = r.FindStringSubmatch(connStr)
 	if len(match) > 1 {
-		op.DatabaseInfo.SID = match[1]
+		info.SID = match[1]
 	}
-	r, err = regexp.Compile(`(?i)\(\s*INSTANCE_NAME\s*=\s*([\w,\.,\-]+)\s*\)`)
+	r, err = regexp.Compile(`(?i)\(\s*INSTANCE_NAME\s*=\s*([\w.\-]+)\s*\)`)
 	if err != nil {
 		return err
 	}
 	match = r.FindStringSubmatch(connStr)
 	if len(match) > 1 {
-		op.DatabaseInfo.InstanceName = match[1]
+		info.InstanceName = match[1]
 	}
 	return nil
 }
-func (op *ConnectionOption) AddServer(server ServerAddr) {
-	for i := 0; i < len(op.Servers); i++ {
-		if server.IsEqual(&op.Servers[i]) {
+func (info *DatabaseInfo) AddServer(server ServerAddr) {
+	for i := 0; i < len(info.Servers); i++ {
+		if server.IsEqual(&info.Servers[i]) {
 			return
 		}
 	}
-	op.Servers = append(op.Servers, server)
+	info.Servers = append(info.Servers, server)
 }
 func (serv *ServerAddr) IsEqual(input *ServerAddr) bool {
 	return strings.ToUpper(serv.Addr) == strings.ToUpper(input.Addr) &&
@@ -189,17 +191,17 @@ func (serv *ServerAddr) IsEqual(input *ServerAddr) bool {
 func (serv *ServerAddr) networkAddr() string {
 	return net.JoinHostPort(serv.Addr, strconv.Itoa(serv.Port))
 }
-func (op *ConnectionOption) ResetServerIndex() {
-	op.serverIndex = 0
+func (info *DatabaseInfo) ResetServerIndex() {
+	info.serverIndex = 0
 }
-func (op *ConnectionOption) GetActiveServer(jump bool) *ServerAddr {
+func (info *DatabaseInfo) GetActiveServer(jump bool) *ServerAddr {
 	if jump {
-		op.serverIndex++
+		info.serverIndex++
 	}
-	if op.serverIndex >= len(op.Servers) {
+	if info.serverIndex >= len(info.Servers) {
 		return nil
 	}
-	return &op.Servers[op.serverIndex]
+	return &info.Servers[info.serverIndex]
 }
 
 func (op *ConnectionOption) ConnectionData() string {

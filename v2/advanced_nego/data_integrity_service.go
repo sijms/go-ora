@@ -18,7 +18,7 @@ type dataIntegrityService struct {
 	iV        []byte
 }
 
-func NewDataIntegrityService(comm *AdvancedNegoComm) (*dataIntegrityService, error) {
+func newDataIntegrityService(comm *AdvancedNegoComm) (*dataIntegrityService, error) {
 	output := &dataIntegrityService{
 		defaultService: defaultService{
 			comm:                  comm,

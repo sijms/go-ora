@@ -79,7 +79,7 @@ type Session struct {
 
 func NewSessionWithInputBufferForDebug(input []byte) *Session {
 	options := &ConnectionOption{
-		AdvNegoSeviceInfo: AdvNegoSeviceInfo{AuthService: nil},
+		AdvNegoServiceInfo: AdvNegoServiceInfo{AuthService: nil},
 		SessionInfo: SessionInfo{
 			SessionDataUnitSize:   0xFFFF,
 			TransportDataUnitSize: 0xFFFF,
@@ -485,6 +485,7 @@ func (session *Session) BreakConnection() error {
 // receive either accept, redirect or refuse packet
 func (session *Session) Connect(ctx context.Context) error {
 	connOption := session.Context.ConnOption
+	session.ResetBuffer()
 	session.Disconnect()
 	connOption.Tracer.Print("Connect")
 	var err error

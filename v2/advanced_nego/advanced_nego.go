@@ -8,7 +8,7 @@ import (
 	"net"
 )
 
-var version int = 0xB200200
+var version = 0xB200200
 
 type KerberosAuthInterface interface {
 	Authenticate(server, service string) ([]byte, error)
@@ -16,7 +16,7 @@ type KerberosAuthInterface interface {
 
 var kerberosAuth KerberosAuthInterface = nil
 
-// Set Kerberos5 Authentication inferface used for kerberos authentication
+// SetKerberosAuth Set Kerberos5 Authentication interface used for kerberos authentication
 func SetKerberosAuth(input KerberosAuthInterface) {
 	kerberosAuth = input
 }
@@ -32,19 +32,19 @@ func NewAdvNego(session *network.Session) (*AdvNego, error) {
 		serviceList: make([]AdvNegoService, 5),
 	}
 	var err error
-	output.serviceList[1], err = NewAuthService(output.comm)
+	output.serviceList[1], err = newAuthService(output.comm)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[2], err = NewEncryptService(output.comm)
+	output.serviceList[2], err = newEncryptService(output.comm)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[3], err = NewDataIntegrityService(output.comm)
+	output.serviceList[3], err = newDataIntegrityService(output.comm)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[4], err = NewSupervisorService(output.comm)
+	output.serviceList[4], err = newSupervisorService(output.comm)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +117,8 @@ func (nego *AdvNego) Read() error {
 			return err
 		}
 	}
-	var authKerberos bool = false
-	var authNTS bool = false
+	var authKerberos = false
+	var authNTS = false
 	if authServ, ok := nego.serviceList[1].(*authService); ok {
 		if authServ.active {
 			if authServ.serviceName == "KERBEROS5" {
@@ -171,7 +171,7 @@ func (nego *AdvNego) Read() error {
 			if err != nil {
 				return err
 			}
-			return nego.kerbosHandshake(authServ)
+			return nego.kerberosHandshake(authServ)
 		}
 	}
 	if authNTS {
@@ -260,7 +260,7 @@ func (nego *AdvNego) StartServices() error {
 	return nil
 }
 
-func (nego *AdvNego) kerbosHandshake(authServ *authService) error {
+func (nego *AdvNego) kerberosHandshake(authServ *authService) error {
 	header, err := nego.readHeader()
 	if err != nil {
 		return err
@@ -304,9 +304,9 @@ func (nego *AdvNego) kerbosHandshake(authServ *authService) error {
 		num1 = 24
 	}
 	nego.comm.session.ResetBuffer()
-	// sendanoheader(length of ticket + 43 + length of address, 1 , 0)
+	// send ano header(length of ticket + 43 + length of address, 1 , 0)
 	nego.writeHeader(len(ticketData)+43+len(localAddress), 1, 0)
-	// sendheader(4)
+	// send header(4)
 	authServ.writeHeader(4)
 	// send ub2 = num1
 	nego.comm.writeUB2(num1)
@@ -333,7 +333,7 @@ func (nego *AdvNego) kerbosHandshake(authServ *authService) error {
 		}
 		if serviceHeader[2] != 0 {
 			return &network.OracleError{ErrCode: serviceHeader[2]}
-			//return fmt.Errorf("advanced negotiation error: during receive service header: network excpetion: ora-%d", serviceHeader[2])
+			//return fmt.Errorf("advanced negotiation error: during receive service header: network exception: ora-%d", serviceHeader[2])
 		}
 	}
 	// get packet header (2)
@@ -354,7 +354,7 @@ func (nego *AdvNego) kerbosHandshake(authServ *authService) error {
 	// send ano header (25,1, 0)
 	nego.comm.session.ResetBuffer()
 	nego.writeHeader(25, 1, 0)
-	// as.sendheader(1)
+	// as.send header(1)
 	authServ.writeHeader(1)
 	// send packet header(0, 1)
 	nego.comm.writePacketHeader(0, 1)
@@ -362,11 +362,11 @@ func (nego *AdvNego) kerbosHandshake(authServ *authService) error {
 	return nego.comm.session.Write()
 }
 func getHostIPAddress() (net.IP, error) {
-	addrs, err := net.InterfaceAddrs()
+	adders, err := net.InterfaceAddrs()
 	if err != nil {
 		return nil, err
 	}
-	for _, address := range addrs {
+	for _, address := range adders {
 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
 				return ipnet.IP.To4(), nil

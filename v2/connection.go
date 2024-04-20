@@ -392,10 +392,10 @@ func (conn *Connection) Open() error {
 
 // OpenWithContext open the connection with timeout context
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
-	if len(conn.conStr.traceDir) > 0 {
-		if err := os.MkdirAll(conn.conStr.traceDir, os.ModePerm); err == nil {
+	if len(conn.connOption.TraceDir) > 0 {
+		if err := os.MkdirAll(conn.connOption.TraceDir, os.ModePerm); err == nil {
 			now := time.Now()
-			traceFileName := fmt.Sprintf("%s/trace_%d_%02d_%02d_%02d_%02d_%02d_%d.log", conn.conStr.traceDir,
+			traceFileName := fmt.Sprintf("%s/trace_%d_%02d_%02d_%02d_%02d_%02d_%d.log", conn.connOption.TraceDir,
 				now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(),
 				now.Nanosecond())
 			if tr, err := os.Create(traceFileName); err == nil {
@@ -529,7 +529,6 @@ func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 
 // NewConnection create a new connection from databaseURL string
 func NewConnection(databaseUrl string) (*Connection, error) {
-	//this.m_id = this.GetHashCode().ToString();
 	conStr, err := newConnectionStringFromUrl(databaseUrl)
 	if err != nil {
 		return nil, err
@@ -541,8 +540,7 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 		connOption: &conStr.connOption,
 		cStrConv:   converters.NewStringConverter(conStr.connOption.CharsetID),
 		autoCommit: true,
-		//w:          conStr.w,
-		cusTyp: map[string]customType{},
+		cusTyp:     map[string]customType{},
 		maxLen: struct {
 			varchar   int
 			nvarchar  int
@@ -1243,7 +1241,7 @@ func (conn *Connection) setBad() {
 	conn.bad = true
 }
 
-func (conn *Connection) ResetSession(ctx context.Context) error {
+func (conn *Connection) ResetSession(_ context.Context) error {
 	if conn.bad {
 		return driver.ErrBadConn
 	}

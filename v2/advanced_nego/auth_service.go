@@ -11,7 +11,7 @@ type authService struct {
 	active      bool
 }
 
-func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
+func newAuthService(comm *AdvancedNegoComm) (*authService, error) {
 	output := &authService{
 		defaultService: defaultService{
 			comm:        comm,

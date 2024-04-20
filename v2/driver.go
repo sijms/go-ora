@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/network"
 	"reflect"
 	"strings"
 	"sync"
@@ -19,15 +20,14 @@ type OracleDriver struct {
 	mu            sync.Mutex
 	sStrConv      converters.IStringConverter
 	nStrConv      converters.IStringConverter
-	//serverCharset  int
-	//serverNCharset int
-	//Conn      *Connection
+	UserId        string
+	connOption    *network.ConnectionOption
 	//Server    string
 	//Port      int
 	//Instance  string
 	//Service   string
 	//DBName    string
-	UserId string
+
 	//SessionId int
 	//SerialNum int
 }
@@ -66,6 +66,9 @@ func (driver *OracleDriver) init(conn *Connection) error {
 		}
 		if driver.nStrConv == nil {
 			driver.nStrConv = conn.nStrConv.Clone()
+		}
+		if driver.connOption == nil {
+			driver.connOption = conn.connOption
 		}
 		driver.dataCollected = true
 	}
@@ -413,4 +416,16 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 	}
 
 	return nil
+}
+
+func ParseConfig(dsn string) (*network.ConnectionOption, error) {
+	connStr, err := newConnectionStringFromUrl(dsn)
+	if err != nil {
+		return nil, err
+	}
+	return &connStr.connOption, nil
+}
+
+func RegisterConnConfig(config *network.ConnectionOption) {
+	oracleDriver.connOption = config
 }

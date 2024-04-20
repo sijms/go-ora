@@ -11,7 +11,7 @@ type encryptService struct {
 	algoID int
 }
 
-func NewEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
+func newEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
 	output := &encryptService{
 		defaultService: defaultService{
 			comm:        comm,

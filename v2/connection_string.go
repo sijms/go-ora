@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-type PromotableTransaction int
+//type PromotableTransaction int
 
 //const (
 //	Promotable PromotableTransaction = 1
@@ -331,18 +331,18 @@ func getCharsetID(charset string) (int, error) {
 //}
 
 type ConnectionString struct {
-	connOption   network.ConnectionOption
-	DataSource   string
-	Host         string
-	Port         int
+	connOption network.ConnectionOption
+	DataSource string
+	//Host         string
+	//Port         int
 	DBAPrivilege DBAPrivilege
 	password     string
-	Trace        string // Trace file
-	traceDir     string
-	WalletPath   string
-	walletPass   string
-	w            *wallet
-	authType     AuthType
+	//Trace        string // Trace file
+	//traceDir     string
+	WalletPath string
+	walletPass string
+	w          *wallet
+	//authType     AuthType
 	//EnList             EnList
 	//ConnectionLifeTime int
 	//IncrPoolSize       int
@@ -367,7 +367,6 @@ type ConnectionString struct {
 	//ApplicationEdition    string
 	//PoolRegulator         int
 	//ConnectionPoolTimeout int
-
 }
 
 // BuildJDBC create url from user, password and JDBC description string
@@ -430,7 +429,7 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			},
 			ClientInfo: network.ClientInfo{Territory: "AMERICA", Language: "AMERICAN"},
 		},
-		Port:         defaultPort,
+		//Port:         defaultPort,
 		DBAPrivilege: NONE,
 		//EnList:                TRUE,
 		//IncrPoolSize:          5,
@@ -502,13 +501,13 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			ret.walletPass = val[0]
 		case "AUTH TYPE":
 			if strings.ToUpper(val[0]) == "OS" {
-				ret.authType = OS
+				ret.connOption.AuthType = int(OS)
 			} else if strings.ToUpper(val[0]) == "KERBEROS" {
-				ret.authType = Kerberos
+				ret.connOption.AuthType = int(Kerberos)
 			} else if strings.ToUpper(val[0]) == "TCPS" {
-				ret.authType = TCPS
+				ret.connOption.AuthType = int(TCPS)
 			} else {
-				ret.authType = Normal
+				ret.connOption.AuthType = int(Normal)
 			}
 		case "OS USER":
 			ret.connOption.ClientInfo.UserName = val[0]
@@ -576,13 +575,22 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			}
 			ret.connOption.SessionInfo.Timeout = time.Second * time.Duration(to)
 		case "TRACE FILE":
-			ret.Trace = val[0]
+			if len(val[0]) > 0 {
+				tf, err := os.Create(val[0])
+				if err != nil {
+					//noinspection GoErrorStringFormat
+					return nil, fmt.Errorf("Can't open trace file: %w", err)
+				}
+				ret.connOption.Tracer = trace.NewTraceWriter(tf)
+			} else {
+				ret.connOption.Tracer = trace.NilTracer()
+			}
 		case "TRACE DIR":
 			fallthrough
 		case "TRACE FOLDER":
 			fallthrough
 		case "TRACE DIRECTORY":
-			ret.traceDir = val[0]
+			ret.connOption.TraceDir = val[0]
 		case "USE_OOB":
 			fallthrough
 		case "ENABLE_OOB":
@@ -765,33 +773,19 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 
 // validate check is data in connection string is correct and fulfilled
 func (connStr *ConnectionString) validate() error {
-	//if !connStr.Pooling {
-	//	connStr.MaxPoolSize = -1
-	//	connStr.MinPoolSize = 0
-	//	connStr.IncrPoolSize = -1
-	//	connStr.DecrPoolSize = 0
-	//	connStr.PoolRegulator = 0
-	//}
-
-	//if len(connStr.UserID) == 0 {
-	//	return errors.New("empty user name")
-	//}
-	//if len(connStr.Password) == 0 {
-	//	return errors.New("empty password")
-	//}
 	if len(connStr.connOption.SID) == 0 && len(connStr.connOption.ServiceName) == 0 {
 		return errors.New("empty SID and service name")
 	}
-	if connStr.authType == Kerberos {
+	if connStr.connOption.AuthType == int(Kerberos) {
 		connStr.connOption.AuthService = append(connStr.connOption.AuthService, "KERBEROS5")
 	}
-	if connStr.authType == TCPS {
+	if connStr.connOption.AuthType == int(TCPS) {
 		connStr.connOption.AuthService = append(connStr.connOption.AuthService, "TCPS")
 	}
-	if len(connStr.connOption.UserID) == 0 || len(connStr.password) == 0 && connStr.authType == Normal {
-		connStr.authType = OS
+	if len(connStr.connOption.UserID) == 0 || len(connStr.password) == 0 && connStr.connOption.AuthType == int(Normal) {
+		connStr.connOption.AuthType = int(OS)
 	}
-	if connStr.authType == OS {
+	if connStr.connOption.AuthType == int(OS) {
 		if runtime.GOOS == "windows" {
 			connStr.connOption.AuthService = append(connStr.connOption.AuthService, "NTS")
 		}
@@ -799,16 +793,6 @@ func (connStr *ConnectionString) validate() error {
 
 	if connStr.connOption.SSL {
 		connStr.connOption.Protocol = "tcps"
-	}
-	if len(connStr.Trace) > 0 {
-		tf, err := os.Create(connStr.Trace)
-		if err != nil {
-			//noinspection GoErrorStringFormat
-			return fmt.Errorf("Can't open trace file: %w", err)
-		}
-		connStr.connOption.Tracer = trace.NewTraceWriter(tf)
-	} else {
-		connStr.connOption.Tracer = trace.NilTracer()
 	}
 
 	// get client info

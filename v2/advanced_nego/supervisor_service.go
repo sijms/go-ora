@@ -10,7 +10,7 @@ type supervisorService struct {
 	servArray []int
 }
 
-func NewSupervisorService(comm *AdvancedNegoComm) (*supervisorService, error) {
+func newSupervisorService(comm *AdvancedNegoComm) (*supervisorService, error) {
 	output := &supervisorService{
 		defaultService: defaultService{
 			comm:        comm,

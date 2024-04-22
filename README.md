@@ -603,6 +603,19 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
   db = sql.OpenDB(connector)
 ```
 
+* ### using custom configuration for connection
+  * another way to set connection configuration instead of using connection string (DSN)
+  * use as follow
+```golang
+    config, err := go_ora.ParseConfig(DSN)
+    // modify config structure 
+	go_ora.RegisterConnConfig(config)
+    // now open db note empty DSN
+	db, err := sql.Open("oracle", "")
+	
+```
+
+
 * ### Use Custom String encode/decode
   * if your database charset is not supported you can create a custom object that implement IStringConverter interface and pass it to the driver as follows
 ```golang
@@ -640,6 +653,15 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 [//]: # (### Supported DBMS features)
 ### releases
 <details>
+
+### version 2.8.12
+* add 2 functions
+  * ParseConfig
+  * RegisterConnConfig
+* fix issue related to LONG and JSON data types
+* fix issue related to using returning clause with prepared statement will hang
+* complete fix for data race
+
 
 ### version 2.8.8
 * introduce new connection break using go-routines thanks to @rheilek

@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"database/sql/driver"
+	"github.com/sijms/go-ora/v2/configurations"
 )
 
 type RefCursor struct {
@@ -92,7 +93,7 @@ func (cursor *RefCursor) load() error {
 	return nil
 }
 func (cursor *RefCursor) getExeOptions() int {
-	if cursor.connection.connOption.Lob == 0 {
+	if cursor.connection.connOption.Lob == configurations.INLINE {
 		return 0x8050
 	} else {
 		return 0x8040
@@ -110,13 +111,6 @@ func (cursor *RefCursor) _query() (*DataSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	// read lobs
-	//if cursor.connection.connOption.Lob != 0 {
-	//	err = cursor.readLobs(dataSet)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//}
 	err = cursor.decodePrim(dataSet)
 	if err != nil {
 		return nil, err
@@ -135,10 +129,6 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 		copy(cursor.scnForSnapshot, cursor.parent.scnForSnapshot)
 	}
 
-	//failOver := cursor.connection.connOption.Failover
-	//if failOver == 0 {
-	//	failOver = 1
-	//}
 	dataSet, err := cursor._query()
 	if err != nil {
 		if isBadConn(err) {
@@ -149,36 +139,10 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 		return nil, err
 	}
 	return dataSet, nil
-	//var dataSet *DataSet
-	//var err error
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = cursor.connection.reConnect(nil, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//		continue
-	//	}
-	//	// call query
-	//	dataSet, err = cursor._query()
-	//	if err == nil {
-	//		break
-	//	}
-	//	reconnect, err = cursor.connection.reConnect(err, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//	}
-	//}
-	//return dataSet, nil
 }
 func (cursor *RefCursor) write() error {
 	var define = false
-	if cursor.connection.connOption.Lob == 0 {
+	if cursor.connection.connOption.Lob == configurations.INLINE {
 		define = true
 	}
 	err := cursor.basicWrite(cursor.getExeOptions(), false, define)

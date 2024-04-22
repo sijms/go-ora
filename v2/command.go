@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/configurations"
 	"github.com/sijms/go-ora/v2/network"
 	"reflect"
 	"regexp"
@@ -118,7 +119,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	//	break;
 	//}
 	// we use here int.MaxValue
-	if stmt.connection.connOption.Lob == 0 {
+	if stmt.connection.connOption.Lob == configurations.INLINE {
 		session.PutInt(0x3FFFFFFF, 4, true, true)
 		//session.PutUint(0, 4, true, true)
 	} else {
@@ -185,7 +186,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	default:
 		//this.m_al8i4[1] = !fetch ? 0L : noOfRowsToFetch;
 		//al8i4[1] = stmt._noOfRowsToFetch
-		if stmt.connection.connOption.Lob == 0 {
+		if stmt.connection.connOption.Lob == configurations.INLINE {
 			if parse {
 				al8i4[1] = 0
 			} else {
@@ -242,7 +243,7 @@ func (stmt *defaultStmt) writeDefine() error {
 		if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
 			num = 0
 			//temp.ContFlag |= 0x2000000
-			if stmt.connection.connOption.Lob == 0 && !col.IsJson {
+			if stmt.connection.connOption.Lob == configurations.INLINE && !col.IsJson {
 				num = 0x3FFFFFFF
 				//col.MaxCharLen = 0
 				if col.DataType == OCIBlobLocator {
@@ -674,7 +675,7 @@ func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 	if err != nil {
 		return err
 	}
-	//if stmt.connection.connOption.Lob > 0 {
+	//if stmt.connection.connOption.Lob > configurations.INLINE {
 	//
 	//}
 	return stmt.decodePrim(dataSet)
@@ -2373,7 +2374,7 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	//	}
 	//}
 	// deal with lobs
-	if (stmt._hasBLOB || stmt._hasLONG) && stmt.connection.connOption.Lob == 0 {
+	if (stmt._hasBLOB || stmt._hasLONG) && stmt.connection.connOption.Lob == configurations.INLINE {
 		stmt.define = true
 		stmt.execute = false
 		stmt.parse = false

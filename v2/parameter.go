@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/configurations"
 	"math"
 	"strings"
 	"time"
@@ -1409,7 +1410,7 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection, temporary
 
 func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLobs *[][]byte, udt bool) error {
 	//var err error
-	if !udt && connection.connOption.Lob == 0 && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
+	if !udt && connection.connOption.Lob == configurations.INLINE && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
 		session := connection.session
 		maxSize, err := session.GetInt(4, true, true)
 		if err != nil {

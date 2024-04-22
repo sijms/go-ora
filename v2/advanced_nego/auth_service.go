@@ -2,6 +2,7 @@ package advanced_nego
 
 import (
 	"errors"
+	"github.com/sijms/go-ora/v2/configurations"
 )
 
 type authService struct {
@@ -11,7 +12,7 @@ type authService struct {
 	active      bool
 }
 
-func newAuthService(comm *AdvancedNegoComm) (*authService, error) {
+func newAuthService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoServiceInfo) (*authService, error) {
 	output := &authService{
 		defaultService: defaultService{
 			comm:        comm,
@@ -31,7 +32,6 @@ func newAuthService(comm *AdvancedNegoComm) (*authService, error) {
 	//	output.availableServiceIDs = []int{1, 2}
 	//}
 	//str :=  ""
-	connOption := comm.session.Context.ConnOption
 	//for
 	//if connOption != nil {
 	//	snConfig := connOption.SNOConfig
@@ -44,7 +44,7 @@ func newAuthService(comm *AdvancedNegoComm) (*authService, error) {
 	//	}
 	//}
 	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
-	err := output.buildServiceList(connOption.AuthService, false, false)
+	err := output.buildServiceList(negoInfo.AuthService, false, false)
 	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err

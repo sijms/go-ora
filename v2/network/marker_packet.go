@@ -3,7 +3,7 @@ package network
 import "encoding/binary"
 
 const (
-	marker_type_break     = 1
+	//marker_type_break     = 1
 	marker_type_reset     = 2
 	marker_type_interrupt = 3
 )

@@ -31,37 +31,5 @@ func newRedirectPacketFromData(packetData []byte) *RedirectPacket {
 			flag:       packetData[5],
 		},
 	}
-	//data := string(packetData[10 : 10+dataLen])
-	//if pck.packet.flag&0x2 == 0 {
-	//	pck.redirectAddr = data
-	//	return &pck
-	//}
-	//length := strings.Index(data, "\x00")
-	//if length > 0 {
-	//	pck.redirectAddr = data[:length]
-	//	pck.reconnectData = data[length:]
-	//} else {
-	//	pck.redirectAddr = data
-	//}
 	return &pck
 }
-
-//func (pck *RedirectPacket) findValue(key string) string {
-//	redirectAddr := strings.ToUpper(pck.redirectAddr)
-//	start := strings.Index(redirectAddr, key)
-//	if start < 0 {
-//		return ""
-//	}
-//	end := strings.Index(redirectAddr[start:], ")")
-//	if end < 0 {
-//		return ""
-//	}
-//	end = start + end
-//	substr := pck.redirectAddr[start:end]
-//	words := strings.Split(substr, "=")
-//	if len(words) == 2 {
-//		return strings.TrimSpace(words[1])
-//	} else {
-//		return ""
-//	}
-//}

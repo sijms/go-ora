@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/configurations"
 	"net"
 	"reflect"
 	"strings"
@@ -31,6 +32,7 @@ type Data interface {
 	Write(session *Session) error
 	Read(session *Session) error
 }
+
 type SessionState struct {
 	summary   *SummaryObject
 	sendPcks  []PacketInterface
@@ -40,8 +42,6 @@ type SessionState struct {
 }
 
 type Session struct {
-	//ctx               context.Context
-	//oldCtx            context.Context
 	mu                sync.Mutex
 	conn              net.Conn
 	sslConn           *tls.Conn
@@ -75,12 +75,13 @@ type Session struct {
 		roots              *x509.CertPool
 		tlsCertificates    []tls.Certificate
 	}
+	tracer trace.Tracer
 }
 
 func NewSessionWithInputBufferForDebug(input []byte) *Session {
-	options := &ConnectionOption{
-		AdvNegoServiceInfo: AdvNegoServiceInfo{AuthService: nil},
-		SessionInfo: SessionInfo{
+	options := &configurations.ConnectionConfig{
+		AdvNegoServiceInfo: configurations.AdvNegoServiceInfo{AuthService: nil},
+		SessionInfo: configurations.SessionInfo{
 			SessionDataUnitSize:   0xFFFF,
 			TransportDataUnitSize: 0xFFFF,
 		},
@@ -97,20 +98,21 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 		Summary:         nil,
 		UseBigClrChunks: false,
 		ClrChunkSize:    0x40,
+		tracer:          options.Tracer,
 	}
 }
-func NewSession(connOption *ConnectionOption) *Session {
-
+func NewSession(config *configurations.ConnectionConfig) *Session {
 	return &Session{
 		//ctx:             context.Background(),
 		conn:            nil,
 		inBuffer:        nil,
 		index:           0,
-		Context:         NewSessionContext(connOption),
+		Context:         NewSessionContext(config),
 		Summary:         nil,
 		UseBigClrChunks: false,
 		ClrChunkSize:    0x40,
 		lastPacket:      bytes.Buffer{},
+		tracer:          config.Tracer,
 	}
 }
 
@@ -193,7 +195,6 @@ func (session *Session) StartContext(ctx context.Context) {
 	go func(idone chan struct{}, mu *sync.Mutex) {
 		var err error
 		mu.Lock()
-		var tracer = session.Context.ConnOption.Tracer
 		mu.Unlock()
 		select {
 		case <-idone:
@@ -204,12 +205,12 @@ func (session *Session) StartContext(ctx context.Context) {
 			session.mu.Unlock()
 			if connected {
 				if err = session.BreakConnection(); err != nil {
-					tracer.Print("Connection Break Error: ", err)
+					session.tracer.Print("Connection Break Error: ", err)
 				}
 			} else {
 				err = session.WriteFinalPacket()
 				if err != nil {
-					tracer.Print("Write Final Packet With Error: ", err)
+					session.tracer.Print("Write Final Packet With Error: ", err)
 				}
 				session.Disconnect()
 			}
@@ -240,8 +241,8 @@ func (session *Session) EndContext() {
 func (session *Session) initRead() error {
 	var err error
 	var timeout = time.Time{}
-	if session.Context.ConnOption.Timeout > 0 {
-		timeout = time.Now().Add(session.Context.ConnOption.Timeout)
+	if session.Context.connConfig.Timeout > 0 {
+		timeout = time.Now().Add(session.Context.connConfig.Timeout)
 	}
 	//if deadline, ok := session.ctx.Deadline(); ok && !session.IsBreak() {
 	//	timeout = deadline
@@ -259,8 +260,8 @@ func (session *Session) initRead() error {
 func (session *Session) initWrite() error {
 	var err error
 	var timeout = time.Time{}
-	if session.Context.ConnOption.Timeout > 0 {
-		timeout = time.Now().Add(session.Context.ConnOption.Timeout)
+	if session.Context.connConfig.Timeout > 0 {
+		timeout = time.Now().Add(session.Context.connConfig.Timeout)
 	}
 	//if deadline, ok := session.ctx.Deadline(); ok && !session.IsBreak() {
 	//	timeout = deadline
@@ -319,7 +320,7 @@ func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
 // negotiate it is a step in SSL communication in which tcp connection is
 // used to create sslConn object
 func (session *Session) negotiate() {
-	connOption := session.Context.ConnOption
+	connOption := session.Context.connConfig
 	if session.SSL.roots == nil && len(session.SSL.Certificates) > 0 {
 		session.SSL.roots = x509.NewCertPool()
 		for _, cert := range session.SSL.Certificates {
@@ -425,8 +426,7 @@ func (session *Session) RestoreIndex() bool {
 
 // BreakConnection elicit connection break to cancel the current operation
 func (session *Session) BreakConnection() error {
-	tracer := session.Context.ConnOption.Tracer
-	tracer.Print("Break Connection")
+	session.tracer.Print("Break Connection")
 	var err error
 	//first discard remaining bytes
 	//if session.remainingBytes > 0 {
@@ -484,20 +484,20 @@ func (session *Session) BreakConnection() error {
 // then send connect packet to the server and
 // receive either accept, redirect or refuse packet
 func (session *Session) Connect(ctx context.Context) error {
-	connOption := session.Context.ConnOption
+	connOption := session.Context.connConfig
 	session.ResetBuffer()
 	session.Disconnect()
-	connOption.Tracer.Print("Connect")
+	session.tracer.Print("Connect")
 	var err error
 	var connected = false
-	var host *ServerAddr
+	var host *configurations.ServerAddr
 	var loop = true
 	dialer := connOption.Dialer
 	if dialer == nil {
 		dialer = &net.Dialer{}
-		if session.Context.ConnOption.Timeout > 0 {
+		if session.Context.connConfig.Timeout > 0 {
 			dialer = &net.Dialer{
-				Timeout: session.Context.ConnOption.Timeout,
+				Timeout: session.Context.connConfig.Timeout,
 			}
 		} else {
 			dialer = &net.Dialer{}
@@ -512,40 +512,40 @@ func (session *Session) Connect(ctx context.Context) error {
 			}
 			return errors.New("no available servers to connect to")
 		}
-		addr := host.networkAddr()
-		if len(session.Context.ConnOption.UnixAddress) > 0 {
-			session.conn, err = dialer.DialContext(ctx, "unix", session.Context.ConnOption.UnixAddress)
+		addr := host.NetworkAddr()
+		if len(session.Context.connConfig.UnixAddress) > 0 {
+			session.conn, err = dialer.DialContext(ctx, "unix", session.Context.connConfig.UnixAddress)
 		} else {
 			session.conn, err = dialer.DialContext(ctx, "tcp", addr)
 		}
 
 		if err != nil {
-			connOption.Tracer.Printf("using: %s ..... [FAILED]", addr)
+			session.tracer.Printf("using: %s ..... [FAILED]", addr)
 			host = connOption.GetActiveServer(true)
 			if host == nil {
 				break
 			}
 			continue
 		}
-		connOption.Tracer.Printf("using: %s ..... [SUCCEED]", addr)
+		session.tracer.Printf("using: %s ..... [SUCCEED]", addr)
 		connected = true
 		loop = false
 	}
 	if !connected {
 		return err
 	}
-	err = connOption.updateSSL(host)
+	err = connOption.UpdateSSL(host)
 	if err != nil {
 		return err
 	}
 	if connOption.SSL {
-		connOption.Tracer.Print("Using SSL/TLS")
+		session.tracer.Print("Using SSL/TLS")
 		session.negotiate()
 		session.reader = bufio.NewReaderSize(session.sslConn, read_buffer_size)
 	} else {
 		session.reader = bufio.NewReaderSize(session.conn, read_buffer_size)
 	}
-	connOption.Tracer.Print("Open :", connOption.ConnectionData())
+	session.tracer.Print("Open :", connOption.ConnectionData())
 	connectPacket := newConnectPacket(session.Context)
 	err = session.writePacket(connectPacket)
 	if err != nil {
@@ -568,13 +568,13 @@ func (session *Session) Connect(ctx context.Context) error {
 		*session.Context = *acceptPacket.sessionCtx
 		session.Context.handshakeComplete = true
 		session.mu.Unlock()
-		connOption.Tracer.Print("Handshake Complete")
+		session.tracer.Print("Handshake Complete")
 		return nil
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
-		connOption.Tracer.Print("Redirect")
+		session.tracer.Print("Redirect")
 		//connOption.connData = redirectPacket.reconnectData
-		servers, err := extractServers(redirectPacket.redirectAddr)
+		servers, err := configurations.ExtractServers(redirectPacket.redirectAddr)
 		if err != nil {
 			return err
 		}
@@ -592,7 +592,7 @@ func (session *Session) Connect(ctx context.Context) error {
 			addr = host.Addr
 			port = host.Port
 		}
-		connOption.Tracer.Printf("connection to %s:%d refused with error: %s", addr, port, refusePacket.Err.Error())
+		session.tracer.Printf("connection to %s:%d refused with error: %s", addr, port, refusePacket.Err.Error())
 		host = connOption.GetActiveServer(true)
 		if host == nil {
 			session.Disconnect()
@@ -775,7 +775,6 @@ func (session *Session) Peek(numBytes int) ([]byte, error) {
 func (session *Session) read(numBytes int) ([]byte, error) {
 	var err error
 	var pck PacketInterface
-	//tracer := session.Context.ConnOption.Tracer
 
 	requiredLen := numBytes
 
@@ -858,12 +857,12 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 	//	tempPck, err := session.readPacket()
 	//	if err != nil {
 	//		if e, ok := err.(net.Error); ok && e.Timeout() {
-	//			session.Context.ConnOption.Tracer.Print("Read Timeout")
+	//			session.Context.connConfig.Tracer.Print("Read Timeout")
 	//			var breakErr error
 	//			tempPck, breakErr = session.BreakConnection()
 	//			if breakErr != nil {
 	//				//return nil, err
-	//				session.Context.ConnOption.Tracer.Print("Connection Break With Error: ", breakErr)
+	//				session.Context.connConfig.Tracer.Print("Connection Break With Error: ", breakErr)
 	//				return nil, err
 	//			}
 	//		} else {
@@ -896,9 +895,8 @@ func (session *Session) writePacket(pck PacketInterface) error {
 	session.mu.Lock()
 	defer session.mu.Unlock()
 	session.sendPcks = append(session.sendPcks, pck)
-	tracer := session.Context.ConnOption.Tracer
 	tmp := pck.bytes()
-	tracer.LogPacket("Write packet:", tmp)
+	session.tracer.LogPacket("Write packet:", tmp)
 	var err = session.initWrite()
 	if err != nil {
 		return err
@@ -1001,12 +999,7 @@ func (session *Session) readPacketData() error {
 	if err != nil {
 		return err
 	}
-	//if pckType == RESEND {
-	//
-	//
-	//}
-	//ret := append(head, body...)
-	session.Context.ConnOption.Tracer.LogPacket("Read packet:", session.lastPacket.Bytes())
+	session.tracer.LogPacket("Read packet:", session.lastPacket.Bytes())
 	return nil
 }
 
@@ -1024,7 +1017,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	//log.Printf("Response: %#v\n\n", packetData)
 	switch pckType {
 	case RESEND:
-		if session.Context.ConnOption.SSL && flag&8 != 0 {
+		if session.Context.connConfig.SSL && flag&8 != 0 {
 			session.negotiate()
 			session.reader = bufio.NewReaderSize(session.sslConn, read_buffer_size)
 		}
@@ -1072,7 +1065,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return session.readPacket()
 	case ACCEPT:
-		return newAcceptPacketFromData(packetData, session.Context.ConnOption), nil
+		return newAcceptPacketFromData(packetData, session.Context.connConfig), nil
 	case REFUSE:
 		return newRefusePacketFromData(packetData), nil
 	case REDIRECT:
@@ -1102,7 +1095,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	case DATA:
 		dataPck, err := newDataPacketFromData(packetData, session.Context, &session.mu)
 		if dataPck != nil {
-			if session.Context.ConnOption.SSL && (dataPck.dataFlag&0x8000 > 0 || dataPck.flag&0x80 > 0) {
+			if session.Context.connConfig.SSL && (dataPck.dataFlag&0x8000 > 0 || dataPck.flag&0x80 > 0) {
 				session.negotiate()
 				session.reader = bufio.NewReaderSize(session.sslConn, read_buffer_size)
 			}

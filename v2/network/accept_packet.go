@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/sijms/go-ora/v2/configurations"
 )
 
 // type AcceptPacket Packet
@@ -33,31 +34,7 @@ func (pck *AcceptPacket) bytes() []byte {
 	return output
 }
 
-//func (pck *AcceptPacket) getPacketType() PacketType {
-//	return pck.packet.packetType
-//}
-
-//func NewAcceptPacket(sessionCtx SessionContext, acceptData []byte) *AcceptPacket {
-//	sessionCtx.Histone = 1
-//	sessionCtx.ACFL0 = 4
-//	sessionCtx.ACFL1 = 4
-//	pck := AcceptPacket{
-//		sessionCtx: sessionCtx,
-//		dataOffset: 32,
-//		length:        0,
-//		packetType:       2,
-//		flag:       0,
-//		NSPFSID:    0,
-//		buffer:     acceptData,
-//		SID:        nil,
-//	}
-//	if len(acceptData) > 230 {
-//		pck.length = uint16(len(acceptData)) + pck.dataOffset
-//	}
-//	return &pck
-//}
-
-func newAcceptPacketFromData(packetData []byte, connOption *ConnectionOption) *AcceptPacket {
+func newAcceptPacketFromData(packetData []byte, config *configurations.ConnectionConfig) *AcceptPacket {
 	if len(packetData) < 32 {
 		return nil
 	}
@@ -70,7 +47,7 @@ func newAcceptPacketFromData(packetData []byte, connOption *ConnectionOption) *A
 	pck := AcceptPacket{
 		Packet: Packet{
 			sessionCtx: &SessionContext{
-				ConnOption:          connOption,
+				connConfig:          config,
 				SID:                 nil,
 				Version:             binary.BigEndian.Uint16(packetData[8:]),
 				LoVersion:           0,

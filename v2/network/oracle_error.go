@@ -65,10 +65,4 @@ func (err *OracleError) Bad() bool {
 	}
 }
 
-// type ErrConnReset struct {
-// }
 var ErrConnReset = errors.New("connection break due to context timeout")
-
-//func (err *ErrConnReset) Error() string {
-//	return "connection reset"
-//}

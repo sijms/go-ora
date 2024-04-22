@@ -44,7 +44,7 @@ func (pck *ConnectPacket) bytes() []byte {
 }
 
 func newConnectPacket(sessionCtx *SessionContext) *ConnectPacket {
-	connectData := sessionCtx.ConnOption.ConnectionData()
+	connectData := sessionCtx.connConfig.ConnectionData()
 	length := uint32(len(connectData))
 	if length > 230 {
 		length = 0

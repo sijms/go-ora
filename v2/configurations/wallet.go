@@ -1,4 +1,4 @@
-package go_ora
+package configurations
 
 import (
 	"bytes"
@@ -22,33 +22,33 @@ import (
 )
 
 // type CertificateData
-type wallet struct {
+type Wallet struct {
 	file                string
 	password            []byte
 	salt                []byte
 	sha1Iteration       int
 	algType             int
-	credentials         []walletCredential
-	certificates        [][]byte
-	privateKeys         [][]byte
-	certificateRequests [][]byte
+	credentials         []WalletCredential
+	Certificates        [][]byte
+	PrivateKeys         [][]byte
+	CertificateRequests [][]byte
 }
-type walletCredential struct {
+type WalletCredential struct {
 	dsn      string
 	username string
 	password string
 }
 
-// newWallet create new wallet object from file path
-func newWallet(filePath string) (*wallet, error) {
-	ret := new(wallet)
+// newWallet create new Wallet object from file path
+func NewWallet(filePath string) (*Wallet, error) {
+	ret := new(Wallet)
 	ret.file = filePath
 	err := ret.read()
 	return ret, err
 }
 
-// read will read the file data decrypting file chunk to get wallet information
-func (w *wallet) read() error {
+// read will read the file data decrypting file chunk to get Wallet information
+func (w *Wallet) read() error {
 	fileData, err := os.ReadFile(w.file)
 	if err != nil {
 		return err
@@ -75,7 +75,7 @@ func (w *wallet) read() error {
 	size := binary.BigEndian.Uint32(fileData[index : index+4])
 	index += 4
 	if num1 != 6 {
-		return errors.New("invalid wallet header version")
+		return errors.New("invalid Wallet header version")
 	}
 	num3 := fileData[index]
 	if num3 == 5 {
@@ -146,18 +146,18 @@ func (w *wallet) read() error {
 			w.password = output
 		}
 	} else {
-		return errors.New("invalid wallet header")
+		return errors.New("invalid Wallet header")
 	}
 	err = w.readPKCS12(fileData[index:])
 	if err != nil {
 		if autoLoginLocal {
-			return fmt.Errorf("can't read wallet with auto login local properties: %v", err)
+			return fmt.Errorf("can't read Wallet with auto login local properties: %v", err)
 		}
 	}
 	return err
 }
 
-func (w *wallet) readPKCS12(data []byte) error {
+func (w *Wallet) readPKCS12(data []byte) error {
 	data, err := w.decodeASN1(data)
 	if err != nil {
 		return err
@@ -166,8 +166,8 @@ func (w *wallet) readPKCS12(data []byte) error {
 }
 
 // readCredentials read dsn, usernames and passwords into walletCredentials array
-func (w *wallet) readCredentials(input []byte) error {
-	w.certificates = nil
+func (w *Wallet) readCredentials(input []byte) error {
+	w.Certificates = nil
 	w.credentials = nil
 	if input[1] == 130 {
 		num2 := int(input[2])*256 + int(input[3])
@@ -210,7 +210,7 @@ func (w *wallet) readCredentials(input []byte) error {
 				if err != nil {
 					return err
 				}
-				w.certificateRequests = append(w.certificateRequests, a)
+				w.CertificateRequests = append(w.CertificateRequests, a)
 			}
 			if temp2.Id.String() != "1.2.840.113549.1.16.12.12" {
 				continue
@@ -233,7 +233,7 @@ func (w *wallet) readCredentials(input []byte) error {
 				continue
 			}
 			for len(w.credentials) < length {
-				w.credentials = append(w.credentials, walletCredential{})
+				w.credentials = append(w.credentials, WalletCredential{})
 			}
 			switch matches[1] {
 			case "oracle.security.client.connect_string":
@@ -258,7 +258,7 @@ func (w *wallet) readCredentials(input []byte) error {
 			if err != nil {
 				return err
 			}
-			w.privateKeys = append(w.privateKeys, a.PrivateKeyData)
+			w.PrivateKeys = append(w.PrivateKeys, a.PrivateKeyData)
 		case "1.2.840.113549.1.12.10.1.3":
 			var a struct {
 				Id asn1.ObjectIdentifier
@@ -271,14 +271,14 @@ func (w *wallet) readCredentials(input []byte) error {
 				return err
 			}
 			found := false
-			for _, cert := range w.certificates {
+			for _, cert := range w.Certificates {
 				if bytes.Equal(cert, a.F1.Data) {
 					found = true
 					break
 				}
 			}
 			if !found {
-				w.certificates = append(w.certificates, a.F1.Data)
+				w.Certificates = append(w.Certificates, a.F1.Data)
 			}
 		default:
 			continue
@@ -288,7 +288,7 @@ func (w *wallet) readCredentials(input []byte) error {
 	return nil
 }
 
-func (w *wallet) decodeASN1(buffer []byte) (data []byte, err error) {
+func (w *Wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 	type contentInfo struct {
 		ContentType asn1.ObjectIdentifier
 		Content     asn1.RawValue `asn1:"tag:0,explicit,optional"`
@@ -343,11 +343,11 @@ func (w *wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 		return
 	}
 	if pfx.Version < 2 {
-		err = errors.New("error in reading wallet")
+		err = errors.New("error in reading Wallet")
 		return
 	}
 	if !pfx.AuthSafe.ContentType.Equal(oidDataContentType) {
-		err = errors.New(fmt.Sprintf("error in reading wallet: invalid object ID received: %s, want: %s",
+		err = errors.New(fmt.Sprintf("error in reading Wallet: invalid object ID received: %s, want: %s",
 			pfx.AuthSafe.ContentType.String(), "1.2.840.113549.1.7.1"))
 		return
 	}
@@ -367,7 +367,7 @@ func (w *wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 		}
 	}
 	if index == -1 {
-		err = errors.New(fmt.Sprintf("error in reading wallet: object ID: %s is not present",
+		err = errors.New(fmt.Sprintf("error in reading Wallet: object ID: %s is not present",
 			"1.2.840.113549.1.7.6"))
 		return
 	}
@@ -376,7 +376,7 @@ func (w *wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 		return
 	}
 	if !temp.EncryptedContentInfo.ContentType.Equal(oidDataContentType) {
-		err = errors.New(fmt.Sprintf("error in reading wallet: invalid object ID received: %s, want: %s",
+		err = errors.New(fmt.Sprintf("error in reading Wallet: invalid object ID received: %s, want: %s",
 			temp.EncryptedContentInfo.ContentType.String(), "1.2.840.113549.1.7.1"))
 		return
 	}
@@ -384,7 +384,7 @@ func (w *wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 	var algo walletAlgorithm
 	switch algorithm {
 	case "1.2.840.113549.1.12.1.6":
-		err = errors.New("RC2 wallet decryption is not supported")
+		err = errors.New("RC2 Wallet decryption is not supported")
 		return
 	case "1.2.840.113549.1.12.1.3":
 		var params pbeParams
@@ -468,7 +468,7 @@ func (w *wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 }
 
 // getCredential read one credential dsn, username, password from encrypted data
-func (w *wallet) getCredential(server string, port int, service, username string) (*walletCredential, error) {
+func (w *Wallet) getCredential(server string, port int, service, username string) (*WalletCredential, error) {
 	rHost, err := regexp.Compile(`\(\s*HOST\s*=\s*([A-z0-9._%+-]+)\)`)
 	if err != nil {
 		return nil, err

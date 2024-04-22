@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/configurations"
 	"github.com/sijms/go-ora/v2/trace"
 	"os"
 	"reflect"
@@ -72,11 +73,11 @@ type NLSData struct {
 	Charset         string
 }
 type Connection struct {
-	State             ConnectionState
-	LogonMode         LogonMode
-	autoCommit        bool
-	conStr            *ConnectionString
-	connOption        *network.ConnectionOption
+	State      ConnectionState
+	LogonMode  LogonMode
+	autoCommit bool
+	//conStr            *ConnectionString
+	connOption        *configurations.ConnectionConfig
 	session           *network.Session
 	tcpNego           *TCPNego
 	dataNego          *DataTypeNego
@@ -106,7 +107,7 @@ type Connection struct {
 type OracleConnector struct {
 	drv           *OracleDriver
 	connectString string
-	dialer        network.DialerContext
+	dialer        configurations.DialerContext
 }
 
 func NewConnector(connString string) driver.Connector {
@@ -118,7 +119,7 @@ func (driver *OracleDriver) OpenConnector(connString string) (driver.Connector, 
 }
 
 func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	conn, err := NewConnection(connector.connectString)
+	conn, err := NewConnection(connector.connectString, connector.drv.connOption)
 	if err != nil {
 		return nil, err
 	}
@@ -145,13 +146,13 @@ func (connector *OracleConnector) Driver() driver.Driver {
 	return connector.drv
 }
 
-func (connector *OracleConnector) Dialer(dialer network.DialerContext) {
+func (connector *OracleConnector) Dialer(dialer configurations.DialerContext) {
 	connector.dialer = dialer
 }
 
 // Open return a new open connection
 func (driver *OracleDriver) Open(name string) (driver.Conn, error) {
-	conn, err := NewConnection(name)
+	conn, err := NewConnection(name, driver.connOption)
 	conn.cusTyp = driver.cusTyp
 	if err != nil {
 		return nil, err
@@ -276,24 +277,6 @@ func (conn *Connection) Ping(ctx context.Context) error {
 	}).exec()
 }
 
-//func (conn *Connection) reConnect(errReceived error, trial int) (bool, error) {
-//	tracer := conn.connOption.Tracer
-//	if conn.State != Opened {
-//		tracer.Print("reconnect trial #", trial)
-//		err := conn.Open()
-//		return true, err
-//	}
-//	if errReceived != nil {
-//		if errors.Is(errReceived, io.EOF) || errors.Is(errReceived, syscall.EPIPE) {
-//			tracer.Print("reconnect trial #", trial)
-//			conn.State = Closed
-//			err := conn.Open()
-//			return true, err
-//		}
-//	}
-//	return false, errReceived
-//}
-
 func (conn *Connection) getStrConv(charsetID int) (converters.IStringConverter, error) {
 	switch charsetID {
 	case conn.sStrConv.GetLangID():
@@ -405,19 +388,19 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 
 	}
 	tracer := conn.connOption.Tracer
-	switch conn.conStr.DBAPrivilege {
-	case SYSDBA:
+	switch conn.connOption.DBAPrivilege {
+	case configurations.SYSDBA:
 		conn.LogonMode |= SysDba
-	case SYSOPER:
+	case configurations.SYSOPER:
 		conn.LogonMode |= SysOper
 	default:
 		conn.LogonMode = 0
 	}
 	conn.connOption.ResetServerIndex()
 	conn.session = network.NewSession(conn.connOption)
-	W := conn.conStr.w
+	W := conn.connOption.Wallet
 	if conn.connOption.SSL && W != nil {
-		err := conn.session.LoadSSLData(W.certificates, W.privateKeys, W.certificateRequests)
+		err := conn.session.LoadSSLData(W.Certificates, W.PrivateKeys, W.CertificateRequests)
 		if err != nil {
 			return err
 		}
@@ -433,7 +416,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	// advanced negotiation
 	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
 		tracer.Print("Advance Negotiation")
-		ano, err := advanced_nego.NewAdvNego(session)
+		ano, err := advanced_nego.NewAdvNego(session, conn.connOption)
 		if err != nil {
 			return err
 		}
@@ -527,18 +510,26 @@ func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 	return &Transaction{conn: conn, ctx: ctx}, nil
 }
 
-// NewConnection create a new connection from databaseURL string
-func NewConnection(databaseUrl string) (*Connection, error) {
-	conStr, err := newConnectionStringFromUrl(databaseUrl)
-	if err != nil {
-		return nil, err
+// NewConnection create a new connection from databaseURL string or configuration
+func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) (*Connection, error) {
+	var err error
+	if len(databaseUrl) > 0 {
+		config, err = ParseConfig(databaseUrl)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if config == nil {
+			return nil, errors.New("database url or configuration is required")
+		}
 	}
+
+	//conStr, err := newConnectionStringFromUrl(databaseUrl)
 
 	return &Connection{
 		State:      Closed,
-		conStr:     conStr,
-		connOption: &conStr.connOption,
-		cStrConv:   converters.NewStringConverter(conStr.connOption.CharsetID),
+		connOption: config,
+		cStrConv:   converters.NewStringConverter(config.CharsetID),
 		autoCommit: true,
 		cusTyp:     map[string]customType{},
 		maxLen: struct {
@@ -578,7 +569,7 @@ func (conn *Connection) Close() (err error) {
 // doAuth a login step that occur during open connection
 func (conn *Connection) doAuth() error {
 	conn.connOption.Tracer.Print("doAuth")
-	if len(conn.connOption.UserID) > 0 && len(conn.conStr.password) > 0 {
+	if len(conn.connOption.UserID) > 0 && len(conn.connOption.Password) > 0 {
 		conn.session.ResetBuffer()
 		conn.session.PutBytes(3, 0x76, 0, 1)
 		conn.session.PutUint(len(conn.connOption.UserID), 4, true, true)
@@ -592,13 +583,13 @@ func (conn *Connection) doAuth() error {
 		conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientInfo.ProgramName, 0)
 		conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientInfo.HostName, 0)
 		conn.session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", conn.connOption.ClientInfo.PID), 0)
-		conn.session.PutKeyValString("AUTH_SID", conn.connOption.ClientInfo.UserName, 0)
+		conn.session.PutKeyValString("AUTH_SID", conn.connOption.ClientInfo.OSUserName, 0)
 		err := conn.session.Write()
 		if err != nil {
 			return err
 		}
 
-		conn.authObject, err = newAuthObject(conn.connOption.UserID, conn.conStr.password, conn.tcpNego, conn)
+		conn.authObject, err = newAuthObject(conn.connOption.UserID, conn.connOption.Password, conn.tcpNego, conn)
 		if err != nil {
 			return err
 		}

@@ -1,10 +1,13 @@
 package network
 
-import "github.com/sijms/go-ora/v2/network/security"
+import (
+	"github.com/sijms/go-ora/v2/configurations"
+	"github.com/sijms/go-ora/v2/network/security"
+)
 
 type SessionContext struct {
 	//conn net.Conn
-	ConnOption *ConnectionOption
+	//ConnOption *ConnectionOption
 	//PortNo int
 	//InstanceName string
 	//HostName string
@@ -13,6 +16,7 @@ type SessionContext struct {
 	//ServiceName string
 	SID []byte
 	//ConnectData string
+	connConfig          *configurations.ConnectionConfig
 	Version             uint16
 	LoVersion           uint16
 	Options             uint16
@@ -37,17 +41,18 @@ type SessionContext struct {
 	}
 }
 
-func NewSessionContext(connOption *ConnectionOption) *SessionContext {
+func NewSessionContext(config *configurations.ConnectionConfig) *SessionContext {
 	ctx := &SessionContext{
-		SessionDataUnit:   connOption.SessionDataUnitSize,
-		TransportDataUnit: connOption.TransportDataUnitSize,
+		SessionDataUnit:   config.SessionDataUnitSize,
+		TransportDataUnit: config.TransportDataUnitSize,
 		Version:           317,
 		LoVersion:         300,
 		Options:           1 | 2048, /*1024 for urgent data transport*/
 		OurOne:            1,
-		ConnOption:        connOption,
+		connConfig:        config,
+		//ConnOption:        connOption,
 	}
-	if connOption.EnableOOB {
+	if config.EnableOOB {
 		ctx.Options |= 1024
 	}
 	return ctx

@@ -5,7 +5,8 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/advanced_nego"
+	"github.com/sijms/go-ora/v2/configurations"
 	"reflect"
 	"strings"
 	"sync"
@@ -21,7 +22,7 @@ type OracleDriver struct {
 	sStrConv      converters.IStringConverter
 	nStrConv      converters.IStringConverter
 	UserId        string
-	connOption    *network.ConnectionOption
+	connOption    *configurations.ConnectionConfig
 	//Server    string
 	//Port      int
 	//Instance  string
@@ -418,14 +419,23 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 	return nil
 }
 
-func ParseConfig(dsn string) (*network.ConnectionOption, error) {
-	connStr, err := newConnectionStringFromUrl(dsn)
+func ParseConfig(dsn string) (*configurations.ConnectionConfig, error) {
+	config, err := configurations.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
-	return &connStr.connOption, nil
+	if len(config.OSPassword) > 0 {
+		SetNTSAuth(&advanced_nego.NTSAuthHash{})
+	}
+	return config, nil
+	//connStr, err := newConnectionStringFromUrl(dsn)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//return &connStr.connOption, nil
 }
 
-func RegisterConnConfig(config *network.ConnectionOption) {
+func RegisterConnConfig(config *configurations.ConnectionConfig) {
 	oracleDriver.connOption = config
+
 }

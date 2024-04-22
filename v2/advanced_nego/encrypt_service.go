@@ -3,6 +3,7 @@ package advanced_nego
 import (
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/configurations"
 	"github.com/sijms/go-ora/v2/network/security"
 )
 
@@ -11,11 +12,11 @@ type encryptService struct {
 	algoID int
 }
 
-func newEncryptService(comm *AdvancedNegoComm) (*encryptService, error) {
+func newEncryptService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoServiceInfo) (*encryptService, error) {
 	output := &encryptService{
 		defaultService: defaultService{
 			comm:        comm,
-			level:       comm.session.Context.ConnOption.EncServiceLevel,
+			level:       negoInfo.EncServiceLevel,
 			serviceType: 2,
 			version:     0xB200200,
 			availableServiceNames: []string{"", "RC4_40", "RC4_56", "RC4_128", "RC4_256",

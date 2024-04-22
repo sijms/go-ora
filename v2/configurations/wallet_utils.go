@@ -1,4 +1,4 @@
-package go_ora
+package configurations
 
 import (
 	"bytes"

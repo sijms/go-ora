@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/configurations"
 	"github.com/sijms/go-ora/v2/network"
 	"github.com/sijms/go-ora/v2/network/security"
 	"strconv"
@@ -237,7 +238,7 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Con
 }
 
 // write authentication data to network
-func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMode, session *network.Session) error {
+func (obj *AuthObject) Write(connOption *configurations.ConnectionConfig, mode LogonMode, session *network.Session) error {
 	var keys = make([]string, 0, 20)
 	var values = make([]string, 0, 20)
 	var flags = make([]uint8, 0, 20)
@@ -267,7 +268,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	index++
 	appendKeyVal("AUTH_PID", fmt.Sprintf("%d", connOption.ClientInfo.PID), 0)
 	index++
-	appendKeyVal("AUTH_SID", connOption.ClientInfo.UserName, 0)
+	appendKeyVal("AUTH_SID", connOption.ClientInfo.OSUserName, 0)
 	index++
 	appendKeyVal("AUTH_CONNECT_STRING", connOption.ConnectionData(), 0)
 	index++

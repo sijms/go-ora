@@ -48,17 +48,17 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	}
 }
 
-func (rf *RefusePacket) extractErrCode() {
-	rf.Err.ErrCode = 12564
-	rf.Err.ErrMsg = "ORA-12564: TNS connection refused"
-	if len(rf.message) == 0 {
+func (pck *RefusePacket) extractErrCode() {
+	pck.Err.ErrCode = 12564
+	pck.Err.ErrMsg = "ORA-12564: TNS connection refused"
+	if len(pck.message) == 0 {
 		return
 	}
 	r, err := regexp.Compile(`\(\s*ERR\s*=\s*([0-9]+)\s*\)`)
 	if err != nil {
 		return
 	}
-	msg := strings.ToUpper(rf.message)
+	msg := strings.ToUpper(pck.message)
 	matches := r.FindStringSubmatch(msg)
 	if len(matches) != 2 {
 		return
@@ -66,11 +66,11 @@ func (rf *RefusePacket) extractErrCode() {
 	strErrCode := matches[1]
 	errCode, err := strconv.ParseInt(strErrCode, 10, 32)
 	if err == nil {
-		rf.Err.ErrCode = int(errCode)
-		rf.Err.translate()
+		pck.Err.ErrCode = int(errCode)
+		pck.Err.translate()
 		return
 	}
-	r, err = regexp.Compile(`\(\s*ERROR\s*=([A-Z0-9=\(\)]+)`)
+	r, err = regexp.Compile(`\(\s*ERROR\s*=([A-Z0-9=()]+)`)
 	if err != nil {
 		return
 	}
@@ -90,8 +90,7 @@ func (rf *RefusePacket) extractErrCode() {
 	strErrCode = matches[1]
 	errCode, err = strconv.ParseInt(strErrCode, 10, 32)
 	if err == nil {
-		rf.Err.ErrCode = int(errCode)
-		rf.Err.translate()
+		pck.Err.ErrCode = int(errCode)
+		pck.Err.translate()
 	}
-	//str := "(DESCRIPTION=(TMP=)(VSNNUM=186647552)(ERR=12514)(ERROR_STACK=(ERROR=(CODE=12514)(EMFI=4))))"
 }

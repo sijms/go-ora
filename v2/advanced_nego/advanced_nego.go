@@ -4,7 +4,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/configurations"
 	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/trace"
 	"net"
 )
 
@@ -23,24 +25,30 @@ func SetKerberosAuth(input KerberosAuthInterface) {
 
 type AdvNego struct {
 	comm        *AdvancedNegoComm
+	clientInfo  *configurations.ClientInfo
+	negoInfo    *configurations.AdvNegoServiceInfo
+	tracer      trace.Tracer
 	serviceList []AdvNegoService
 }
 
-func NewAdvNego(session *network.Session) (*AdvNego, error) {
+func NewAdvNego(session *network.Session, config *configurations.ConnectionConfig) (*AdvNego, error) {
 	output := &AdvNego{
 		comm:        &AdvancedNegoComm{session: session},
+		clientInfo:  &config.ClientInfo,
+		negoInfo:    &config.AdvNegoServiceInfo,
+		tracer:      config.Tracer,
 		serviceList: make([]AdvNegoService, 5),
 	}
 	var err error
-	output.serviceList[1], err = newAuthService(output.comm)
+	output.serviceList[1], err = newAuthService(output.comm, output.negoInfo)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[2], err = newEncryptService(output.comm)
+	output.serviceList[2], err = newEncryptService(output.comm, output.negoInfo)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[3], err = newDataIntegrityService(output.comm)
+	output.serviceList[3], err = newDataIntegrityService(output.comm, output.negoInfo, output.tracer)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +160,7 @@ func (nego *AdvNego) Read() error {
 	nego.writeHeader(size+13, numService, 0)
 	if dataServ, ok := nego.serviceList[3].(*dataIntegrityService); ok {
 		if len(dataServ.publicKey) > 0 {
-			nego.comm.session.Context.ConnOption.Tracer.Print("Send Client Public Key:")
+			nego.tracer.Print("Send Client Public Key:")
 			dataServ.writeHeader(1)
 			nego.comm.writeBytes(dataServ.publicKey)
 		}
@@ -175,8 +183,7 @@ func (nego *AdvNego) Read() error {
 		}
 	}
 	if authNTS {
-		connOption := nego.comm.session.Context.ConnOption
-		ntsPacket, err := createNTSNegoPacket(connOption.ClientInfo.DomainName, connOption.ClientInfo.HostName)
+		ntsPacket, err := createNTSNegoPacket(nego.clientInfo.DomainName, nego.clientInfo.HostName)
 		if err != nil {
 			return err
 		}
@@ -196,8 +203,8 @@ func (nego *AdvNego) Read() error {
 		if err != nil {
 			return err
 		}
-		ntsPacket, err = createNTSAuthPacket(chaData, connOption.ClientInfo.UserName,
-			connOption.ClientInfo.Password)
+		ntsPacket, err = createNTSAuthPacket(chaData, nego.clientInfo.OSUserName,
+			nego.clientInfo.OSPassword)
 		if err != nil {
 			return err
 		}

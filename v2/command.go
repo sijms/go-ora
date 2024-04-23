@@ -620,10 +620,10 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 		if maxRowSize > 0 {
 			stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
 		}
-		stmt.connection.connOption.Tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
+		stmt.connection.tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
 	}
 
-	tracer := stmt.connection.connOption.Tracer
+	tracer := stmt.connection.tracer
 	var err = stmt._fetch(dataSet)
 	if errors.Is(err, network.ErrConnReset) {
 		err = stmt.connection.read()
@@ -660,7 +660,7 @@ func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 	//defer func() {
 	//	err := stmt.freeTemporaryLobs()
 	//	if err != nil {
-	//		stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
+	//		stmt.connection.tracer.Printf("Error free temporary lobs: %v", err)
 	//	}
 	//}()
 	session.ResetBuffer()
@@ -697,7 +697,7 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 		if maxRowSize > 0 {
 			stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
 		}
-		stmt.connection.connOption.Tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
+		stmt.connection.tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
 	}
 	stmt.connection.session.ResetBuffer()
 	err := stmt.basicWrite(exeOp, false, true)
@@ -1092,8 +1092,8 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 	//		return err
 	//	}
 	//}
-	if stmt.connection.connOption.Tracer.IsOn() {
-		dataSet.Trace(stmt.connection.connOption.Tracer)
+	if stmt.connection.tracer.IsOn() {
+		dataSet.Trace(stmt.connection.tracer)
 	}
 	//return stmt.readLobs(dataSet)
 	return nil
@@ -1104,7 +1104,7 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	if len(stmt.temporaryLobs) == 0 {
 		return nil
 	}
-	stmt.connection.connOption.Tracer.Printf("Free %d Temporary Lobs", len(stmt.temporaryLobs))
+	stmt.connection.tracer.Printf("Free %d Temporary Lobs", len(stmt.temporaryLobs))
 	session := stmt.connection.session
 	//defer func(input *[][]byte) {
 	//	*input = nil
@@ -1248,7 +1248,7 @@ func (stmt *defaultStmt) Close() error {
 	}
 	err := stmt.freeTemporaryLobs()
 	if err != nil {
-		stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
+		stmt.connection.tracer.Printf("Error free temporary lobs: %v", err)
 	}
 	if stmt.cursorID != 0 {
 		session := stmt.connection.session
@@ -1270,7 +1270,7 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.connOption.Tracer
+	tracer := stmt.connection.tracer
 	tracer.Printf("Exec With Context:")
 	stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext()
@@ -1845,7 +1845,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			}
 			if processedPars > 0 {
 				stmt.bulkExec = false
-				stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
+				stmt.connection.tracer.Printf("    %d:\n%v", x, args[x])
 				parIndex += processedPars
 				structPars = append(structPars, args[x].Value)
 				continue
@@ -1986,7 +1986,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		}
 		stmt.setParam(parIndex, *par)
 		parIndex++
-		stmt.connection.connOption.Tracer.Printf("    %d:\n%v", x, args[x])
+		stmt.connection.tracer.Printf("    %d:\n%v", x, args[x])
 	}
 	if useNamedPars {
 		err = stmt.useNamedParameters()
@@ -2113,7 +2113,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.connOption.Tracer
+	tracer := stmt.connection.tracer
 	tracer.Printf("Exec:\n%s", stmt.text)
 	var result *QueryResult
 	var err error
@@ -2226,7 +2226,7 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.connOption.Tracer
+	tracer := stmt.connection.tracer
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	stmt._hasMoreRows = true
 	var useNamedPars = len(namedArgs) > 0
@@ -2319,7 +2319,7 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.connOption.Tracer
+	tracer := stmt.connection.tracer
 	tracer.Print("Query With Context:", stmt.text)
 
 	stmt.connection.session.StartContext(ctx)
@@ -2346,7 +2346,7 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	//defer func() {
 	//	err = stmt.freeTemporaryLobs()
 	//	if err != nil {
-	//		stmt.connection.connOption.Tracer.Printf("Error free temporary lobs: %v", err)
+	//		stmt.connection.tracer.Printf("Error free temporary lobs: %v", err)
 	//	}
 	//}()
 
@@ -2448,7 +2448,7 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.connOption.Tracer
+	tracer := stmt.connection.tracer
 	tracer.Printf("Query:\n%s", stmt.text)
 	var dataSet *DataSet
 	var err error

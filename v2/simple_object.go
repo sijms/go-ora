@@ -52,7 +52,7 @@ func (obj *simpleObject) read() error {
 
 func (obj *simpleObject) exec() error {
 	conn := obj.connection
-	tracer := conn.connOption.Tracer
+	tracer := conn.tracer
 	obj.write()
 	if obj.err != nil {
 		return obj.err

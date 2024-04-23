@@ -223,11 +223,11 @@ urlOptions := map[string]string {
 ```
 * ### Define Lob Fetching Mode
   * this option define how lob data will be loaded
-  * default value is `pre` means lob data is send online with other values
-  * other value is `post` means lob data will be loaded after finish loading other value through a separate network call
+  * default value is `pre` or `inline` means lob data is send online with other values
+  * other value is `post` or `stream` means lob data will be loaded after finish loading other value through a separate network call
 ```golang
 urlOptions := map[string]string {
-	"lob fetch": "post",
+	"lob fetch": "stream",
 }
 ```
 * ### Define Client Charset
@@ -603,7 +603,7 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
   db = sql.OpenDB(connector)
 ```
 
-* ### using custom configuration for connection
+* ### use custom configurations for connection
   * another way to set connection configuration instead of using connection string (DSN)
   * use as follow
 ```golang
@@ -612,7 +612,6 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 	go_ora.RegisterConnConfig(config)
     // now open db note empty DSN
 	db, err := sql.Open("oracle", "")
-	
 ```
 
 
@@ -660,6 +659,7 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
   * RegisterConnConfig
 * fix issue related to LONG and JSON data types
 * fix issue related to using returning clause with prepared statement will hang
+* add `lob fetch=inline` which is equal to `lob fetch=pre`
 * complete fix for data race
 
 

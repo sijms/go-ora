@@ -74,7 +74,7 @@ func (lob *Lob) getSize() (size int64, err error) {
 	lob.initialize()
 	lob.sendSize = true
 	session := lob.connection.session
-	lob.connection.connOption.Tracer.Print("Read Lob Size")
+	lob.connection.tracer.Print("Read Lob Size")
 	session.ResetBuffer()
 	lob.writeOp(1)
 	err = session.Write()
@@ -86,15 +86,15 @@ func (lob *Lob) getSize() (size int64, err error) {
 		return
 	}
 	size = lob.size
-	lob.connection.connOption.Tracer.Print("Lob Size: ", size)
+	lob.connection.tracer.Print("Lob Size: ", size)
 	return
 }
 
 func (lob *Lob) getDataWithOffsetSize(offset, count int64) (data []byte, err error) {
 	if offset == 0 && count == 0 {
-		lob.connection.connOption.Tracer.Print("Read Lob Data:")
+		lob.connection.tracer.Print("Read Lob Data:")
 	} else {
-		lob.connection.connOption.Tracer.Printf("Read Lob Data Position: %d, Count: %d\n", offset, count)
+		lob.connection.tracer.Printf("Read Lob Data Position: %d, Count: %d\n", offset, count)
 	}
 	lob.initialize()
 	lob.size = count
@@ -122,7 +122,7 @@ func (lob *Lob) getData() (data []byte, err error) {
 }
 
 func (lob *Lob) putData(data []byte) error {
-	lob.connection.connOption.Tracer.Printf("Put Lob Data: %d bytes", len(data))
+	lob.connection.tracer.Printf("Put Lob Data: %d bytes", len(data))
 	lob.initialize()
 	lob.size = int64(len(data))
 	lob.sendSize = true
@@ -140,7 +140,7 @@ func (lob *Lob) putData(data []byte) error {
 
 func (lob *Lob) putString(data string) error {
 	conn := lob.connection
-	conn.connOption.Tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
+	conn.tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
 	lob.initialize()
 	var strConv converters.IStringConverter
 	if lob.variableWidthChar() {
@@ -193,7 +193,7 @@ func (lob *Lob) freeTemporary() error {
 }
 
 func (lob *Lob) createTemporaryBLOB() error {
-	lob.connection.connOption.Tracer.Print("Create Temporary BLob:")
+	lob.connection.tracer.Print("Create Temporary BLob:")
 	lob.sourceLocator = make([]byte, 0x28)
 	lob.sourceLocator[1] = 0x54
 	lob.sourceLen = len(lob.sourceLocator)
@@ -215,7 +215,7 @@ func (lob *Lob) createTemporaryBLOB() error {
 }
 
 func (lob *Lob) createTemporaryClob(charset, charsetForm int) error {
-	lob.connection.connOption.Tracer.Print("Create Temporary CLob")
+	lob.connection.tracer.Print("Create Temporary CLob")
 	lob.sourceLocator = make([]byte, 0x28)
 	lob.sourceLocator[1] = 0x54
 	lob.sourceLen = len(lob.sourceLocator)
@@ -243,7 +243,7 @@ func (lob *Lob) createTemporaryClob(charset, charsetForm int) error {
 }
 
 func (lob *Lob) open(mode, opID int) error {
-	lob.connection.connOption.Tracer.Printf("Open Lob: Mode= %d   Operation ID= %d", mode, opID)
+	lob.connection.tracer.Printf("Open Lob: Mode= %d   Operation ID= %d", mode, opID)
 	if lob.isTemporary() {
 		if lob.sourceLocator[7]&8 == 8 {
 			return errors.New("TTC Error")
@@ -267,7 +267,7 @@ func (lob *Lob) open(mode, opID int) error {
 }
 
 func (lob *Lob) close(opID int) error {
-	lob.connection.connOption.Tracer.Print("Close Lob: ")
+	lob.connection.tracer.Print("Close Lob: ")
 	//if lob.isTemporary() {
 	//	if lob.sourceLocator[7]&8 == 8 {
 	//		return errors.New("TTC Error")

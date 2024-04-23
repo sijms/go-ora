@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"github.com/sijms/go-ora/v2/trace"
 	"sync"
 )
 
@@ -24,7 +25,7 @@ func (pck *DataPacket) bytes() []byte {
 	return ret.Bytes()
 }
 
-func newDataPacket(initialData []byte, sessionCtx *SessionContext, mu *sync.Mutex) (*DataPacket, error) {
+func newDataPacket(initialData []byte, sessionCtx *SessionContext, tracer trace.Tracer, mu *sync.Mutex) (*DataPacket, error) {
 	//var outputData []byte = initialData
 	var err error
 	mu.Lock()
@@ -36,7 +37,6 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext, mu *sync.Mute
 	if sessionCtx.AdvancedService.CryptAlgo != nil {
 		//outputData = make([]byte, len(outputData))
 		//copy(outputData, outputData)
-		tracer := sessionCtx.connConfig.Tracer
 		tracer.LogPacket("Write packet (Decrypted): ", initialData)
 		initialData, err = sessionCtx.AdvancedService.CryptAlgo.Encrypt(initialData)
 		if err != nil {
@@ -61,7 +61,7 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext, mu *sync.Mute
 	}, nil
 }
 
-func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, mu *sync.Mutex) (*DataPacket, error) {
+func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, tracer trace.Tracer, mu *sync.Mutex) (*DataPacket, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	if len(packetData) < 0xA || PacketType(packetData[4]) != DATA {
@@ -92,7 +92,6 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, mu *sy
 		if err != nil {
 			return nil, err
 		}
-		tracer := sessionCtx.connConfig.Tracer
 		tracer.LogPacket("Read packet (Decrypted): ", pck.buffer)
 	}
 	if sessionCtx.AdvancedService.HashAlgo != nil {

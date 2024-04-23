@@ -121,7 +121,7 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	if cursor.connection.State != Opened {
 		return nil, driver.ErrBadConn
 	}
-	tracer := cursor.connection.connOption.Tracer
+	tracer := cursor.connection.tracer
 	tracer.Printf("Query RefCursor: %d", cursor.cursorID)
 	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
 	cursor._hasMoreRows = true

@@ -77,6 +77,7 @@ type Connection struct {
 	LogonMode  LogonMode
 	autoCommit bool
 	//conStr            *ConnectionString
+	tracer            trace.Tracer
 	connOption        *configurations.ConnectionConfig
 	session           *network.Session
 	tcpNego           *TCPNego
@@ -260,13 +261,13 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 
 // Prepare take a query string and create a stmt object
 func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
-	conn.connOption.Tracer.Print("Prepare\n", query)
+	conn.tracer.Print("Prepare\n", query)
 	return NewStmt(query, conn), nil
 }
 
 // Ping test if connection is online
 func (conn *Connection) Ping(ctx context.Context) error {
-	conn.connOption.Tracer.Print("Ping")
+	conn.tracer.Print("Ping")
 	conn.session.ResetBuffer()
 	conn.session.StartContext(ctx)
 	defer conn.session.EndContext()
@@ -305,7 +306,7 @@ func (conn *Connection) getStrConv(charsetID int) (converters.IStringConverter, 
 //}
 
 func (conn *Connection) Logoff() error {
-	conn.connOption.Tracer.Print("Logoff")
+	conn.tracer.Print("Logoff")
 	session := conn.session
 	session.ResetBuffer()
 	//session.PutBytes(0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11, 0x1, 0, 0, 0, 0x1, 0, 0, 0, 0, 0, 0x1, 0, 0, 0, 0, 0,
@@ -358,7 +359,7 @@ func (conn *Connection) Open() error {
 }
 
 //func (conn *Connection) restore() error {
-//	tracer := conn.connOption.Tracer
+//	tracer := conn.tracer
 //	failOver := conn.connOption.Failover
 //	var err error
 //	for trial := 0; trial < failOver; trial++ {
@@ -382,12 +383,23 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 				now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(),
 				now.Nanosecond())
 			if tr, err := os.Create(traceFileName); err == nil {
-				conn.connOption.Tracer = trace.NewTraceWriter(tr)
+				conn.tracer = trace.NewTraceWriter(tr)
 			}
 		}
 
+	} else {
+		if len(conn.connOption.TraceFilePath) > 0 {
+			tf, err := os.Create(conn.connOption.TraceFilePath)
+			if err != nil {
+				//noinspection GoErrorStringFormat
+				return fmt.Errorf("Can't open trace file: %w", err)
+			}
+			conn.tracer = trace.NewTraceWriter(tf)
+		} else {
+			conn.tracer = trace.NilTracer()
+		}
 	}
-	tracer := conn.connOption.Tracer
+	tracer := conn.tracer
 	switch conn.connOption.DBAPrivilege {
 	case configurations.SYSDBA:
 		conn.LogonMode |= SysDba
@@ -397,7 +409,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		conn.LogonMode = 0
 	}
 	conn.connOption.ResetServerIndex()
-	conn.session = network.NewSession(conn.connOption)
+	conn.session = network.NewSession(conn.connOption, conn.tracer)
 	W := conn.connOption.Wallet
 	if conn.connOption.SSL && W != nil {
 		err := conn.session.LoadSSLData(W.Certificates, W.PrivateKeys, W.CertificateRequests)
@@ -416,7 +428,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	// advanced negotiation
 	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
 		tracer.Print("Advance Negotiation")
-		ano, err := advanced_nego.NewAdvNego(session, conn.connOption)
+		ano, err := advanced_nego.NewAdvNego(session, conn.tracer, conn.connOption)
 		if err != nil {
 			return err
 		}
@@ -493,7 +505,7 @@ func (conn *Connection) getDBTimeZone() {
 
 // Begin a transaction
 func (conn *Connection) Begin() (driver.Tx, error) {
-	conn.connOption.Tracer.Print("Begin transaction")
+	conn.tracer.Print("Begin transaction")
 	conn.autoCommit = false
 	return &Transaction{conn: conn, ctx: context.Background()}, nil
 }
@@ -505,7 +517,7 @@ func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 	if opts.Isolation != 0 {
 		return nil, errors.New("only support default value for isolation")
 	}
-	conn.connOption.Tracer.Print("Begin transaction with context")
+	conn.tracer.Print("Begin transaction with context")
 	conn.autoCommit = false
 	return &Transaction{conn: conn, ctx: ctx}, nil
 }
@@ -525,10 +537,11 @@ func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) 
 	}
 
 	//conStr, err := newConnectionStringFromUrl(databaseUrl)
-
+	temp := new(configurations.ConnectionConfig)
+	*temp = *config
 	return &Connection{
 		State:      Closed,
-		connOption: config,
+		connOption: temp,
 		cStrConv:   converters.NewStringConverter(config.CharsetID),
 		autoCommit: true,
 		cusTyp:     map[string]customType{},
@@ -545,7 +558,7 @@ func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) 
 
 // Close the connection by disconnect network session
 func (conn *Connection) Close() (err error) {
-	tracer := conn.connOption.Tracer
+	tracer := conn.tracer
 	tracer.Print("Close")
 	//var err error = nil
 	if conn.session != nil {
@@ -561,14 +574,14 @@ func (conn *Connection) Close() (err error) {
 		conn.session = nil
 	}
 	conn.State = Closed
-	conn.connOption.Tracer.Print("Connection Closed")
-	_ = conn.connOption.Tracer.Close()
+	conn.tracer.Print("Connection Closed")
+	_ = conn.tracer.Close()
 	return
 }
 
 // doAuth a login step that occur during open connection
 func (conn *Connection) doAuth() error {
-	conn.connOption.Tracer.Print("doAuth")
+	conn.tracer.Print("doAuth")
 	if len(conn.connOption.UserID) > 0 && len(conn.connOption.Password) > 0 {
 		conn.session.ResetBuffer()
 		conn.session.PutBytes(3, 0x76, 0, 1)
@@ -950,7 +963,7 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 	defer func() {
 		_ = stmt.Close()
 	}()
-	tracer := conn.connOption.Tracer
+	tracer := conn.tracer
 	tracer.Printf("BulkInsert:\n%s", stmt.text)
 	tracer.Printf("Row Num: %d", rowNum)
 	tracer.Printf("Column Num: %d", len(columns))
@@ -1081,7 +1094,7 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 	if conn.State != Opened {
 		return nil, driver.ErrBadConn
 	}
-	conn.connOption.Tracer.Print("Prepare With Context\n", query)
+	conn.tracer.Print("Prepare With Context\n", query)
 	conn.session.StartContext(ctx)
 	defer conn.session.EndContext()
 	return NewStmt(query, conn), nil
@@ -1089,7 +1102,7 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 
 func (conn *Connection) readMsg(msgCode uint8) error {
 	session := conn.session
-	tracer := conn.connOption.Tracer
+	tracer := conn.tracer
 	var err error
 	switch msgCode {
 	case 4:
@@ -1240,7 +1253,7 @@ func (conn *Connection) ResetSession(_ context.Context) error {
 }
 
 func (conn *Connection) dataTypeNegotiation() error {
-	tracer := conn.connOption.Tracer
+	tracer := conn.tracer
 	var err error
 	tracer.Print("Data Type Negotiation")
 	conn.dataNego = buildTypeNego(conn.tcpNego, conn.session)
@@ -1273,7 +1286,7 @@ func (conn *Connection) dataTypeNegotiation() error {
 	//this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompileTimeCapabilities[7] >= (byte) 8;
 }
 func (conn *Connection) protocolNegotiation() error {
-	tracer := conn.connOption.Tracer
+	tracer := conn.tracer
 	var err error
 	tracer.Print("TCP Negotiation")
 	conn.tcpNego, err = newTCPNego(conn.session)

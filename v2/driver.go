@@ -69,7 +69,8 @@ func (driver *OracleDriver) init(conn *Connection) error {
 			driver.nStrConv = conn.nStrConv.Clone()
 		}
 		if driver.connOption == nil {
-			driver.connOption = conn.connOption
+			driver.connOption = new(configurations.ConnectionConfig)
+			*driver.connOption = *conn.connOption
 		}
 		driver.dataCollected = true
 	}

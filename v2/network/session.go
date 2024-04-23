@@ -85,7 +85,6 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 			SessionDataUnitSize:   0xFFFF,
 			TransportDataUnitSize: 0xFFFF,
 		},
-		Tracer: trace.NilTracer(),
 	}
 	return &Session{
 		//ctx:        context.Background(),
@@ -98,10 +97,10 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 		Summary:         nil,
 		UseBigClrChunks: false,
 		ClrChunkSize:    0x40,
-		tracer:          options.Tracer,
+		tracer:          trace.NilTracer(),
 	}
 }
-func NewSession(config *configurations.ConnectionConfig) *Session {
+func NewSession(config *configurations.ConnectionConfig, tracer trace.Tracer) *Session {
 	return &Session{
 		//ctx:             context.Background(),
 		conn:            nil,
@@ -112,7 +111,7 @@ func NewSession(config *configurations.ConnectionConfig) *Session {
 		UseBigClrChunks: false,
 		ClrChunkSize:    0x40,
 		lastPacket:      bytes.Buffer{},
-		tracer:          config.Tracer,
+		tracer:          tracer,
 	}
 }
 
@@ -604,7 +603,7 @@ func (session *Session) Connect(ctx context.Context) error {
 }
 
 func (session *Session) WriteFinalPacket() error {
-	data, err := newDataPacket(nil, session.Context, &session.mu)
+	data, err := newDataPacket(nil, session.Context, session.tracer, &session.mu)
 	if err != nil {
 		return err
 	}
@@ -636,7 +635,7 @@ func (session *Session) Write() error {
 	size := session.outBuffer.Len()
 	if size == 0 {
 		// send empty data packet
-		pck, err := newDataPacket(nil, session.Context, &session.mu)
+		pck, err := newDataPacket(nil, session.Context, session.tracer, &session.mu)
 		if err != nil {
 			return err
 		}
@@ -650,7 +649,7 @@ func (session *Session) Write() error {
 		segment := make([]byte, segmentLen)
 		for size > segmentLen {
 			copy(segment, outputBytes[offset:offset+segmentLen])
-			pck, err := newDataPacket(segment, session.Context, &session.mu)
+			pck, err := newDataPacket(segment, session.Context, session.tracer, &session.mu)
 			if err != nil {
 				return err
 			}
@@ -664,7 +663,7 @@ func (session *Session) Write() error {
 		}
 	}
 	if size != 0 {
-		pck, err := newDataPacket(outputBytes[offset:], session.Context, &session.mu)
+		pck, err := newDataPacket(outputBytes[offset:], session.Context, session.tracer, &session.mu)
 		if err != nil {
 			return err
 		}
@@ -1075,7 +1074,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		if uint16(pck.length) <= pck.dataOffset {
 			err = session.readPacketData()
 			packetData = session.lastPacket.Bytes()
-			dataPck, err := newDataPacketFromData(packetData, session.Context, &session.mu)
+			dataPck, err := newDataPacketFromData(packetData, session.Context, session.tracer, &session.mu)
 			if err != nil {
 				return nil, err
 			}
@@ -1093,7 +1092,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return pck, nil
 	case DATA:
-		dataPck, err := newDataPacketFromData(packetData, session.Context, &session.mu)
+		dataPck, err := newDataPacketFromData(packetData, session.Context, session.tracer, &session.mu)
 		if dataPck != nil {
 			if session.Context.connConfig.SSL && (dataPck.dataFlag&0x8000 > 0 || dataPck.flag&0x80 > 0) {
 				session.negotiate()

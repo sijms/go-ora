@@ -31,12 +31,12 @@ type AdvNego struct {
 	serviceList []AdvNegoService
 }
 
-func NewAdvNego(session *network.Session, config *configurations.ConnectionConfig) (*AdvNego, error) {
+func NewAdvNego(session *network.Session, tracer trace.Tracer, config *configurations.ConnectionConfig) (*AdvNego, error) {
 	output := &AdvNego{
 		comm:        &AdvancedNegoComm{session: session},
 		clientInfo:  &config.ClientInfo,
 		negoInfo:    &config.AdvNegoServiceInfo,
-		tracer:      config.Tracer,
+		tracer:      tracer,
 		serviceList: make([]AdvNegoService, 5),
 	}
 	var err error

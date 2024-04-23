@@ -3,7 +3,6 @@ package configurations
 import (
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/trace"
 	"net"
 	"net/url"
 	"os"
@@ -32,10 +31,11 @@ type ConnectionConfig struct {
 	DatabaseInfo
 	SessionInfo
 	AdvNegoServiceInfo
-	Tracer       trace.Tracer
-	TraceDir     string
-	PrefetchRows int
-	Lob          LobFetch
+	//Tracer       trace.Tracer
+	TraceFilePath string
+	TraceDir      string
+	PrefetchRows  int
+	Lob           LobFetch
 	//Failover     int
 	//RetryTime    int
 
@@ -246,16 +246,17 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			}
 			config.SessionInfo.Timeout = time.Second * time.Duration(to)
 		case "TRACE FILE":
-			if len(val[0]) > 0 {
-				tf, err := os.Create(val[0])
-				if err != nil {
-					//noinspection GoErrorStringFormat
-					return nil, fmt.Errorf("Can't open trace file: %w", err)
-				}
-				config.Tracer = trace.NewTraceWriter(tf)
-			} else {
-				config.Tracer = trace.NilTracer()
-			}
+			config.TraceFilePath = val[0]
+			//if len(val[0]) > 0 {
+			//	tf, err := os.Create(val[0])
+			//	if err != nil {
+			//		//noinspection GoErrorStringFormat
+			//		return nil, fmt.Errorf("Can't open trace file: %w", err)
+			//	}
+			//	config.Tracer = trace.NewTraceWriter(tf)
+			//} else {
+			//	config.Tracer = trace.NilTracer()
+			//}
 		case "TRACE DIR":
 			fallthrough
 		case "TRACE FOLDER":

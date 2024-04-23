@@ -302,7 +302,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	}
 	var uds_flags int
 	uds_flags, err = session.GetInt(4, true, true)
-	par.IsJson = (uds_flags & 0x100) > 0
+	par.IsJson = (uds_flags & 0x500) > 0
 	if session.TTCVersion < 17 {
 		return nil
 	}

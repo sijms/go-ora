@@ -223,7 +223,7 @@ urlOptions := map[string]string {
 ```
 * ### Define Lob Fetching Mode
   * this option define how lob data will be loaded
-  * default value is `pre` or `inline` means lob data is send online with other values
+  * default value is `pre` or `inline` means lob data is send inline with other values
   * other value is `post` or `stream` means lob data will be loaded after finish loading other value through a separate network call
 ```golang
 urlOptions := map[string]string {

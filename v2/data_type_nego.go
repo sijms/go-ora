@@ -16,7 +16,6 @@ type DataTypeNego struct {
 	DataTypeRepFor1200     int16
 	CompileTimeCaps        []byte
 	RuntimeCap             []byte
-	DBTimeZone             []byte
 	b32kTypeSupported      bool
 	supportSessionStateOps bool
 	serverTZVersion        int
@@ -462,19 +461,31 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	}
 	return &result
 }
-func (nego *DataTypeNego) read(session *network.Session) error {
-	msg, err := session.GetByte()
+func (nego *DataTypeNego) read(session *network.Session) (zone *time.Location, err error) {
+	var msg uint8
+	msg, err = session.GetByte()
 	if err != nil {
-		return err
+		return
 	}
 	if msg != 2 {
-		return errors.New(fmt.Sprintf("message code error: received code %d and expected code is 2", msg))
+		err = errors.New(fmt.Sprintf("message code error: received code %d and expected code is 2", msg))
+		return
 	}
 	if nego.RuntimeCap[1] == 1 {
-		nego.DBTimeZone, err = session.GetBytes(11)
+		var tz_bytes []byte
+		tz_bytes, err = session.GetBytes(11)
 		if err != nil {
-			return err
+			return
 		}
+		if len(tz_bytes) < 11 {
+			err = errors.New("incorrect format for DBTimeZone")
+			return
+		}
+		tzHours := int(tz_bytes[4]) - 60
+		tzMin := int(tz_bytes[5]) - 60
+		tzSec := int(tz_bytes[6]) - 60
+		zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHours, tzMin),
+			tzHours*60*60+tzMin*60+tzSec)
 		if nego.CompileTimeCaps[37]&2 == 2 {
 			nego.serverTZVersion, _ = session.GetInt(4, false, true)
 		}
@@ -502,8 +513,8 @@ func (nego *DataTypeNego) read(session *network.Session) error {
 	}
 	//fmt.Println("server timezone version: ", nego.serverTZVersion)
 	//fmt.Println("client timezone version: ", nego.clientTZVersion)
-	//fmt.Println("server timezone: ", nego.DBTimeZone)
-	return nil
+	//fmt.Println("server timezone: ", nego.dbTimeZone)
+	return
 }
 func (nego *DataTypeNego) write(session *network.Session) error {
 	session.ResetBuffer()

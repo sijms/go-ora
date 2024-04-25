@@ -581,7 +581,7 @@ func (stmt *Stmt) getExeOption() int {
 	if !stmt.parse && !stmt.execute {
 		op |= 0x40
 	}
-	if len(stmt.Pars) > 0 {
+	if len(stmt.Pars) > 0 && !stmt.define {
 		op |= 0x8
 		if stmt.stmtType == PLSQL || (stmt._hasReturnClause && !stmt.reSendParDef) {
 			op |= 0x400

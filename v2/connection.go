@@ -101,8 +101,8 @@ type Connection struct {
 		date      int
 		timestamp int
 	}
-	bad       bool
-	dbTimeLoc *time.Location
+	bad        bool
+	dbTimeZone *time.Location
 }
 
 type OracleConnector struct {
@@ -490,17 +490,24 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			return err
 		}
 	}
-	conn.getDBTimeZone()
 	return nil
 }
 
-func (conn *Connection) getDBTimeZone() {
-	var current time.Time
-	err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
+func (conn *Connection) getDBTimeZone() error {
+	var result string
+	err := conn.QueryRowContext(context.Background(), "SELECT DBTIMEZONE FROM DUAL", nil).Scan(&result)
+	//var current time.Time
+	//err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
 	if err != nil {
-		conn.dbTimeLoc = time.UTC
+		return err
 	}
-	conn.dbTimeLoc = current.Location()
+	var tzHours, tzMin int
+	_, err = fmt.Sscanf(result, "%03d:%02d", &tzHours, &tzMin)
+	if err != nil {
+		return err
+	}
+	conn.dbTimeZone = time.FixedZone(result, tzHours*60*60+tzMin*60)
+	return nil
 }
 
 // Begin a transaction
@@ -1261,10 +1268,21 @@ func (conn *Connection) dataTypeNegotiation() error {
 	if err != nil {
 		return err
 	}
-	err = conn.dataNego.read(conn.session)
+	conn.dbTimeZone, err = conn.dataNego.read(conn.session)
 	if err != nil {
 		return err
 	}
+	if conn.dbTimeZone == nil {
+		conn.tracer.Print("DB timezone not retrieved in data type negotiation")
+		conn.tracer.Print("try to query DB timezone")
+		err = conn.getDBTimeZone()
+		if err != nil {
+			conn.tracer.Print("error during get DB timezone: ", err)
+			conn.tracer.Print("set DB timezone to: UTC(+00:00)")
+			conn.dbTimeZone = time.UTC
+		}
+	}
+	conn.tracer.Print("DB timezone: ", conn.dbTimeZone)
 	conn.session.TTCVersion = conn.dataNego.CompileTimeCaps[7]
 	conn.session.UseBigScn = conn.tcpNego.ServerCompileTimeCaps[7] >= 8
 	if conn.tcpNego.ServerCompileTimeCaps[7] < conn.session.TTCVersion {

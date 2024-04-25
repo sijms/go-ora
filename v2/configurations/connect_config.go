@@ -301,7 +301,7 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			} else if tempVal == "POST" || tempVal == "STREAM" {
 				config.Lob = STREAM
 			} else {
-				return nil, errors.New("LOB FETCH value should be: PRE(default) or POST or STREAM")
+				return nil, errors.New("LOB FETCH value should be either INLINE/PRE (default) or STREAM/POST")
 			}
 		case "LANGUAGE":
 			config.Language = val[0]

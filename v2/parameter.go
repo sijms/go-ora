@@ -1136,8 +1136,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			return err
 		}
 		if conn.dbTimeZone != time.UTC {
-			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
-				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbTimeZone)
+			par.oPrimValue = tempTime.In(conn.dbTimeZone)
 		} else {
 			par.oPrimValue = tempTime
 		}
@@ -1154,7 +1153,8 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		}
 		par.oPrimValue = tempTime
 		if conn.dbTimeZone != time.UTC {
-			par.oPrimValue = tempTime.In(conn.dbTimeZone)
+			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
+				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbTimeZone)
 		}
 	//case TimeStampDTY, TimeStampeLTZ, TimeStampLTZ_DTY, TIMESTAMPTZ, TimeStampTZ_DTY:
 	//	fallthrough

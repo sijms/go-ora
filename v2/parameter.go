@@ -5,11 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/configurations"
 	"math"
 	"strings"
 	"time"
 
+	"github.com/sijms/go-ora/v2/configurations"
 	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
 )
@@ -1135,12 +1135,14 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		if err != nil {
 			return err
 		}
+
 		if conn.dbTimeZone != time.UTC {
 			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
 				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbServerTimeZone)
 		} else {
 			par.oPrimValue = tempTime
 		}
+
 	case TIMESTAMPTZ, TimeStampTZ_DTY:
 		tempTime, err := converters.DecodeDate(par.BValue)
 		if err != nil {
@@ -1154,7 +1156,8 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		}
 		par.oPrimValue = tempTime
 		if conn.dbTimeZone != time.UTC {
-			par.oPrimValue = tempTime.In(conn.dbTimeZone)
+			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
+				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbTimeZone)
 		}
 	//case TimeStampDTY, TimeStampeLTZ, TimeStampLTZ_DTY, TIMESTAMPTZ, TimeStampTZ_DTY:
 	//	fallthrough

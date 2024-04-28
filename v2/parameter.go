@@ -1135,8 +1135,14 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		if err != nil {
 			return err
 		}
-		par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
-			tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), time.Local)
+
+		if conn.dbTimeZone != time.UTC {
+			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
+				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbServerTimeZone)
+		} else {
+			par.oPrimValue = tempTime
+		}
+
 	case TIMESTAMPTZ, TimeStampTZ_DTY:
 		tempTime, err := converters.DecodeDate(par.BValue)
 		if err != nil {

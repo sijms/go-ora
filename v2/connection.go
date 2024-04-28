@@ -101,8 +101,9 @@ type Connection struct {
 		date      int
 		timestamp int
 	}
-	bad        bool
-	dbTimeZone *time.Location
+	bad              bool
+	dbTimeZone       *time.Location
+	dbServerTimeZone *time.Location
 }
 
 type OracleConnector struct {
@@ -490,7 +491,17 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			return err
 		}
 	}
+	conn.getDBServerTimeZone()
 	return nil
+}
+
+func (conn *Connection) getDBServerTimeZone() {
+	var current time.Time
+	err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
+	if err != nil {
+		conn.dbServerTimeZone = time.UTC
+	}
+	conn.dbServerTimeZone = current.Location()
 }
 
 func (conn *Connection) getDBTimeZone() error {

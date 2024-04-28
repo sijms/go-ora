@@ -1137,7 +1137,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		}
 		if conn.dbTimeZone != time.UTC {
 			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
-				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbTimeZone)
+				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbServerTimeZone)
 		} else {
 			par.oPrimValue = tempTime
 		}

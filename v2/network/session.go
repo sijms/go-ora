@@ -166,8 +166,10 @@ func (session *Session) LoadState() (oldState *SessionState) {
 }
 
 func (session *Session) resetWrite() {
+	session.mu.Lock()
 	session.sendPcks = nil
 	session.outBuffer.Reset()
+	session.mu.Unlock()
 }
 func (session *Session) resetRead() {
 	session.inBuffer = nil
@@ -679,9 +681,7 @@ func (session *Session) Write() error {
 func (session *Session) processMarker() error {
 	var err error
 	// send reset connection
-	session.mu.Lock()
 	session.resetWrite()
-	session.mu.Unlock()
 	marker := newMarkerPacket(marker_type_reset, session.Context)
 	err = session.writePacket(marker)
 	if err != nil {

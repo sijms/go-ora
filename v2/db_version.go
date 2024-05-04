@@ -35,6 +35,9 @@ func GetDBVersion(session *network.Session) (*DBVersion, error) {
 		return nil, err
 	}
 	msg, err := session.GetByte()
+	if err != nil {
+		return nil, err
+	}
 	if msg != 8 {
 		return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", msg))
 	}

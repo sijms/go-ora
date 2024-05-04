@@ -196,6 +196,7 @@ func (session *Session) StartContext(ctx context.Context) {
 	go func(idone chan struct{}, mu *sync.Mutex) {
 		var err error
 		mu.Lock()
+		var tracer = session.tracer
 		mu.Unlock()
 		select {
 		case <-idone:
@@ -206,12 +207,12 @@ func (session *Session) StartContext(ctx context.Context) {
 			session.mu.Unlock()
 			if connected {
 				if err = session.BreakConnection(); err != nil {
-					session.tracer.Print("Connection Break Error: ", err)
+					tracer.Print("Connection Break Error: ", err)
 				}
 			} else {
 				err = session.WriteFinalPacket()
 				if err != nil {
-					session.tracer.Print("Write Final Packet With Error: ", err)
+					tracer.Print("Write Final Packet With Error: ", err)
 				}
 				session.Disconnect()
 			}
@@ -930,8 +931,8 @@ func (session *Session) GetError() *OracleError {
 }
 
 func (session *Session) readAll(size int) error {
-	session.mu.Lock()
-	defer session.mu.Unlock()
+	//session.mu.Lock()
+	//defer session.mu.Unlock()
 	index := 0
 	tempBuffer := make([]byte, size)
 	var err error

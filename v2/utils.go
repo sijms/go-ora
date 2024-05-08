@@ -1225,6 +1225,12 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 			if err != nil {
 				return err
 			}
+			if itemsLen == 0xFE {
+				itemsLen, err = session.GetInt(4, false, true)
+				if err != nil {
+					return err
+				}
+			}
 			pars := make([]ParameterInfo, 0, itemsLen)
 			for x := 0; x < itemsLen; x++ {
 				var tempPar = parent.cusType.attribs[0]

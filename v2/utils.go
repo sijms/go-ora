@@ -59,7 +59,6 @@ func refineSqlText(text string) string {
 		switch ch {
 		case '\\':
 			// bypass next character
-			index++
 			continue
 		case '/':
 			if index+1 < length && text[index+1] == '*' {

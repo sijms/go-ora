@@ -63,6 +63,8 @@ func init() {
 		urlOptions["SSL VERIFY"] = "false"
 		urlOptions["wallet"] = wallet
 	}
+	urlOptions["DATA INTEGRITY"] = "required"
+	urlOptions["ENCRYPTION"] = "required"
 }
 
 func execCmd(db *sql.DB, stmts ...string) error {

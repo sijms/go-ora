@@ -803,10 +803,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 							if err != nil {
 								return err
 							}
-							_, err = session.GetInt(2, true, true)
-							if err != nil {
-								return err
-							}
 						}
 					}
 				}
@@ -839,13 +835,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 						} else {
 							if stmt.Pars[x].Direction != Input {
 								err = stmt.calculateParameterValue(&stmt.Pars[x])
-								if err != nil {
-									return err
-								}
-								if stmt.Pars[x].DataType == XMLType && stmt.Pars[x].IsNull {
-									continue
-								}
-								_, err = session.GetInt(2, true, true)
 								if err != nil {
 									return err
 								}
@@ -1234,10 +1223,24 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) erro
 
 // get values of rows and output parameter according to DataType and binary value (bValue)
 func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
-	if param.DataType == OCIBlobLocator || param.DataType == OCIClobLocator || param.DataType == OCIFileLocator {
+	if param.isLobType() {
 		stmt._hasBLOB = true
 	}
-	return param.decodeParameterValue(stmt.connection, &stmt.temporaryLobs)
+	err := param.decodeParameterValue(stmt.connection, &stmt.temporaryLobs)
+	if err != nil {
+		return err
+	}
+	if param.DataType == XMLType && param.IsNull {
+		return nil
+	}
+	if param.DataType != XMLType && param.MaxNoOfArrayElements > 0 {
+		return nil
+	}
+	_, err = stmt.connection.session.GetInt(2, true, true)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Close stmt cursor in the server

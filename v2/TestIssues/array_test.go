@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
 	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
@@ -43,45 +44,53 @@ func TestArray(t *testing.T) {
 
 	var createPackage = func(db *sql.DB) error {
 		sqlText := `create or replace package GOORA_TEMP_PKG as
-	type t_visit_id is table of TTB_MAIN.id%type index by binary_integer;
-    type t_visit_name is table of TTB_MAIN.name%type index by binary_integer;
-	type t_visit_val is table of TTB_MAIN.val%type index by binary_integer;
-    type t_visit_date is table of TTB_MAIN.ldate%type index by binary_integer;
-    
-	procedure test_get1(p_visit_id t_visit_id, l_cursor out SYS_REFCURSOR);
-    procedure test_get2(p_visit_id t_visit_id, p_visit_name out t_visit_name,
-        p_visit_val out t_visit_val, p_visit_date out t_visit_date);
-end GOORA_TEMP_PKG;
-`
+		type t_visit_id is table of TTB_MAIN.id%type index by binary_integer;
+	   type t_visit_name is table of TTB_MAIN.name%type index by binary_integer;
+		type t_visit_val is table of TTB_MAIN.val%type index by binary_integer;
+	   type t_visit_date is table of TTB_MAIN.ldate%type index by binary_integer;
+	
+		procedure test_get1(p_visit_id t_visit_id, l_cursor out SYS_REFCURSOR);
+	   procedure test_get2(p_visit_id t_visit_id, p_visit_name out t_visit_name,
+	       p_visit_val out t_visit_val, p_visit_date out t_visit_date);
+		procedure test_empty_array(p_visit_id t_visit_id, p_visit_name out t_visit_name,
+	       p_visit_val out t_visit_val, p_visit_date out t_visit_date);
+	end GOORA_TEMP_PKG;
+	`
 		err := execCmd(db, sqlText)
 		if err != nil {
 			return err
 		}
 		sqlText = `create or replace PACKAGE BODY GOORA_TEMP_PKG as
-	procedure test_get1(p_visit_id t_visit_id, l_cursor out SYS_REFCURSOR) as 
-		temp t_visit_id := p_visit_id;
-	begin
-		OPEN l_cursor for select id, name, val, ldate from TTB_MAIN 
-		    where id in (select column_value from table(temp));
-	end test_get1;
-    
-    procedure test_get2(p_visit_id t_visit_id, p_visit_name out t_visit_name,
-        p_visit_val out t_visit_val, p_visit_date out t_visit_date) as
-        temp t_visit_id := p_visit_id;
-        cursor tempCur is select id, name, val, ldate from TTB_MAIN
-            where id in (select column_value from table(temp));
-        tempRow tempCur%rowtype;
-        idx number := 1;
-    begin
-        for tempRow in tempCur loop
-            p_visit_name(idx) := tempRow.name;
-            p_visit_val(idx) := tempRow.val;
-            p_visit_date(idx) := tempRow.ldate;
-            idx := idx + 1;
-        end loop;
-    end test_get2;
-end GOORA_TEMP_PKG;
-`
+		procedure test_get1(p_visit_id t_visit_id, l_cursor out SYS_REFCURSOR) as
+			temp t_visit_id := p_visit_id;
+		begin
+			OPEN l_cursor for select id, name, val, ldate from TTB_MAIN
+			    where id in (select column_value from table(temp));
+		end test_get1;
+	
+	   procedure test_get2(p_visit_id t_visit_id, p_visit_name out t_visit_name,
+	       p_visit_val out t_visit_val, p_visit_date out t_visit_date) as
+	       temp t_visit_id := p_visit_id;
+	       cursor tempCur is select id, name, val, ldate from TTB_MAIN
+	           where id in (select column_value from table(temp));
+	       tempRow tempCur%rowtype;
+	       idx number := 1;
+	   begin
+	       for tempRow in tempCur loop
+	           p_visit_name(idx) := tempRow.name;
+	           p_visit_val(idx) := tempRow.val;
+	           p_visit_date(idx) := tempRow.ldate;
+	           idx := idx + 1;
+	       end loop;
+	   end test_get2;
+	
+		procedure test_empty_array(p_visit_id t_visit_id, p_visit_name out t_visit_name,
+			p_visit_val out t_visit_val, p_visit_date out t_visit_date) as
+		BEGIN
+			NULL;
+		END test_empty_array;
+	end GOORA_TEMP_PKG;
+	`
 		return execCmd(db, sqlText)
 	}
 
@@ -127,7 +136,7 @@ end GOORA_TEMP_PKG;
 		)
 		// note size here is important and equal to max number of items that array can accommodate
 		_, err := db.Exec(`BEGIN GOORA_TEMP_PKG.TEST_GET2(:1, :2, :3, :4); END;`,
-			[]int{1, 3, 5}, go_ora.Out{Dest: &nameArray, Size: 10},
+			[]int{1, 3, 4, 5, 7, 8}, go_ora.Out{Dest: &nameArray, Size: 10},
 			go_ora.Out{Dest: &valArray, Size: 10},
 			go_ora.Out{Dest: &dateArray, Size: 10})
 		if err != nil {
@@ -138,6 +147,33 @@ end GOORA_TEMP_PKG;
 		t.Log(dateArray)
 		return nil
 	}
+
+	var query3 = func(db *sql.DB) error {
+		var (
+			nameArray []sql.NullString
+			valArray  []sql.NullFloat64
+			dateArray []sql.NullTime
+		)
+		// note size here is important and equal to max number of items that array can accommodate
+		_, err := db.Exec(`BEGIN GOORA_TEMP_PKG.test_empty_array(:1, :2, :3, :4); END;`,
+			[]int{1, 3, 5}, go_ora.Out{Dest: &nameArray, Size: 10},
+			go_ora.Out{Dest: &valArray, Size: 10},
+			go_ora.Out{Dest: &dateArray, Size: 10})
+		if err != nil {
+			return err
+		}
+		if len(nameArray) != 0 {
+			return fmt.Errorf("expected empty array for name value and got: %d array size", len(nameArray))
+		}
+		if len(valArray) != 0 {
+			return fmt.Errorf("expected empty array for numeric value and got: %d array size", len(valArray))
+		}
+		if len(dateArray) != 0 {
+			return fmt.Errorf("expected empty array for date value and got: %d array size", len(dateArray))
+		}
+		return nil
+	}
+
 	db, err := getDB()
 	if err != nil {
 		t.Error(err)
@@ -183,6 +219,11 @@ end GOORA_TEMP_PKG;
 		return
 	}
 	err = query2(db)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	err = query3(db)
 	if err != nil {
 		t.Error(err)
 		return

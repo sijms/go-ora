@@ -864,7 +864,7 @@ func setString(value reflect.Value, input string) error {
 		return intErr
 	case tyNullFloat64:
 		if floatErr == nil {
-			value.Set(reflect.ValueOf(sql.NullFloat64{float64(tempInt), true}))
+			value.Set(reflect.ValueOf(sql.NullFloat64{tempFloat, true}))
 		}
 		return floatErr
 	case tyNullBool:

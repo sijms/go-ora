@@ -12,6 +12,7 @@ import (
 )
 
 func TestArray(t *testing.T) {
+	var expectedTime = time.Now()
 	var insert = func(db *sql.DB) error {
 		sqlText := `INSERT INTO TTB_MAIN(ID, NAME, VAL, LDATE, DATA) VALUES(:ID, :NAME, :VAL, :LDATE, :DATA)`
 		length := 10
@@ -29,7 +30,7 @@ func TestArray(t *testing.T) {
 				Id:   x + 1,
 				Name: sql.NullString{strings.Repeat("*", 20), true},
 				Val:  sql.NullFloat64{float64(length) / float64(x+1), true},
-				Date: sql.NullTime{time.Now(), true},
+				Date: sql.NullTime{expectedTime, true},
 				Data: bytes.Repeat([]byte{55}, 20),
 			}
 			if x == 2 {
@@ -123,6 +124,40 @@ func TestArray(t *testing.T) {
 			if err != nil {
 				return err
 			}
+			if id == 1 {
+				if name.String != strings.Repeat("*", 20) {
+					return fmt.Errorf("expected name to be %s, got %s at id: %d", strings.Repeat("*", 20), name.String, id)
+				}
+				if val.Float64 != 10.0 {
+					return fmt.Errorf("expected val to be %f, got %f at id: %d", 10.0, val.Float64, id)
+				}
+				if !isEqualTime(date.Time, expectedTime, false) {
+					return fmt.Errorf("expected date to be %v, and got %v at id: %d", expectedTime, date.Time, id)
+				}
+			}
+			if id == 3 {
+				if name.Valid {
+					return fmt.Errorf("expected name to be null, got %s at id: %d", name.String, id)
+				}
+				if val.Valid {
+					return fmt.Errorf("expected val to be null, got %f at id: %d", val.Float64, id)
+				}
+				if date.Valid {
+					return fmt.Errorf("expected date to be null, and got %v at id: %d", date.Time, id)
+				}
+			}
+			if id == 5 {
+				if name.String != strings.Repeat("*", 20) {
+					return fmt.Errorf("expected name to be %s, got %s at id: %d", strings.Repeat("*", 20), name.String, id)
+				}
+				if val.Float64 != 2.0 {
+					return fmt.Errorf("expected val to be %f, got %f at id: %d", 2.0, val.Float64, id)
+				}
+				if !isEqualTime(date.Time, expectedTime, false) {
+					return fmt.Errorf("expected date to be %v, and got %v at id: %d", expectedTime, date.Time, id)
+				}
+			}
+
 			t.Log("ID: ", id, "\tName: ", name.String, "\tVal: ", val.Float64, "\tDate: ", date.Time)
 		}
 		return rows.Err()
@@ -142,9 +177,64 @@ func TestArray(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		t.Log(nameArray)
-		t.Log(valArray)
-		t.Log(dateArray)
+		expectedString := sql.NullString{strings.Repeat("*", 20), true}
+
+		if nameArray[0] != expectedString {
+			return fmt.Errorf("expected name %s, got %s at position 0", expectedString.String, nameArray[0].String)
+		}
+		if nameArray[1].Valid {
+			return fmt.Errorf("expected name to be null at position 1, got %s", nameArray[1].String)
+		}
+		if nameArray[2] != expectedString {
+			return fmt.Errorf("expected name %s, got %s at position 2", expectedString.String, nameArray[2].String)
+		}
+		if nameArray[3] != expectedString {
+			return fmt.Errorf("expected name %s, got %s at position 3", expectedString.String, nameArray[3].String)
+		}
+		if nameArray[4] != expectedString {
+			return fmt.Errorf("expected name %s, got %s at position 4", expectedString.String, nameArray[4].String)
+		}
+		if nameArray[5] != expectedString {
+			return fmt.Errorf("expected name %s, got %s at position 5", expectedString.String, nameArray[5].String)
+		}
+
+		if valArray[0].Float64 != 10.0 {
+			return fmt.Errorf("expected val %v and got %v at position: 0", 10.0, valArray[0].Float64)
+		}
+		if valArray[1].Valid {
+			return fmt.Errorf("expected null val at position 1 got: %v", valArray[1].Valid)
+		}
+		if valArray[2].Float64 != 2.5 {
+			return fmt.Errorf("expected val %v and got %v at position: 2", 2.5, valArray[2].Float64)
+		}
+		if valArray[3].Float64 != 2.0 {
+			return fmt.Errorf("expected val %v and got %v at position: 3", 2.0, valArray[3].Float64)
+		}
+		if valArray[4].Float64 != 1.43 {
+			return fmt.Errorf("expected val %v and got %v at position: 4", 1.43, valArray[4].Float64)
+		}
+		if valArray[5].Float64 != 1.25 {
+			return fmt.Errorf("expected val %v and got %v at position: 5", 1.25, valArray[5].Float64)
+		}
+
+		if !isEqualTime(dateArray[0].Time, expectedTime, false) {
+			return fmt.Errorf("expected date %v, got %v at position: 0", expectedTime, dateArray[0].Time)
+		}
+		if dateArray[1].Valid {
+			return fmt.Errorf("expected null date at position 1 got: %v", dateArray[1].Valid)
+		}
+		if !isEqualTime(dateArray[2].Time, expectedTime, false) {
+			return fmt.Errorf("expected date: %v, got %v at position: 2", expectedTime, dateArray[2].Time)
+		}
+		if !isEqualTime(dateArray[3].Time, expectedTime, false) {
+			return fmt.Errorf("expected date: %v, got %v at position: 3", expectedTime, dateArray[3].Time)
+		}
+		if !isEqualTime(dateArray[4].Time, expectedTime, false) {
+			return fmt.Errorf("expected date: %v, got %v at position: 4", expectedTime, dateArray[4].Time)
+		}
+		if !isEqualTime(dateArray[5].Time, expectedTime, false) {
+			return fmt.Errorf("expected date: %v, got %v at position: 5", expectedTime, dateArray[5].Time)
+		}
 		return nil
 	}
 

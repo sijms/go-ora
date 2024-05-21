@@ -354,45 +354,38 @@ func (stmt *Stmt) writePars() error {
 		if !stmt.parse && par.Direction == Output && stmt.stmtType != PLSQL {
 			continue
 		}
-		if par.DataType == REFCURSOR {
-			session.WriteBytes(&buffer, 1, 0)
-		} else if par.Direction == Input && par.isLobType() {
-			if len(par.BValue) > 0 {
-				session.WriteUint(&buffer, len(par.BValue), 2, true, true)
-			}
-			session.WriteClr(&buffer, par.BValue)
-		} else {
-			if par.cusType != nil {
-				//fmt.Printf("%#v\n", par.ToID)
-				//session.WriteBytes(&buffer, 0x1, 0x24, 0x24, 0, 0x22, 0x2, 0x8)
-				//session.WriteBytes(&buffer, par.ToID...)
-				//session.WriteBytes(&buffer, bytes.Repeat([]byte{0}, 13)...)
-				//session.WriteBytes(&buffer, 1, 0, 1)
-				session.WriteBytes(&buffer, 0, 0, 0, 0)
-				//if bytes.Equal(par.BValue, []byte{0xFF}) {
-				//	par.BValue = []byte{0x88, 0x1, 3}
-				//}
-				size := len(par.BValue)
-				//if size == 1 && (bytes.Equal(par.BValue, []byte{0xFD}) || bytes.Equal(par.BValue, []byte{0xFF})) {
-				//	// null object
-				//	session.WriteBytes(&buffer, 0, 1, 1, 0x81, 1)
-				//
-				//} else {
-				session.WriteUint(&buffer, size, 4, true, true)
-				session.WriteBytes(&buffer, 1, 1)
+		if !par.isLongType() {
+			if par.DataType == REFCURSOR {
+				session.WriteBytes(&buffer, 1, 0)
+			} else if par.Direction == Input && par.isLobType() {
+				if len(par.BValue) > 0 {
+					session.WriteUint(&buffer, len(par.BValue), 2, true, true)
+				}
 				session.WriteClr(&buffer, par.BValue)
-				//}
 			} else {
-				if par.MaxNoOfArrayElements > 0 {
-					if par.BValue == nil {
-						session.WriteBytes(&buffer, 0)
-					} else {
-						session.WriteBytes(&buffer, par.BValue...)
-					}
-				} else {
+				if par.cusType != nil {
+					session.WriteBytes(&buffer, 0, 0, 0, 0)
+					size := len(par.BValue)
+					session.WriteUint(&buffer, size, 4, true, true)
+					session.WriteBytes(&buffer, 1, 1)
 					session.WriteClr(&buffer, par.BValue)
+				} else {
+					if par.MaxNoOfArrayElements > 0 {
+						if par.BValue == nil {
+							session.WriteBytes(&buffer, 0)
+						} else {
+							session.WriteBytes(&buffer, par.BValue...)
+						}
+					} else {
+						session.WriteClr(&buffer, par.BValue)
+					}
 				}
 			}
+		}
+	}
+	for _, par := range stmt.Pars {
+		if par.isLongType() {
+			session.WriteClr(&buffer, par.BValue)
 		}
 	}
 	if buffer.Len() > 0 {
@@ -2187,39 +2180,7 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 	} else {
 		stmt.Pars = append(stmt.Pars, par)
 	}
-	// set temporary lobs
-
-	//switch value := par.iPrimValue.(type) {
-	//case *Lob:
-	//	if value != nil && value.sourceLocator != nil {
-	//		stmt.temporaryLobs = append(stmt.temporaryLobs, value.sourceLocator)
-	//	}
-	//case *BFile:
-	//	if value != nil && value.lob.sourceLocator != nil {
-	//		stmt.temporaryLobs = append(stmt.temporaryLobs, value.lob.sourceLocator)
-	//	}
-	//case []ParameterInfo:
-	//	temp := collectLocators(value)
-	//	stmt.temporaryLobs = append(stmt.temporaryLobs, temp...)
-	//}
 }
-
-// addParam
-//func (stmt *Stmt) addParam(name string, val driver.Value, size int, direction ParameterDirection) error {
-//	par, err := stmt.NewParam(name, val, size, direction)
-//	if err != nil {
-//		return err
-//	}
-//	stmt.setParam(-1, *par)
-//	return nil
-//}
-// AddRefCursorParam add new output parameter of type REF CURSOR
-//
-// note: better to use sql.Out structure see examples for more information
-//func (stmt *Stmt) AddRefCursorParam(name string) {
-//	par, _ := stmt.NewParam(name, new(RefCursor), 0, Output)
-//	stmt.Pars = append(stmt.Pars, *par)
-//}
 
 // Query_ execute a query command and return oracle dataset object
 //
@@ -2269,52 +2230,6 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 		return nil, err
 	}
 	return dataSet, nil
-	//	if err == nil {
-	//		break
-	//	}
-	//var dataSet *DataSet
-	//var err error
-	//
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = stmt.connection.reConnect(nil, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//		continue
-	//	}
-	//	// reset statement if connection break and reconnect
-	//	if writeTrials > 0 {
-	//		stmt.reset()
-	//	}
-	//	// call query
-	//	dataSet, err = stmt._query()
-	//	if err == nil {
-	//		break
-	//	}
-	//	reconnect, err = stmt.connection.reConnect(err, writeTrials+1)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return nil, err
-	//		}
-	//	}
-	//	if retryTime > 0 {
-	//		time.Sleep(time.Duration(retryTime) * time.Second)
-	//	}
-	//}
-	//return dataSet, err
-
-	//result, err := stmt.Query(args)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if dataSet, ok := result.(*DataSet); ok {
-	//	return dataSet, nil
-	//}
-	//return nil, errors.New("the returned driver.rows is not an oracle DataSet")
 }
 
 func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
@@ -2363,19 +2278,6 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	// deal with ref cursor
-	//for colIndex, col := range dataSet.Cols {
-	//	if col.DataType == REFCURSOR {
-	//		for rowIndex, row := range dataSet.rows {
-	//			if cursor, ok := row[colIndex].(*RefCursor); ok {
-	//				dataSet.rows[rowIndex][colIndex], err = cursor.Query()
-	//				if err != nil {
-	//					return nil, err
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
 	// deal with lobs
 	if (stmt._hasBLOB || stmt._hasLONG) && stmt.connection.connOption.Lob == configurations.INLINE {
 		stmt.define = true

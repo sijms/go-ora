@@ -281,8 +281,12 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		}
 	case NCHAR:
 		tempString := getString(val)
-		par.MaxCharLen = len(tempString)
+		length := len(tempString)
+		par.MaxCharLen = length
 		par.iPrimValue = tempString
+		if length > connection.maxLen.varchar {
+			par.DataType = LongVarChar
+		}
 	case DATE:
 		fallthrough
 	case TIMESTAMP:
@@ -302,6 +306,9 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		par.iPrimValue = tempByte
 		if par.MaxLen == 0 {
 			par.MaxLen = 1
+		}
+		if par.MaxLen > connection.maxLen.raw {
+			par.DataType = LongRaw
 		}
 	case OCIClobLocator:
 		fallthrough
@@ -538,6 +545,17 @@ func (par *ParameterInfo) encodeValue(size int, connection *Connection) error {
 		return err
 	}
 
+	// check if the data length beyond max length for some types
+	//switch par.DataType {
+	//case NCHAR:
+	//	if len(par.BValue) > connection.maxLen.varchar {
+	//		return fmt.Errorf("passing varchar value with size: %d bigger than max size: %d", len(par.BValue), connection.maxLen.varchar)
+	//	}
+	//case RAW:
+	//	if len(par.BValue) > connection.maxLen.raw {
+	//		return fmt.Errorf("passing raw value with size: %d bigger than max size: %d", len(par.BValue), connection.maxLen.raw)
+	//	}
+	//}
 	if par.DataType == OCIFileLocator {
 		par.MaxLen = size
 		if par.MaxLen == 0 {

@@ -605,13 +605,22 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 
 * ### use custom configurations for connection
   * another way to set connection configuration instead of using connection string (DSN)
-  * use as follow
+  * for custom dial you should implement `DialerContext` interface or simply use `config.RegisterDial` function (start from v2.8.19)
+  * example code:
 ```golang
-    config, err := go_ora.ParseConfig(DSN)
-    // modify config structure 
-	go_ora.RegisterConnConfig(config)
-    // now open db note empty DSN
-	db, err := sql.Open("oracle", "")
+config, err := go_ora.ParseConfig(DSN)
+	
+// for using custom dial use RegisterDial
+// start from v2.8.19
+config.RegisterDial(func(ctx context.Context, network, address string) (net.Conn, error) {
+    // your custom dial code
+})
+
+// modify config structure 
+
+go_ora.RegisterConnConfig(config)
+// now open db note empty DSN 
+db, err := sql.Open("oracle", "")
 ```
 
 
@@ -652,6 +661,20 @@ complete code for mapping refcursor to sql.Rows is found in [example/refcursor_t
 [//]: # (### Supported DBMS features)
 ### releases
 <details>
+
+### version 2.8.19
+* add support for long input: 
+  * if input parameter (string or []byte) larger than 32Kb the driver will swith type to `LongVarchar` and `LongRaw`
+  * so now you can input data with size up to 1 GB that fit into LONG and LOB columns
+* add function `RegisterDial` to the configuration object that accept func input
+```golang
+config, err := go_ora.ParseConfig(`yours DSN string`)
+config.RegisterDial(func(ctx context.Context, network, address string) (net.Conn, error) {
+    // your custom dial code
+})
+go_ora.RegisterConfig(config)
+db, err := sql.Open("oracle", "")
+```
 
 ### version 2.8.12
 * add 2 functions

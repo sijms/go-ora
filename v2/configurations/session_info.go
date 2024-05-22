@@ -25,6 +25,19 @@ type SessionInfo struct {
 	Dialer                DialerContext
 }
 
+func (si *SessionInfo) RegisterDial(dialer func(ctx context.Context, network, address string) (net.Conn, error)) {
+	var temp = &customDial{DialCtx: dialer}
+	si.Dialer = temp
+}
+
+type customDial struct {
+	DialCtx func(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+func (c *customDial) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return c.DialCtx(ctx, network, address)
+}
+
 func (si *SessionInfo) UpdateSSL(server *ServerAddr) error {
 	if server != nil {
 		if strings.ToLower(server.Protocol) == "tcps" {

@@ -16,6 +16,11 @@ const (
 	NONE    DBAPrivilege = 0
 	SYSDBA  DBAPrivilege = 0x20
 	SYSOPER DBAPrivilege = 0x40
+	SYSASM  DBAPrivilege = 0x00400000
+	SYSBKP  DBAPrivilege = 0x01000000
+	SYSDGD  DBAPrivilege = 0x02000000
+	SYSKMT  DBAPrivilege = 0x04000000
+	SYSRAC  DBAPrivilege = 0x08000000
 )
 
 type AuthType int
@@ -159,6 +164,16 @@ func DBAPrivilegeFromString(s string) DBAPrivilege {
 		return SYSDBA
 	} else if S == "SYSOPER" {
 		return SYSOPER
+	} else if S == "SYSASM" {
+		return SYSASM
+	} else if S == "SYSBKP" {
+		return SYSBKP
+	} else if S == "SYSDGD" {
+		return SYSDGD
+	} else if S == "SYSKMT" {
+		return SYSKMT
+	} else if S == "SYSRAC" {
+		return SYSRAC
 	} else {
 		return NONE
 	}

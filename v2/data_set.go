@@ -369,6 +369,9 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 
 // Columns return a string array that represent columns names
 func (dataSet *DataSet) Columns() []string {
+	if dataSet == nil {
+		return nil
+	}
 	if len(*dataSet.cols) == 0 {
 		return nil
 	}

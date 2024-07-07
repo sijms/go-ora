@@ -7,8 +7,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/configurations"
-	"github.com/sijms/go-ora/v2/trace"
 	"os"
 	"reflect"
 	"regexp"
@@ -17,8 +15,10 @@ import (
 	"time"
 
 	"github.com/sijms/go-ora/v2/advanced_nego"
+	"github.com/sijms/go-ora/v2/configurations"
 	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/trace"
 )
 
 type ConnectionState int
@@ -776,6 +776,9 @@ func (conn *Connection) getServerNetworkInformation(code uint8) error {
 			return err
 		}
 		conn.transactionID, err = session.GetClr()
+		if err != nil {
+			return err
+		}
 		if len(conn.transactionID) > length {
 			conn.transactionID = conn.transactionID[:length]
 		}
@@ -1031,6 +1034,9 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 	session := conn.session
 	session.ResetBuffer()
 	err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
+	if err != nil {
+		return nil, err
+	}
 	for x := 0; x < rowNum; x++ {
 		for idx, col := range columns {
 			stmt.Pars[idx].Value = col[x]
@@ -1080,10 +1086,10 @@ func (conn *Connection) QueryRowContext(ctx context.Context, query string, args 
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
 	rows, err := stmt.QueryContext(ctx, args)
-	dataSet := rows.(*DataSet)
 	if err != nil {
 		return &DataSet{lasterr: err}
 	}
+	dataSet := rows.(*DataSet)
 	dataSet.Next_()
 	return dataSet
 }
@@ -1166,6 +1172,9 @@ func (conn *Connection) readMsg(msgCode uint8) error {
 			return err
 		}
 		size, err = session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
 		for x := 0; x < size; x++ {
 			_, val, num, err := session.GetKeyVal()
 			if err != nil {

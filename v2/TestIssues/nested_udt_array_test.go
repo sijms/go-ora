@@ -14,9 +14,10 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"testing"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestNestedUDTArray(t *testing.T) {
@@ -38,8 +39,8 @@ func TestNestedUDTArray(t *testing.T) {
 		Data  []typeChild `udt:"DATA"`
 		Child typeChild   `udt:"CHILD"`
 	}
-	var refDate = time.Date(2024, 1, 11, 19, 19, 19, 0, time.UTC)
-	var createParent = func(index int, date time.Time) typeParent {
+	refDate := time.Date(2024, 1, 11, 19, 19, 19, 0, time.UTC)
+	createParent := func(index int, date time.Time) typeParent {
 		var parent typeParent
 		parent.Id = index + 1
 		parent.Value = fmt.Sprintf("parent_%d", index+1)
@@ -60,7 +61,7 @@ func TestNestedUDTArray(t *testing.T) {
 		parent.Child.Child = typeChild2{6, "child2_6", date}
 		return parent
 	}
-	var checkChildType2 = func(input *typeChild2, index, idShift int, extraText string) error {
+	checkChildType2 := func(input *typeChild2, index, idShift int, extraText string) error {
 		if input.Id != index+1+idShift {
 			return fmt.Errorf("expected child2.Id: %d and got: %d at index: %d",
 				index+1+idShift, input.Id, index)
@@ -75,7 +76,7 @@ func TestNestedUDTArray(t *testing.T) {
 		}
 		return nil
 	}
-	var checkChildType = func(input *typeChild, index, idShift int, extraText string) error {
+	checkChildType := func(input *typeChild, index, idShift int, extraText string) error {
 		for index2, temp := range input.Data {
 			err := checkChildType2(&temp, index2, idShift, extraText)
 			if err != nil {
@@ -92,7 +93,7 @@ func TestNestedUDTArray(t *testing.T) {
 		}
 		return checkChildType2(&input.Child, 5, idShift, extraText)
 	}
-	var checkParentType = func(input *typeParent, index, idShift int, extraText string) error {
+	checkParentType := func(input *typeParent, index, idShift int, extraText string) error {
 		for index2, temp := range input.Data {
 			err := checkChildType(&temp, index2, idShift, extraText)
 			if err != nil {
@@ -108,7 +109,7 @@ func TestNestedUDTArray(t *testing.T) {
 		}
 		return checkChildType(&input.Child, 3, idShift, extraText)
 	}
-	var createTypes = func(db *sql.DB) error {
+	createTypes := func(db *sql.DB) error {
 		return execCmd(db, `
 create or replace type childType2 as object(
 	ID number,
@@ -128,7 +129,7 @@ create or replace type parentType as object(
 	child childType
 )`, `create or replace type parentTypeCol as table of parentType`)
 	}
-	var dropTypes = func(db *sql.DB) error {
+	dropTypes := func(db *sql.DB) error {
 		return execCmd(db,
 			"DROP TYPE parentTypeCol",
 			"DROP TYPE parentType",
@@ -137,8 +138,8 @@ create or replace type parentType as object(
 			"DROP TYPE childType2Col",
 			"DROP TYPE childType2")
 	}
-	var outputPar = func(db *sql.DB) error {
-		var parent = typeParent{}
+	outputPar := func(db *sql.DB) error {
+		parent := typeParent{}
 		_, err := db.Exec(`
 DECLARE
 	v_child2 childType2;
@@ -175,12 +176,12 @@ END;`, sql.Named("ldate", refDate), sql.Named("output", go_ora.Out{Dest: &parent
 		return checkParentType(&parent, 0, 0, "")
 	}
 
-	var inputPar = func(db *sql.DB) error {
-		var input = time.Date(2024, 1, 11, 19, 19, 19, 0, time.UTC)
-		var parent = createParent(0, time.Now())
+	inputPar := func(db *sql.DB) error {
+		input := time.Date(2024, 1, 11, 19, 19, 19, 0, time.UTC)
+		parent := createParent(0, time.Now())
 		var output typeParent
-		var id = 5
-		var name = "_verified"
+		id := 5
+		name := "_verified"
 		_, err := db.Exec(`
 DECLARE
 	parent parentType;
@@ -233,7 +234,7 @@ end;`, sql.Named("parent", parent), sql.Named("id", id), sql.Named("name", name)
 		return checkParentType(&output, 0, id, name)
 	}
 
-	var inputParArray = func(db *sql.DB) error {
+	inputParArray := func(db *sql.DB) error {
 		var parents []typeParent
 		parents = append(parents, createParent(0, refDate),
 			createParent(1, refDate),
@@ -295,7 +296,7 @@ end;`, sql.Named("parent", parent), sql.Named("id", id), sql.Named("name", name)
 		return checkParentType(&output, 0, id, name)
 	}
 
-	var outputParArray = func(db *sql.DB) error {
+	outputParArray := func(db *sql.DB) error {
 		var parents []typeParent
 		_, err := db.Exec(`
 	DECLARE

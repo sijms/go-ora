@@ -6,7 +6,7 @@ import (
 )
 
 func TestColumnType(t *testing.T) {
-	var createTable = func(db *sql.DB) error {
+	createTable := func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE GOORA_T_CHAR ( 
     col1 char(32), 
     col2 nchar(32), 
@@ -14,11 +14,11 @@ func TestColumnType(t *testing.T) {
     col4 nvarchar2(32))`)
 	}
 
-	var dropTable = func(db *sql.DB) error {
+	dropTable := func(db *sql.DB) error {
 		return execCmd(db, "drop table GOORA_T_CHAR purge")
 	}
 
-	var insert = func(db *sql.DB) error {
+	insert := func(db *sql.DB) error {
 		return execCmd(db, `INSERT INTO GOORA_T_CHAR VALUES('char','nchar','varchar2','nvarchar2')`)
 	}
 

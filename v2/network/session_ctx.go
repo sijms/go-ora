@@ -6,16 +6,16 @@ import (
 )
 
 type SessionContext struct {
-	//conn net.Conn
-	//ConnOption *ConnectionOption
-	//PortNo int
-	//InstanceName string
-	//HostName string
-	//IPAddress string
-	//Protocol string
-	//ServiceName string
+	// conn net.Conn
+	// ConnOption *ConnectionOption
+	// PortNo int
+	// InstanceName string
+	// HostName string
+	// IPAddress string
+	// Protocol string
+	// ServiceName string
 	SID []byte
-	//ConnectData string
+	// ConnectData string
 	connConfig          *configurations.ConnectionConfig
 	Version             uint16
 	LoVersion           uint16
@@ -50,7 +50,7 @@ func NewSessionContext(config *configurations.ConnectionConfig) *SessionContext 
 		Options:           1 | 2048, /*1024 for urgent data transport*/
 		OurOne:            1,
 		connConfig:        config,
-		//ConnOption:        connOption,
+		// ConnOption:        connOption,
 	}
 	if config.EnableOOB {
 		ctx.Options |= 1024

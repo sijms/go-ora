@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/sijms/go-ora/v2/trace"
 	"sync"
+
+	"github.com/sijms/go-ora/v2/trace"
 )
 
 type DataPacket struct {
@@ -26,7 +27,7 @@ func (pck *DataPacket) bytes() []byte {
 }
 
 func newDataPacket(initialData []byte, sessionCtx *SessionContext, tracer trace.Tracer, mu *sync.Mutex) (*DataPacket, error) {
-	//var outputData []byte = initialData
+	// var outputData []byte = initialData
 	var err error
 	mu.Lock()
 	defer mu.Unlock()
@@ -35,8 +36,8 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext, tracer trace.
 		initialData = append(initialData, hashData...)
 	}
 	if sessionCtx.AdvancedService.CryptAlgo != nil {
-		//outputData = make([]byte, len(outputData))
-		//copy(outputData, outputData)
+		// outputData = make([]byte, len(outputData))
+		// copy(outputData, outputData)
 		tracer.LogPacket("Write packet (Decrypted): ", initialData)
 		initialData, err = sessionCtx.AdvancedService.CryptAlgo.Encrypt(initialData)
 		if err != nil {
@@ -71,7 +72,7 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, tracer
 		Packet: Packet{
 			sessionCtx: sessionCtx,
 			dataOffset: 0xA,
-			//length:     binary.BigEndian.Uint16(packetData),
+			// length:     binary.BigEndian.Uint16(packetData),
 			packetType: PacketType(packetData[4]),
 			flag:       packetData[5],
 		},

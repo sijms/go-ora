@@ -54,14 +54,17 @@ func MaxBytePerChar(charsetID int) int {
 		return 1
 	}
 }
+
 func (conv *StringConverter) GetLangID() int {
 	return conv.LangID
 }
+
 func (conv *StringConverter) SetLangID(langID int) int {
 	oldValue := conv.LangID
 	conv.LangID = langID
 	return oldValue
 }
+
 func (conv *StringConverter) Encode(input string) []byte {
 	if len(input) == 0 {
 		return nil
@@ -109,7 +112,7 @@ func (conv *StringConverter) Encode(input string) []byte {
 				}
 			} else {
 				output = append(output, uint8(conv.eReplace))
-				//output[x] = uint8(conv.eReplace)
+				// output[x] = uint8(conv.eReplace)
 			}
 		}
 		return output

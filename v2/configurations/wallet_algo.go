@@ -34,8 +34,8 @@ type pbkdf2 struct {
 }
 
 func (algo *pbkdf2) create() error {
-	//origPass, _ := decodeBMPString(convertToBigEndianUtf16(algo.password))
-	//origPass := convertToBigEndianUtf16(algo.password)
+	// origPass, _ := decodeBMPString(convertToBigEndianUtf16(algo.password))
+	// origPass := convertToBigEndianUtf16(algo.password)
 	prf := hmac.New(algo.hash, algo.password)
 	hashLen := prf.Size()
 	numBlocks := (algo.keyLen + hashLen - 1) / hashLen
@@ -49,10 +49,10 @@ func (algo *pbkdf2) create() error {
 		prf.Reset()
 		prf.Write(algo.salt)
 		binary.BigEndian.PutUint32(buf[:4], uint32(block))
-		//buf[0] = byte(block >> 24)
-		//buf[1] = byte(block >> 16)
-		//buf[2] = byte(block >> 8)
-		//buf[3] = byte(block)
+		// buf[0] = byte(block >> 24)
+		// buf[1] = byte(block >> 16)
+		// buf[2] = byte(block >> 8)
+		// buf[3] = byte(block)
 		prf.Write(buf[:4])
 		dk = prf.Sum(dk)
 		T := dk[len(dk)-hashLen:]
@@ -108,6 +108,7 @@ func (algo *shaWithTripleDESCBC) create() error {
 func (algo *defaultAlgorithm) getIV() []byte {
 	return algo.iv
 }
+
 func (algo *defaultAlgorithm) getBlock() cipher.Block {
 	return algo.blk
 }

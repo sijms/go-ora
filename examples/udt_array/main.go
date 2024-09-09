@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 type test1 struct {
@@ -76,6 +77,7 @@ func queryRow(conn *sql.DB) error {
 	fmt.Println("finish query row: ", time.Now().Sub(t))
 	return nil
 }
+
 func query(conn *sql.DB) error {
 	t := time.Now()
 	var data []test1
@@ -90,7 +92,7 @@ func query(conn *sql.DB) error {
 
 func get2(conn *sql.DB) error {
 	t := time.Now()
-	var data = []test1{
+	data := []test1{
 		{
 			Id:       1,
 			Name:     "name_1",
@@ -129,6 +131,7 @@ func get2(conn *sql.DB) error {
 	fmt.Println("finish get2: ", time.Now().Sub(t))
 	return nil
 }
+
 func insertData(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `INSERT INTO UDT_ARRAY_TABLE(ID, DATA) VALUES(:1, :2)`
@@ -136,13 +139,15 @@ func insertData(conn *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	//data := make([]test1, 0, 10)
-	//ids := make([]int, 0, 10)
+	// data := make([]test1, 0, 10)
+	// ids := make([]int, 0, 10)
 	for x := 0; x < 10; x++ {
-		_, err = stmt.Exec(x+1, test1{int64(x + 1),
+		_, err = stmt.Exec(x+1, test1{
+			int64(x + 1),
 			fmt.Sprintf("name_%d", x+1),
 			"DATA",
-			time.Now()})
+			time.Now(),
+		})
 		if err != nil {
 			return err
 		}
@@ -158,6 +163,7 @@ func insertData(conn *sql.DB) error {
 	fmt.Println("finish insert: ", time.Now().Sub(t))
 	return nil
 }
+
 func createTable(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `CREATE TABLE UDT_ARRAY_TABLE
@@ -192,6 +198,7 @@ func createUDTArray(conn *sql.DB) error {
 	fmt.Println("Finish create UDT Array: ", time.Now().Sub(t))
 	return nil
 }
+
 func dropUDTArray(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec("drop type TEST_TYPE2")
@@ -201,6 +208,7 @@ func dropUDTArray(conn *sql.DB) error {
 	fmt.Println("Finish drop UDT Array: ", time.Now().Sub(t))
 	return nil
 }
+
 func createUDT(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `create or replace TYPE TEST_TYPE1 IS OBJECT 
@@ -282,13 +290,13 @@ func main() {
 		}
 	}()
 
-	//insert some data
+	// insert some data
 	err = insertData(conn)
 	if err != nil {
 		fmt.Println("can't insert data: ", err)
 		return
 	}
-	//create package
+	// create package
 	err = createPackage(conn)
 	if err != nil {
 		fmt.Println("can't create package: ", err)

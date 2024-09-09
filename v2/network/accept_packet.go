@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/sijms/go-ora/v2/configurations"
 )
 

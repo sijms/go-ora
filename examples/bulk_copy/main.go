@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"log"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *go_ora.Connection) error {
@@ -113,5 +114,4 @@ func main() {
 	if err != nil {
 		fmt.Println("Can't copy data: ", err)
 	}
-
 }

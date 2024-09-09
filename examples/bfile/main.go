@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -20,6 +21,7 @@ func createTable(conn *sql.DB) error {
 	}
 	return err
 }
+
 func dropTable(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec(`drop table GOORA_TEST_BFILE purge`)

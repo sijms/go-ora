@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -85,6 +86,7 @@ END;`
 	fmt.Println("Finish query output pars: ", time.Now().Sub(t))
 	return nil
 }
+
 func usage() {
 	fmt.Println()
 	fmt.Println("output_par")
@@ -100,9 +102,7 @@ func usage() {
 }
 
 func main() {
-	var (
-		server string
-	)
+	var server string
 
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
@@ -153,5 +153,4 @@ func main() {
 		fmt.Println("Can't get output parameters", err)
 		return
 	}
-
 }

@@ -10,8 +10,9 @@ package ntlmssp
 import (
 	"crypto/hmac"
 	"crypto/md5"
-	"github.com/sijms/go-ora/network/security/md4"
 	"strings"
+
+	"github.com/sijms/go-ora/network/security/md4"
 )
 
 func getNtlmV2Hash(password, username, target string) []byte {
@@ -25,8 +26,8 @@ func getNtlmHash(password string) []byte {
 }
 
 func computeNtlmV2Response(ntlmV2Hash, serverChallenge, clientChallenge,
-	timestamp, targetInfo []byte) []byte {
-
+	timestamp, targetInfo []byte,
+) []byte {
 	temp := []byte{1, 1, 0, 0, 0, 0, 0, 0}
 	temp = append(temp, timestamp...)
 	temp = append(temp, clientChallenge...)

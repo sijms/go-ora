@@ -9,7 +9,7 @@ import (
 )
 
 func TestIssue430(t *testing.T) {
-	var insert = func(db *sql.DB) error {
+	insert := func(db *sql.DB) error {
 		type TTB_DATA struct {
 			Id   int64     `db:"ID"`
 			Name string    `db:"NAME"`
@@ -17,7 +17,7 @@ func TestIssue430(t *testing.T) {
 			Date time.Time `db:"LDATE"`
 		}
 		data := make([]TTB_DATA, 100)
-		for x, _ := range data {
+		for x := range data {
 			data[x].Id = int64(1 + x)
 			data[x].Name = "test_" + strconv.Itoa(x)
 			data[x].Val = 100.23 + 1
@@ -29,7 +29,7 @@ func TestIssue430(t *testing.T) {
 		}
 		return nil
 	}
-	var query = func(db *sql.DB) error {
+	query := func(db *sql.DB) error {
 		result := struct {
 			Id   int64     `db:"ID,number,,output"`
 			Name string    `db:"NAME,,200,output"`
@@ -79,5 +79,4 @@ END;`, &result)
 		t.Error(err)
 		return
 	}
-
 }

@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strconv"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func usage() {
@@ -21,6 +22,7 @@ func usage() {
 	fmt.Println(`  urloptions -server "server" -service "service" port 1521 user "user" password "pass"`)
 	fmt.Println()
 }
+
 func main() {
 	var (
 		server, service, user, password, traceFile, ssl, sslVerify, wallet, servers, sid string

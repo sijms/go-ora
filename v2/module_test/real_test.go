@@ -7,11 +7,13 @@ import (
 	"testing"
 )
 
-var sqlColNamesTestDataTypeReal = []string{"id",
+var sqlColNamesTestDataTypeReal = []string{
+	"id",
 	"data_float", "data_double", "data_real",
 	"data_decimal", "data_number", "data_numeric",
 	"data_float32", "data_float64",
-	"data_float4", "data_float8"}
+	"data_float4", "data_float8",
+}
 
 func TestDataType_Real(t *testing.T) {
 	testName := "TestDataType_Real"
@@ -26,11 +28,13 @@ func TestDataType_Real(t *testing.T) {
 
 	tblName := "test_real"
 	colNameList := sqlColNamesTestDataTypeReal
-	colTypes := []string{"NVARCHAR2(8)",
+	colTypes := []string{
+		"NVARCHAR2(8)",
 		"FLOAT", "DOUBLE PRECISION", "REAL",
 		"DECIMAL(38,6)", "NUMBER(38,6)", "NUMERIC(38,6)",
 		"BINARY_FLOAT", "BINARY_DOUBLE",
-		"BINARY_FLOAT", "BINARY_DOUBLE"}
+		"BINARY_FLOAT", "BINARY_DOUBLE",
+	}
 	type Row struct {
 		id          string
 		dataFloat   float64
@@ -79,9 +83,11 @@ func TestDataType_Real(t *testing.T) {
 			dataFloat8:  math.Round(vReal*1e8) / 1e8,
 		}
 		rowArr = append(rowArr, row)
-		params := []interface{}{row.id, row.dataFloat, row.dataDouble, row.dataReal,
+		params := []interface{}{
+			row.id, row.dataFloat, row.dataDouble, row.dataReal,
 			row.dataDecimal, row.dataNumeric, row.dataNumeric,
-			row.dataFloat32, row.dataFloat64, row.dataFloat4, row.dataFloat8}
+			row.dataFloat32, row.dataFloat64, row.dataFloat4, row.dataFloat8,
+		}
 		_, err := db.Exec(sql, params...)
 		if err != nil {
 			fmt.Printf("%s\n%#v\n", sql, params)
@@ -206,11 +212,13 @@ func TestDataType_RealNonFraction(t *testing.T) {
 
 	tblName := "test_real"
 	colNameList := sqlColNamesTestDataTypeReal
-	colTypes := []string{"NVARCHAR2(8)",
+	colTypes := []string{
+		"NVARCHAR2(8)",
 		"FLOAT", "DOUBLE PRECISION", "REAL",
 		"DECIMAL(38,6)", "NUMBER(38,6)", "NUMERIC(38,6)",
 		"BINARY_FLOAT", "BINARY_DOUBLE",
-		"BINARY_FLOAT", "BINARY_DOUBLE"}
+		"BINARY_FLOAT", "BINARY_DOUBLE",
+	}
 	type Row struct {
 		id          string
 		dataFloat   float64
@@ -259,9 +267,11 @@ func TestDataType_RealNonFraction(t *testing.T) {
 			dataFloat8:  math.Round(vReal*1e8) / 1e8,
 		}
 		rowArr = append(rowArr, row)
-		params := []interface{}{row.id, row.dataFloat, row.dataDouble, row.dataReal,
+		params := []interface{}{
+			row.id, row.dataFloat, row.dataDouble, row.dataReal,
 			row.dataDecimal, row.dataNumeric, row.dataNumeric,
-			row.dataFloat32, row.dataFloat64, row.dataFloat4, row.dataFloat8}
+			row.dataFloat32, row.dataFloat64, row.dataFloat4, row.dataFloat8,
+		}
 		_, err := db.Exec(sql, params...)
 		if err != nil {
 			fmt.Printf("%s\n%#v\n", sql, params)

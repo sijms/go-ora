@@ -3,6 +3,7 @@ package go_ora
 import (
 	"errors"
 	"fmt"
+
 	"github.com/sijms/go-ora/v2/network"
 )
 
@@ -13,8 +14,8 @@ type DBVersion struct {
 	MajorVersion    int
 	MinorVersion    int
 	PatchsetVersion int
-	//isDb10gR20OrHigher bool
-	//isDb11gR10OrHigher bool
+	// isDb10gR20OrHigher bool
+	// isDb11gR10OrHigher bool
 }
 
 // GetDBVersion write a request to get database version the read
@@ -22,11 +23,11 @@ type DBVersion struct {
 func GetDBVersion(session *network.Session) (*DBVersion, error) {
 	session.ResetBuffer()
 	session.PutBytes(3, 0x3B, 0, 1)
-	//session.PutUint(1, 1, false, false)
+	// session.PutUint(1, 1, false, false)
 	session.PutUint(0x100, 2, true, true)
 	session.PutBytes(1, 1)
-	//session.PutUint(1, 1, false, false)
-	//session.PutUint(1, 1, false, false)
+	// session.PutUint(1, 1, false, false)
+	// session.PutUint(1, 1, false, false)
 	if session.TTCVersion >= 11 {
 		session.PutUint(1, 4, true, true)
 	}

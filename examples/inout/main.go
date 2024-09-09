@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func usage() {
@@ -24,9 +25,7 @@ func usage() {
 }
 
 func main() {
-	var (
-		server string
-	)
+	var server string
 
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
@@ -83,10 +82,12 @@ func createProc(conn *sql.DB) error {
 	fmt.Println("finish create proc: ", time.Now().Sub(t))
 	return err
 }
+
 func execSql(conn *sql.DB, sqlText string) error {
 	_, err := conn.Exec(sqlText)
 	return err
 }
+
 func dropProc(conn *sql.DB) error {
 	t := time.Now()
 	err := execSql(conn, "DROP PROCEDURE test_in_out_param")

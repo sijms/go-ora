@@ -73,7 +73,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 				if cust.isArray && len(cust.attribs) > 0 {
 					if par.cusType.name == cust.attribs[0].cusType.name {
 						found = true
-						//par.TypeName = name
+						// par.TypeName = name
 						par.ToID = cust.toid
 						*par.cusType = cust
 						par.Flag = 0x3
@@ -120,7 +120,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 			par.MaxLen = converters.MAX_LEN_TIMESTAMP
 		}
 	case tyTimeStamp, tyNullTimeStamp:
-		//if par.Flag&0x43 > 0 {
+		// if par.Flag&0x43 > 0 {
 		par.DataType = TIMESTAMP
 		par.MaxLen = converters.MAX_LEN_DATE
 		//} else {
@@ -130,7 +130,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 	case tyTimeStampTZ, tyNullTimeStampTZ:
 		par.DataType = TimeStampTZ_DTY
 		par.MaxLen = converters.MAX_LEN_TIMESTAMP
-	//case tyTime, tyNullTime:
+	// case tyTime, tyNullTime:
 	//	if par.Direction == Input {
 	//		par.DataType = TIMESTAMP
 	//		par.MaxLen = converters.MAX_LEN_TIMESTAMP
@@ -138,7 +138,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 	//		par.DataType = DATE
 	//		par.MaxLen = converters.MAX_LEN_DATE
 	//	}
-	//case tyTimeStamp, tyNullTimeStamp:
+	// case tyTimeStamp, tyNullTimeStamp:
 	//	if par.Direction == Input {
 	//		par.DataType = TIMESTAMP
 	//		par.MaxLen = converters.MAX_LEN_TIMESTAMP
@@ -146,7 +146,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 	//		par.DataType = TIMESTAMP
 	//		par.MaxLen = converters.MAX_LEN_DATE
 	//	}
-	//case tyTimeStampTZ, tyNullTimeStampTZ:
+	// case tyTimeStampTZ, tyNullTimeStampTZ:
 	//	par.DataType = TimeStampTZ_DTY
 	//	par.MaxLen = converters.MAX_LEN_TIMESTAMP
 	case tyBytes:
@@ -201,7 +201,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 					par.cusType = new(customType)
 					*par.cusType = cusTyp
 					par.ToID = cusTyp.toid
-					//par.TypeName = cusTyp.name
+					// par.TypeName = cusTyp.name
 				}
 			}
 			if par.cusType == nil {
@@ -230,7 +230,7 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		return nil
 	}
 	// check if array
-	//if par.MaxNoOfArrayElements > 0 && par.cusType == nil {
+	// if par.MaxNoOfArrayElements > 0 && par.cusType == nil {
 	if par.MaxNoOfArrayElements > 0 {
 		if !isArrayValue(val) {
 			return fmt.Errorf("parameter %s require array value", par.Name)
@@ -331,7 +331,6 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		if value, ok := val.(BFile); ok {
 			if value.Valid {
 				if par.Direction == Input && !value.isInit() {
-
 					return errors.New("BFile should be initialized first")
 				}
 				par.iPrimValue = &value
@@ -389,14 +388,14 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 		} else {
 			par.BValue = nil
 		}
-	//case float64:
+	// case float64:
 	//	par.BValue, err = converters.EncodeDouble(value)
 	//	if err != nil {
 	//		return err
 	//	}
-	//case int64:
+	// case int64:
 	//	par.BValue = converters.EncodeInt64(value)
-	//case uint64:
+	// case uint64:
 	//	par.BValue = converters.EncodeUint64(value)
 	case *Number:
 		par.BValue = value.data
@@ -458,7 +457,6 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 						} else {
 							session.WriteClr(&arrayBuffer, attrib.BValue)
 						}
-
 					}
 					if par.MaxCharLen < attrib.MaxCharLen {
 						par.MaxCharLen = attrib.MaxCharLen

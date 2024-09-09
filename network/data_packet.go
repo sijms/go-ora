@@ -39,8 +39,8 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext) (*DataPacket,
 		outputData = append(outputData, hashData...)
 	}
 	if sessionCtx.AdvancedService.CryptAlgo != nil {
-		//outputData = make([]byte, len(outputData))
-		//copy(outputData, outputData)
+		// outputData = make([]byte, len(outputData))
+		// copy(outputData, outputData)
 		outputData, err = sessionCtx.AdvancedService.CryptAlgo.Encrypt(outputData)
 		if err != nil {
 			return nil, err
@@ -71,7 +71,7 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext) (*Data
 	pck := &DataPacket{
 		Packet: Packet{
 			dataOffset: 0xA,
-			//length:     binary.BigEndian.Uint16(packetData),
+			// length:     binary.BigEndian.Uint16(packetData),
 			packetType: PacketType(packetData[4]),
 			flag:       packetData[5],
 		},

@@ -14,11 +14,13 @@ import (
 )
 
 // Compile time Sentinels for implemented Interfaces.
-var _ = driver.Rows((*DataSet)(nil))
-var _ = driver.RowsColumnTypeDatabaseTypeName((*DataSet)(nil))
-var _ = driver.RowsColumnTypeLength((*DataSet)(nil))
-var _ = driver.RowsColumnTypeNullable((*DataSet)(nil))
-var _ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
+var (
+	_ = driver.Rows((*DataSet)(nil))
+	_ = driver.RowsColumnTypeDatabaseTypeName((*DataSet)(nil))
+	_ = driver.RowsColumnTypeLength((*DataSet)(nil))
+	_ = driver.RowsColumnTypeNullable((*DataSet)(nil))
+	_ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
+)
 
 // var _ = driver.RowsColumnTypeScanType((*DataSet)(nil))
 // var _ = driver.RowsNextResultSet((*DataSet)(nil))
@@ -30,7 +32,7 @@ type DataSet struct {
 	rowCount        int
 	uACBufferLength int
 	maxRowSize      int
-	//Cols            []ParameterInfo
+	// Cols            []ParameterInfo
 	cols       *[]ParameterInfo
 	rows       []Row
 	currentRow Row
@@ -160,7 +162,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 					continue
 				}
 				err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), srcIndex+processedFields)
-				//err := setFieldValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), colInfo.cusType, dataSet.currentRow[srcIndex+processedFields])
+				// err := setFieldValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), colInfo.cusType, dataSet.currentRow[srcIndex+processedFields])
 				if err != nil {
 					return err
 				}
@@ -195,7 +197,7 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 // for non-supported type
 // error means error occur during operation
 func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) error {
-	//value := dataSet.currentRow[colIndex]
+	// value := dataSet.currentRow[colIndex]
 	col := (*dataSet.cols)[colIndex]
 	//if value == nil {
 	//	return setNull(obj)
@@ -310,7 +312,7 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 		return io.EOF
 	}
 	if hasMoreRows && (hasBLOB || hasLONG) && dataSet.index == 0 {
-		//dataSet.rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
+		// dataSet.rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
 		if err := dataSet.parent.fetch(dataSet); err != nil {
 			return err
 		}
@@ -369,9 +371,6 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 
 // Columns return a string array that represent columns names
 func (dataSet *DataSet) Columns() []string {
-	if dataSet == nil {
-		return nil
-	}
 	if len(*dataSet.cols) == 0 {
 		return nil
 	}

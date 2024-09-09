@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"testing"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestLob(t *testing.T) {
@@ -19,7 +20,7 @@ func TestLob(t *testing.T) {
 	}
 	clob := strings.Repeat(string(fileData), 10)
 	blob := bytes.Repeat(fileData, 10)
-	var createTable = func(db *sql.DB) error {
+	createTable := func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE GOORA_TEMP_LOB(
 	ID	number(10)	NOT NULL,
 	DATA1 CLOB,
@@ -30,11 +31,11 @@ func TestLob(t *testing.T) {
 	)`)
 	}
 
-	var dropTable = func(db *sql.DB) error {
+	dropTable := func(db *sql.DB) error {
 		return execCmd(db, "drop table GOORA_TEMP_LOB purge")
 	}
 
-	var insert = func(db *sql.DB) error {
+	insert := func(db *sql.DB) error {
 		type TempStruct struct {
 			ID    int            `db:"ID"`
 			Data1 sql.NullString `db:"DATA1"`
@@ -65,7 +66,7 @@ func TestLob(t *testing.T) {
 		return err
 	}
 
-	var sqlQuery = func(db *sql.DB) error {
+	sqlQuery := func(db *sql.DB) error {
 		sqlText := "SELECT ID, DATA1, DATA2, DATA3, DATA4 FROM GOORA_TEMP_LOB WHERE ID < 3"
 		rows, err := db.Query(sqlText)
 		if err != nil {
@@ -110,11 +111,11 @@ func TestLob(t *testing.T) {
 		}
 		return nil
 	}
-	var parameterQuery = func(db *sql.DB, id int) error {
+	parameterQuery := func(db *sql.DB, id int) error {
 		sqlText := `BEGIN
 SELECT ID, DATA1, DATA2, DATA3, DATA4 INTO :ID, :DATA1, :DATA2, :DATA3, :DATA4 FROM GOORA_TEMP_LOB WHERE ID = :iid;
 END;`
-		var temp = struct {
+		temp := struct {
 			ID    int            `db:"ID,,,output"`
 			Data1 sql.NullString `db:"DATA1,,500,output"`
 			Data2 go_ora.Clob    `db:"DATA2,clob,100000000,output"`

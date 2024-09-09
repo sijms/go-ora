@@ -6,10 +6,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
+
 	"github.com/sijms/go-ora/v2/configurations"
 	"github.com/sijms/go-ora/v2/network/security"
 	"github.com/sijms/go-ora/v2/trace"
-	"math/big"
 )
 
 type dataIntegrityService struct {
@@ -34,7 +35,7 @@ func newDataIntegrityService(comm *AdvancedNegoComm, negoInfo *configurations.Ad
 		tracer: tracer,
 	}
 	err := output.buildServiceList([]string{}, true, true)
-	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
+	// output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +113,7 @@ func (serv *dataIntegrityService) readServiceData(subPacketNum int) error {
 	serv.tracer.LogPacket("Shared Key:", serv.sharedKey)
 	return nil
 }
+
 func (serv *dataIntegrityService) writeServiceData() error {
 	serv.writeHeader(2)
 	comm := serv.comm
@@ -120,7 +122,7 @@ func (serv *dataIntegrityService) writeServiceData() error {
 	for i := 0; i < len(serv.selectedIndices); i++ {
 		index := serv.selectedIndices[i]
 		selectedIndices[i] = uint8(serv.availableServiceIDs[index])
-		//comm.session.PutBytes(uint8(serv.availableServiceIDs[index]))
+		// comm.session.PutBytes(uint8(serv.availableServiceIDs[index]))
 	}
 	comm.writeBytes(selectedIndices)
 	return nil
@@ -133,7 +135,7 @@ func (serv *dataIntegrityService) getServiceDataLength() int {
 func (serv *dataIntegrityService) activateAlgorithm() error {
 	serv.comm.session.Context.AdvancedService.SessionKey = serv.sharedKey
 	serv.comm.session.Context.AdvancedService.IV = serv.iV
-	//return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
+	// return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
 	var algo security.OracleNetworkDataIntegrity = nil
 	var err error
 	switch serv.algoID {

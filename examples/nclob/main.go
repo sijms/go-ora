@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 var buffer = `戸独稿案摯人三父載暮意豊回断合。川解山雑人神犯都会与福中国書兆約夢高。食過理処社本記殺宅惑名碁張島節誤東。批粉細入徴全鹿案易将基朝。同幡催速児載適歳療福実能説祝果権断起。絡素新著光番焦角阜細診技経退。数温交蓋能者確玉軍転嶋桜高全禁。西本宮本気育毎警利医費界。都売趣込定覧斎日兵氏惑座込給。同調香待速伝幸与健地真西亡。
@@ -103,6 +104,7 @@ func readWithSql(conn *sql.DB) error {
 	fmt.Println("1 row read by sql: ", time.Now().Sub(t))
 	return nil
 }
+
 func readWithOutPutPars(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `BEGIN
@@ -117,6 +119,7 @@ END;`
 	fmt.Println("1 row read by output parameters: ", time.Now().Sub(t))
 	return nil
 }
+
 func printLargeString(prefix, data string) {
 	if len(data) <= 25 {
 		fmt.Println(prefix, data)
@@ -126,6 +129,7 @@ func printLargeString(prefix, data string) {
 	temp = strings.ReplaceAll(temp, "\n", "\\n")
 	fmt.Println(prefix, temp[:25], "...........", temp[len(temp)-25:], "\tsize: ", len(data))
 }
+
 func usage() {
 	fmt.Println()
 	fmt.Println("nclob")
@@ -139,6 +143,7 @@ func usage() {
 	fmt.Println(`  nclob -server "oracle://user:pass@server/service_name"`)
 	fmt.Println()
 }
+
 func main() {
 	var server string
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")

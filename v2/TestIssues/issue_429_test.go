@@ -15,9 +15,9 @@ func TestIssue429(t *testing.T) {
 		Val  float64   `db:"VAL"`
 		Date time.Time `db:"LDATE"`
 	}
-	var insert = func(db *sql.DB) error {
+	insert := func(db *sql.DB) error {
 		data := make([]TTB_DATA, 100)
-		for x, _ := range data {
+		for x := range data {
 			data[x].Id = int64(1000000000 + x)
 			data[x].Name = "test_" + strconv.Itoa(x)
 			data[x].Val = 100.23 + 1
@@ -29,7 +29,7 @@ func TestIssue429(t *testing.T) {
 		}
 		return nil
 	}
-	var query = func(db *sql.DB) error {
+	query := func(db *sql.DB) error {
 		var id int
 		err := db.QueryRow("SELECT ID FROM TTB_MAIN WHERE NAME = :1", "test_0").Scan(&id)
 		if err != nil {

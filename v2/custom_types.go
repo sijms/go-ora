@@ -9,19 +9,24 @@ type ValueEncoder interface {
 	EncodeValue(param *ParameterInfo, connection *Connection) error
 }
 
-type PLBool bool
-type NVarChar string
+type (
+	PLBool   bool
+	NVarChar string
+)
 
 func (val *NVarChar) Value() (driver.Value, error) {
 	return val, nil
 }
+
 func (val *NVarChar) Scan(value interface{}) error {
 	*val = NVarChar(getString(value))
 	return nil
 }
+
 func (val NVarChar) MarshalJSON() ([]byte, error) {
 	return json.Marshal(string(val))
 }
+
 func (val *NVarChar) UnmarshalJSON(data []byte) error {
 	var temp string
 	err := json.Unmarshal(data, &temp)
@@ -100,7 +105,7 @@ func (val NullNVarChar) MarshalJSON() ([]byte, error) {
 }
 
 func (val *NullNVarChar) UnmarshalJSON(data []byte) error {
-	var temp = new(string)
+	temp := new(string)
 	err := json.Unmarshal(data, temp)
 	if err != nil {
 		return err
@@ -122,7 +127,7 @@ func (val NClob) MarshalJSON() ([]byte, error) {
 }
 
 func (val *NClob) UnmarshalJSON(data []byte) error {
-	var temp = new(string)
+	temp := new(string)
 	err := json.Unmarshal(data, temp)
 	if err != nil {
 		return err
@@ -144,7 +149,7 @@ func (val Clob) MarshalJSON() ([]byte, error) {
 }
 
 func (val *Clob) UnmarshalJSON(data []byte) error {
-	var temp = new(string)
+	temp := new(string)
 	err := json.Unmarshal(data, temp)
 	if err != nil {
 		return err
@@ -163,7 +168,7 @@ func (val Blob) MarshalJSON() ([]byte, error) {
 }
 
 func (val *Blob) UnmarshalJSON(data []byte) error {
-	var temp = new([]byte)
+	temp := new([]byte)
 	err := json.Unmarshal(data, temp)
 	if err != nil {
 		return err

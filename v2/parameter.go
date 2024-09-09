@@ -14,8 +14,10 @@ import (
 	"github.com/sijms/go-ora/v2/network"
 )
 
-type TNSType int
-type ParameterDirection int
+type (
+	TNSType            int
+	ParameterDirection int
+)
 
 // func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
 //	return driver.Value(string(*n)), nil
@@ -25,7 +27,7 @@ const (
 	Input  ParameterDirection = 1
 	Output ParameterDirection = 2
 	InOut  ParameterDirection = 3
-	//RetVal ParameterDirection = 9
+	// RetVal ParameterDirection = 9
 )
 
 type Out struct {
@@ -97,7 +99,7 @@ const (
 	Boolean                   TNSType = 0xFC
 )
 
-//type ParameterType int
+// type ParameterType int
 
 //const (
 //	Number ParameterType = 1
@@ -639,7 +641,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			locator, err = session.GetClr()
 		} else {
 			locator = par.BValue
-
 		}
 		if err != nil {
 			return err
@@ -712,7 +713,7 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection, temporary
 }
 
 func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLobs *[][]byte, udt bool) error {
-	//var err error
+	// var err error
 	if !udt && connection.connOption.Lob == configurations.INLINE && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
 		session := connection.session
 		maxSize, err := session.GetInt(4, true, true)
@@ -775,6 +776,6 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLob
 		}
 		return nil
 	}
-	//par.Value, err = par.decodeValue(connection, udt)
+	// par.Value, err = par.decodeValue(connection, udt)
 	return par.decodePrimValue(connection, temporaryLobs, udt)
 }

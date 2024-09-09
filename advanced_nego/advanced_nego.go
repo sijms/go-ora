@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
 	"github.com/sijms/go-ora/network"
 )
 
@@ -38,6 +39,7 @@ func NewAdvNego(session *network.Session) (*AdvNego, error) {
 	}
 	return output, nil
 }
+
 func (nego *AdvNego) readHeader() ([]int, error) {
 	num, err := nego.comm.session.GetInt64(4, false, true)
 	if err != nil {
@@ -62,6 +64,7 @@ func (nego *AdvNego) readHeader() ([]int, error) {
 	output[3], err = nego.comm.session.GetInt(1, false, true)
 	return output, err
 }
+
 func (nego *AdvNego) writeHeader(length, servCount int, errFlags uint8) {
 	nego.comm.session.PutInt(uint64(0xDEADBEEF), 4, true, false)
 	nego.comm.session.PutInt(length, 2, true, false)
@@ -69,6 +72,7 @@ func (nego *AdvNego) writeHeader(length, servCount int, errFlags uint8) {
 	nego.comm.session.PutInt(servCount, 2, true, false)
 	nego.comm.session.PutBytes(errFlags)
 }
+
 func (nego *AdvNego) readServiceHeader() ([]int, error) {
 	output := make([]int, 3)
 	var err error
@@ -83,6 +87,7 @@ func (nego *AdvNego) readServiceHeader() ([]int, error) {
 	output[2], err = nego.comm.session.GetInt(4, false, true)
 	return output, err
 }
+
 func (nego *AdvNego) Read() error {
 	header, err := nego.readHeader()
 	if err != nil {
@@ -187,19 +192,20 @@ func (nego *AdvNego) Read() error {
 		if err != nil {
 			return err
 		}
-		//fmt.Println(nego.comm.session.GetBytes(10))
-		//return errors.New("interrupt")
+		// fmt.Println(nego.comm.session.GetBytes(10))
+		// return errors.New("interrupt")
 		return nil
 	}
 	return nego.comm.session.Write()
 }
+
 func (nego *AdvNego) Write() error {
 	nego.comm.session.ResetBuffer()
 	size := 0
 	for i := 1; i < 5; i++ {
 		size = size + 8 + nego.serviceList[i].getServiceDataLength()
 	}
-	//size += 13
+	// size += 13
 	nego.writeHeader(13+size, 4, 0)
 	err := nego.serviceList[4].writeServiceData()
 	if err != nil {

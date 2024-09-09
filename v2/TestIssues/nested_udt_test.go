@@ -3,14 +3,15 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestNestedUDT(t *testing.T) {
-	var create = func(db *sql.DB) error {
+	create := func(db *sql.DB) error {
 		return execCmd(db, `
 create or replace type subType2 as object(
 	num number(10),
@@ -48,7 +49,7 @@ BEGIN
 	end loop;
 END TP_NESTED_UDT;`)
 	}
-	var drop = func(db *sql.DB) error {
+	drop := func(db *sql.DB) error {
 		return execCmd(db,
 			"DROP PROCEDURE TP_NESTED_UDT",
 			"DROP TABLE TTB_NESTED_UDT",
@@ -73,7 +74,7 @@ END TP_NESTED_UDT;`)
 	}
 	now := time.Now()
 	expectedTime := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, time.Local)
-	var isEqual = func(s1, s2 mainS) bool {
+	isEqual := func(s1, s2 mainS) bool {
 		time1 := s1.Sub1.Sub2.LDate
 		time2 := s2.Sub1.Sub2.LDate
 		if time1.Year() == time2.Year() &&
@@ -91,7 +92,7 @@ END TP_NESTED_UDT;`)
 		}
 		return false
 	}
-	var insert = func(db *sql.DB) error {
+	insert := func(db *sql.DB) error {
 		length := 100
 		type insertData struct {
 			Id    int    `db:"ID"`
@@ -102,7 +103,7 @@ END TP_NESTED_UDT;`)
 		}
 		baseValue := 1.1
 		data := make([]insertData, length)
-		for index, _ := range data {
+		for index := range data {
 			data[index].Id = index + 1
 			data[index].Sep1 = strings.Repeat("-", 100)
 			data[index].Sep2 = strings.Repeat("-", 100)
@@ -125,7 +126,7 @@ END TP_NESTED_UDT;`)
 			VALUES(:ID, :DATA1, :SEP1, :DATA2, :SEP2)`, data)
 		return err
 	}
-	var queryTable = func(db *sql.DB) error {
+	queryTable := func(db *sql.DB) error {
 		rows, err := db.Query("SELECT ID, DATA1, SEP1, DATA2, SEP2 FROM TTB_NESTED_UDT")
 		if err != nil {
 			return err
@@ -153,7 +154,7 @@ END TP_NESTED_UDT;`)
 		}
 		return rows.Err()
 	}
-	var query = func(db *sql.DB) error {
+	query := func(db *sql.DB) error {
 		got := mainS{}
 		err := db.QueryRow("SELECT mainType(5, subType1(1, 'test', subType2(33, :1)), 'NAME') from dual", expectedTime).Scan(&got)
 		if err != nil {
@@ -176,8 +177,8 @@ END TP_NESTED_UDT;`)
 		}
 		return nil
 	}
-	var inputPar = func(db *sql.DB) error {
-		var input = mainS{
+	inputPar := func(db *sql.DB) error {
+		input := mainS{
 			Num: 7,
 			Sub1: sub1{
 				Num:  8,
@@ -189,7 +190,7 @@ END TP_NESTED_UDT;`)
 			},
 			S1: sql.NullString{"test", true},
 		}
-		var output = mainS{}
+		output := mainS{}
 		_, err := db.Exec(`
 	DECLARE
 		v_main mainType;
@@ -218,7 +219,7 @@ END TP_NESTED_UDT;`)
 		}
 		return nil
 	}
-	var callProc = func(db *sql.DB) error {
+	callProc := func(db *sql.DB) error {
 		var output []mainS
 		_, err := db.Exec(`BEGIN TP_NESTED_UDT(10, :1); END;`, go_ora.Out{Dest: &output, Size: 100})
 		if err != nil {

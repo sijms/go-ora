@@ -440,9 +440,7 @@ func compareBytes(byte1, byte2 []byte) int {
 	j := len(byte2)
 	b := 0
 	k := math.Min(float64(i), float64(j))
-	var (
-		m, n = 0, 0
-	)
+	m, n := 0, 0
 	for b < int(k) {
 		m = int(byte1[b] & 0xFF)
 		n = int(byte2[b] & 0xFF)

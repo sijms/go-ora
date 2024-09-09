@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -21,6 +22,7 @@ func createTable(conn *sql.DB) error {
 	fmt.Println("Finish create table: ", time.Now().Sub(t))
 	return nil
 }
+
 func dropTable(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec("drop table TEMP_TABLE_322 purge")
@@ -53,6 +55,7 @@ func queryData(conn *sql.DB) error {
 	fmt.Println("Finish query data: ", time.Now().Sub(t))
 	return nil
 }
+
 func main() {
 	conn, err := sql.Open("oracle", os.Getenv("DSN"))
 	if err != nil {

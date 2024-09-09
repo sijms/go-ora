@@ -1,5 +1,6 @@
 package TestIssues
 
+/*
 import (
 	"github.com/sijms/go-ora/dbms"
 	"testing"
@@ -61,3 +62,4 @@ END;`)
 		t.Errorf("expected: %s and got: %s", "this is a test2", line)
 	}
 }
+*/

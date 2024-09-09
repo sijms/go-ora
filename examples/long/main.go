@@ -3,10 +3,11 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 var longText = strings.Repeat("*", 0x3FFF)
@@ -48,7 +49,6 @@ func insertData(conn *sql.DB) error {
 	}
 	fmt.Println("Finish insert one row: ", time.Now().Sub(t))
 	return nil
-
 }
 
 func queryData(conn *sql.DB) error {
@@ -74,6 +74,7 @@ func queryData(conn *sql.DB) error {
 	fmt.Println("Finish query: ", time.Now().Sub(t))
 	return nil
 }
+
 func main() {
 	conn, err := sql.Open("oracle", os.Getenv("DSN"))
 	if err != nil {

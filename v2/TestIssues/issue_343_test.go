@@ -7,7 +7,7 @@ import (
 )
 
 func TestIssue343(t *testing.T) {
-	var createTable = func(db *sql.DB) error {
+	createTable := func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_343 
    (	"ID" NUMBER(20,0) NOT NULL ENABLE, 
 		"TM" VARCHAR2(30), 
@@ -22,10 +22,10 @@ func TestIssue343(t *testing.T) {
 		 PRIMARY KEY ("ID")
 	)`)
 	}
-	var dropTable = func(db *sql.DB) error {
+	dropTable := func(db *sql.DB) error {
 		return execCmd(db, "DROP TABLE TTB_343 PURGE")
 	}
-	var merge = func(db *sql.DB) error {
+	merge := func(db *sql.DB) error {
 		sqlText := `MERGE INTO TTB_343 t1 USING(select :ID ID from dual) tmp ON (tmp.ID=t1.ID) 
     WHEN MATCHED THEN UPDATE SET TM=:TM,SN=:SN,CUS=:CUS, AID=:AID,TR=:TR,PID=:PID,CODE=:CODE,TTNO=:TTNO,UPDATETIME=:UPDATETIME WHERE t1.ID=:ID AND t1.UPDATETIME<=:UPDATETIME 
     WHEN NOT MATCHED THEN INSERT (ID,TM,SN,CUS,AID,TR,PID,CODE,TTNO,UPDATETIME) VALUES (:ID,:TM,:SN,:CUS,:AID,:TR,:PID,:CODE,:TTNO,:UPDATETIME)`
@@ -43,7 +43,7 @@ func TestIssue343(t *testing.T) {
 			UpdateTime time.Time      `db:"UPDATETIME,timestamp"`
 		}
 		data := make([]TestShort, length)
-		for index, _ := range data {
+		for index := range data {
 			data[index].Id = index + 1
 			if index > 0 && index%10 == 0 {
 				data[index].Tm = sql.NullString{Valid: false}

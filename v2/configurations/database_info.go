@@ -16,11 +16,6 @@ const (
 	NONE    DBAPrivilege = 0
 	SYSDBA  DBAPrivilege = 0x20
 	SYSOPER DBAPrivilege = 0x40
-	SYSASM  DBAPrivilege = 0x00400000
-	SYSBKP  DBAPrivilege = 0x01000000
-	SYSDGD  DBAPrivilege = 0x02000000
-	SYSKMT  DBAPrivilege = 0x04000000
-	SYSRAC  DBAPrivilege = 0x08000000
 )
 
 type AuthType int
@@ -54,13 +49,15 @@ type DatabaseInfo struct {
 	connStr         string
 }
 
-func ExtractServers(connStr string) ([]ServerAddr, error) {
-	r, err := regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w.-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(COMMUNITY)\s*=\s*([\w.-]+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\)\s*)+\)`)
+func ExtractServers(connStr string) (addresses []ServerAddr, err error) {
+	var connectionAddressRegexp *regexp.Regexp
+	connectionAddressRegexp, err = regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w.-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(COMMUNITY)\s*=\s*([\w.-]+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\)\s*)+\)`)
 	if err != nil {
 		return nil, err
 	}
-	ret := make([]ServerAddr, 0, 5)
-	matches := r.FindAllStringSubmatch(connStr, -1)
+
+	addresses = make([]ServerAddr, 0, 5)
+	matches := connectionAddressRegexp.FindAllStringSubmatch(connStr, -1)
 	for _, match := range matches {
 		server := ServerAddr{
 			Port: 1521,
@@ -85,50 +82,63 @@ func ExtractServers(connStr string) ([]ServerAddr, error) {
 			}
 		}
 		if len(server.Addr) > 0 {
-			ret = append(ret, server)
+			addresses = append(addresses, server)
 		}
 	}
-	return ret, nil
+	return addresses, nil
 }
 
-func (info *DatabaseInfo) UpdateDatabaseInfo(connStr string) error {
+func (info *DatabaseInfo) UpdateDatabaseInfo(connStr string) (err error) {
 	connStr = strings.ReplaceAll(connStr, "\r", "")
 	connStr = strings.ReplaceAll(connStr, "\n", "")
-	info.connStr = connStr
-	var err error
+
 	info.Servers, err = ExtractServers(connStr)
 	if err != nil {
 		return err
 	}
+
 	if len(info.Servers) == 0 {
 		return errors.New("no address passed in connection string")
 	}
-	r, err := regexp.Compile(`(?i)\(\s*SERVICE_NAME\s*=\s*([\w.-]+)\s*\)`)
+
+	info.connStr = connStr
+
+	var serviceNameRegexp *regexp.Regexp
+	serviceNameRegexp, err = regexp.Compile(`(?i)\(\s*SERVICE_NAME\s*=\s*([\w.-]+)\s*\)`)
 	if err != nil {
 		return err
 	}
-	match := r.FindStringSubmatch(connStr)
+
+	match := serviceNameRegexp.FindStringSubmatch(connStr)
 	if len(match) > 1 {
 		info.ServiceName = match[1]
 	}
-	r, err = regexp.Compile(`(?i)\(\s*SID\s*=\s*([\w.-]+)\s*\)`)
+
+	var sidRegexp *regexp.Regexp
+	sidRegexp, err = regexp.Compile(`(?i)\(\s*SID\s*=\s*([\w.-]+)\s*\)`)
 	if err != nil {
 		return err
 	}
-	match = r.FindStringSubmatch(connStr)
+
+	match = sidRegexp.FindStringSubmatch(connStr)
 	if len(match) > 1 {
 		info.SID = match[1]
 	}
-	r, err = regexp.Compile(`(?i)\(\s*INSTANCE_NAME\s*=\s*([\w.-]+)\s*\)`)
+
+	var instanceNameRegexp *regexp.Regexp
+	instanceNameRegexp, err = regexp.Compile(`(?i)\(\s*INSTANCE_NAME\s*=\s*([\w.-]+)\s*\)`)
 	if err != nil {
 		return err
 	}
-	match = r.FindStringSubmatch(connStr)
+
+	match = instanceNameRegexp.FindStringSubmatch(connStr)
 	if len(match) > 1 {
 		info.InstanceName = match[1]
 	}
+
 	return nil
 }
+
 func (info *DatabaseInfo) AddServer(server ServerAddr) {
 	for i := 0; i < len(info.Servers); i++ {
 		if server.IsEqual(&info.Servers[i]) {
@@ -142,12 +152,15 @@ func (serv *ServerAddr) IsEqual(input *ServerAddr) bool {
 	return strings.ToUpper(serv.Addr) == strings.ToUpper(input.Addr) &&
 		serv.Port == input.Port
 }
+
 func (serv *ServerAddr) NetworkAddr() string {
 	return net.JoinHostPort(serv.Addr, strconv.Itoa(serv.Port))
 }
+
 func (info *DatabaseInfo) ResetServerIndex() {
 	info.serverIndex = 0
 }
+
 func (info *DatabaseInfo) GetActiveServer(jump bool) *ServerAddr {
 	if jump {
 		info.serverIndex++
@@ -162,19 +175,9 @@ func DBAPrivilegeFromString(s string) DBAPrivilege {
 	S := strings.ToUpper(s)
 	if S == "SYSDBA" {
 		return SYSDBA
-	} else if S == "SYSOPER" {
-		return SYSOPER
-	} else if S == "SYSASM" {
-		return SYSASM
-	} else if S == "SYSBKP" {
-		return SYSBKP
-	} else if S == "SYSDGD" {
-		return SYSDGD
-	} else if S == "SYSKMT" {
-		return SYSKMT
-	} else if S == "SYSRAC" {
-		return SYSRAC
-	} else {
-		return NONE
 	}
+	if S == "SYSOPER" {
+		return SYSOPER
+	}
+	return NONE
 }

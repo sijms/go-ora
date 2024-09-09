@@ -4,12 +4,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 func generatePlaceholders(n int) string {

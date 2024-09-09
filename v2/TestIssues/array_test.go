@@ -5,15 +5,16 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestArray(t *testing.T) {
-	var expectedTime = time.Now()
-	var insert = func(db *sql.DB) error {
+	expectedTime := time.Now()
+	insert := func(db *sql.DB) error {
 		sqlText := `INSERT INTO TTB_MAIN(ID, NAME, VAL, LDATE, DATA) VALUES(:ID, :NAME, :VAL, :LDATE, :DATA)`
 		length := 10
 		type TempStruct struct {
@@ -43,7 +44,7 @@ func TestArray(t *testing.T) {
 		return err
 	}
 
-	var createPackage = func(db *sql.DB) error {
+	createPackage := func(db *sql.DB) error {
 		sqlText := `create or replace package GOORA_TEMP_PKG as
 		type t_visit_id is table of TTB_MAIN.id%type index by binary_integer;
 	   type t_visit_name is table of TTB_MAIN.name%type index by binary_integer;
@@ -95,11 +96,11 @@ func TestArray(t *testing.T) {
 		return execCmd(db, sqlText)
 	}
 
-	var dropPackage = func(db *sql.DB) error {
+	dropPackage := func(db *sql.DB) error {
 		return execCmd(db, "drop package GOORA_TEMP_PKG")
 	}
 
-	var query1 = func(db *sql.DB) error {
+	query1 := func(db *sql.DB) error {
 		var cursor go_ora.RefCursor
 		// sql code take input array of integer and return a cursor that can be queried for result
 		_, err := db.Exec(`BEGIN GOORA_TEMP_PKG.TEST_GET1(:1, :2); END;`, []int64{1, 3, 5}, sql.Out{Dest: &cursor})
@@ -163,7 +164,7 @@ func TestArray(t *testing.T) {
 		return rows.Err()
 	}
 
-	var query2 = func(db *sql.DB) error {
+	query2 := func(db *sql.DB) error {
 		var (
 			nameArray []sql.NullString
 			valArray  []sql.NullFloat64
@@ -238,7 +239,7 @@ func TestArray(t *testing.T) {
 		return nil
 	}
 
-	var query3 = func(db *sql.DB) error {
+	query3 := func(db *sql.DB) error {
 		var (
 			nameArray []sql.NullString
 			valArray  []sql.NullFloat64

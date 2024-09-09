@@ -3,10 +3,11 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 type Customer struct {
@@ -29,6 +30,7 @@ func execCmd(db *sql.DB, stmts ...string) error {
 	}
 	return nil
 }
+
 func createTypes(db *sql.DB) error {
 	return execCmd(db, "create or replace TYPE SLICE AS TABLE OF varchar2(500)",
 		"create or replace type IntArray as table of number(10, 2)",
@@ -48,6 +50,7 @@ BIRTH_DATE DATE
 )`,
 	)
 }
+
 func dropTypes(db *sql.DB) error {
 	return execCmd(db, "DROP TYPE Customer",
 		"drop type SLICE", "drop type IntArray", "drop type DateArray",
@@ -57,7 +60,7 @@ func dropTypes(db *sql.DB) error {
 }
 
 func nestedRegularArray(db *sql.DB) error {
-	var customer = Customer{
+	customer := Customer{
 		Id: 10, Name: "Name1", BirthDate: time.Now(),
 	}
 	var output Customer
@@ -83,13 +86,15 @@ END;`, go_ora.Object{Name: "Customer", Value: customer},
 	fmt.Println(output)
 	return nil
 }
+
 func inputPar(db *sql.DB) error {
-	var input = []int{1, 2, 3, 4, 5}
-	var input2 = []sql.NullString{sql.NullString{"test", true},
-		sql.NullString{"test", true},
-		sql.NullString{"", false},
-		sql.NullString{"", false},
-		sql.NullString{"test", true},
+	input := []int{1, 2, 3, 4, 5}
+	input2 := []sql.NullString{
+		{"test", true},
+		{"test", true},
+		{"", false},
+		{"", false},
+		{"test", true},
 	}
 
 	var output []int
@@ -129,8 +134,9 @@ END;`,
 	fmt.Println(output2)
 	return nil
 }
+
 func blobInput(db *sql.DB) error {
-	var array = make([]go_ora.Blob, 3)
+	array := make([]go_ora.Blob, 3)
 	for x := 0; x < 3; x++ {
 		array[x].Valid = true
 		array[x].Data = []byte("test")
@@ -143,6 +149,7 @@ BEGIN
 END;`, go_ora.Object{Name: "BlobArray", Value: &array})
 	return err
 }
+
 func blobOutput(db *sql.DB) error {
 	var array []go_ora.Blob
 	_, err := db.Exec(`
@@ -161,6 +168,7 @@ END;`, go_ora.Out{Dest: go_ora.Object{Name: "BlobArray", Value: &array}})
 	fmt.Println(array)
 	return nil
 }
+
 func basicPars(db *sql.DB) error {
 	var (
 		length          int = 10
@@ -206,7 +214,6 @@ func basicPars(db *sql.DB) error {
 			input8[x] = go_ora.Clob{String: "CLOB_", Valid: true}
 			input9[x] = go_ora.NClob{String: "NCLOB_안녕하세요AAA", Valid: true}
 		}
-
 	}
 	fmt.Println("input for slice: ", input1)
 	fmt.Println("input for slice2: ", input2)
@@ -272,7 +279,7 @@ END;`, length,
 		go_ora.Object{Name: "SLICE2", Value: input2},
 		go_ora.Object{Name: "IntArray", Value: input3},
 		go_ora.Object{Name: "DateArray", Value: input4},
-		//go_ora.Object{Name: "ZoneArray", Value: input5},
+		// go_ora.Object{Name: "ZoneArray", Value: input5},
 		go_ora.Object{Name: "ByteArray", Value: input6},
 		go_ora.Object{Name: "BlobArray", Value: input7},
 		go_ora.Object{Name: "ClobArray", Value: input8},
@@ -282,7 +289,7 @@ END;`, length,
 		go_ora.Object{Name: "SLICE2", Value: &output2},
 		go_ora.Object{Name: "IntArray", Value: &output3},
 		go_ora.Object{Name: "DateArray", Value: &output4},
-		//go_ora.Object{Name: "ZoneArray", Value: &output5},
+		// go_ora.Object{Name: "ZoneArray", Value: &output5},
 		go_ora.Object{Name: "ByteArray", Value: &output6},
 		go_ora.Object{Name: "BlobArray", Value: &output7},
 		go_ora.Object{Name: "ClobArray", Value: &output8},
@@ -302,6 +309,7 @@ END;`, length,
 	fmt.Println("output for NClobArray: ", output9)
 	return nil
 }
+
 func outputParString(db *sql.DB) error {
 	var output []sql.NullString
 	var output2 []sql.NullString
@@ -351,7 +359,7 @@ end;`, go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
 		go_ora.Out{Dest: go_ora.Object{Name: "SLICE2", Value: &output2}},
 		go_ora.Out{Dest: go_ora.Object{Name: "IntArray", Value: &output3}},
 		go_ora.Out{Dest: go_ora.Object{Name: "DateArray", Value: &output4}},
-		//go_ora.Out{Dest: go_ora.Object{Name: "ZoneArray", Value: &output5}},
+		// go_ora.Out{Dest: go_ora.Object{Name: "ZoneArray", Value: &output5}},
 		go_ora.Out{Dest: go_ora.Object{Name: "ByteArray", Value: &output6}},
 	)
 	if err != nil {
@@ -459,7 +467,7 @@ func main() {
 		fmt.Println("can't input par: ", err)
 		return
 	}
-	//get temporary lobs before
+	// get temporary lobs before
 	temp, err := getTemporaryLobs(db)
 	if err != nil {
 		fmt.Println("can't get temporay lob before: ", err)

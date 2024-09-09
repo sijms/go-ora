@@ -18,6 +18,7 @@ type BFile struct {
 func CreateNullBFile() *BFile {
 	return &BFile{Valid: false}
 }
+
 func CreateBFile(db *sql.DB, dirName, fileName string) (*BFile, error) {
 	output := &BFile{fileName: fileName, dirName: dirName, Valid: true}
 	_, err := db.Exec("SELECT :1 FROM DUAL", output)
@@ -64,18 +65,23 @@ func (file *BFile) init(conn *Connection) error {
 	}
 	return nil
 }
+
 func (file *BFile) GetDirName() string {
 	return file.dirName
 }
+
 func (file *BFile) GetFileName() string {
 	return file.fileName
 }
+
 func (file *BFile) IsOpen() bool {
 	return file.isOpened
 }
+
 func (file *BFile) isInit() bool {
 	return len(file.lob.sourceLocator) > 0
 }
+
 func (file *BFile) Open() error {
 	if file.isOpened {
 		return nil
@@ -90,6 +96,7 @@ func (file *BFile) Open() error {
 	file.isOpened = true
 	return nil
 }
+
 func (file *BFile) Close() error {
 	if !file.isOpened {
 		return nil
@@ -104,6 +111,7 @@ func (file *BFile) Close() error {
 	file.isOpened = false
 	return nil
 }
+
 func (file *BFile) Exists() (bool, error) {
 	if !file.isOpened {
 		return false, errors.New("invalid operation on closed object")
@@ -137,9 +145,11 @@ func (file *BFile) GetLength() (int64, error) {
 func (file *BFile) Read() ([]byte, error) {
 	return file.lob.getDataWithOffsetSize(0, 0)
 }
+
 func (file *BFile) ReadFromPos(pos int64) ([]byte, error) {
 	return file.lob.getDataWithOffsetSize(pos, 0)
 }
+
 func (file *BFile) ReadBytesFromPos(pos, count int64) ([]byte, error) {
 	return file.lob.getDataWithOffsetSize(pos, count)
 }

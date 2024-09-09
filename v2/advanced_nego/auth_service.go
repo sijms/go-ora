@@ -2,6 +2,7 @@ package advanced_nego
 
 import (
 	"errors"
+
 	"github.com/sijms/go-ora/v2/configurations"
 )
 
@@ -22,7 +23,7 @@ func newAuthService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoServ
 		},
 		status: 0xFCFF,
 	}
-	//var avaAuth []string
+	// var avaAuth []string
 	output.availableServiceNames = []string{"", "NTS", "KERBEROS5", "TCPS"}
 	output.availableServiceIDs = []int{0, 1, 1, 2}
 	//if runtime.GOOS == "windows" {
@@ -45,7 +46,7 @@ func newAuthService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoServ
 	//}
 	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
 	err := output.buildServiceList(negoInfo.AuthService, false, false)
-	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
+	// output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err
 	}

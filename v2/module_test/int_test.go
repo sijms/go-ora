@@ -7,10 +7,12 @@ import (
 	"testing"
 )
 
-var sqlColNamesTestDataTypeInt = []string{"id",
+var sqlColNamesTestDataTypeInt = []string{
+	"id",
 	"data_int", "data_integer", "data_decimal", "data_number", "data_numeric",
 	"data_tinyint", "data_smallint", "data_mediumint", "data_bigint",
-	"data_int1", "data_int2", "data_int4", "data_int8"}
+	"data_int1", "data_int2", "data_int4", "data_int8",
+}
 
 func TestDataType_Int(t *testing.T) {
 	testName := "TestDataType_Int"
@@ -25,10 +27,12 @@ func TestDataType_Int(t *testing.T) {
 
 	tblName := "test_int"
 	colNameList := sqlColNamesTestDataTypeInt
-	colTypes := []string{"NVARCHAR2(8)",
+	colTypes := []string{
+		"NVARCHAR2(8)",
 		"INT", "INTEGER", "NUMERIC(38,0)", "NUMBER(38,0)", "DECIMAL(38,0)",
 		"NUMERIC(3,0)", "SMALLINT", "DECIMAL(19,0)", "DEC(38,0)",
-		"DEC(4,0)", "NUMBER(8,0)", "DECIMAL(16,0)", "NUMERIC(32,0)"}
+		"DEC(4,0)", "NUMBER(8,0)", "DECIMAL(16,0)", "NUMERIC(32,0)",
+	}
 	type Row struct {
 		id            string
 		dataInt       int
@@ -83,10 +87,12 @@ func TestDataType_Int(t *testing.T) {
 			dataInt8:      vInt - 2,
 		}
 		rowArr = append(rowArr, row)
-		params := []interface{}{row.id,
+		params := []interface{}{
+			row.id,
 			row.dataInt, row.dataInteger, row.dataDecimal, row.dataNumber, row.dataNumeric,
 			row.dataTinyInt, row.dataSmallInt, row.dataMediumInt, row.dataBigInt,
-			row.dataInt1, row.dataInt2, row.dataInt4, row.dataInt8}
+			row.dataInt1, row.dataInt2, row.dataInt4, row.dataInt8,
+		}
 		_, err := db.Exec(sql, params...)
 		if err != nil {
 			fmt.Printf("%s\n%#v\n", sql, params)

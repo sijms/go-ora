@@ -2,17 +2,20 @@ package go_ora
 
 import (
 	"database/sql/driver"
-	"github.com/sijms/go-ora/trace"
 	"io"
+
+	"github.com/sijms/go-ora/trace"
 
 	"github.com/sijms/go-ora/network"
 )
 
 // Compile time Sentinels for implemented Interfaces.
-var _ = driver.Rows((*DataSet)(nil))
-var _ = driver.RowsColumnTypeDatabaseTypeName((*DataSet)(nil))
-var _ = driver.RowsColumnTypeLength((*DataSet)(nil))
-var _ = driver.RowsColumnTypeNullable((*DataSet)(nil))
+var (
+	_ = driver.Rows((*DataSet)(nil))
+	_ = driver.RowsColumnTypeDatabaseTypeName((*DataSet)(nil))
+	_ = driver.RowsColumnTypeLength((*DataSet)(nil))
+	_ = driver.RowsColumnTypeNullable((*DataSet)(nil))
+)
 
 // var _ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
 // var _ = driver.RowsColumnTypeScanType((*DataSet)(nil))
@@ -27,7 +30,7 @@ type DataSet struct {
 	MaxRowSize      int
 	Cols            []ParameterInfo
 	Rows            []Row
-	//currentRow      Row
+	// currentRow      Row
 	index  int
 	parent StmtInterface
 }
@@ -87,7 +90,6 @@ func (dataSet *DataSet) setBitVector(bitVector []byte) {
 			dataSet.Cols[x].getDataFromServer = true
 		}
 	}
-
 }
 
 func (dataSet *DataSet) Close() error {
@@ -201,7 +203,6 @@ func (dataSet DataSet) ColumnTypeLength(index int) (length int64, ok bool) {
 		return int64(dataSet.Cols[index].Precision), true
 	}
 	return int64(0), false
-
 }
 
 func (dataSet DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {

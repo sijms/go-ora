@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"math/rand"
 	"os"
 	"sync"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -54,6 +55,7 @@ func truncateTable(conn *sql.DB) error {
 	fmt.Println("finish truncate table: ", time.Now().Sub(t))
 	return nil
 }
+
 func merge(db *sql.DB) error {
 	t := time.Now()
 	sqlText := `MERGE INTO TESTSHORT t1 USING(select :ID ID from dual) tmp ON (tmp.ID=t1.ID) 
@@ -76,7 +78,6 @@ func merge(db *sql.DB) error {
 			default:
 				bind = append(bind, "text")
 			}
-
 		}
 		bindall = append(bindall, sql.Named(colname, bind))
 	}
@@ -113,6 +114,7 @@ func merge(db *sql.DB) error {
 	return tx.Commit()
 	return nil
 }
+
 func main() {
 	conn, err := sql.Open("oracle", os.Getenv("DSN"))
 	if err != nil {

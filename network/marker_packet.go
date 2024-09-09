@@ -5,9 +5,9 @@ import "encoding/binary"
 type MarkerPacket struct {
 	packet     Packet
 	sessionCtx *SessionContext
-	//length     uint16
-	//packetType PacketType
-	//flag       uint8
+	// length     uint16
+	// packetType PacketType
+	// flag       uint8
 	markerData uint8
 	markerType uint8
 }
@@ -37,6 +37,7 @@ func newMarkerPacket(markerData uint8, sessionCtx *SessionContext) *MarkerPacket
 		markerData: markerData,
 	}
 }
+
 func newMarkerPacketFromData(packetData []byte, sessionCtx *SessionContext) *MarkerPacket {
 	if len(packetData) != 0xB {
 		return nil

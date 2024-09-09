@@ -3,8 +3,9 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 type Product struct {
@@ -46,6 +47,7 @@ NAME varchar2(100),
 PRODUCTS ProductCol
 )`)
 }
+
 func dropTypes(db *sql.DB) error {
 	return execCmd(db, "DROP TYPE CUSTOMER", "DROP TYPE ProductCol", "DROP TYPE PRODUCT")
 }
@@ -122,6 +124,7 @@ END;`, go_ora.Object{Name: "Customer", Value: input},
 	}
 	return nil
 }
+
 func nullInputFullOutput(db *sql.DB) error {
 	input := Customer{
 		Id:   1,
@@ -168,9 +171,10 @@ END;`, go_ora.Object{Name: "Product", Value: &output}, go_ora.Out{Dest: &output2
 	fmt.Println(output2)
 	return err
 }
+
 func nullArray(db *sql.DB) error {
 	var output []Product
-	//output = append(output, Product{3, "product_3", "desc_3"})
+	// output = append(output, Product{3, "product_3", "desc_3"})
 	var output2 string
 	_, err := db.Exec(`
 DECLARE

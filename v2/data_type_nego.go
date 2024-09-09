@@ -3,8 +3,9 @@ package go_ora
 import (
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/network"
 	"time"
+
+	"github.com/sijms/go-ora/v2/network"
 )
 
 type DataTypeNego struct {
@@ -70,14 +71,14 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 			1, 0, 5, 1, 0, 0, 0, 24,
 			0, 0, 7, 32, 2, 58, 0, 0, 5,
 		},
-		//CompileTimeCaps: []byte{0x6, 0x1, 0x1, 0x1, 0x6f, 0x1, 0x1, 0x10,
+		// CompileTimeCaps: []byte{0x6, 0x1, 0x1, 0x1, 0x6f, 0x1, 0x1, 0x10,
 		//	0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x7f,
 		//	0xff, 0x3, 0x10, 0x3, 0x3, 0x1, 0x1, 0xff,
 		//	0x1, 0xff, 0xff, 0x1, 0xb, 0x1, 0x1, 0xff,
 		//	0x1, 0x6, 0xc, 0xe6, 0x1, 0x7f, 0x5, 0xf,
 		//	0x7f, 0xd, 0x3, 0, 0x1},
 		RuntimeCap: []byte{2, 1, 0, 0, 0, 0, 0},
-		//RuntimeCap:             []byte{2, 1, 0, 0, 18, 0, 87},
+		// RuntimeCap:             []byte{2, 1, 0, 0, 18, 0, 87},
 		b32kTypeSupported:      false,
 		supportSessionStateOps: false,
 		clientTZVersion:        0x20,
@@ -461,6 +462,7 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	}
 	return &result
 }
+
 func (nego *DataTypeNego) read(session *network.Session) (zone *time.Location, err error) {
 	var msg uint8
 	msg, err = session.GetByte()
@@ -511,11 +513,12 @@ func (nego *DataTypeNego) read(session *network.Session) (zone *time.Location, e
 		}
 		level++
 	}
-	//fmt.Println("server timezone version: ", nego.serverTZVersion)
-	//fmt.Println("client timezone version: ", nego.clientTZVersion)
-	//fmt.Println("server timezone: ", nego.dbTimeZone)
+	// fmt.Println("server timezone version: ", nego.serverTZVersion)
+	// fmt.Println("client timezone version: ", nego.clientTZVersion)
+	// fmt.Println("server timezone: ", nego.dbTimeZone)
 	return
 }
+
 func (nego *DataTypeNego) write(session *network.Session) error {
 	session.ResetBuffer()
 	if nego.Server.ServerCompileTimeCaps == nil || len(nego.Server.ServerCompileTimeCaps) <= 27 || nego.Server.ServerCompileTimeCaps[27] == 0 {
@@ -523,7 +526,7 @@ func (nego *DataTypeNego) write(session *network.Session) error {
 	}
 	session.PutBytes(nego.MessageCode)
 	// client remote in
-	//session.PutBytes(0, 0, 0, 0)
+	// session.PutBytes(0, 0, 0, 0)
 	session.PutInt(nego.Server.ServerCharset, 2, false, false)
 	// client remote out
 	session.PutInt(nego.Server.ServerCharset, 2, false, false)
@@ -535,7 +538,7 @@ func (nego *DataTypeNego) write(session *network.Session) error {
 		session.PutBytes(TZBytes()...)
 		if nego.CompileTimeCaps[37]&2 == 2 {
 			session.PutInt(nego.clientTZVersion, 4, true, false)
-			//session.PutBytes(0, 0, 0, uint8(nego.clientTZVersion))
+			// session.PutBytes(0, 0, 0, uint8(nego.clientTZVersion))
 		}
 	}
 	session.PutInt(nego.Server.ServernCharset, 2, false, false)

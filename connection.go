@@ -6,10 +6,11 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"strconv"
+
 	"github.com/sijms/go-ora/advanced_nego"
 	"github.com/sijms/go-ora/converters"
 	"github.com/sijms/go-ora/network"
-	"strconv"
 )
 
 type ConnectionState int
@@ -23,11 +24,11 @@ type LogonMode int
 
 const (
 	NoNewPass LogonMode = 0x1
-	//WithNewPass LogonMode = 0x2
+	// WithNewPass LogonMode = 0x2
 	SysDba      LogonMode = 0x20 // no verify response from server
 	SysOper     LogonMode = 0x40 // no verify response from server
 	UserAndPass LogonMode = 0x100
-	//PROXY       LogonMode = 0x400
+	// PROXY       LogonMode = 0x400
 )
 
 type NLSData struct {
@@ -63,8 +64,7 @@ type Connection struct {
 	strConv           converters.IStringConverter
 	NLSData           NLSData
 }
-type OracleDriver struct {
-}
+type OracleDriver struct{}
 type OracleConnector struct {
 	drv           *OracleDriver
 	connectString string
@@ -73,12 +73,12 @@ type OracleConnector struct {
 func init() {
 	sql.Register("oracle", &OracleDriver{})
 }
-func (drv *OracleDriver) OpenConnector(name string) (driver.Connector, error) {
 
+func (drv *OracleDriver) OpenConnector(name string) (driver.Connector, error) {
 	return &OracleConnector{drv: drv, connectString: name}, nil
 }
-func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, error) {
 
+func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	conn, err := NewConnection(connector.connectString)
 	if err != nil {
 		return nil, err
@@ -89,11 +89,12 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	}
 	return conn, nil
 }
+
 func (connector *OracleConnector) Driver() driver.Driver {
 	return connector.drv
 }
-func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 
+func (drv *OracleDriver) Open(name string) (driver.Conn, error) {
 	conn, err := NewConnection(name)
 	if err != nil {
 		return nil, err
@@ -108,7 +109,6 @@ func (conn *Connection) SetStringConverter(converter converters.IStringConverter
 }
 
 func (conn *Connection) GetNLS() (*NLSData, error) {
-
 	// we read from sys.nls_session_parameters ONCE
 	cmdText := `
 DECLARE
@@ -156,7 +156,7 @@ DECLARE
 	stmt.AddParam("p_err_code", "", 2000, Output)
 	stmt.AddParam("p_err_msg", "", 2000, Output)
 	defer stmt.Close()
-	//fmt.Println(stmt.Pars)
+	// fmt.Println(stmt.Pars)
 	_, err := stmt.Exec(nil)
 	if err != nil {
 		return nil, err
@@ -363,6 +363,7 @@ func (conn *Connection) Open() error {
 	//
 	//return nil
 }
+
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	tracer := conn.connOption.Tracer
 	switch conn.conStr.DBAPrivilege {
@@ -486,7 +487,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	conn.serialID = int(serialNum)
 	conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
-	//conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
+	// conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
 	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
@@ -498,6 +499,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	return nil
 }
+
 func (conn *Connection) Begin() (driver.Tx, error) {
 	conn.connOption.Tracer.Print("Begin transaction")
 	conn.autoCommit = false
@@ -517,7 +519,7 @@ func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 }
 
 func NewConnection(databaseUrl string) (*Connection, error) {
-	//this.m_id = this.GetHashCode().ToString();
+	// this.m_id = this.GetHashCode().ToString();
 	conStr, err := newConnectionStringFromUrl(databaseUrl)
 	if err != nil {
 		return nil, err
@@ -582,9 +584,9 @@ func NewConnection(databaseUrl string) (*Connection, error) {
 
 func (conn *Connection) Close() (err error) {
 	conn.connOption.Tracer.Print("Close")
-	//var err error = nil
+	// var err error = nil
 	if conn.session != nil {
-		//err = conn.Logoff()
+		// err = conn.Logoff()
 		conn.session.Disconnect()
 		conn.session = nil
 	}
@@ -602,7 +604,7 @@ func (conn *Connection) doAuth() error {
 	conn.session.PutUint(int(conn.LogonMode), 4, true, true)
 	conn.session.PutBytes(1, 1, 5, 1, 1)
 	conn.session.PutClr([]byte(conn.connOption.UserID))
-	//conn.session.PutBytes([]byte(conn.connOption.UserID)...)
+	// conn.session.PutBytes([]byte(conn.connOption.UserID)...)
 	conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientInfo.HostName, 0)
 	conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientInfo.ProgramName, 0)
 	conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientInfo.HostName, 0)

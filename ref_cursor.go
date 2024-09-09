@@ -9,11 +9,11 @@ type RefCursor struct {
 	len        uint8
 	MaxRowSize int
 	parent     *defaultStmt
-	//ID         int
-	//scnFromExe []int
-	//connection *Connection
-	//noOfRowsToFetch int
-	//hasMoreRows bool
+	// ID         int
+	// scnFromExe []int
+	// connection *Connection
+	// noOfRowsToFetch int
+	// hasMoreRows bool
 }
 
 func (cursor *RefCursor) load(session *network.Session) error {
@@ -99,9 +99,11 @@ func (cursor *RefCursor) load(session *network.Session) error {
 	}
 	return nil
 }
+
 func (cursor *RefCursor) getExeOptions() int {
 	return 0x8040
 }
+
 func (cursor *RefCursor) Query() (*DataSet, error) {
 	cursor.connection.connOption.Tracer.Printf("Query RefCursor: %d", cursor.cursorID)
 	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
@@ -122,6 +124,7 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	}
 	return dataSet, nil
 }
+
 func (cursor *RefCursor) write() error {
 	err := cursor.basicWrite(cursor.getExeOptions(), false, false)
 	if err != nil {

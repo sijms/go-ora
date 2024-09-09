@@ -21,7 +21,7 @@ func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
 		},
 		status: 0xFCFF,
 	}
-	//var avaAuth []string
+	// var avaAuth []string
 	output.availableServiceNames = []string{"", "NTS", "KERBEROS5", "TCPS"}
 	output.availableServiceIDs = []int{0, 1, 1, 2}
 	//if runtime.GOOS == "windows" {
@@ -45,7 +45,7 @@ func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
 	//}
 	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
 	err := output.buildServiceList(connOption.AuthService, false, false)
-	//output.selectedServ, err = output.validate(strings.Split(str,","), true)
+	// output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err
 	}

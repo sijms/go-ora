@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func execCmd(db *sql.DB, stmts ...string) error {
@@ -96,7 +97,7 @@ func createParent(index int, date time.Time) typeParent {
 }
 
 func outputPar(db *sql.DB) error {
-	var parent = typeParent{}
+	parent := typeParent{}
 	_, err := db.Exec(`
 DECLARE
 	v_child2 childType2;
@@ -131,8 +132,9 @@ END;`, sql.Named("ldate", refDate), sql.Named("output", go_ora.Out{Dest: &parent
 	fmt.Println(parent)
 	return err
 }
+
 func inputPar(db *sql.DB) error {
-	var parent = createParent(0, refDate)
+	parent := createParent(0, refDate)
 	var output typeParent
 	_, err := db.Exec(`
 DECLARE
@@ -187,6 +189,7 @@ end;`, sql.Named("parent", parent), sql.Named("id", 5), sql.Named("name", "_veri
 	fmt.Println(output)
 	return nil
 }
+
 func outputParArray(db *sql.DB) error {
 	var parents []typeParent
 	_, err := db.Exec(`
@@ -229,6 +232,7 @@ END;`, sql.Named("ldate", refDate), sql.Named("output", go_ora.Out{Dest: &parent
 	fmt.Println(parents)
 	return err
 }
+
 func inputParArray(db *sql.DB) error {
 	var parents []typeParent
 	parents = append(parents, createParent(0, refDate),
@@ -290,6 +294,7 @@ end;`, sql.Named("parents", parents), sql.Named("id", 5), sql.Named("name", "_ve
 	fmt.Println("output: ", output)
 	return nil
 }
+
 func main() {
 	db, err := sql.Open("oracle", os.Getenv("DSN"))
 	if err != nil {

@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func execCmd(db *sql.DB, stmts ...string) error {
@@ -86,11 +87,12 @@ func queryPars(db *sql.DB) error {
 	fmt.Println("Timestamp TZ: ", date3)
 	return nil
 }
+
 func main() {
-	//fmt.Println(time.Now())
-	//fmt.Println(time.Now().Local())
-	//fmt.Println(time.Now().UTC())
-	//return
+	// fmt.Println(time.Now())
+	// fmt.Println(time.Now().Local())
+	// fmt.Println(time.Now().UTC())
+	// return
 	// DSN_MAALI_STORE
 	db, err := sql.Open("oracle", os.Getenv("DSN"))
 	if err != nil {

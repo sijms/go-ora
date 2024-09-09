@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	go_ora "github.com/sijms/go-ora/v2/lazy_init"
 )
 
 type RefusePacket struct {
@@ -48,21 +50,39 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	}
 }
 
+var errExtractRegexp = go_ora.NewLazyInit(func() (interface{}, error) {
+	return regexp.Compile(`\(\s*ERR\s*=\s*([0-9]+)\s*\)`)
+})
+
+var errorExtractRegexp = go_ora.NewLazyInit(func() (interface{}, error) {
+	return regexp.Compile(`\(\s*ERROR\s*=([A-Z0-9=()]+)`)
+})
+
+var codeExtractRegexp = go_ora.NewLazyInit(func() (interface{}, error) {
+	return regexp.Compile(`CODE\s*=\s*([0-9]+)`)
+})
+
 func (pck *RefusePacket) extractErrCode() {
+	var err error
+
 	pck.Err.ErrCode = 12564
 	pck.Err.ErrMsg = "ORA-12564: TNS connection refused"
 	if len(pck.message) == 0 {
 		return
 	}
-	r, err := regexp.Compile(`\(\s*ERR\s*=\s*([0-9]+)\s*\)`)
+
+	var errExtractRegexpAny interface{}
+	errExtractRegexpAny, err = errExtractRegexp.GetValue()
 	if err != nil {
 		return
 	}
+
 	msg := strings.ToUpper(pck.message)
-	matches := r.FindStringSubmatch(msg)
+	matches := errExtractRegexpAny.(*regexp.Regexp).FindStringSubmatch(msg)
 	if len(matches) != 2 {
 		return
 	}
+
 	strErrCode := matches[1]
 	errCode, err := strconv.ParseInt(strErrCode, 10, 32)
 	if err == nil {
@@ -70,23 +90,30 @@ func (pck *RefusePacket) extractErrCode() {
 		pck.Err.translate()
 		return
 	}
-	r, err = regexp.Compile(`\(\s*ERROR\s*=([A-Z0-9=()]+)`)
+
+	var errorExtractRegexpAny interface{}
+	errorExtractRegexpAny, err = errorExtractRegexp.GetValue()
 	if err != nil {
 		return
 	}
-	matches = r.FindStringSubmatch(msg)
+
+	matches = errorExtractRegexpAny.(*regexp.Regexp).FindStringSubmatch(msg)
 	if len(matches) != 2 {
 		return
 	}
 	codeStr := matches[1]
-	r, err = regexp.Compile(`CODE\s*=\s*([0-9]+)`)
+
+	var codeExtractRegexpAny interface{}
+	codeExtractRegexpAny, err = codeExtractRegexp.GetValue()
 	if err != nil {
 		return
 	}
-	matches = r.FindStringSubmatch(codeStr)
+
+	matches = codeExtractRegexpAny.(*regexp.Regexp).FindStringSubmatch(codeStr)
 	if len(matches) != 2 {
 		return
 	}
+
 	strErrCode = matches[1]
 	errCode, err = strconv.ParseInt(strErrCode, 10, 32)
 	if err == nil {

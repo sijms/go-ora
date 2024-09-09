@@ -2,12 +2,13 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/sijms/go-ora/v2"
 	"testing"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestBoolType(t *testing.T) {
-	var createProc = func(db *sql.DB) error {
+	createProc := func(db *sql.DB) error {
 		return execCmd(db, `CREATE OR REPLACE PROCEDURE GO_ORA_TEMP_PROC(
 		L_BOOL IN BOOLEAN,
 		MESSAGE OUT VARCHAR2) AS
@@ -19,7 +20,7 @@ BEGIN
 	END IF;
 END GO_ORA_TEMP_PROC;`)
 	}
-	var dropProc = func(db *sql.DB) error {
+	dropProc := func(db *sql.DB) error {
 		return execCmd(db, `drop procedure GO_ORA_TEMP_PROC`)
 	}
 

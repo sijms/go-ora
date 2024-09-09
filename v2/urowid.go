@@ -3,6 +3,7 @@ package go_ora
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/sijms/go-ora/v2/network"
 )
 
@@ -26,6 +27,7 @@ func newURowID(session *network.Session) (*urowid, error) {
 	}
 	return nil, nil
 }
+
 func (id *urowid) physicalRawIDToByteArray() []byte {
 	// physical
 	temp32 := binary.BigEndian.Uint32(id.data[1:5])
@@ -42,6 +44,7 @@ func (id *urowid) physicalRawIDToByteArray() []byte {
 		return id.rowid.getBytes()
 	}
 }
+
 func (id *urowid) logicalRawIDToByteArray() []byte {
 	length1 := len(id.data)
 	num1 := length1 / 3
@@ -57,7 +60,7 @@ func (id *urowid) logicalRawIDToByteArray() []byte {
 	var output []byte = nil
 	if length2 > 0 {
 		KGRD_INDBYTE_CHAR := []byte{65, 42, 45, 40, 41}
-		var buffer = []byte{
+		buffer := []byte{
 			65, 66, 67, 68, 69, 70, 71, 72,
 			73, 74, 75, 76, 77, 78, 79, 80,
 			81, 82, 83, 84, 85, 86, 87, 88,
@@ -94,6 +97,7 @@ func (id *urowid) logicalRawIDToByteArray() []byte {
 	}
 	return output
 }
+
 func (id *urowid) getBytes() []byte {
 	if id.data[0] == 1 {
 		return id.physicalRawIDToByteArray()

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+
 	go_ora "github.com/sijms/go-ora/v2"
 )
 
@@ -30,6 +31,7 @@ func NewAQ(conn *sql.DB, name, typeName string) *AQ {
 	}
 	return output
 }
+
 func (aq *AQ) validate() error {
 	if aq.conn == nil {
 		return errors.New("no connection defined for AQ type")
@@ -42,6 +44,7 @@ func (aq *AQ) validate() error {
 	}
 	return nil
 }
+
 func (aq *AQ) Create() error {
 	err := aq.validate()
 	if err != nil {
@@ -68,8 +71,8 @@ func (aq *AQ) Drop() error {
 	DBMS_AQADM.DROP_QUEUE(:QUEUE_NAME, FALSE);
 	DBMS_AQADM.DROP_QUEUE_TABLE(:TB_NAME);
 END;`
-	_, err = aq.conn.Exec(sqlText, aq) //sql.Named("QUEUE_NAME", aq.Name),
-	//sql.Named("TABLE_NAME", aq.TableName))
+	_, err = aq.conn.Exec(sqlText, aq) // sql.Named("QUEUE_NAME", aq.Name),
+	// sql.Named("TABLE_NAME", aq.TableName))
 	return err
 }
 
@@ -123,6 +126,7 @@ END;`
 		sql.Named("MSG_ID", go_ora.Out{Dest: &messageID, Size: 100}))
 	return
 }
+
 func (aq *AQ) Enqueue(message driver.Value) (messageID []byte, err error) {
 	err = aq.validate()
 	if err != nil {

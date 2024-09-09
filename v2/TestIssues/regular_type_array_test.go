@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestRegularTypeArray(t *testing.T) {
@@ -18,7 +19,7 @@ func TestRegularTypeArray(t *testing.T) {
 		PRICES    []float64      `udt:"PRICES"`
 		BirthDate time.Time      `udt:"BIRTH_DATE"`
 	}
-	var createTypes = func(db *sql.DB) error {
+	createTypes := func(db *sql.DB) error {
 		return execCmd(db, "create or replace TYPE SLICE AS TABLE OF varchar2(500)",
 			"create or replace type IntArray as table of number(10, 2)",
 			"create or replace type DateArray as table of DATE",
@@ -37,7 +38,7 @@ BIRTH_DATE DATE
 )`,
 		)
 	}
-	var dropTypes = func(db *sql.DB) error {
+	dropTypes := func(db *sql.DB) error {
 		return execCmd(db, "DROP TYPE Customer",
 			"drop type SLICE", "drop type IntArray", "drop type DateArray",
 			"drop type ZoneArray", "drop type SLICE2", "DROP TYPE ByteArray",
@@ -45,12 +46,12 @@ BIRTH_DATE DATE
 		)
 	}
 
-	var outputParString = func(db *sql.DB) error {
+	outputParString := func(db *sql.DB) error {
 		var output []sql.NullString
 		var output2 []sql.NullString
 		var output3 []sql.NullInt64
 		var output4 []sql.NullTime
-		//var output5 []sql.NullTime
+		// var output5 []sql.NullTime
 		var output6 [][]byte
 		_, err := db.Exec(`
 DECLARE
@@ -146,14 +147,14 @@ end;`, go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
 		return nil
 	}
 
-	var basicPars = func(db *sql.DB) error {
+	basicPars := func(db *sql.DB) error {
 		var (
 			length          = 10
 			input1, output1 []sql.NullString
 			input2, output2 []sql.NullString
 			input3, output3 []sql.NullInt64
 			input4, output4 []sql.NullTime
-			//input5, output5 []sql.NullTime
+			// input5, output5 []sql.NullTime
 			input6, output6 [][]byte
 			input7, output7 []go_ora.Blob
 			input8, output8 []go_ora.Clob
@@ -164,7 +165,7 @@ end;`, go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
 		input2 = make([]sql.NullString, length)
 		input3 = make([]sql.NullInt64, length)
 		input4 = make([]sql.NullTime, length)
-		//input5 = make([]sql.NullTime, length)
+		// input5 = make([]sql.NullTime, length)
 		input6 = make([][]byte, length)
 		input7 = make([]go_ora.Blob, length)
 		input8 = make([]go_ora.Clob, length)
@@ -175,7 +176,7 @@ end;`, go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
 				input2[x] = sql.NullString{"", false}
 				input3[x] = sql.NullInt64{0, false}
 				input4[x] = sql.NullTime{Valid: false}
-				//input5[x] = sql.NullTime{Valid: false}
+				// input5[x] = sql.NullTime{Valid: false}
 				input6[x] = nil
 				input7[x] = go_ora.Blob{Data: nil}
 				input8[x] = go_ora.Clob{Valid: false}
@@ -185,7 +186,7 @@ end;`, go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
 				input2[x] = sql.NullString{"안녕하세요AAA_", true}
 				input3[x] = sql.NullInt64{int64(x), true}
 				input4[x] = sql.NullTime{time.Now(), true}
-				//input5[x] = sql.NullTime{Time: time.Now(), Valid: true}
+				// input5[x] = sql.NullTime{Time: time.Now(), Valid: true}
 				input6[x] = []byte("test_")
 				input7[x] = go_ora.Blob{Data: []byte("BLOB")}
 				input8[x] = go_ora.Clob{String: "CLOB_", Valid: true}
@@ -247,7 +248,7 @@ END;`, length,
 			go_ora.Object{Name: "SLICE2", Value: input2},
 			go_ora.Object{Name: "IntArray", Value: input3},
 			go_ora.Object{Name: "DateArray", Value: input4},
-			//go_ora.Object{Name: "ZoneArray", Value: input5},
+			// go_ora.Object{Name: "ZoneArray", Value: input5},
 			go_ora.Object{Name: "ByteArray", Value: input6},
 			go_ora.Object{Name: "BlobArray", Value: input7},
 			go_ora.Object{Name: "ClobArray", Value: input8},
@@ -257,7 +258,7 @@ END;`, length,
 			go_ora.Object{Name: "SLICE2", Value: &output2},
 			go_ora.Object{Name: "IntArray", Value: &output3},
 			go_ora.Object{Name: "DateArray", Value: &output4},
-			//go_ora.Object{Name: "ZoneArray", Value: &output5},
+			// go_ora.Object{Name: "ZoneArray", Value: &output5},
 			go_ora.Object{Name: "ByteArray", Value: &output6},
 			go_ora.Object{Name: "BlobArray", Value: &output7},
 			go_ora.Object{Name: "ClobArray", Value: &output8},
@@ -324,15 +325,15 @@ END;`, length,
 		return nil
 	}
 
-	var getTempLobs = func(db *sql.DB) (int, error) {
+	getTempLobs := func(db *sql.DB) (int, error) {
 		var r int
 		err := db.QueryRow(`SELECT SUM(cache_lobs) + SUM(nocache_lobs) + SUM(abstract_lobs) 
 	FROM v$temporary_lobs l, v$session s WHERE s.SID = l.SID AND s.sid = userenv('SID')`).Scan(&r)
 		return r, err
 	}
-	var nestedRegularArray = func(db *sql.DB) error {
+	nestedRegularArray := func(db *sql.DB) error {
 		refDate := time.Now()
-		var customer = Customer{
+		customer := Customer{
 			Id: 10, Name: "Name1", BirthDate: refDate,
 		}
 		var output Customer

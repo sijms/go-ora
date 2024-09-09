@@ -79,7 +79,6 @@ func (w *Wallet) read() error {
 	}
 	num3 := fileData[index]
 	if num3 == 5 {
-
 	} else if num3 == 6 {
 		index++
 		rgbKey := fileData[index : index+16]
@@ -189,12 +188,12 @@ func (w *Wallet) readCredentials(input []byte) error {
 		temp2 struct1
 		temp3 WalletCredentialData
 	)
-	//objectType := 0
+	// objectType := 0
 	_, err := asn1.Unmarshal(input, &temp1)
 	if err != nil {
 		return err
 	}
-	//var a []asn1.RawValue
+	// var a []asn1.RawValue
 	for _, tmp := range temp1 {
 		// check the ContentType of the tmp first
 		switch tmp.Id.String() {
@@ -203,15 +202,17 @@ func (w *Wallet) readCredentials(input []byte) error {
 			if err != nil {
 				return err
 			}
+
 			if temp2.Id.String() == "0.22.72.134.247.13.1.10" {
 				// certificate request
 				var a []byte
-				_, err := asn1.Unmarshal(temp2.Data.Bytes, &a)
+				_, err = asn1.Unmarshal(temp2.Data.Bytes, &a)
 				if err != nil {
 					return err
 				}
 				w.CertificateRequests = append(w.CertificateRequests, a)
 			}
+
 			if temp2.Id.String() != "1.2.840.113549.1.16.12.12" {
 				continue
 			}
@@ -220,21 +221,28 @@ func (w *Wallet) readCredentials(input []byte) error {
 			if err != nil {
 				return err
 			}
-			r, err := regexp.Compile("(^.+)([0-9]+)")
+
+			var walletCredentialsRegexp *regexp.Regexp
+			walletCredentialsRegexp, err = regexp.Compile("(^.+)([0-9]+)")
 			if err != nil {
 				return err
 			}
-			matches := r.FindStringSubmatch(temp3.Id)
+
+			matches := walletCredentialsRegexp.FindStringSubmatch(temp3.Id)
 			if len(matches) != 3 {
 				continue
 			}
-			length, err := strconv.Atoi(matches[2])
+
+			var length int
+			length, err = strconv.Atoi(matches[2])
 			if err != nil {
 				continue
 			}
+
 			for len(w.credentials) < length {
 				w.credentials = append(w.credentials, WalletCredential{})
 			}
+
 			switch matches[1] {
 			case "oracle.security.client.connect_string":
 				w.credentials[length-1].dsn = temp3.Value
@@ -283,7 +291,6 @@ func (w *Wallet) readCredentials(input []byte) error {
 		default:
 			continue
 		}
-
 	}
 	return nil
 }
@@ -359,7 +366,7 @@ func (w *Wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 	if err != nil {
 		return
 	}
-	var index = -1
+	index := -1
 	for idx, obj := range authenticatedSafe {
 		if obj.ContentType.Equal(oidEncryptedDataContentType) {
 			index = idx
@@ -417,7 +424,7 @@ func (w *Wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 			err = errors.New("pkcs12: only octet string salts are supported for pbkdf2")
 			return
 		}
-		//var prf hash.Hash
+		// var prf hash.Hash
 		var h func() hash.Hash
 		var keyLen int
 		// get hash type
@@ -468,36 +475,43 @@ func (w *Wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 }
 
 // getCredential read one credential dsn, username, password from encrypted data
-func (w *Wallet) getCredential(server string, port int, service, username string) (*WalletCredential, error) {
-	rHost, err := regexp.Compile(`\(\s*HOST\s*=\s*([A-z0-9._%+-]+)\)`)
+func (w *Wallet) getCredential(server string, port int, service, username string) (credential *WalletCredential, err error) {
+	var hostRegexp *regexp.Regexp
+	hostRegexp, err = regexp.Compile(`\(\s*HOST\s*=\s*([A-z0-9._%+-]+)\)`)
 	if err != nil {
 		return nil, err
 	}
-	rPort, err := regexp.Compile(`\(\s*PORT\s*=\s*([0-9]+)\)`)
+
+	var portRegexp *regexp.Regexp
+	portRegexp, err = regexp.Compile(`\(\s*PORT\s*=\s*([0-9]+)\)`)
 	if err != nil {
 		return nil, err
 	}
-	rService, err := regexp.Compile(`\(\s*SERVICE_NAME\s*=\s*([A-Z0-9._%+-]+)\)`)
+
+	var serviceRegexp *regexp.Regexp
+	serviceRegexp, err = regexp.Compile(`\(\s*SERVICE_NAME\s*=\s*([A-Z0-9._%+-]+)\)`)
 	if err != nil {
 		return nil, err
 	}
+
 	var (
 		lhost    string
 		lport    int
 		lservice string
 	)
+
 	for _, cred := range w.credentials {
 		if username != "" {
 			if strings.ToUpper(username) != strings.ToUpper(cred.username) {
 				continue
 			}
 		}
-		matches := rHost.FindStringSubmatch(strings.ToUpper(cred.dsn))
+		matches := hostRegexp.FindStringSubmatch(strings.ToUpper(cred.dsn))
 		if len(matches) != 2 {
 			continue
 		}
 		lhost = strings.TrimSpace(matches[1])
-		matches = rPort.FindStringSubmatch(strings.ToUpper(cred.dsn))
+		matches = portRegexp.FindStringSubmatch(strings.ToUpper(cred.dsn))
 		if len(matches) == 2 {
 			lport, err = strconv.Atoi(matches[1])
 			if err != nil {
@@ -506,7 +520,7 @@ func (w *Wallet) getCredential(server string, port int, service, username string
 		} else {
 			lport = defaultPort
 		}
-		matches = rService.FindStringSubmatch(strings.ToUpper(cred.dsn))
+		matches = serviceRegexp.FindStringSubmatch(strings.ToUpper(cred.dsn))
 		if len(matches) != 2 {
 			continue
 		}

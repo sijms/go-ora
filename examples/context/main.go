@@ -5,22 +5,21 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 func main() {
-	var (
-		server string
-	)
+	var server string
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
 
 	connStr := os.ExpandEnv(server)
 	if connStr == "" {
 		fmt.Println("Missing -server option")
-		//usage()
+		// usage()
 		os.Exit(1)
 	}
 	fmt.Println("Connection string: ", connStr)

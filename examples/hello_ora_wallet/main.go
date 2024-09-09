@@ -46,5 +46,4 @@ func main() {
 	err = row.Scan(&queryResultColumnOne)
 	dieOnError("error in row.Scan: %w", err)
 	fmt.Println("The time in the database ", queryResultColumnOne)
-
 }

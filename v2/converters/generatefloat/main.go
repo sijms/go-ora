@@ -238,5 +238,4 @@ var TestFloatValue = []struct {
 		Package string
 		Values  []tmplRow
 	}{packageName, result})
-
 }

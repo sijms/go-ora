@@ -73,7 +73,7 @@ func (val NullTimeStamp) MarshalJSON() ([]byte, error) {
 }
 
 func (val *NullTimeStamp) UnmarshalJSON(data []byte) error {
-	var temp = new(time.Time)
+	temp := new(time.Time)
 	err := json.Unmarshal(data, temp)
 	if err != nil {
 		return err

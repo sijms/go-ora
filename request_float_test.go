@@ -29,6 +29,7 @@ func TestMain(m *testing.M) {
 	conn.Close()
 	os.Exit(rc)
 }
+
 func TestSelectBindFloat(t *testing.T) {
 	for _, tt := range converters.TestFloatValue {
 		t.Run(tt.SelectText, func(t *testing.T) {
@@ -52,9 +53,7 @@ func TestSelectBindFloat(t *testing.T) {
 				return
 			}
 
-			var (
-				got float64
-			)
+			var got float64
 			err = rows.Scan(&got)
 			if err != nil {
 				t.Errorf("Query can't scan row: %s", err)
@@ -73,7 +72,6 @@ func TestSelectBindFloat(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestSelectBindInt(t *testing.T) {
@@ -100,9 +98,7 @@ func TestSelectBindInt(t *testing.T) {
 					return
 				}
 
-				var (
-					got int64
-				)
+				var got int64
 				err = rows.Scan(&got)
 				if err != nil {
 					t.Errorf("Query can't scan row: %s", err)
@@ -140,9 +136,7 @@ func TestSelectBindFloatAsInt(t *testing.T) {
 				return
 			}
 
-			var (
-				got int64
-			)
+			var got int64
 			err = rows.Scan(&got)
 
 			if err == nil && !tt.IsInteger {
@@ -190,9 +184,7 @@ func TestSelectBindIntAsFloat(t *testing.T) {
 					return
 				}
 
-				var (
-					got float64
-				)
+				var got float64
 				err = rows.Scan(&got)
 
 				if err == nil && !tt.IsInteger {
@@ -207,7 +199,6 @@ func TestSelectBindIntAsFloat(t *testing.T) {
 					}
 				} else if got != 0.0 {
 					t.Errorf("DecodeDouble(EncodeDouble(%g)) = %g", tt.Float, got)
-
 				}
 			})
 		}

@@ -31,14 +31,10 @@ type ConnectionConfig struct {
 	DatabaseInfo
 	SessionInfo
 	AdvNegoServiceInfo
-	//Tracer       trace.Tracer
 	TraceFilePath string
 	TraceDir      string
 	PrefetchRows  int
 	Lob           LobFetch
-	//Failover     int
-	//RetryTime    int
-
 }
 
 func (config *ConnectionConfig) ConnectionData() string {
@@ -85,9 +81,9 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 	config := &ConnectionConfig{
 		PrefetchRows: 25,
 		SessionInfo: SessionInfo{
-			Timeout: time.Second * time.Duration(120),
-			//TransportDataUnitSize: 0xFFFF,
-			//SessionDataUnitSize:   0xFFFF,
+			Timeout: time.Second * time.Duration(10*60), // 10 minutes
+			// TransportDataUnitSize: 0xFFFF,
+			// SessionDataUnitSize:   0xFFFF,
 			TransportDataUnitSize: 0x200000,
 			SessionDataUnitSize:   0x200000,
 			Protocol:              "tcp",
@@ -469,7 +465,7 @@ func (config *ConnectionConfig) validate() error {
 
 	// get client info
 	var idx int
-	var temp = getCurrentUser()
+	temp := getCurrentUser()
 
 	if temp != nil {
 		idx = strings.Index(temp.Username, "\\")

@@ -3,13 +3,14 @@ package TestIssues
 import (
 	"database/sql"
 	"errors"
-	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestIssue173(t *testing.T) {
-	var createFunction = func(db *sql.DB) error {
+	createFunction := func(db *sql.DB) error {
 		return execCmd(db, `CREATE OR REPLACE FUNCTION go_ora$text(p_param VARCHAR2) RETURN CLOB AS
 	   v_txt CLOB;
 	BEGIN
@@ -20,8 +21,8 @@ func TestIssue173(t *testing.T) {
 	   RETURN v_txt || '\n' || p_param;
 	END;`)
 	}
-	var dropFunction = func(db *sql.DB) error { return execCmd(db, "DROP FUNCTION go_ora$text") }
-	var run = func(db *sql.DB) error {
+	dropFunction := func(db *sql.DB) error { return execCmd(db, "DROP FUNCTION go_ora$text") }
+	run := func(db *sql.DB) error {
 		var str go_ora.Clob
 		_, err := db.Exec("BEGIN :1 := go_ora$text(:2);end;", go_ora.Out{Dest: &str, Size: 100000}, "ss")
 		if err != nil {
@@ -62,5 +63,4 @@ func TestIssue173(t *testing.T) {
 			return
 		}
 	}
-
 }

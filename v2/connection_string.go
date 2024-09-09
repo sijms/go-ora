@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-//type PromotableTransaction int
+// type PromotableTransaction int
 
 //const (
 //	Promotable PromotableTransaction = 1
@@ -23,9 +23,9 @@ import (
 //	SYSOPER DBAPrivilege = 0x40
 //)
 
-//const defaultPort int = 1521
+// const defaultPort int = 1521
 
-//type EnList int
+// type EnList int
 
 //const (
 //	FALSE   EnList = 0
@@ -44,28 +44,28 @@ import (
 //	}
 //}
 
-//type ConnectionString struct {
-//connOption network.ConnectionOption
-//DataSource string
-//Host         string
-//Port         int
-//DBAPrivilege DBAPrivilege
-//password string
-//Trace        string // Trace file
-//traceDir     string
-//WalletPath string
-//walletPass string
-//w          *wallet
-//authType     AuthType
-//EnList             EnList
-//ConnectionLifeTime int
-//IncrPoolSize       int
-//DecrPoolSize       int
-//MaxPoolSize        int
-//MinPoolSize        int
+// type ConnectionString struct {
+// connOption network.ConnectionOption
+// DataSource string
+// Host         string
+// Port         int
+// DBAPrivilege DBAPrivilege
+// password string
+// Trace        string // Trace file
+// traceDir     string
+// WalletPath string
+// walletPass string
+// w          *wallet
+// authType     AuthType
+// EnList             EnList
+// ConnectionLifeTime int
+// IncrPoolSize       int
+// DecrPoolSize       int
+// MaxPoolSize        int
+// MinPoolSize        int
 
-//PasswordSecurityInfo  bool
-//Pooling               bool
+// PasswordSecurityInfo  bool
+// Pooling               bool
 
 //PromotableTransaction PromotableTransaction
 //ProxyUserID           string

@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 )
 
-var conn = &Connection{tcpNego: &TCPNego{ServernCharset: 870, ServerCharset: 0x230}}
-var expNilPar = ParameterInfo{
-	DataType: NCHAR,
-	Flag:     3,
-	MaxLen:   1,
-}
+var (
+	conn      = &Connection{tcpNego: &TCPNego{ServernCharset: 870, ServerCharset: 0x230}}
+	expNilPar = ParameterInfo{
+		DataType: NCHAR,
+		Flag:     3,
+		MaxLen:   1,
+	}
+)
 
 func checkParInfo(par *ParameterInfo, expPar *ParameterInfo) error {
 	if par.CharsetForm != expPar.CharsetForm {
@@ -38,7 +41,7 @@ func checkParInfo(par *ParameterInfo, expPar *ParameterInfo) error {
 		return fmt.Errorf("expected max char len %v and get %v", expPar.MaxCharLen, par.MaxCharLen)
 	}
 
-	if par.iPrimValue != expPar.iPrimValue {
+	if !reflect.DeepEqual(par.iPrimValue, expPar.iPrimValue) {
 		return fmt.Errorf("expected primary values %v and get %v", expPar.iPrimValue, par.iPrimValue)
 	}
 	if bytes.Compare(par.BValue, expPar.BValue) != 0 {
@@ -83,18 +86,27 @@ func TestEncodeValue(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
 	par.Value = 5
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
 	}
+
+	var val5 *Number
+	val5, err = NewNumberFromInt64(5)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 	err = checkParInfo(par, &ParameterInfo{
 		DataType:   NUMBER,
 		Flag:       3,
 		MaxLen:     22,
-		iPrimValue: int64(5),
 		BValue:     []byte{193, 6},
+		iPrimValue: val5,
 	})
 	if err != nil {
 		t.Error(err)
@@ -107,11 +119,19 @@ func TestEncodeValue(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
+	var val10p9 *Number
+	val10p9, err = NewNumberFromFloat(10.9)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 	err = checkParInfo(par, &ParameterInfo{
 		DataType:   NUMBER,
 		Flag:       3,
 		MaxLen:     22,
-		iPrimValue: float64(10.9),
+		iPrimValue: val10p9,
 		BValue:     []byte{193, 11, 91},
 	})
 	if err != nil {
@@ -120,17 +140,24 @@ func TestEncodeValue(t *testing.T) {
 	}
 
 	par.Value = true
-	// test bool = true
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
 	}
+
+	var val1 *Number
+	val1, err = NewNumberFromInt64(1)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 	err = checkParInfo(par, &ParameterInfo{
 		DataType:   NUMBER,
 		Flag:       3,
 		MaxLen:     22,
-		iPrimValue: int64(1),
+		iPrimValue: val1,
 		BValue:     []byte{193, 2},
 	})
 	if err != nil {
@@ -139,17 +166,24 @@ func TestEncodeValue(t *testing.T) {
 	}
 
 	par.Value = false
-	// test bool = true
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
 	}
+
+	var val0 *Number
+	val0, err = NewNumberFromInt64(0)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 	err = checkParInfo(par, &ParameterInfo{
 		DataType:   NUMBER,
 		Flag:       3,
 		MaxLen:     22,
-		iPrimValue: int64(0),
+		iPrimValue: val0,
 		BValue:     []byte{128},
 	})
 	if err != nil {
@@ -158,7 +192,6 @@ func TestEncodeValue(t *testing.T) {
 	}
 
 	par.Value = sql.NullBool{false, true}
-	// NullBool = false
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -168,7 +201,7 @@ func TestEncodeValue(t *testing.T) {
 		DataType:   NUMBER,
 		Flag:       3,
 		MaxLen:     22,
-		iPrimValue: int64(0),
+		iPrimValue: val0,
 		BValue:     []byte{128},
 	})
 	if err != nil {
@@ -177,7 +210,6 @@ func TestEncodeValue(t *testing.T) {
 	}
 
 	par.Value = sql.NullBool{true, false}
-	// NullBool = null
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -194,17 +226,24 @@ func TestEncodeValue(t *testing.T) {
 	}
 
 	par.Value = sql.NullInt32{25, true}
-	// NullInt32
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
 	}
+
+	var val25 *Number
+	val25, err = NewNumberFromInt64(25)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 	err = checkParInfo(par, &ParameterInfo{
 		DataType:   NUMBER,
 		Flag:       3,
 		MaxLen:     22,
-		iPrimValue: int64(25),
+		iPrimValue: val25,
 		BValue:     []byte{193, 26},
 	})
 	if err != nil {
@@ -235,8 +274,9 @@ func TestEncodeValue(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
 	err = checkParInfo(par, &ParameterInfo{
-		DataType:    NCHAR,
+		DataType:    LongVarChar,
 		Flag:        3,
 		ContFlag:    16,
 		CharsetID:   0x230,
@@ -276,8 +316,9 @@ func TestEncodeValue(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
 	err = checkParInfo(par, &ParameterInfo{
-		DataType:    NCHAR,
+		DataType:    LongVarChar,
 		Flag:        3,
 		ContFlag:    16,
 		CharsetID:   870,
@@ -313,6 +354,10 @@ func TestEncodeValue(t *testing.T) {
 
 	timeVal := time.Date(2023, 5, 28, 23, 38, 11, 500, time.Local)
 	par.Value = timeVal
+	conn.dataNego = &DataTypeNego{
+		clientTZVersion: 1,
+		serverTZVersion: 1,
+	}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -320,12 +365,12 @@ func TestEncodeValue(t *testing.T) {
 	}
 
 	err = checkParInfo(par, &ParameterInfo{
-		DataType:   DATE,
+		DataType:   TimeStampTZ_DTY,
 		Flag:       3,
 		ContFlag:   0,
-		MaxLen:     11,
+		MaxLen:     13,
 		iPrimValue: timeVal,
-		BValue:     []byte{120, 123, 5, 28, 24, 39, 12},
+		BValue:     []byte{120, 123, 5, 28, 24, 39, 12, 0, 0, 1, 244, 20, 60},
 	})
 	if err != nil {
 		t.Error(err)
@@ -338,10 +383,11 @@ func TestEncodeValue(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
 	err = checkParInfo(par, &ParameterInfo{
-		DataType: DATE,
+		DataType: TimeStampTZ_DTY,
 		Flag:     3,
-		MaxLen:   11,
+		MaxLen:   13,
 	})
 	if err != nil {
 		t.Error(err)
@@ -374,6 +420,7 @@ func TestEncodeValue(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
 	err = checkParInfo(par, &ParameterInfo{
 		DataType: TIMESTAMP,
 		Flag:     3,
@@ -397,7 +444,7 @@ func TestEncodeValue(t *testing.T) {
 		ContFlag:   0,
 		MaxLen:     13,
 		iPrimValue: timeVal,
-		BValue:     []byte{120, 123, 5, 28, 24, 39, 12, 0, 0, 1, 244, 23, 60},
+		BValue:     []byte{120, 123, 5, 28, 24, 39, 12, 0, 0, 1, 244, 20, 60},
 	})
 	if err != nil {
 		t.Error(err)

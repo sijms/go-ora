@@ -540,7 +540,6 @@ func EncodeTimeStamp(ti time.Time) []byte {
 	ret[6] = uint8(ti.Second() + 1)
 	binary.BigEndian.PutUint32(ret[7:11], uint32(ti.Nanosecond()))
 	return ret
-
 }
 
 // DecodeDate convert oracle time representation into time.Time
@@ -567,9 +566,9 @@ func DecodeDate(data []byte) (time.Time, error) {
 			int(data[4]-1), int(data[5]-1), int(data[6]-1), nanoSec, time.UTC), nil
 	}
 	var zone *time.Location
-	//var err error
+	// var err error
 	if data[11]&0x80 != 0 {
-		var regionCode = (int(data[11]) & 0x7F) << 6
+		regionCode := (int(data[11]) & 0x7F) << 6
 		regionCode += (int(data[12]) & 0xFC) >> 2
 		name, found := zoneid[regionCode]
 		if found {
@@ -593,7 +592,7 @@ func DecodeDate(data []byte) (time.Time, error) {
 	}
 	return time.Date(year, time.Month(data[2]), int(data[3]),
 		int(data[4]-1), int(data[5]-1), int(data[6]-1), nanoSec, zone), nil
-	//return time.Date(year, time.Month(data[2]), int(data[3]),
+	// return time.Date(year, time.Month(data[2]), int(data[3]),
 	//	int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, time.UTC), nil
 }
 
@@ -620,8 +619,9 @@ func addDigitToMantissa(mantissaIn uint64, d byte) (mantissaOut uint64, carryOut
 // FromNumber decode Oracle binary representation of numbers
 // and returns mantissa, negative and exponent
 // Some documentation:
-//	https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
-//  https://www.orafaq.com/wiki/Number
+//
+//		https://gotodba.com/2015/03/24/how-are-numbers-saved-in-oracle/
+//	 https://www.orafaq.com/wiki/Number
 func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int, mantissaDigits int, err error) {
 	if len(inputData) == 0 {
 		return 0, false, 0, 0, fmt.Errorf("Invalid NUMBER")
@@ -688,7 +688,6 @@ func DecodeDouble(inputData []byte) float64 {
 		return -math.Round(float64(mantissa)*math.Pow10(exponent)*math.Pow10(absExponent)) / math.Pow10(absExponent)
 	}
 	return math.Round(float64(mantissa)*math.Pow10(exponent)*math.Pow10(absExponent)) / math.Pow10(absExponent)
-
 }
 
 // DecodeInt convert NUMBER to int64
@@ -719,11 +718,12 @@ func DecodeInt(inputData []byte) int64 {
 // Ex When parsing a float into an int64, the driver will try to cast the float64 into the int64.
 // If the float64 can't be represented by an int64, Parse will issue an error "invalid syntax"
 func DecodeNumber(inputData []byte) interface{} {
-	var powerOfTen = [...]uint64{
+	powerOfTen := [...]uint64{
 		1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
 		10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000,
 		1000000000000000, 10000000000000000, 100000000000000000, 1000000000000000000,
-		10000000000000000000}
+		10000000000000000000,
+	}
 
 	mantissa, negative, exponent, mantissaDigits, err := FromNumber(inputData)
 	if err != nil {
@@ -769,7 +769,6 @@ fallbackToFloat:
 
 // ToNumber encode mantissa, sign and exponent as a []byte expected by Oracle
 func ToNumber(mantissa []byte, negative bool, exponent int) []byte {
-
 	if len(mantissa) == 0 {
 		return []byte{128}
 	}

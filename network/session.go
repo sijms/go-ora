@@ -10,11 +10,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/trace"
 	"net"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/trace"
 
 	"github.com/sijms/go-ora/converters"
 )
@@ -36,7 +37,7 @@ type Session struct {
 	oldCtx  context.Context
 	conn    net.Conn
 	sslConn *tls.Conn
-	//connOption        ConnectionOption
+	// connOption        ConnectionOption
 	Context           *SessionContext
 	sendPcks          []PacketInterface
 	inBuffer          []byte
@@ -62,7 +63,7 @@ type Session struct {
 		roots              *x509.CertPool
 		tlsCertificates    []tls.Certificate
 	}
-	//certificates      []*x509.Certificate
+	// certificates      []*x509.Certificate
 }
 
 func NewSessionWithInputBufferForDebug(input []byte) *Session {
@@ -79,20 +80,21 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 		conn:     nil,
 		inBuffer: input,
 		index:    0,
-		//connOption:      *connOption,
+		// connOption:      *connOption,
 		Context:         NewSessionContext(options),
 		Summary:         nil,
 		UseBigClrChunks: false,
 		ClrChunkSize:    0x40,
 	}
 }
+
 func NewSession(connOption *ConnectionOption) *Session {
 	return &Session{
 		ctx:      context.Background(),
 		conn:     nil,
 		inBuffer: nil,
 		index:    0,
-		//connOption:      *connOption,
+		// connOption:      *connOption,
 		Context:         NewSessionContext(connOption),
 		Summary:         nil,
 		UseBigClrChunks: false,
@@ -161,6 +163,7 @@ func (session *Session) StartContext(ctx context.Context) {
 	session.oldCtx = session.ctx
 	session.ctx = ctx
 }
+
 func (session *Session) EndContext() {
 	session.ctx = session.oldCtx
 }
@@ -275,9 +278,9 @@ func (session *Session) Connect(ctx context.Context) error {
 	session.Disconnect()
 	connOption.Tracer.Print("Connect")
 	var err error
-	var connected = false
+	connected := false
 	var host *ServerAddr
-	var loop = true
+	loop := true
 	dialer := net.Dialer{
 		Timeout: time.Second * session.Context.ConnOption.Timeout,
 	}
@@ -342,7 +345,7 @@ func (session *Session) Connect(ctx context.Context) error {
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
 		connOption.Tracer.Print("Redirect")
-		//connOption.connData = redirectPacket.reconnectData
+		// connOption.connData = redirectPacket.reconnectData
 		servers, err := extractServers(redirectPacket.redirectAddr)
 		if err != nil {
 			return err
@@ -385,23 +388,25 @@ func (session *Session) Disconnect() {
 	}
 }
 
-//func (session *Session) Debug() {
-//	//if session.index > 350 && session.index < 370 {
-//	fmt.Println("index: ", session.index)
-//	fmt.Printf("data buffer: %#v\n", session.InBuffer[session.index:session.index+30])
-//	//oldIndex := session.index
-//	//fmt.Println(session.GetClr())
-//	//session.index = oldIndex
-//	//}
-//}
-//func (session *Session) DumpIn() {
-//	log.Printf("%#v\n", session.InBuffer)
-//}
+//	func (session *Session) Debug() {
+//		//if session.index > 350 && session.index < 370 {
+//		fmt.Println("index: ", session.index)
+//		fmt.Printf("data buffer: %#v\n", session.InBuffer[session.index:session.index+30])
+//		//oldIndex := session.index
+//		//fmt.Println(session.GetClr())
+//		//session.index = oldIndex
+//		//}
+//	}
 //
-//func (session *Session) DumpOut() {
-//	log.Printf("%#v\n", session.OutBuffer)
-//}
-// Write send data store in output buffer through network
+//	func (session *Session) DumpIn() {
+//		log.Printf("%#v\n", session.InBuffer)
+//	}
+//
+//	func (session *Session) DumpOut() {
+//		log.Printf("%#v\n", session.OutBuffer)
+//	}
+//
+// # Write send data store in output buffer through network
 //
 // if data bigger than SessionDataUnit it should be divided into
 // segment and each segment sent in data packet
@@ -415,7 +420,7 @@ func (session *Session) Write() error {
 			return err
 		}
 		return session.writePacket(pck)
-		//return errors.New("the output buffer is empty")
+		// return errors.New("the output buffer is empty")
 	}
 
 	segmentLen := int(session.Context.SessionDataUnit - 20)
@@ -473,7 +478,7 @@ func (session *Session) writePacket(pck PacketInterface) error {
 	tracer := session.Context.ConnOption.Tracer
 	tmp := pck.bytes()
 	tracer.LogPacket("Write packet:", tmp)
-	var err = session.initWrite()
+	err := session.initWrite()
 	if err != nil {
 		return err
 	}
@@ -506,7 +511,6 @@ func (session *Session) GetError() *OracleError {
 
 // read a packet from network stream
 func (session *Session) readPacket() (PacketInterface, error) {
-
 	readPacketData := func() ([]byte, error) {
 		trials := 0
 		for {
@@ -550,7 +554,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				} else {
 					temp, err = session.conn.Read(body[index:])
 				}
-				//temp, err := conn.Read(body[index:])
+				// temp, err := conn.Read(body[index:])
 				if err != nil {
 					if e, ok := err.(net.Error); ok && e.Timeout() && temp != 0 {
 						index += uint32(temp)
@@ -566,7 +570,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 					session.negotiate()
 				}
 				for _, pck := range session.sendPcks {
-					//log.Printf("Request: %#v\n\n", pck.bytes())
+					// log.Printf("Request: %#v\n\n", pck.bytes())
 					err := session.initWrite()
 					if err != nil {
 						return nil, err
@@ -586,17 +590,15 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			session.Context.ConnOption.Tracer.LogPacket("Read packet:", ret)
 			return ret, nil
 		}
-
 	}
 	var packetData []byte
 	var err error
 	packetData, err = readPacketData()
-
 	if err != nil {
 		return nil, err
 	}
 	pckType := PacketType(packetData[4])
-	//log.Printf("Response: %#v\n\n", packetData)
+	// log.Printf("Response: %#v\n\n", packetData)
 	switch pckType {
 	case ACCEPT:
 		return newAcceptPacketFromData(packetData, session.Context.ConnOption), nil
@@ -616,7 +618,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		} else {
 			data = string(packetData[10 : 10+dataLen])
 		}
-		//fmt.Println("data returned: ", data)
+		// fmt.Println("data returned: ", data)
 		length := strings.Index(data, "\x00")
 		if pck.packet.flag&2 != 0 && length > 0 {
 			pck.redirectAddr = data[:length]
@@ -826,7 +828,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compr
 	}
 	if size == 1 {
 		session.outBuffer.WriteByte(uint8(num))
-		//session.OutBuffer = append(session.OutBuffer, uint8(num))
+		// session.OutBuffer = append(session.OutBuffer, uint8(num))
 		return
 	}
 	if compress {
@@ -839,12 +841,12 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compr
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			//session.OutBuffer = append(session.OutBuffer, 0)
+			// session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			session.outBuffer.WriteByte(size)
 			session.outBuffer.Write(temp)
-			//session.OutBuffer = append(session.OutBuffer, size)
-			//session.OutBuffer = append(session.OutBuffer, temp...)
+			// session.OutBuffer = append(session.OutBuffer, size)
+			// session.OutBuffer = append(session.OutBuffer, temp...)
 		}
 	} else {
 		temp := make([]byte, size)
@@ -868,7 +870,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compr
 			}
 		}
 		session.outBuffer.Write(temp)
-		//session.OutBuffer = append(session.OutBuffer, temp...)
+		// session.OutBuffer = append(session.OutBuffer, temp...)
 	}
 }
 
@@ -909,7 +911,7 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			//session.OutBuffer = append(session.OutBuffer, 0)
+			// session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			if num < 0 {
 				num = num * -1
@@ -1038,7 +1040,7 @@ func (session *Session) GetInt64(size int, compress bool, bigEndian bool) (int64
 		ret = int64(binary.BigEndian.Uint64(temp))
 	} else {
 		copy(temp[:size], rb)
-		//temp = append(pck.buffer[pck.index: pck.index + size], temp...)
+		// temp = append(pck.buffer[pck.index: pck.index + size], temp...)
 		ret = int64(binary.LittleEndian.Uint64(temp))
 	}
 	if negFlag {
@@ -1307,7 +1309,7 @@ func (session *Session) WriteKeyVal(buffer *bytes.Buffer, key []byte, val []byte
 	}
 	if len(val) == 0 {
 		buffer.WriteByte(0)
-		//session.OutBuffer = append(session.OutBuffer, 0)
+		// session.OutBuffer = append(session.OutBuffer, 0)
 	} else {
 		session.WriteUint(buffer, len(val), 4, true, true)
 		session.WriteClr(buffer, val)

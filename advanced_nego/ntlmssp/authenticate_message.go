@@ -80,8 +80,8 @@ func (m authenicateMessage) MarshalBinary() ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-//ProcessChallenge crafts an AUTHENTICATE message in response to the CHALLENGE message
-//that was received from the server
+// ProcessChallenge crafts an AUTHENTICATE message in response to the CHALLENGE message
+// that was received from the server
 func ProcessChallenge(challengeMessageData []byte, user, password string) ([]byte, error) {
 	if user == "" && password == "" {
 		return nil, errors.New("Anonymous authentication not supported")

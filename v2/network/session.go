@@ -575,15 +575,11 @@ func (session *Session) Connect(ctx context.Context) error {
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
 		session.tracer.Print("Redirect")
-		//connOption.connData = redirectPacket.reconnectData
-		servers, err := configurations.ExtractServers(redirectPacket.redirectAddr)
+		err = session.Context.connConfig.UpdateDatabaseInfoForRedirect(redirectPacket.redirectAddr, redirectPacket.reconnectData)
 		if err != nil {
 			return err
 		}
-		for _, srv := range servers {
-			connOption.AddServer(srv)
-		}
-		host = connOption.GetActiveServer(true)
+		session.Context.connConfig.ResetServerIndex()
 		return session.Connect(ctx)
 	}
 	if refusePacket, ok := pck.(*RefusePacket); ok {

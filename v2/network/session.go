@@ -42,19 +42,19 @@ type SessionState struct {
 }
 
 type Session struct {
-	mu                sync.Mutex
-	conn              net.Conn
-	sslConn           *tls.Conn
-	reader            *bufio.Reader
-	remainingBytes    int
-	lastPacket        bytes.Buffer
-	Context           *SessionContext
-	sendPcks          []PacketInterface
-	inBuffer          []byte
-	outBuffer         bytes.Buffer
-	index             int
-	breakIndex        int
-	doneContext       []chan struct{}
+	mu             sync.Mutex
+	conn           net.Conn
+	sslConn        *tls.Conn
+	reader         *bufio.Reader
+	remainingBytes int
+	lastPacket     bytes.Buffer
+	Context        *SessionContext
+	sendPcks       []PacketInterface
+	inBuffer       []byte
+	outBuffer      bytes.Buffer
+	index          int
+	breakIndex     int
+	//doneContext       []chan struct{}
 	TimeZone          []byte
 	TTCVersion        uint8
 	HasEOSCapability  bool
@@ -188,11 +188,11 @@ func (session *Session) SetConnected() {
 	defer session.mu.Unlock()
 	session.Connected = true
 }
-func (session *Session) StartContext(ctx context.Context) {
+func (session *Session) StartContext(ctx context.Context) chan struct{} {
 	//session.oldCtx = session.ctx
 	//session.ctx = ctx
 	done := make(chan struct{})
-	session.doneContext = append(session.doneContext, done)
+	//session.doneContext = append(session.doneContext, done)
 	go func(idone chan struct{}, mu *sync.Mutex) {
 		var err error
 		mu.Lock()
@@ -202,37 +202,46 @@ func (session *Session) StartContext(ctx context.Context) {
 		case <-idone:
 			return
 		case <-ctx.Done():
-			session.mu.Lock()
-			connected := session.Connected
-			session.mu.Unlock()
-			if connected {
-				if err = session.BreakConnection(); err != nil {
-					tracer.Print("Connection Break Error: ", err)
+			select {
+			case <-done:
+				return
+			default:
+				session.mu.Lock()
+				connected := session.Connected
+				session.mu.Unlock()
+				if connected {
+					if err = session.BreakConnection(); err != nil {
+						tracer.Print("Connection Break Error: ", err)
+					}
+				} else {
+					err = session.WriteFinalPacket()
+					if err != nil {
+						tracer.Print("Write Final Packet With Error: ", err)
+					}
+					session.Disconnect()
 				}
-			} else {
-				err = session.WriteFinalPacket()
-				if err != nil {
-					tracer.Print("Write Final Packet With Error: ", err)
-				}
-				session.Disconnect()
 			}
 		}
 	}(done, &session.mu)
+	return done
 }
-func (session *Session) EndContext() {
-	index := len(session.doneContext) - 1
-	if index >= 0 {
-		done := session.doneContext[index]
-		if done != nil {
-			close(done)
-			done = nil
-		}
+func (session *Session) EndContext(done chan struct{}) {
+	if done != nil {
+		close(done)
 	}
-	if index == 0 {
-		session.doneContext = nil
-	} else {
-		session.doneContext = session.doneContext[:index]
-	}
+	//index := len(session.doneContext) - 1
+	//if index >= 0 {
+	//	done := session.doneContext[index]
+	//	if done != nil {
+	//		close(done)
+	//		done = nil
+	//	}
+	//}
+	//if index == 0 {
+	//	session.doneContext = nil
+	//} else {
+	//	session.doneContext = session.doneContext[:index]
+	//}
 	//if session.doneContext != nil {
 	//	close(session.doneContext)
 	//	session.doneContext = nil
@@ -1860,6 +1869,28 @@ func (session *Session) WriteInt(buffer *bytes.Buffer, number interface{}, size 
 	}
 }
 
+func (session *Session) GetFixedClr() ([]byte, error) {
+	nb, err := session.GetByte()
+	if err != nil {
+		return nil, err
+	}
+	var size int
+	switch nb {
+	case 0:
+		size = 0
+	case 0xFE:
+		size, err = session.GetInt(4, false, true)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		size = int(nb)
+	}
+	if size == 0 {
+		return nil, nil
+	}
+	return session.GetBytes(size)
+}
 func (session *Session) WriteFixedClr(buffer *bytes.Buffer, data []byte) {
 	if len(data) > 0xFC {
 		buffer.WriteByte(0xFE)

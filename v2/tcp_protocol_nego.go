@@ -99,10 +99,10 @@ func newTCPNego(session *network.Session) (*TCPNego, error) {
 	if err != nil {
 		return nil, err
 	}
-	if result.ServerCompileTimeCaps[15]&1 != 0 {
+	if len(result.ServerCompileTimeCaps) > 15 && result.ServerCompileTimeCaps[15]&1 != 0 {
 		session.HasEOSCapability = true
 	}
-	if result.ServerCompileTimeCaps[16]&1 != 0 {
+	if len(result.ServerCompileTimeCaps) > 16 && result.ServerCompileTimeCaps[16]&1 != 0 {
 		session.HasFSAPCapability = true
 	}
 	if result.ServerCompileTimeCaps == nil || len(result.ServerCompileTimeCaps) < 8 {

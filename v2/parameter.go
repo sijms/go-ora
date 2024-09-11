@@ -517,7 +517,17 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 	if par.DataType == RAW && par.MaxLen == 0 {
 		return nil
 	}
-	par.BValue, err = session.GetClr()
+	if udt { /*special extraction of udt fields*/
+		switch par.DataType {
+		case NCHAR, CHAR, LONG, LongVarChar:
+			par.BValue, err = session.GetFixedClr()
+		default:
+			par.BValue, err = session.GetClr()
+		}
+	} else {
+		par.BValue, err = session.GetClr()
+	}
+
 	if err != nil {
 		return err
 	}

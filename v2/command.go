@@ -1268,8 +1268,8 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	}
 	tracer := stmt.connection.tracer
 	tracer.Printf("Exec With Context:")
-	stmt.connection.session.StartContext(ctx)
-	defer stmt.connection.session.EndContext()
+	done := stmt.connection.session.StartContext(ctx)
+	defer stmt.connection.session.EndContext(done)
 	tracer.Printf("Exec:\n%s", stmt.text)
 	stmt.arrayBindCount = 0
 	result, err := stmt._exec(args)
@@ -1383,46 +1383,6 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 						if err != nil {
 							return err
 						}
-
-						//var pFieldValue reflect.Value
-						//if fieldValue.Kind() != reflect.Ptr && fieldValue.CanAddr() {
-						//	pFieldValue = fieldValue.Addr()
-						//} else {
-						//	pFieldValue = fieldValue
-						//}
-						//if _, ok := pFieldValue.Interface().(sql.Scanner); ok {
-						//err := scanner.Scan(par.Value)
-						//if err != nil {
-						//	return err
-						//}
-						//continue
-						//}
-						//if valuer, ok := par.Value.(driver.Valuer); ok {
-						//	tempVal, err := valuer.Value()
-						//	if err != nil {
-						//		return err
-						//	}
-						//	if tempVal == nil {
-						//		fieldValue.Set(reflect.Zero(fieldType))
-						//	} else {
-						//		if fieldType.Kind() == reflect.Ptr {
-						//			if fieldValue.IsNil() {
-						//				temp := reflect.New(fieldType.Elem())
-						//				fieldValue.Set(temp)
-						//			}
-						//			fieldValue = fieldValue.Elem()
-						//		}
-						//		if scanner, ok := fieldValue.Interface().(sql.Scanner); ok {
-						//			err = scanner.Scan(par.Value)
-						//			if err != nil {
-						//				return err
-						//			}
-						//			continue
-						//		}
-						//	}
-						//} else {
-						//
-						//}
 					}
 				}
 			}
@@ -1555,181 +1515,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			err = fmt.Errorf("unknown type: %s for parameter: %s", _type, name)
 		}
 		return
-		//if _, ok := fieldValue.(driver.Valuer); ok {
-		//	if _, ok = structValue.Field(fieldIndex).Addr().Interface().(sql.Scanner); ok {
-		//		tempPar, err = stmt.NewParam(name, structValue.Field(fieldIndex).Addr().Interface(), size, dir)
-		//		return
-		//	}
-		//}
-		//if len(_type) > 0 {
-		//} else {
-		//	//fieldType := reflect.TypeOf(fieldValue)
-		//	if tNumber(fieldType) {
-		//		var fieldVal = &sql.NullFloat64{}
-		//		if !hasNullValue {
-		//			fieldVal.Float64, err = getFloat(fieldValue)
-		//			if err != nil {
-		//				err = typeErr
-		//				return
-		//			}
-		//			fieldVal.Valid = true
-		//		}
-		//		tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-		//	}
-		//	switch fieldType.Kind() {
-		//	case reflect.Bool:
-		//		var fieldVal = &sql.NullFloat64{}
-		//		if !hasNullValue {
-		//			fieldVal.Float64, err = getFloat(fieldValue)
-		//			if err != nil {
-		//				err = typeErr
-		//				return
-		//			}
-		//			fieldVal.Valid = true
-		//		}
-		//		tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-		//	case reflect.String:
-		//		fieldVal := &sql.NullString{}
-		//		if !hasNullValue {
-		//			fieldVal.String, fieldVal.Valid = getString(fieldValue), true
-		//		}
-		//		tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-		//	default:
-		//		switch aval := fieldValue.(type) {
-		//		case NVarChar:
-		//			fieldVal := &NullNVarChar{}
-		//			if !hasNullValue {
-		//				fieldVal.NVarChar, fieldVal.Valid = aval, true
-		//			}
-		//			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-		//		case []byte:
-		//			var fieldVal []byte
-		//			if !hasNullValue {
-		//				fieldVal = aval
-		//			}
-		//			tempPar, err = stmt.NewParam(name, &fieldVal, size, dir)
-		//		case time.Time:
-		//			fieldVal := &sql.NullTime{}
-		//			if !hasNullValue {
-		//				fieldVal.Time, fieldVal.Valid = aval, true
-		//			}
-		//			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-		//		case TimeStamp:
-		//			fieldVal := &NullTimeStamp{}
-		//			if !hasNullValue {
-		//				fieldVal.TimeStamp, fieldVal.Valid = aval, true
-		//			}
-		//			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-		//		case TimeStampTZ:
-		//			fieldVal := &NullTimeStampTZ{}
-		//			if !hasNullValue {
-		//				fieldVal.TimeStampTZ, fieldVal.Valid = aval, true
-		//			}
-		//			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
-		//		case Clob:
-		//			tempPar, err = stmt.NewParam(name, &aval, size, dir)
-		//		case NClob:
-		//			tempPar, err = stmt.NewParam(name, &aval, size, dir)
-		//		case Blob:
-		//			tempPar, err = stmt.NewParam(name, &aval, size, dir)
-		//		}
-		//	}
-		//}
-		//return
 	}
-	//addInputField := func(name, _type string, fieldIndex int) (tempPar *ParameterInfo, err error) {
-	//	var fieldValue = structValue.Field(fieldIndex).Interface()
-	//	if fieldValue == nil {
-	//		tempPar, err = stmt.NewParam(name, fieldValue, 0, Input)
-	//		return
-	//	}
-	//	// value is pointer
-	//	if tempType.Field(fieldIndex).Type.Kind() == reflect.Ptr {
-	//		if structValue.Field(fieldIndex).IsNil() {
-	//			tempPar, err = stmt.NewParam(name, nil, 0, Input)
-	//			return
-	//		} else {
-	//			fieldValue = structValue.Field(fieldIndex).Elem().Interface()
-	//		}
-	//	}
-	//	typeErr := fmt.Errorf("error passing field %s as type %s", tempType.Field(fieldIndex).Name, _type)
-	//	switch _type {
-	//	case "number":
-	//		var fieldVal float64
-	//		fieldVal, err = getFloat(fieldValue)
-	//		if err != nil {
-	//			err = typeErr
-	//			return
-	//		}
-	//		tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-	//	case "varchar":
-	//		fieldVal := getString(fieldValue)
-	//		tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-	//	case "nvarchar":
-	//		fieldVal := getString(fieldValue)
-	//		tempPar, err = stmt.NewParam(name, NVarChar(fieldVal), 0, Input)
-	//	case "date":
-	//		var fieldVal time.Time
-	//		fieldVal, err = getDate(fieldValue)
-	//		if err != nil {
-	//			err = typeErr
-	//			return
-	//		}
-	//		tempPar, err = stmt.NewParam(name, fieldVal, 0, Input)
-	//	case "timestamp":
-	//		var fieldVal time.Time
-	//		fieldVal, err = getDate(fieldValue)
-	//		if err != nil {
-	//			err = typeErr
-	//			return
-	//		}
-	//		tempPar, err = stmt.NewParam(name, TimeStamp(fieldVal), 0, Input)
-	//	case "timestamptz":
-	//		var fieldVal time.Time
-	//		fieldVal, err = getDate(fieldValue)
-	//		if err != nil {
-	//			err = typeErr
-	//			return
-	//		}
-	//		tempPar, err = stmt.NewParam(name, TimeStampTZ(fieldVal), 0, Input)
-	//	case "raw":
-	//		var fieldVal []byte
-	//		fieldVal, err = getBytes(fieldValue)
-	//		if err != nil {
-	//			err = typeErr
-	//			return
-	//		}
-	//		tempPar = &ParameterInfo{
-	//			Name:      name,
-	//			Direction: Input,
-	//			Value:     fieldVal,
-	//		}
-	//	case "clob":
-	//		fieldVal := getString(fieldValue)
-	//		tempPar = &ParameterInfo{
-	//			Name:      name,
-	//			Direction: Input,
-	//			Value:     Clob{String: fieldVal, Valid: true},
-	//		}
-	//	case "nclob":
-	//		fieldVal := getString(fieldValue)
-	//		tempPar, err = stmt.NewParam(name, NClob{String: fieldVal, Valid: true}, 0, Input)
-	//	case "blob":
-	//		var fieldVal []byte
-	//		fieldVal, err = getBytes(fieldValue)
-	//		if err != nil {
-	//			err = typeErr
-	//			return
-	//		}
-	//		tempPar, err = stmt.NewParam(name, Blob{Data: fieldVal}, 0, Input)
-	//	case "":
-	//		tempPar, err = stmt.NewParam(name, structValue.Field(fieldIndex).Interface(), 0, Input)
-	//	default:
-	//		err = typeErr
-	//	}
-	//	return
-	//}
-	// deal with struct types
 	if parValue != nil && tempType.Kind() == reflect.Struct {
 		structFieldCount := tempType.NumField()
 
@@ -1920,19 +1706,6 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 							return nil, err
 						}
 						stmt.temporaryLobs = append(stmt.temporaryLobs, par.collectLocators()...)
-						//switch value := par.iPrimValue.(type) {
-						//case *Lob:
-						//	if value != nil && value.sourceLocator != nil {
-						//		stmt.temporaryLobs = append(stmt.temporaryLobs, value.sourceLocator)
-						//	}
-						//case *BFile:
-						//	if value != nil && value.lob.sourceLocator != nil {
-						//		stmt.temporaryLobs = append(stmt.temporaryLobs, value.lob.sourceLocator)
-						//	}
-						//case []ParameterInfo:
-						//	temp := collectLocators(value)
-						//	stmt.temporaryLobs = append(stmt.temporaryLobs, temp...)
-						//}
 						if maxLen < par.MaxLen {
 							maxLen = par.MaxLen
 						}
@@ -1945,13 +1718,6 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 							continue
 						}
 						dataType = par.DataType
-						//if y == 0 {
-						//	dataType = par.DataType
-						//} else {
-						//	if par.DataType != dataType && par.DataType != NCHAR {
-						//
-						//	}
-						//}
 					}
 					// save arrayValues into primitive
 					par.iPrimValue = arrayValues
@@ -2240,8 +2006,8 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	tracer := stmt.connection.tracer
 	tracer.Print("Query With Context:", stmt.text)
 
-	stmt.connection.session.StartContext(ctx)
-	defer stmt.connection.session.EndContext()
+	done := stmt.connection.session.StartContext(ctx)
+	defer stmt.connection.session.EndContext(done)
 	return stmt.Query_(namedArgs)
 }
 

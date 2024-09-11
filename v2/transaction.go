@@ -16,8 +16,8 @@ func (tx *Transaction) Commit() error {
 	}
 	tx.conn.autoCommit = true
 	tx.conn.session.ResetBuffer()
-	tx.conn.session.StartContext(tx.ctx)
-	defer tx.conn.session.EndContext()
+	done := tx.conn.session.StartContext(tx.ctx)
+	defer tx.conn.session.EndContext(done)
 	return (&simpleObject{connection: tx.conn, operationID: 0xE}).exec()
 }
 
@@ -27,7 +27,7 @@ func (tx *Transaction) Rollback() error {
 	}
 	tx.conn.autoCommit = true
 	tx.conn.session.ResetBuffer()
-	tx.conn.session.StartContext(tx.ctx)
-	defer tx.conn.session.EndContext()
+	done := tx.conn.session.StartContext(tx.ctx)
+	defer tx.conn.session.EndContext(done)
 	return (&simpleObject{connection: tx.conn, operationID: 0xF}).exec()
 }

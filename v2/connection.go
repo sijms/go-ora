@@ -137,7 +137,9 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	if connector.drv.nStrConv != nil {
 		conn.nStrConv = connector.drv.nStrConv.Clone()
 	}
-	conn.connOption.Dialer = connector.dialer
+	if conn.connOption.Dialer == nil {
+		conn.connOption.Dialer = connector.dialer
+	}
 	err = conn.OpenWithContext(ctx)
 	if err != nil {
 		return nil, err
@@ -275,8 +277,8 @@ func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
 func (conn *Connection) Ping(ctx context.Context) error {
 	conn.tracer.Print("Ping")
 	conn.session.ResetBuffer()
-	conn.session.StartContext(ctx)
-	defer conn.session.EndContext()
+	done := conn.session.StartContext(ctx)
+	defer conn.session.EndContext(done)
 	return (&simpleObject{
 		connection:  conn,
 		operationID: 0x93,
@@ -435,8 +437,8 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	session := conn.session
 	// start check for context
-	session.StartContext(ctx)
-	defer session.EndContext()
+	done := session.StartContext(ctx)
+	defer session.EndContext(done)
 	err := session.Connect(ctx)
 	if err != nil {
 		return err
@@ -1134,8 +1136,8 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 		return nil, driver.ErrBadConn
 	}
 	conn.tracer.Print("Prepare With Context\n", query)
-	conn.session.StartContext(ctx)
-	defer conn.session.EndContext()
+	done := conn.session.StartContext(ctx)
+	defer conn.session.EndContext(done)
 	return NewStmt(query, conn), nil
 }
 

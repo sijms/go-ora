@@ -139,6 +139,47 @@ func (info *DatabaseInfo) UpdateDatabaseInfo(connStr string) (err error) {
 	return nil
 }
 
+func (info *DatabaseInfo) UpdateDatabaseInfoForRedirect(redirectAddr string, reconnectData string) error {
+	redirectAddr = strings.ReplaceAll(redirectAddr, "\r", "")
+	redirectAddr = strings.ReplaceAll(redirectAddr, "\n", "")
+	reconnectData = strings.ReplaceAll(reconnectData, "\r", "")
+	reconnectData = strings.ReplaceAll(reconnectData, "\n", "")
+	var err error
+	info.Servers, err = ExtractServers(redirectAddr)
+	if err != nil {
+		return err
+	}
+	if len(info.Servers) == 0 {
+		return errors.New("no address passed in connection string")
+	}
+	r, err := regexp.Compile(`(?i)\(\s*SERVICE_NAME\s*=\s*([\w.-]+)\s*\)`)
+	if err != nil {
+		return err
+	}
+	match := r.FindStringSubmatch(reconnectData)
+	if len(match) > 1 {
+		info.ServiceName = match[1]
+	}
+	r, err = regexp.Compile(`(?i)\(\s*SID\s*=\s*([\w.-]+)\s*\)`)
+	if err != nil {
+		return err
+	}
+	match = r.FindStringSubmatch(reconnectData)
+	if len(match) > 1 {
+		info.SID = match[1]
+	}
+	r, err = regexp.Compile(`(?i)\(\s*INSTANCE_NAME\s*=\s*([\w.-]+)\s*\)`)
+	if err != nil {
+		return err
+	}
+	match = r.FindStringSubmatch(reconnectData)
+	if len(match) > 1 {
+		info.InstanceName = match[1]
+	}
+	info.connStr = ""
+	return nil
+}
+
 func (info *DatabaseInfo) AddServer(server ServerAddr) {
 	for i := 0; i < len(info.Servers); i++ {
 		if server.IsEqual(&info.Servers[i]) {

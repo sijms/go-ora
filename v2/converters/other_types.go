@@ -41,7 +41,13 @@ func ConvertBinaryFloat(bytes []byte) float64 {
 		return float64(x)
 	}
 	exp := len(strX) - index - 1
-	return math.Floor(float64(x)*math.Pow10(exp)) / math.Pow10(exp)
+	return math.Trunc(float64(x)*math.Pow10(exp)) / math.Pow10(exp)
+	//test2 := float64(test)
+	//return test2
+	//if u > (1 << 31) {
+	//	return -math.Float32frombits(u)
+	//}
+	//return math.Float32frombits(^u)
 }
 
 func ConvertBinaryDouble(bytes []byte) float64 {

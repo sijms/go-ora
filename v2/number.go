@@ -177,6 +177,12 @@ func (num *Number) decode() (strNum string, exp int, negative bool, err error) {
 	} else {
 		exp = int(num.data[0]&0x7F) - 64
 	}
+
+	if _isPosInf(num.data) || _isNegInf(num.data) {
+		strNum = "Infinity"
+		return
+	}
+
 	buf := num.data[1:]
 	if negative && buf[len(buf)-1] == 0x66 {
 		buf = buf[:len(buf)-1]
@@ -193,6 +199,15 @@ func (num *Number) decode() (strNum string, exp int, negative bool, err error) {
 	exp = exp*2 - len(output)
 	strNum = string(output)
 	return
+}
+
+func _isNegInf(b []byte) bool {
+	return b[0] == 0 && len(b) == 1
+}
+
+func _isPosInf(b []byte) bool {
+	// -1 =255
+	return len(b) == 2 && b[0] == 255 && b[1] == 101
 }
 
 func (num *Number) Int64() (int64, error) {

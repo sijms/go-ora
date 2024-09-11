@@ -489,14 +489,18 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 				if attrib.DataType == OCIFileLocator && attrib.MaxLen == 0 {
 					attrib.MaxLen = 4000
 				}
-				if attrib.DataType == XMLType {
+				switch attrib.DataType {
+				case XMLType:
 					if attrib.cusType.isArray {
 						session.WriteFixedClr(&objectBuffer, attrib.BValue)
 					} else {
 						objectBuffer.Write(attrib.BValue)
 					}
-				} else {
-					session.WriteClr(&objectBuffer, attrib.BValue)
+				//case NCHAR, CHAR, LONG, LongVarChar:
+				//	session.WriteFixedClr(&objectBuffer, attrib.BValue)
+				default:
+					session.WriteFixedClr(&objectBuffer, attrib.BValue)
+					//session.WriteClr(&objectBuffer, attrib.BValue)
 				}
 			}
 			if par.parent == nil {

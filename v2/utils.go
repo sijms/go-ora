@@ -1084,31 +1084,6 @@ func isBadConn(err error) bool {
 	return false
 }
 
-//func collectLocators(pars []ParameterInfo) [][]byte {
-//	output := make([][]byte, 0, 10)
-//	for _, par := range pars {
-//		output = append(output, par.collectLocator()...)
-//switch value := par.iPrimValue.(type) {
-//case *Lob:
-//	if value != nil && value.sourceLocator != nil {
-//		output = append(output, value.sourceLocator)
-//	}
-//case *BFile:
-//	if value != nil && value.lob.sourceLocator != nil {
-//		output = append(output, value.lob.sourceLocator)
-//	}
-//case []ParameterInfo:
-//	temp := collectLocators(value)
-//	output = append(output, temp...)
-//}
-//	}
-//	return output
-//}
-
-//	func initializePtr(v interface{}) {
-//		rv := reflect.ValueOf(v).Elem()
-//		rv.Set(reflect.New(rv.Type().Elem()))
-//	}
 func getTOID2(conn *sql.DB, owner, typeName string) ([]byte, error) {
 	var toid []byte
 	err := conn.QueryRow(`SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`,
@@ -1318,28 +1293,7 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 					} else {
 						if attrib.cusType.isArray {
 							attrib.parent = nil
-							nb, err := session.GetByte()
-							if err != nil {
-								return err
-							}
-							var size int
-							switch nb {
-							case 0:
-								size = 0
-							case 0xFE:
-								size, err = session.GetInt(4, false, true)
-								if err != nil {
-									return err
-								}
-							default:
-								size = int(nb)
-							}
-							if size > 0 {
-								attrib.BValue, err = session.GetBytes(size)
-								if err != nil {
-									return err
-								}
-							}
+							attrib.BValue, err = session.GetFixedClr()
 						}
 						err = decodeObject(conn, &attrib, temporaryLobs)
 						if err != nil {

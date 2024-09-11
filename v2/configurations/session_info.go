@@ -26,8 +26,12 @@ type SessionInfo struct {
 }
 
 func (si *SessionInfo) RegisterDial(dialer func(ctx context.Context, network, address string) (net.Conn, error)) {
-	temp := &customDial{DialCtx: dialer}
-	si.Dialer = temp
+	if dialer != nil {
+		var temp = &customDial{DialCtx: dialer}
+		si.Dialer = temp
+	} else {
+		si.Dialer = nil
+	}
 }
 
 type customDial struct {

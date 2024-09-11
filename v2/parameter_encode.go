@@ -498,10 +498,11 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 					} else {
 						objectBuffer.Write(attrib.BValue)
 					}
-				case NCHAR, CHAR, LONG, LongVarChar:
-					session.WriteFixedClr(&objectBuffer, attrib.BValue)
+				//case NCHAR, CHAR, LONG, LongVarChar:
+				//	session.WriteFixedClr(&objectBuffer, attrib.BValue)
 				default:
-					session.WriteClr(&objectBuffer, attrib.BValue)
+					session.WriteFixedClr(&objectBuffer, attrib.BValue)
+					//session.WriteClr(&objectBuffer, attrib.BValue)
 				}
 			}
 			if par.parent == nil {

@@ -1876,8 +1876,8 @@ func (session *Session) GetFixedClr() ([]byte, error) {
 	}
 	var size int
 	switch nb {
-	case 0:
-		size = 0
+	case 0, 0xFD, 0xFF:
+		return nil, nil
 	case 0xFE:
 		size, err = session.GetInt(4, false, true)
 		if err != nil {
@@ -1885,9 +1885,6 @@ func (session *Session) GetFixedClr() ([]byte, error) {
 		}
 	default:
 		size = int(nb)
-	}
-	if size == 0 {
-		return nil, nil
 	}
 	return session.GetBytes(size)
 }

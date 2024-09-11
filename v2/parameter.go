@@ -518,12 +518,14 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		return nil
 	}
 	if udt { /*special extraction of udt fields*/
-		switch par.DataType {
-		case NCHAR, CHAR, LONG, LongVarChar:
-			par.BValue, err = session.GetFixedClr()
-		default:
-			par.BValue, err = session.GetClr()
-		}
+		//switch par.DataType {
+		//case NCHAR, CHAR, LONG, LongVarChar:
+		//	par.BValue, err = session.GetFixedClr()
+		//	//par.BValue, err = session.GetClr()
+		//default:
+		//	par.BValue, err = session.GetClr()
+		//}
+		par.BValue, err = session.GetFixedClr()
 	} else {
 		par.BValue, err = session.GetClr()
 	}
@@ -649,7 +651,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			locator, err = session.GetClr()
 		} else {
 			locator = par.BValue
-
 		}
 		if err != nil {
 			return err

@@ -3,16 +3,16 @@ package network
 import "github.com/sijms/go-ora/network/security"
 
 type SessionContext struct {
-	//conn net.Conn
+	// conn net.Conn
 	ConnOption *ConnectionOption
-	//PortNo int
-	//InstanceName string
-	//HostName string
-	//IPAddress string
-	//Protocol string
-	//ServiceName string
+	// PortNo int
+	// InstanceName string
+	// HostName string
+	// IPAddress string
+	// Protocol string
+	// ServiceName string
 	SID []byte
-	//ConnectData string
+	// ConnectData string
 	Version             uint16
 	LoVersion           uint16
 	Options             uint16

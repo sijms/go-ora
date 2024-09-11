@@ -1,28 +1,32 @@
 package go_ora
 
 import (
+	"testing"
+
 	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
-	"testing"
+	"github.com/sijms/go-ora/v2/trace"
 )
 
-var inputBuffer = []byte{8, 1, 1, 1, 128, 0, 0, 1, 20, 0, 0, 0, 0, 2, 3, 105, 1, 1,
+var inputBuffer = []byte{
+	8, 1, 1, 1, 128, 0, 0, 1, 20, 0, 0, 0, 0, 2, 3, 105, 1, 1,
 	20, 0, 1, 0, 1, 4, 4, 78, 65, 77, 69, 0, 0, 0, 0, 0, 1, 14, 2, 1, 144,
 	2, 1, 144, 3, 1, 0, 0, 1, 5, 1, 1, 0, 0, 1, 32, 1, 22, 0, 0, 0, 0, 0, 4,
 	1, 7, 1, 6, 0, 0, 0, 0, 1, 5, 1, 39, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+}
 
 func TestBulkCopyRead(t *testing.T) {
-
 	session := network.NewSessionWithInputBufferForDebug(inputBuffer)
 	session.TTCVersion = 12
-	conn := &Connection{
+	c := &Connection{
 		session: session,
+		tracer:  trace.NilTracer(),
 	}
-	conn.sStrConv = converters.NewStringConverter(873)
-	session.StrConv = conn.sStrConv
+	c.sStrConv = converters.NewStringConverter(873)
+	session.StrConv = c.sStrConv
 	bulk := BulkCopy{
-		conn:          conn,
+		conn:          c,
 		TableName:     "",
 		SchemaName:    "",
 		PartitionName: "",

@@ -2,8 +2,9 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/sijms/go-ora/v2"
 	"testing"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestCascadeType(t *testing.T) {
@@ -20,7 +21,7 @@ func TestCascadeType(t *testing.T) {
 		Name    string             `udt:"NAME"`
 		SubInfo []HkGoraTestSubObj `udt:"SUB_INFO"`
 	}
-	var createTypes = func(db *sql.DB) error {
+	createTypes := func(db *sql.DB) error {
 		err := execCmd(db,
 			"create or replace type HK_GORA_ID_OBJ as object(ID number(22,0));",
 			"create or replace type HK_GORA_ID_COLL as table of HK_GORA_ID_OBJ;",
@@ -33,7 +34,7 @@ func TestCascadeType(t *testing.T) {
 		}
 		return nil
 	}
-	var dropTypes = func(db *sql.DB) error {
+	dropTypes := func(db *sql.DB) error {
 		return execCmd(db,
 			"drop type HK_GORA_TEST_COLL",
 			"drop type HK_GORA_TEST_OBJ",
@@ -42,7 +43,7 @@ func TestCascadeType(t *testing.T) {
 			"drop type HK_GORA_ID_COLL",
 			"drop type HK_GORA_ID_OBJ")
 	}
-	var registerTypes = func(db *sql.DB) error {
+	registerTypes := func(db *sql.DB) error {
 		err := go_ora.RegisterType(db, "HK_GORA_ID_OBJ", "HK_GORA_ID_COLL", HkGoraIdObj{})
 		if err != nil {
 			return err

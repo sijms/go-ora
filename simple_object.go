@@ -3,19 +3,20 @@ package go_ora
 import (
 	"errors"
 	"fmt"
+
 	"github.com/sijms/go-ora/network"
 )
 
 type simpleObject struct {
 	connection *Connection
-	//session     *network.Session
+	// session     *network.Session
 	operationID uint8
 	data        []byte
 	err         error
 }
 
 func (obj *simpleObject) write() *simpleObject {
-	//obj.session.ResetBuffer()
+	// obj.session.ResetBuffer()
 	if obj.connection.dBVersion.Number >= 10102 {
 		session := obj.connection.session
 		session.PutBytes(3, obj.operationID, 0)

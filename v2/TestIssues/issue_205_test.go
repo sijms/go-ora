@@ -8,23 +8,23 @@ import (
 )
 
 func TestIssue205(t *testing.T) {
-	var createTable = func(db *sql.DB) error {
+	createTable := func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_205(
 	ID NUMBER(10) NOT NULL,
 		BIG_TEXT LONG,
 		PRIMARY KEY (ID)
 	) NOCOMPRESS`)
 	}
-	var dropTable = func(db *sql.DB) error {
+	dropTable := func(db *sql.DB) error {
 		return execCmd(db, `DROP TABLE TTB_205 PURGE`)
 	}
-	var insert = func(db *sql.DB) error {
+	insert := func(db *sql.DB) error {
 		type ttb_205 struct {
 			Id   int            `db:"ID"`
 			Name sql.NullString `db:"NAME"`
 		}
 		data := make([]ttb_205, 100)
-		for index, _ := range data {
+		for index := range data {
 			data[index].Id = index + 1
 			if (index+1)%2 == 0 {
 				data[index].Name.Valid = false
@@ -39,7 +39,7 @@ func TestIssue205(t *testing.T) {
 		}
 		return nil
 	}
-	var sqlQuery = func(db *sql.DB) error {
+	sqlQuery := func(db *sql.DB) error {
 		rows, err := db.Query("SELECT BIG_TEXT, ID FROM TTB_205 WHERE ID < 3")
 		if err != nil {
 			return err
@@ -70,7 +70,7 @@ func TestIssue205(t *testing.T) {
 		}
 		return rows.Err()
 	}
-	var outputQuery = func(db *sql.DB, id int) error {
+	outputQuery := func(db *sql.DB, id int) error {
 		temp := struct {
 			ID   int            `db:"ID,,,output"`
 			Name sql.NullString `db:"NAME,,100000,output"`

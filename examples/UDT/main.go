@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 type test1 struct {
@@ -31,9 +32,7 @@ func createUDT(conn *sql.DB) error {
 
 func queryUDT(conn *sql.DB) error {
 	t := time.Now()
-	var (
-		test test1
-	)
+	var test test1
 	err := conn.QueryRow("SELECT TEST_TYPE1(10, 'NAME') FROM DUAL").Scan(&test)
 	if err != nil {
 		return err
@@ -51,6 +50,7 @@ func dropUDT(conn *sql.DB) error {
 	fmt.Println("Finish drop UDT: ", time.Now().Sub(t))
 	return nil
 }
+
 func usage() {
 	fmt.Println()
 	fmt.Println("user defined type")
@@ -66,9 +66,7 @@ func usage() {
 }
 
 func main() {
-	var (
-		server string
-	)
+	var server string
 
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()

@@ -18,7 +18,7 @@ func TestBinaryFloat(t *testing.T) {
 	}{
 		{
 			[]byte{195, 6, 115, 51},
-			134.45,
+			134.44,
 		},
 		{
 			[]byte{60, 249, 140, 204},

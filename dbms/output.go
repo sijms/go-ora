@@ -99,6 +99,7 @@ func (db_out *DBOutput) Print(w io.StringWriter) error {
 	_, err = w.WriteString(line)
 	return err
 }
+
 func (db_out *DBOutput) GetOutput() (string, error) {
 	sqlText := `declare 
 	l_line varchar2(255); 

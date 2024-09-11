@@ -11,7 +11,6 @@ type IStringConverter interface {
 	Decode([]byte) string
 	GetLangID() int
 	Clone() IStringConverter
-	//SetLangID(langID int) int
 }
 
 type StringConverter struct {
@@ -36,7 +35,7 @@ func MaxBytePerChar(charsetID int) int {
 	case 0x35C, 0x35F:
 		return 4 // TLBConvZHTEUC
 	case 0x341, 0x343, 0x34A, 0x355, 0x360:
-		return 4 //TLBConvShift
+		return 4 // TLBConvShift
 	case 0x354:
 		return 3 // TLBConvGBK
 	case 870:
@@ -67,15 +66,10 @@ func (conv *StringConverter) Clone() IStringConverter {
 		eBuffer:   conv.eBuffer,
 	}
 }
+
 func (conv *StringConverter) GetLangID() int {
 	return conv.LangID
 }
-
-//func (conv *StringConverter) SetLangID(langID int) int {
-//	oldValue := conv.LangID
-//	conv.LangID = langID
-//	return oldValue
-//}
 
 func (conv *StringConverter) Encode(input string) []byte {
 	if len(input) == 0 {
@@ -186,7 +180,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 			index += 2
 		}
 		return string(utf16.Decode(output))
-	case 0x341, 0x343, 0x34A, 0x355, 0x360: //TLBConvShift
+	case 0x341, 0x343, 0x34A, 0x355, 0x360: // TLBConvShift
 		index := 0
 		result := 0
 		output := make([]uint16, 0, len(input))

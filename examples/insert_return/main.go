@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 // create sequence
@@ -112,6 +113,7 @@ VALUES(:1, :2, :3) RETURNING VISIT_ID INTO :4`)
 	fmt.Println("Finish insert data: ", time.Now().Sub(t))
 	return nil
 }
+
 func usage() {
 	fmt.Println()
 	fmt.Println("insert_return")
@@ -125,10 +127,9 @@ func usage() {
 	fmt.Println(`  insert_return -server "oracle://user:pass@server/service_name"`)
 	fmt.Println()
 }
+
 func main() {
-	var (
-		server string
-	)
+	var server string
 
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()

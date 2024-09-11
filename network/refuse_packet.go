@@ -9,10 +9,10 @@ import (
 
 type RefusePacket struct {
 	packet Packet
-	//dataOffset uint16
-	//Len uint16
-	//packetType PacketType
-	//Flag uint8
+	// dataOffset uint16
+	// Len uint16
+	// packetType PacketType
+	// Flag uint8
 	Err          OracleError
 	SystemReason uint8
 	UserReason   uint8
@@ -32,6 +32,7 @@ func (pck *RefusePacket) bytes() []byte {
 func (pck *RefusePacket) getPacketType() PacketType {
 	return pck.packet.packetType
 }
+
 func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	if len(packetData) < 12 {
 		return nil
@@ -100,5 +101,5 @@ func (rf *RefusePacket) extractErrCode() {
 		rf.Err.ErrCode = int(errCode)
 		rf.Err.translate()
 	}
-	//str := "(DESCRIPTION=(TMP=)(VSNNUM=186647552)(ERR=12514)(ERROR_STACK=(ERROR=(CODE=12514)(EMFI=4))))"
+	// str := "(DESCRIPTION=(TMP=)(VSNNUM=186647552)(ERR=12514)(ERROR_STACK=(ERROR=(CODE=12514)(EMFI=4))))"
 }

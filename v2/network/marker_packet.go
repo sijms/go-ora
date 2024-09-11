@@ -3,7 +3,7 @@ package network
 import "encoding/binary"
 
 const (
-	//marker_type_break     = 1
+	// marker_type_break     = 1
 	marker_type_reset     = 2
 	marker_type_interrupt = 3
 )
@@ -33,6 +33,7 @@ func newMarkerPacket(markerType uint8, sessionCtx *SessionContext) *MarkerPacket
 		markerType: markerType,
 	}
 }
+
 func newMarkerPacketFromData(packetData []byte, sessionCtx *SessionContext) *MarkerPacket {
 	if len(packetData) != 0xB {
 		return nil

@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sijms/go-ora/v2/lazy_init"
+
 	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
 )
@@ -99,14 +101,22 @@ func refineSqlText(text string) string {
 	}
 	return strings.TrimSpace(string(textBuffer))
 }
-func parseSqlText(text string) ([]string, error) {
+
+var parameterNameRegexp = lazy_init.NewLazyInit(func() (interface{}, error) {
+	return regexp.Compile(`:(\w+)`)
+})
+
+func parseQueryParametersNames(text string) (names []string, err error) {
 	refinedSql := refineSqlText(text)
-	reg, err := regexp.Compile(`:(\w+)`)
+
+	var parameterNameRegexpAny interface{}
+	parameterNameRegexpAny, err = parameterNameRegexp.GetValue()
 	if err != nil {
 		return nil, err
 	}
-	names := make([]string, 0, 10)
-	matches := reg.FindAllStringSubmatch(refinedSql, -1)
+
+	names = make([]string, 0, 10)
+	matches := parameterNameRegexpAny.(*regexp.Regexp).FindAllStringSubmatch(refinedSql, -1)
 	for _, match := range matches {
 		if len(match) > 1 {
 			names = append(names, match[1])
@@ -184,6 +194,7 @@ func tSigned(input reflect.Type) bool {
 		return false
 	}
 }
+
 func tUnsigned(input reflect.Type) bool {
 	switch input.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
@@ -192,15 +203,19 @@ func tUnsigned(input reflect.Type) bool {
 		return false
 	}
 }
+
 func tInteger(input reflect.Type) bool {
 	return tSigned(input) || tUnsigned(input)
 }
+
 func tFloat(input reflect.Type) bool {
 	return input.Kind() == reflect.Float32 || input.Kind() == reflect.Float64
 }
+
 func tNumber(input reflect.Type) bool {
 	return tInteger(input) || tFloat(input) || input == tyBool
 }
+
 func tNullNumber(input reflect.Type) bool {
 	switch input {
 	case tyNullBool, tyNullByte, tyNullInt16, tyNullInt32, tyNullInt64:
@@ -486,6 +501,7 @@ func setBytes(value reflect.Value, input []byte) error {
 	}
 	return nil
 }
+
 func setTime(value reflect.Value, input time.Time) error {
 	if value.Kind() == reflect.Ptr {
 		if value.IsNil() {
@@ -526,9 +542,9 @@ func setTime(value reflect.Value, input time.Time) error {
 	}
 	return nil
 }
-func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}) error {
 
-	//input should be one of primitive values
+func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}) error {
+	// input should be one of primitive values
 	if input == nil {
 		return setNull(fieldValue)
 	}
@@ -557,7 +573,7 @@ func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}
 			return err
 		}
 		return setNumber(fieldValue, num)
-	//case float64:
+	// case float64:
 	//	return setNumber(fieldValue, val)
 	case string:
 		return setString(fieldValue, val)
@@ -586,14 +602,16 @@ func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}
 		return fmt.Errorf("unsupported primitive type: %s", fieldValue.Type().Name())
 	}
 }
+
 func setNull(value reflect.Value) error {
 	if value.Kind() == reflect.Ptr && value.IsNil() {
 		return nil
 	}
 	value.Set(reflect.Zero(value.Type()))
-	//value.SetZero()
+	// value.SetZero()
 	return nil
 }
+
 func setBFile(value reflect.Value, input BFile) error {
 	if value.Kind() == reflect.Ptr {
 		if value.IsNil() {
@@ -620,6 +638,7 @@ func setBFile(value reflect.Value, input BFile) error {
 	}
 	return nil
 }
+
 func setArray(value reflect.Value, input []ParameterInfo) error {
 	if value.Kind() == reflect.Ptr {
 		if value.IsNil() {
@@ -669,7 +688,6 @@ func setUDTObject(value reflect.Value, cust *customType, input []ParameterInfo) 
 	} else {
 		tempObj := reflect.New(cust.typ)
 		for _, par := range input {
-
 			if fieldIndex, ok := cust.fieldMap[par.Name]; ok {
 				err := setFieldValue(tempObj.Elem().Field(fieldIndex), par.cusType, par.oPrimValue)
 				if err != nil {
@@ -754,7 +772,8 @@ func setLob(value reflect.Value, input Lob) error {
 		value.Set(reflect.ValueOf(Clob{
 			String:  strConv.Decode(lobData),
 			Valid:   true,
-			locator: input.sourceLocator}))
+			locator: input.sourceLocator,
+		}))
 	case tyNClob:
 		strConv, err = getStrConv()
 		if err != nil {
@@ -763,11 +782,13 @@ func setLob(value reflect.Value, input Lob) error {
 		value.Set(reflect.ValueOf(NClob{
 			String:  strConv.Decode(lobData),
 			Valid:   true,
-			locator: input.sourceLocator}))
+			locator: input.sourceLocator,
+		}))
 	case tyBlob:
 		value.Set(reflect.ValueOf(Blob{
 			Data:    lobData,
-			locator: input.sourceLocator}))
+			locator: input.sourceLocator,
+		}))
 	case tyBytes:
 		value.Set(reflect.ValueOf(lobData))
 	default:
@@ -1080,8 +1101,10 @@ func getTOID(conn *Connection, owner, typeName string) ([]byte, error) {
 		_ = stmt.Close()
 	}(stmt)
 	var ret []byte
-	rows, err := stmt.Query_([]driver.NamedValue{driver.NamedValue{Value: strings.ToUpper(owner)},
-		driver.NamedValue{Value: strings.ToUpper(typeName)}})
+	rows, err := stmt.Query_([]driver.NamedValue{
+		{Value: strings.ToUpper(owner)},
+		{Value: strings.ToUpper(typeName)},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -1116,6 +1139,7 @@ func encodeObject(session *network.Session, objectData []byte, isArray bool) []b
 	fieldsData.Write(objectData)
 	return fieldsData.Bytes()
 }
+
 func putUDTAttributes(input *customType, pars []ParameterInfo, index int) ([]ParameterInfo, int) {
 	oPrimValue := make([]ParameterInfo, 0, len(input.attribs))
 	for _, attrib := range input.attribs {
@@ -1131,6 +1155,7 @@ func putUDTAttributes(input *customType, pars []ParameterInfo, index int) ([]Par
 	}
 	return oPrimValue, index
 }
+
 func getUDTAttributes(input *customType, value reflect.Value) []ParameterInfo {
 	output := make([]ParameterInfo, 0, 10)
 	for _, attrib := range input.attribs {
@@ -1170,6 +1195,7 @@ func isArrayValue(val interface{}) bool {
 	}
 	return false
 }
+
 func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]byte) error {
 	session := conn.session
 	if parent.parent == nil {
@@ -1209,7 +1235,7 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 			}
 			pars := make([]ParameterInfo, 0, itemsLen)
 			for x := 0; x < itemsLen; x++ {
-				var tempPar = parent.cusType.attribs[0]
+				tempPar := parent.cusType.attribs[0]
 				//if parent.cusType.isRegularArray() {
 				//
 				//} else {
@@ -1246,9 +1272,9 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 			}
 			parent.oPrimValue = pars
 		case 0x84:
-			//pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
+			// pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
 			// collect all attributes in one list
-			//pars := getUDTAttributes(parent.cusType, reflect.Value{})
+			// pars := getUDTAttributes(parent.cusType, reflect.Value{})
 			pars := make([]ParameterInfo, 0, 10)
 			for _, attrib := range parent.cusType.attribs {
 				attrib.Direction = parent.Direction
@@ -1258,7 +1284,6 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 					temp, err := session.Peek(1)
 					if err != nil {
 						return err
-
 					}
 					if temp[0] == 0xFD || temp[0] == 0xFF {
 						_, err = session.GetByte()
@@ -1310,7 +1335,6 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 				temp, err := session.Peek(1)
 				if err != nil {
 					return err
-
 				}
 				if temp[0] == 0xFD || temp[0] == 0xFF {
 					_, err = session.GetByte()
@@ -1387,8 +1411,8 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 	typeErr := fmt.Errorf("error passing field %s as type %s", fieldValue.Type().Name(), _type)
 	switch _type {
 	case "number":
-		//var fieldVal float64
-		tempPar.Value, err = NewNumber(fieldValue.Interface()) //getFloat(fieldValue.Interface())
+		// var fieldVal float64
+		tempPar.Value, err = NewNumber(fieldValue.Interface()) // getFloat(fieldValue.Interface())
 		if err != nil {
 			err = typeErr
 			return

@@ -3,8 +3,9 @@ package go_ora
 import (
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/network"
 	"time"
+
+	"github.com/sijms/go-ora/network"
 )
 
 type DataTypeNego struct {
@@ -84,7 +85,7 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	}
 	if !result.Server.hasCompileTimeCaps(4, 32) {
 		result.CompileTimeCaps[4] &= 223 // 0xDF
-		//this.connection.isO7L_MRExposed = false;
+		// this.connection.isO7L_MRExposed = false;
 	}
 
 	xmlTypeClientSideDecoding := false
@@ -467,6 +468,7 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	}
 	return &result
 }
+
 func (nego *DataTypeNego) read(session *network.Session) error {
 	msg, err := session.GetByte()
 	if err != nil {
@@ -508,6 +510,7 @@ func (nego *DataTypeNego) read(session *network.Session) error {
 
 	return nil
 }
+
 func (nego *DataTypeNego) write(session *network.Session) error {
 	session.ResetBuffer()
 	if nego.Server.ServerCompileTimeCaps == nil || len(nego.Server.ServerCompileTimeCaps) <= 27 || nego.Server.ServerCompileTimeCaps[27] == 0 {
@@ -515,7 +518,7 @@ func (nego *DataTypeNego) write(session *network.Session) error {
 	}
 	session.PutBytes(nego.MessageCode)
 	// client remote in
-	//session.PutBytes(0, 0, 0, 0)
+	// session.PutBytes(0, 0, 0, 0)
 	session.PutInt(nego.Server.ServerCharset, 2, false, false)
 	// client remote out
 	session.PutInt(nego.Server.ServerCharset, 2, false, false)

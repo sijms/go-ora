@@ -3,10 +3,11 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -86,13 +87,13 @@ func merge(conn *sql.DB) error {
 		sql.Named("CODE", code),
 		sql.Named("TTNO", ttno),
 		sql.Named("UPDATETIME", updateTime))
-
 	if err != nil {
 		return err
 	}
 	fmt.Println("finish merge: ", time.Now().Sub(t))
 	return nil
 }
+
 func main() {
 	conn, err := sql.Open("oracle", os.Getenv("DSN"))
 	if err != nil {

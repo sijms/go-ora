@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -63,6 +64,7 @@ func query2(conn *sql.DB) error {
 	}
 	return nil
 }
+
 func query(conn *sql.DB) error {
 	rows, err := conn.Query(`SELECT ID FROM TEMP_TABLE_350`)
 	if err != nil {
@@ -84,6 +86,7 @@ func query(conn *sql.DB) error {
 	}
 	return nil
 }
+
 func main() {
 	conn, err := sql.Open("oracle", os.Getenv("DSN"))
 	if err != nil {

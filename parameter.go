@@ -8,8 +8,10 @@ import (
 	"github.com/sijms/go-ora/network"
 )
 
-type OracleType int
-type ParameterDirection int
+type (
+	OracleType         int
+	ParameterDirection int
+)
 
 const (
 	Input  ParameterDirection = 1
@@ -119,8 +121,8 @@ func (par *ParameterInfo) load(session *network.Session) error {
 		return err
 	}
 	par.Precision, err = session.GetByte()
-	//precision, err := session.GetInt(1, false, false)
-	//var scale int
+	// precision, err := session.GetInt(1, false, false)
+	// var scale int
 	switch par.DataType {
 	case NUMBER:
 		fallthrough
@@ -151,7 +153,7 @@ func (par *ParameterInfo) load(session *network.Session) error {
 		}
 	default:
 		par.Scale, err = session.GetByte()
-		//scale, err = session.GetInt(1, false, false)
+		// scale, err = session.GetInt(1, false, false)
 	}
 	//if par.Scale == uint8(-127) {
 	//
@@ -161,8 +163,8 @@ func (par *ParameterInfo) load(session *network.Session) error {
 		par.Scale = 0xFF
 	}
 
-	//par.Scale = uint16(scale)
-	//par.Precision = uint16(precision)
+	// par.Scale = uint16(scale)
+	// par.Precision = uint16(precision)
 	par.MaxLen, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err
@@ -245,18 +247,19 @@ func (par *ParameterInfo) load(session *network.Session) error {
 	_, err = session.GetInt(4, true, true)
 	return nil
 }
+
 func (par *ParameterInfo) write(session *network.Session) error {
 	session.PutBytes(uint8(par.DataType), par.Flag, par.Precision, par.Scale)
-	//session.PutUint(int(par.DataType), 1, false, false)
-	//session.PutUint(par.Flag, 1, false, false)
-	//session.PutUint(par.Precision, 1, false, false)
-	//session.PutUint(par.Scale, 1, false, false)
+	// session.PutUint(int(par.DataType), 1, false, false)
+	// session.PutUint(par.Flag, 1, false, false)
+	// session.PutUint(par.Precision, 1, false, false)
+	// session.PutUint(par.Scale, 1, false, false)
 	session.PutUint(par.MaxLen, 4, true, true)
 	session.PutInt(par.MaxNoOfArrayElements, 4, true, true)
 	session.PutInt(par.ContFlag, 4, true, true)
 	if par.ToID == nil {
 		session.PutBytes(0)
-		//session.PutInt(0, 1, false, false)
+		// session.PutInt(0, 1, false, false)
 	} else {
 		session.PutInt(len(par.ToID), 4, true, true)
 		session.PutClr(par.ToID)
@@ -264,7 +267,7 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	session.PutUint(par.Version, 2, true, true)
 	session.PutUint(par.CharsetID, 2, true, true)
 	session.PutBytes(uint8(par.CharsetForm))
-	//session.PutUint(par.CharsetForm, 1, false, false)
+	// session.PutUint(par.CharsetForm, 1, false, false)
 	session.PutUint(par.MaxCharLen, 4, true, true)
 	return nil
 }

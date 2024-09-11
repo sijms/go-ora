@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 func execStmt(conn *sql.DB, sqlText, helpString string) error {
@@ -18,6 +19,7 @@ func execStmt(conn *sql.DB, sqlText, helpString string) error {
 	fmt.Println(helpString, time.Now().Sub(t))
 	return nil
 }
+
 func insertData(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec("insert into GOORA_TEMP_DEPT values (10,'ACCOUNTING','NEW YORK')")
@@ -111,9 +113,7 @@ func usage() {
 }
 
 func main() {
-	var (
-		server string
-	)
+	var server string
 
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
@@ -223,5 +223,4 @@ where  e.deptno = dc.deptno`
 		return
 	}
 	fmt.Println("Finish run with clause: ", time.Now().Sub(t))
-
 }

@@ -11,10 +11,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/network"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/network"
 )
 
 // E infront of the variable means encrypted
@@ -171,7 +172,7 @@ func (obj *AuthObject) Write(connOption *network.ConnectionOption, mode LogonMod
 	session.PutUint(keyValSize, 4, true, true)
 	session.PutBytes(1, 1)
 	if len(connOption.UserID) > 0 {
-		//session.PutBytes([]byte(connOption.UserID)...)
+		// session.PutBytes([]byte(connOption.UserID)...)
 		session.PutClr([]byte(connOption.UserID))
 	}
 	index := 0
@@ -380,6 +381,7 @@ func EncryptPassword(password string, key []byte) (string, error) {
 	buffer := append(buff1, []byte(password)...)
 	return EncryptSessionKey(true, key, buffer)
 }
+
 func encryptPassword2(password string, key []byte) (string, error) {
 	padding := 0
 	temp := []byte(password)
@@ -441,9 +443,8 @@ func (obj *AuthObject) VerifyResponse(response string) bool {
 		fmt.Println(err)
 		return false
 	}
-	//fmt.Printf("%#v\n", key)
+	// fmt.Printf("%#v\n", key)
 	return bytes.Compare(key[16:], []byte{83, 69, 82, 86, 69, 82, 95, 84, 79, 95, 67, 76, 73, 69, 78, 84}) == 0
 	//KZSR_SVR_RESPONSE = new byte[16]{ (byte) 83, (byte) 69, (byte) 82, (byte) 86, (byte) 69, (byte) 82, (byte) 95, (byte) 84, (byte) 79,
 	//(byte) 95, (byte) 67, (byte) 76, (byte) 73, (byte) 69, (byte) 78, (byte) 84 };
-
 }

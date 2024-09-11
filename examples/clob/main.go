@@ -6,17 +6,16 @@ import (
 	"database/sql/driver"
 	"flag"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
-	go_ora "github.com/sijms/go-ora/v2"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
-var (
-	server string
-)
+var server string
 
 func createTable(conn *sql.DB) error {
 	t := time.Now()
@@ -35,6 +34,7 @@ func createTable(conn *sql.DB) error {
 	fmt.Println("Finish create table GOORA_TEMP_VISIT :", time.Now().Sub(t))
 	return nil
 }
+
 func dropTable(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec("drop table GOORA_TEMP_VISIT purge")
@@ -44,6 +44,7 @@ func dropTable(conn *sql.DB) error {
 	fmt.Println("Finish drop table: ", time.Now().Sub(t))
 	return nil
 }
+
 func readWithOutputParameters2() error {
 	t := time.Now()
 	conn, err := go_ora.NewConnection(server)
@@ -89,13 +90,13 @@ END;`
 		printLargeString("Data3: ", string(tempVal.Data))
 	}
 	printLargeString("Data4: ", string(data4.Data))
-	//fmt.Println("Data2: ", data2.String)
-	//printLargeString("Data3: ", string(data3.Data))
-	//fmt.Println("Data4: ", string(data4.Data))
+	// fmt.Println("Data2: ", data2.String)
+	// printLargeString("Data3: ", string(data3.Data))
+	// fmt.Println("Data4: ", string(data4.Data))
 	fmt.Println("Finish query output pars: ", time.Now().Sub(t))
 	return nil
-
 }
+
 func readWithOutputParameters(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `BEGIN
@@ -119,6 +120,7 @@ END;`
 	fmt.Println("Finish query output pars: ", time.Now().Sub(t))
 	return nil
 }
+
 func readWithSql(conn *sql.DB) error {
 	t := time.Now()
 	rows, err := conn.Query("SELECT VISIT_ID, VISIT_DATA, VISIT_DATA2, VISIT_DATA3, VISIT_DATA4 FROM GOORA_TEMP_VISIT")
@@ -181,6 +183,7 @@ func readWithSql(conn *sql.DB) error {
 	fmt.Printf("%d row readed: %v\n", cnt, time.Now().Sub(t))
 	return nil
 }
+
 func printLargeString(prefix, data string) {
 	if len(data) <= 25 {
 		fmt.Println(prefix, data)
@@ -190,6 +193,7 @@ func printLargeString(prefix, data string) {
 	temp = strings.ReplaceAll(temp, "\n", "\\n")
 	fmt.Println(prefix, temp[:25], "...........", temp[len(temp)-25:], "\tsize: ", len(data))
 }
+
 func insertData2() error {
 	t := time.Now()
 	conn, err := go_ora.NewConnection(server)
@@ -226,6 +230,7 @@ func insertData2() error {
 	fmt.Println("1 row inserted: ", time.Now().Sub(t))
 	return nil
 }
+
 func insertData3(conn *sql.DB) error {
 	t := time.Now()
 	val, err := ioutil.ReadFile("clob.json")
@@ -241,6 +246,7 @@ func insertData3(conn *sql.DB) error {
 	fmt.Println("1 row inserted: ", time.Now().Sub(t))
 	return nil
 }
+
 func insertData(conn *sql.DB) error {
 	t := time.Now()
 	val, err := ioutil.ReadFile("clob.json")
@@ -257,6 +263,7 @@ func insertData(conn *sql.DB) error {
 	fmt.Println("1 row inserted: ", time.Now().Sub(t))
 	return nil
 }
+
 func usage() {
 	fmt.Println()
 	fmt.Println("clob")
@@ -270,8 +277,8 @@ func usage() {
 	fmt.Println(`  clob -server "oracle://user:pass@server/service_name"`)
 	fmt.Println()
 }
-func main() {
 
+func main() {
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
 

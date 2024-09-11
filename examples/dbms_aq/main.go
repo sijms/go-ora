@@ -3,11 +3,12 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/sijms/go-ora/dbms"
 	_ "github.com/sijms/go-ora/v2"
 	go_ora "github.com/sijms/go-ora/v2"
-	"os"
-	"time"
 )
 
 type test1 struct {

@@ -47,7 +47,7 @@ func newRowID(session *network.Session) (*rowid, error) {
 }
 
 func convertRowIDToByte(number int64, size int) []byte {
-	var buffer = []byte{
+	buffer := []byte{
 		65, 66, 67, 68, 69, 70, 71, 72,
 		73, 74, 75, 76, 77, 78, 79, 80,
 		81, 82, 83, 84, 85, 86, 87, 88,
@@ -68,6 +68,7 @@ func convertRowIDToByte(number int64, size int) []byte {
 	}
 	return output
 }
+
 func (id *rowid) getBytes() []byte {
 	output := make([]byte, 0, 18)
 	output = append(output, convertRowIDToByte(id.rba, 6)...)

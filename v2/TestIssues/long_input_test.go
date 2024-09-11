@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestLongInput(t *testing.T) {
-	var createTable = func(db *sql.DB) error {
+	createTable := func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_557 (
 			ID NUMBER(10), 
 			DATA_BLOB BLOB, 
@@ -20,11 +21,11 @@ func TestLongInput(t *testing.T) {
 			LDATE DATE
 		) NOCOMPRESS`)
 	}
-	var dropTable = func(db *sql.DB) error {
+	dropTable := func(db *sql.DB) error {
 		return execCmd(db, "drop table TTB_557 purge")
 	}
 
-	var raw = func(db *sql.DB, data []byte) error {
+	raw := func(db *sql.DB, data []byte) error {
 		_, err := db.Exec(`INSERT INTO TTB_557(DATA_BLOB, ID, LDATE) VALUES(:1, :2, :3)`, data, 1, time.Now())
 		if err != nil {
 			return err
@@ -68,7 +69,7 @@ func TestLongInput(t *testing.T) {
 		return nil
 	}
 
-	var varchar = func(db *sql.DB, data string) error {
+	varchar := func(db *sql.DB, data string) error {
 		_, err := db.Exec(`INSERT INTO TTB_557(DATA_CLOB, ID, LDATE) VALUES(:1, :2, :3)`, data, 1, time.Now())
 		if err != nil {
 			return err
@@ -112,7 +113,7 @@ func TestLongInput(t *testing.T) {
 		return nil
 	}
 
-	var nvarchar = func(db *sql.DB, data string) error {
+	nvarchar := func(db *sql.DB, data string) error {
 		_, err := db.Exec(`INSERT INTO TTB_557(DATA_NCLOB, ID, LDATE) VALUES(:1, :2, :3)`, go_ora.NVarChar(data), 1, time.Now())
 		if err != nil {
 			return err

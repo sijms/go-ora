@@ -154,6 +154,7 @@ func (op *ConnectionOption) UpdateDatabaseInfo(connStr string) error {
 	}
 	return nil
 }
+
 func (op *ConnectionOption) AddServer(server ServerAddr) {
 	for i := 0; i < len(op.Servers); i++ {
 		if server.IsEqual(&op.Servers[i]) {
@@ -162,13 +163,16 @@ func (op *ConnectionOption) AddServer(server ServerAddr) {
 	}
 	op.Servers = append(op.Servers, server)
 }
+
 func (serv *ServerAddr) IsEqual(input *ServerAddr) bool {
 	return strings.ToUpper(serv.Addr) == strings.ToUpper(input.Addr) &&
 		serv.Port == input.Port
 }
+
 func (serv *ServerAddr) networkAddr() string {
 	return net.JoinHostPort(serv.Addr, strconv.Itoa(serv.Port))
 }
+
 func (op *ConnectionOption) GetActiveServer(jump bool) *ServerAddr {
 	if jump {
 		op.serverIndex++

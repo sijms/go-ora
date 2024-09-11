@@ -7,20 +7,20 @@ import (
 )
 
 func TestIssue466(t *testing.T) {
-	var createTable = func(db *sql.DB) error {
+	createTable := func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_466(ID varchar2(100))`)
 	}
-	var dropTable = func(db *sql.DB) error {
+	dropTable := func(db *sql.DB) error {
 		return execCmd(db, `DROP TABLE TTB_466 purge`)
 	}
-	var generateRows = func(startIndex, count int) []string {
+	generateRows := func(startIndex, count int) []string {
 		rows := make([]string, count)
 		for i := 0; i < count; i++ {
 			rows[i] = fmt.Sprintf("ID%02d", i+startIndex)
 		}
 		return rows
 	}
-	var insert = func(stmt *sql.Stmt, rows []string) error {
+	insert := func(stmt *sql.Stmt, rows []string) error {
 		result, err := stmt.Exec(rows)
 		if err != nil {
 			return err

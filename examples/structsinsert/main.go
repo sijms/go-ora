@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -75,7 +76,6 @@ func dropTable(conn *sql.DB) error {
 }
 
 func structsInsert(databaseUrl string) error {
-
 	type GooraTempVisit struct {
 		VisitId   int       `db:"VISIT_ID"`
 		Name      string    `db:"NAME"`
@@ -121,6 +121,7 @@ func structsInsert(databaseUrl string) error {
 	fmt.Printf("%d rows inserted: %v\n", rowsAffected, time.Now().Sub(t))
 	return nil
 }
+
 func usage() {
 	fmt.Println()
 	fmt.Println("structs_insert")
@@ -136,9 +137,7 @@ func usage() {
 }
 
 func main() {
-	var (
-		server string
-	)
+	var server string
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
 

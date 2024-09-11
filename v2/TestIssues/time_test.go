@@ -8,7 +8,7 @@ import (
 )
 
 func TestTime(t *testing.T) {
-	var createTable = func(db *sql.DB) error {
+	createTable := func(db *sql.DB) error {
 		return execCmd(db, `
 CREATE TABLE TTB_TIME(
     ID NUMBER,
@@ -19,15 +19,15 @@ CREATE TABLE TTB_TIME(
 )`)
 	}
 
-	var dropTable = func(db *sql.DB) error { return execCmd(db, `DROP TABLE TTB_TIME PURGE`) }
-	var date = time.Now()
+	dropTable := func(db *sql.DB) error { return execCmd(db, `DROP TABLE TTB_TIME PURGE`) }
+	date := time.Now()
 	loc, _ := time.LoadLocation("Asia/Shanghai")
-	var insert = func(db *sql.DB) error {
+	insert := func(db *sql.DB) error {
 		_, err := db.Exec("INSERT INTO TTB_TIME(ID, DATE1, DATE2, DATE3, DATE4) VALUES(:1, :2, :3, :4, :5)",
 			1, date, date, date.In(loc), date)
 		return err
 	}
-	var query = func(db *sql.DB) error {
+	query := func(db *sql.DB) error {
 		var (
 			id                         int
 			date1, date2, date3, date4 time.Time

@@ -12,20 +12,20 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/configurations"
 	"net"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/sijms/go-ora/v2/configurations"
+
 	"github.com/sijms/go-ora/v2/trace"
 
 	"github.com/sijms/go-ora/v2/converters"
 )
 
-//var ErrConnectionReset error = errors.New("connection reset")
-
+// var ErrConnectionReset error = errors.New("connection reset")
 var read_buffer_size = 0x4000
 
 type Data interface {
@@ -67,7 +67,7 @@ type Session struct {
 	ClrChunkSize      int
 	breakConn         bool
 	Connected         bool
-	//resetConn         bool
+	// resetConn         bool
 	SSL struct {
 		CertificateRequest []*x509.CertificateRequest
 		PrivateKeys        []*rsa.PrivateKey
@@ -87,12 +87,12 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 		},
 	}
 	return &Session{
-		//ctx:        context.Background(),
+		// ctx:        context.Background(),
 		conn:       nil,
 		inBuffer:   input,
 		index:      0,
 		lastPacket: bytes.Buffer{},
-		//connOption:      *connOption,
+		// connOption:      *connOption,
 		Context:         NewSessionContext(options),
 		Summary:         nil,
 		UseBigClrChunks: false,
@@ -100,9 +100,10 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 		tracer:          trace.NilTracer(),
 	}
 }
+
 func NewSession(config *configurations.ConnectionConfig, tracer trace.Tracer) *Session {
 	return &Session{
-		//ctx:             context.Background(),
+		// ctx:             context.Background(),
 		conn:            nil,
 		inBuffer:        nil,
 		index:           0,
@@ -171,6 +172,7 @@ func (session *Session) resetWrite() {
 	session.outBuffer.Reset()
 	session.mu.Unlock()
 }
+
 func (session *Session) resetRead() {
 	session.inBuffer = nil
 	session.index = 0
@@ -188,6 +190,7 @@ func (session *Session) SetConnected() {
 	defer session.mu.Unlock()
 	session.Connected = true
 }
+
 func (session *Session) StartContext(ctx context.Context) chan struct{} {
 	//session.oldCtx = session.ctx
 	//session.ctx = ctx
@@ -196,7 +199,7 @@ func (session *Session) StartContext(ctx context.Context) chan struct{} {
 	go func(idone chan struct{}, mu *sync.Mutex) {
 		var err error
 		mu.Lock()
-		var tracer = session.tracer
+		tracer := session.tracer
 		mu.Unlock()
 		select {
 		case <-idone:
@@ -225,6 +228,7 @@ func (session *Session) StartContext(ctx context.Context) chan struct{} {
 	}(done, &session.mu)
 	return done
 }
+
 func (session *Session) EndContext(done chan struct{}) {
 	if done != nil {
 		close(done)
@@ -251,7 +255,7 @@ func (session *Session) EndContext(done chan struct{}) {
 
 func (session *Session) initRead() error {
 	var err error
-	var timeout = time.Time{}
+	timeout := time.Time{}
 	if session.Context.connConfig.Timeout > 0 {
 		timeout = time.Now().Add(session.Context.connConfig.Timeout)
 	}
@@ -270,7 +274,7 @@ func (session *Session) initRead() error {
 
 func (session *Session) initWrite() error {
 	var err error
-	var timeout = time.Time{}
+	timeout := time.Time{}
 	if session.Context.connConfig.Timeout > 0 {
 		timeout = time.Now().Add(session.Context.connConfig.Timeout)
 	}
@@ -500,9 +504,9 @@ func (session *Session) Connect(ctx context.Context) error {
 	session.Disconnect()
 	session.tracer.Print("Connect")
 	var err error
-	var connected = false
+	connected := false
 	var host *configurations.ServerAddr
-	var loop = true
+	loop := true
 	dialer := connOption.Dialer
 	if dialer == nil {
 		dialer = &net.Dialer{}
@@ -514,7 +518,7 @@ func (session *Session) Connect(ctx context.Context) error {
 			dialer = &net.Dialer{}
 		}
 	}
-	//connOption.serverIndex = 0
+	// connOption.serverIndex = 0
 	for loop {
 		host = connOption.GetActiveServer(false)
 		if host == nil {
@@ -623,7 +627,7 @@ func (session *Session) WriteFinalPacket() error {
 func (session *Session) Disconnect() {
 	session.mu.Lock()
 	defer session.mu.Unlock()
-	//session.ResetBuffer()
+	// session.ResetBuffer()
 	if session.sslConn != nil {
 		_ = session.sslConn.Close()
 		session.sslConn = nil
@@ -648,7 +652,7 @@ func (session *Session) Write() error {
 			return err
 		}
 		return session.writePacket(pck)
-		//return errors.New("the output buffer is empty")
+		// return errors.New("the output buffer is empty")
 	}
 
 	segmentLen := int(session.Context.SessionDataUnit - 64)
@@ -727,7 +731,7 @@ func (session *Session) processMarker() error {
 	//}
 
 	return nil
-	//breakConn, resetConn := false, false
+	// breakConn, resetConn := false, false
 
 	//switch input.markerType {
 	//case 0:
@@ -838,7 +842,7 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 				return nil, err
 			}
 			session.index = session.breakIndex
-			//session.ResetBreak()
+			// session.ResetBreak()
 			return nil, ErrConnReset
 		} else {
 			return nil, fmt.Errorf("receive abnormal packet type %d instead of data packet", pck.getPacketType())
@@ -902,7 +906,7 @@ func (session *Session) writePacket(pck PacketInterface) error {
 	session.sendPcks = append(session.sendPcks, pck)
 	tmp := pck.bytes()
 	session.tracer.LogPacket("Write packet:", tmp)
-	var err = session.initWrite()
+	err := session.initWrite()
 	if err != nil {
 		return err
 	}
@@ -936,8 +940,8 @@ func (session *Session) GetError() *OracleError {
 }
 
 func (session *Session) readAll(size int) error {
-	//session.mu.Lock()
-	//defer session.mu.Unlock()
+	// session.mu.Lock()
+	// defer session.mu.Unlock()
 	index := 0
 	tempBuffer := make([]byte, size)
 	var err error
@@ -971,7 +975,7 @@ func (session *Session) readAll(size int) error {
 func (session *Session) readPacketData() error {
 	var err error
 	if session.remainingBytes > 0 {
-		if session.lastPacket.Len() < 8 { //means break occur inside head
+		if session.lastPacket.Len() < 8 { // means break occur inside head
 		}
 		err = session.readAll(session.remainingBytes)
 		if err != nil {
@@ -983,7 +987,7 @@ func (session *Session) readPacketData() error {
 	session.lastPacket.Reset()
 	err = session.readAll(8)
 	if err != nil {
-		//if remaining bytes = 8 means no data read so make it 0
+		// if remaining bytes = 8 means no data read so make it 0
 		if session.remainingBytes == 8 {
 			session.remainingBytes = 0
 		}
@@ -991,8 +995,8 @@ func (session *Session) readPacketData() error {
 	}
 	head := session.lastPacket.Bytes()
 	var length uint32
-	//pckType := PacketType(head[4])
-	//flag := head[5]
+	// pckType := PacketType(head[4])
+	// flag := head[5]
 
 	if session.Context.handshakeComplete && session.Context.Version >= 315 {
 		length = binary.BigEndian.Uint32(head)
@@ -1018,15 +1022,15 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	packetData := session.lastPacket.Bytes()
 	pckType := PacketType(packetData[4])
 	flag := packetData[5]
-	//session.isFinalPacketRead = flag&0x20 > 0
-	//log.Printf("Response: %#v\n\n", packetData)
+	// session.isFinalPacketRead = flag&0x20 > 0
+	// log.Printf("Response: %#v\n\n", packetData)
 	switch pckType {
 	case RESEND:
 		if session.Context.connConfig.SSL && flag&8 != 0 {
 			session.negotiate()
 			session.reader = bufio.NewReaderSize(session.sslConn, read_buffer_size)
 		}
-		var resend = func() error {
+		resend := func() error {
 			session.mu.Lock()
 			defer session.mu.Unlock()
 			for _, pck := range session.sendPcks {
@@ -1088,7 +1092,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		} else {
 			data = string(packetData[10 : 10+dataLen])
 		}
-		//fmt.Println("data returned: ", data)
+		// fmt.Println("data returned: ", data)
 		length := strings.Index(data, "\x00")
 		if pck.flag&2 != 0 && length > 0 {
 			pck.redirectAddr = data[:length]
@@ -1338,7 +1342,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		//}
 		//fallthrough
 	default:
-		//fmt.Printf("Packet Data: %#v\n", packetData)
+		// fmt.Printf("Packet Data: %#v\n", packetData)
 		return nil, fmt.Errorf("unsupported packet type: %d", pckType)
 	}
 }
@@ -1389,7 +1393,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compr
 	// if the size is one byte no compression occur only one byte written
 	if size == 1 {
 		session.outBuffer.WriteByte(uint8(num))
-		//session.OutBuffer = append(session.OutBuffer, uint8(num))
+		// session.OutBuffer = append(session.OutBuffer, uint8(num))
 		return
 	}
 	if compress {
@@ -1401,12 +1405,12 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compr
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			//session.OutBuffer = append(session.OutBuffer, 0)
+			// session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			session.outBuffer.WriteByte(size)
 			session.outBuffer.Write(temp)
-			//session.OutBuffer = append(session.OutBuffer, size)
-			//session.OutBuffer = append(session.OutBuffer, temp...)
+			// session.OutBuffer = append(session.OutBuffer, size)
+			// session.OutBuffer = append(session.OutBuffer, temp...)
 		}
 	} else {
 		temp := make([]byte, size)
@@ -1430,7 +1434,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian, compr
 			}
 		}
 		session.outBuffer.Write(temp)
-		//session.OutBuffer = append(session.OutBuffer, temp...)
+		// session.OutBuffer = append(session.OutBuffer, temp...)
 	}
 }
 
@@ -1471,7 +1475,7 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			//session.OutBuffer = append(session.OutBuffer, 0)
+			// session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			if num < 0 {
 				num = num * -1
@@ -1600,7 +1604,7 @@ func (session *Session) GetInt64(size int, compress bool, bigEndian bool) (int64
 		ret = int64(binary.BigEndian.Uint64(temp))
 	} else {
 		copy(temp[:size], rb)
-		//temp = append(pck.buffer[pck.index: pck.index + size], temp...)
+		// temp = append(pck.buffer[pck.index: pck.index + size], temp...)
 		ret = int64(binary.LittleEndian.Uint64(temp))
 	}
 	if negFlag {
@@ -1941,7 +1945,7 @@ func (session *Session) WriteKeyVal(buffer *bytes.Buffer, key []byte, val []byte
 	}
 	if len(val) == 0 {
 		buffer.WriteByte(0)
-		//session.OutBuffer = append(session.OutBuffer, 0)
+		// session.OutBuffer = append(session.OutBuffer, 0)
 	} else {
 		session.WriteUint(buffer, len(val), 4, true, true)
 		session.WriteClr(buffer, val)

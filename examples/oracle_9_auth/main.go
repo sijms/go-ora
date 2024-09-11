@@ -55,6 +55,7 @@ func getKeyFromUserNameAndPassword(username string, password string) ([]byte, er
 	// function OSLogonHelper.Method1_bytearray (DecryptSessionKey)
 	return append(key2, make([]byte, 8)...), nil
 }
+
 func decryptSessionKey2(encKey []byte, sessionKey string) ([]byte, error) {
 	result, err := hex.DecodeString(sessionKey)
 	if err != nil {
@@ -88,8 +89,8 @@ func encryptPassword(password string, key []byte) (string, error) {
 	// [36, -90, -28, -115, -91, 95, -80, -2]
 	fmt.Println("enc password: ", encPassword)
 	return hex.EncodeToString(encPassword), nil
-
 }
+
 func decryptSessionKey(padding bool, encKey []byte, sessionKey string) ([]byte, error) {
 	result, err := hex.DecodeString(sessionKey)
 	if err != nil {
@@ -123,6 +124,7 @@ func decryptSessionKey(padding bool, encKey []byte, sessionKey string) ([]byte, 
 	}
 	return output[:len(output)-cutLen], nil
 }
+
 func main() {
 	username := "LAB"
 	password := "lab"
@@ -143,5 +145,4 @@ func main() {
 	fmt.Println(sessionKey)
 
 	fmt.Println(encryptPassword(password, sessionKey))
-
 }

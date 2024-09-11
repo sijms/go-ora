@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 //func dieOnError(msg string, err error) {
@@ -119,6 +120,7 @@ func callStoredProcedure(conn *sql.DB) error {
 	fmt.Println("Name: ", name, "\tVal: ", val, "\tDate: ", date)
 	return nil
 }
+
 func usage() {
 	fmt.Println()
 	fmt.Println("store_proc")
@@ -132,10 +134,9 @@ func usage() {
 	fmt.Println(`  store_proc -server "oracle://user:pass@server/service_name"`)
 	fmt.Println()
 }
+
 func main() {
-	var (
-		server string
-	)
+	var server string
 
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()

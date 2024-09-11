@@ -3,8 +3,9 @@ package go_ora
 import (
 	"bytes"
 	"errors"
-	"github.com/sijms/go-ora/v2/converters"
 	"go/types"
+
+	"github.com/sijms/go-ora/v2/converters"
 )
 
 type Clob struct {
@@ -53,10 +54,10 @@ func (lob *Lob) initialize() {
 	lob.bNullO2U = false
 	lob.sendSize = false
 	lob.size = 0
-	//lob.charsetID = 0
+	// lob.charsetID = 0
 	lob.sourceOffset = 0
 	lob.destOffset = 0
-	//lob.scn = nil
+	// lob.scn = nil
 }
 
 // variableWidthChar if lob has variable width char or not
@@ -458,7 +459,7 @@ func (lob *Lob) read() error {
 			if msg == 9 {
 				loop = false
 			}
-			//return errors.New(fmt.Sprintf("TTC error: received code %d during LOB reading", msg))
+			// return errors.New(fmt.Sprintf("TTC error: received code %d during LOB reading", msg))
 		}
 	}
 	//if session.IsBreak() {
@@ -570,7 +571,7 @@ func (lob *Lob) readData() error {
 }
 
 func (lob *Lob) GetLobId(locator []byte) []byte {
-	//BitConverter.ToString(lobLocator, 10, 10);
+	// BitConverter.ToString(lobLocator, 10, 10);
 	return locator[10 : 10+10]
 }
 
@@ -634,9 +635,9 @@ func (val *Clob) Scan(value interface{}) error {
 }
 
 func (val *Blob) Scan(value interface{}) error {
-	//val.Valid = true
+	// val.Valid = true
 	if value == nil {
-		//val.Valid = false
+		// val.Valid = false
 		val.Data = nil
 		return nil
 	}
@@ -685,9 +686,11 @@ func (val *NClob) Scan(value interface{}) error {
 func (val Blob) getLocator() []byte {
 	return val.locator
 }
+
 func (val Clob) getLocator() []byte {
 	return val.locator
 }
+
 func (val NClob) getLocator() []byte {
 	return val.locator
 }

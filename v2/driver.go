@@ -5,11 +5,12 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/advanced_nego"
-	"github.com/sijms/go-ora/v2/configurations"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/sijms/go-ora/v2/advanced_nego"
+	"github.com/sijms/go-ora/v2/configurations"
 
 	"github.com/sijms/go-ora/v2/converters"
 )
@@ -23,14 +24,14 @@ type OracleDriver struct {
 	nStrConv      converters.IStringConverter
 	UserId        string
 	connOption    *configurations.ConnectionConfig
-	//Server    string
-	//Port      int
-	//Instance  string
-	//Service   string
-	//DBName    string
+	// Server    string
+	// Port      int
+	// Instance  string
+	// Service   string
+	// DBName    string
 
-	//SessionId int
-	//SerialNum int
+	// SessionId int
+	// SerialNum int
 }
 
 var oracleDriver = &OracleDriver{
@@ -94,6 +95,7 @@ func SetStringConverter(db GetDriverInterface, charset, nCharset converters.IStr
 		driver.nStrConv = nCharset
 	}
 }
+
 func DelSessionParam(db *sql.DB, key string) {
 	if drv, ok := db.Driver().(*OracleDriver); ok {
 		drv.mu.Lock()
@@ -101,6 +103,7 @@ func DelSessionParam(db *sql.DB, key string) {
 		delete(drv.sessionParam, key)
 	}
 }
+
 func AddSessionParam(db *sql.DB, key, value string) error {
 	_, err := db.Exec(fmt.Sprintf("alter session set %s=%s", key, value))
 	if err != nil {
@@ -240,7 +243,7 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 	cust := customType{
 		owner: owner,
 		name:  typeName,
-		//arrayTypeName: arrayTypeName,
+		// arrayTypeName: arrayTypeName,
 		typ: typ,
 	}
 	arrayCust := customType{owner: owner, name: arrayTypeName, isArray: true}
@@ -265,7 +268,7 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 		arrayParam.DataType = DATE
 	case "TIMESTAMP WITH LOCAL TIME ZONE":
 		arrayParam.DataType = TimeStampLTZ_DTY
-	//case "TIMESTAMP WITH TIME ZONE":
+	// case "TIMESTAMP WITH TIME ZONE":
 	//	arrayParam.DataType = TimeStampTZ_DTY
 	//	arrayParam.MaxLen = converters.MAX_LEN_TIMESTAMP
 	case "RAW":
@@ -438,5 +441,4 @@ func ParseConfig(dsn string) (*configurations.ConnectionConfig, error) {
 
 func RegisterConnConfig(config *configurations.ConnectionConfig) {
 	oracleDriver.connOption = config
-
 }

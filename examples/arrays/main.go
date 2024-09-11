@@ -5,9 +5,10 @@ import (
 	"database/sql/driver"
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -84,6 +85,7 @@ func bulkInsert(databaseUrl string) error {
 	fmt.Printf("%d rows inserted: %v\n", rowsAffected, time.Now().Sub(t))
 	return nil
 }
+
 func dropPackage(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec(`drop package GOORA_TEMP_PKG`)
@@ -93,6 +95,7 @@ func dropPackage(conn *sql.DB) error {
 	fmt.Println("Drop package: ", time.Now().Sub(t))
 	return nil
 }
+
 func createPackage(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `create or replace package GOORA_TEMP_PKG as
@@ -227,9 +230,7 @@ func usage() {
 }
 
 func main() {
-	var (
-		server string
-	)
+	var server string
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
 

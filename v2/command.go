@@ -8,12 +8,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/configurations"
-	"github.com/sijms/go-ora/v2/network"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/v2/lazy_init"
+
+	"github.com/sijms/go-ora/v2/configurations"
+	"github.com/sijms/go-ora/v2/network"
 )
 
 type StmtType int
@@ -38,7 +41,7 @@ type StmtInterface interface {
 type defaultStmt struct {
 	connection *Connection
 	text       string
-	//disableCompression bool
+	// disableCompression bool
 	_hasLONG          bool
 	_hasBLOB          bool
 	_hasMoreRows      bool
@@ -59,6 +62,7 @@ type defaultStmt struct {
 func (stmt *defaultStmt) CanAutoClose() bool {
 	return stmt.autoClose
 }
+
 func (stmt *defaultStmt) hasMoreRows() bool {
 	return stmt._hasMoreRows
 }
@@ -85,13 +89,12 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	session.PutUint(stmt.cursorID, 2, true, true)
 	if stmt.cursorID == 0 {
 		session.PutBytes(1)
-
 	} else {
 		session.PutBytes(0)
 	}
 	if parse {
 		session.PutUint(len(strConv.Encode(stmt.text)), 4, true, true)
-		//session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
+		// session.PutUint(len(stmt.connection.strConv.Encode(stmt.text)), 4, true, true)
 		session.PutBytes(1)
 	} else {
 		session.PutBytes(0, 1)
@@ -103,8 +106,8 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutUint(stmt._noOfRowsToFetch, 4, true, true)
 	} else {
 		session.PutBytes(0, 0)
-		//session.PutUint(0, 4, true, true)
-		//session.PutUint(0, 4, true, true)
+		// session.PutUint(0, 4, true, true)
+		// session.PutUint(0, 4, true, true)
 	}
 	//switch (longFetchSize)
 	//{
@@ -121,7 +124,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	// we use here int.MaxValue
 	if stmt.connection.connOption.Lob == configurations.INLINE {
 		session.PutInt(0x3FFFFFFF, 4, true, true)
-		//session.PutUint(0, 4, true, true)
+		// session.PutUint(0, 4, true, true)
 	} else {
 		session.PutUint(0x7FFFFFFF, 4, true, true)
 	}
@@ -184,8 +187,8 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	case OTHERS:
 		al8i4[1] = 1
 	default:
-		//this.m_al8i4[1] = !fetch ? 0L : noOfRowsToFetch;
-		//al8i4[1] = stmt._noOfRowsToFetch
+		// this.m_al8i4[1] = !fetch ? 0L : noOfRowsToFetch;
+		// al8i4[1] = stmt._noOfRowsToFetch
 		if stmt.connection.connOption.Lob == configurations.INLINE {
 			if parse {
 				al8i4[1] = 0
@@ -242,10 +245,10 @@ func (stmt *defaultStmt) writeDefine() error {
 		col.MaxCharLen = 0
 		if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
 			num = 0
-			//temp.ContFlag |= 0x2000000
+			// temp.ContFlag |= 0x2000000
 			if stmt.connection.connOption.Lob == configurations.INLINE && !col.IsJson {
 				num = 0x3FFFFFFF
-				//col.MaxCharLen = 0
+				// col.MaxCharLen = 0
 				if col.DataType == OCIBlobLocator {
 					col.DataType = LongRaw
 					// change data type in the original array
@@ -257,7 +260,7 @@ func (stmt *defaultStmt) writeDefine() error {
 				}
 			} else {
 				col.ContFlag |= 0x2000000
-				//num = 0x7FFFFFFF
+				// num = 0x7FFFFFFF
 				col.MaxCharLen = 0x8000
 			}
 		} else {
@@ -276,13 +279,13 @@ func (stmt *defaultStmt) writeDefine() error {
 
 type Stmt struct {
 	defaultStmt
-	//reExec           bool
+	// reExec           bool
 	reSendParDef bool
 	parse        bool // means parse the command in the server this occurs if the stmt is not cached
 	execute      bool
 	define       bool
 	bulkExec     bool
-	//noOfDefCols        int
+	// noOfDefCols        int
 }
 
 type QueryResult struct {
@@ -298,50 +301,55 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 	return rs.rowsAffected, nil
 }
 
+var sqlQueryReturnStatementRegexp = lazy_init.NewLazyInit(func() (interface{}, error) {
+	return regexp.Compile(`(\bRETURNING\b|\bRETURN\b)\s+.*\s+\bINTO\b`)
+})
+
 // NewStmt create new stmt and set its connection properties
 func NewStmt(text string, conn *Connection) *Stmt {
-	ret := &Stmt{
+	stmt := &Stmt{
 		reSendParDef: false,
 		parse:        true,
 		execute:      true,
 		define:       false,
 	}
-	ret.connection = conn
-	ret.text = text
-	ret._hasBLOB = false
-	ret._hasLONG = false
-	//ret.disableCompression = false
-	ret.arrayBindCount = 0
-	ret.scnForSnapshot = make([]int, 2)
+	stmt.connection = conn
+	stmt.text = text
+	stmt._hasBLOB = false
+	stmt._hasLONG = false
+	// stmt.disableCompression = false
+	stmt.arrayBindCount = 0
+	stmt.scnForSnapshot = make([]int, 2)
 	// get stmt type
 	uCmdText := strings.ToUpper(refineSqlText(text))
 	if strings.HasPrefix(uCmdText, "(") {
 		uCmdText = uCmdText[1:]
 	}
 	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
-		ret.stmtType = SELECT
+		stmt.stmtType = SELECT
 	} else if strings.HasPrefix(uCmdText, "INSERT") ||
 		strings.HasPrefix(uCmdText, "MERGE") {
-		ret.stmtType = DML
-		ret.bulkExec = true
+		stmt.stmtType = DML
+		stmt.bulkExec = true
 	} else if strings.HasPrefix(uCmdText, "UPDATE") ||
 		strings.HasPrefix(uCmdText, "DELETE") {
-		ret.stmtType = DML
+		stmt.stmtType = DML
 	} else if strings.HasPrefix(uCmdText, "DECLARE") || strings.HasPrefix(uCmdText, "BEGIN") {
-		ret.stmtType = PLSQL
+		stmt.stmtType = PLSQL
 	} else {
-		ret.stmtType = OTHERS
+		stmt.stmtType = OTHERS
 	}
+
 	// returning clause
-	var err error
-	if ret.stmtType != PLSQL {
-		//ret._hasReturnClause, err = regexp.MatchString(`\bRETURNING\b\s+(\w+\s*,\s*)*\s*\w+\s+\bINTO\b`, uCmdText)
-		ret._hasReturnClause, err = regexp.MatchString(`(\bRETURNING\b|\bRETURN\b)\s+.*\s+\bINTO\b`, uCmdText)
+	if stmt.stmtType != PLSQL {
+		sqlQueryReturnStatementRegexpAny, err := sqlQueryReturnStatementRegexp.GetValue()
 		if err != nil {
-			ret._hasReturnClause = false
+			stmt._hasReturnClause = false
+			return stmt
 		}
+		stmt._hasReturnClause = sqlQueryReturnStatementRegexpAny.(*regexp.Regexp).MatchString(uCmdText)
 	}
-	return ret
+	return stmt
 }
 
 func (stmt *Stmt) writePars() error {
@@ -486,7 +494,7 @@ func (stmt *Stmt) write() error {
 			}
 		}
 	} else {
-		//stmt.reExec = true
+		// stmt.reExec = true
 		err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
 		if err != nil {
 			return err
@@ -597,7 +605,7 @@ func (stmt *Stmt) getExeOption() int {
 // fetch get more rows from network stream
 func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	if stmt._noOfRowsToFetch == 25 {
-		//m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
+		// m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
 		maxRowSize := 0
 		for _, col := range stmt.columns {
 			if col.DataType == OCIClobLocator || col.DataType == OCIBlobLocator {
@@ -617,7 +625,7 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	}
 
 	tracer := stmt.connection.tracer
-	var err = stmt._fetch(dataSet)
+	err := stmt._fetch(dataSet)
 	if errors.Is(err, network.ErrConnReset) {
 		err = stmt.connection.read()
 		session := stmt.connection.session
@@ -672,11 +680,12 @@ func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 	//
 	//}
 	return stmt.decodePrim(dataSet)
-	//return nil
+	// return nil
 }
+
 func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 	if stmt._noOfRowsToFetch == 25 {
-		//m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
+		// m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
 		maxRowSize := 0
 		for _, col := range stmt.columns {
 			if col.isLobType() {
@@ -771,9 +780,9 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 			}
 			if !after7 {
 				if stmt.stmtType == SELECT {
-					//b, _ := session.GetBytes(0x10)
-					//fmt.Printf("%#v\n", b)
-					//return errors.New("interrupt")
+					// b, _ := session.GetBytes(0x10)
+					// fmt.Printf("%#v\n", b)
+					// return errors.New("interrupt")
 				}
 			}
 		case 7:
@@ -834,7 +843,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 							} else {
 								//_, err = session.GetClr()
 							}
-
 						}
 					}
 				} else {
@@ -865,7 +873,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 						}
 						newRow[index] = col.oPrimValue
 					}
-					//copy(newRow, dataSet.currentRow)
+					// copy(newRow, dataSet.currentRow)
 					dataSet.rows = append(dataSet.rows, newRow)
 				}
 			}
@@ -896,10 +904,10 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 				if err != nil {
 					return err
 				}
-				//fmt.Println(key, val, num)
+				// fmt.Println(key, val, num)
 				if num == 163 {
 					session.TimeZone = val
-					//fmt.Println("session time zone", session.TimeZone)
+					// fmt.Println("session time zone", session.TimeZone)
 				}
 			}
 			if session.TTCVersion >= 4 {
@@ -924,7 +932,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 				if err != nil {
 					return err
 				}
-				//for (int index = 0; index < length3; ++index)
+				// for (int index = 0; index < length3; ++index)
 				//	rowsAffectedByArrayBind[index] = this.m_marshallingEngine.UnmarshalSB8();
 				for i := 0; i < length; i++ {
 					_, err = session.GetInt(8, true, true)
@@ -938,7 +946,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 			if err != nil {
 				return err
 			}
-			//dataSet.BindDirections = make([]byte, dataSet.columnCount)
+			// dataSet.BindDirections = make([]byte, dataSet.columnCount)
 			for x := 0; x < dataSet.columnCount; x++ {
 				direction, err := session.GetByte()
 				switch direction {
@@ -1031,7 +1039,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 				return err
 			}
 			for x := 0; x < count; x++ {
-				//refCursorAccessor.UnmarshalOneRow();
+				// refCursorAccessor.UnmarshalOneRow();
 				// this function is equal to load cursor so each item is a cursor
 				cursor := RefCursor{}
 				cursor.connection = stmt.connection
@@ -1077,12 +1085,12 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 	if stmt.connection.tracer.IsOn() {
 		dataSet.Trace(stmt.connection.tracer)
 	}
-	//return stmt.readLobs(dataSet)
+	// return stmt.readLobs(dataSet)
 	return nil
 }
 
 func (stmt *defaultStmt) freeTemporaryLobs() error {
-	//var locators = collectLocators(stmt.Pars)
+	// var locators = collectLocators(stmt.Pars)
 	if len(stmt.temporaryLobs) == 0 {
 		return nil
 	}
@@ -1110,7 +1118,7 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	session.ResetBuffer()
 	for start < len(stmt.temporaryLobs) {
 		end = start + 25000
-		//end = start + 25
+		// end = start + 25
 		if end > len(stmt.temporaryLobs) {
 			end = len(stmt.temporaryLobs)
 		}
@@ -1131,17 +1139,17 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	session.SaveState(nil)
 	session.PutBytes(0x3, 0x5c, 0)
 	session.PutInt(3, 4, true, true)
-	//session.PutInt(0x5C0003, 4, true, true)
-	//session.PutBytes(bytes.Repeat([]byte{0}, 79)...)
+	// session.PutInt(0x5C0003, 4, true, true)
+	// session.PutBytes(bytes.Repeat([]byte{0}, 79)...)
 
 	session.PutBytes(bytes.Repeat([]byte{0}, 19)...)
 	session.PutInt(2, 4, true, true)
-	//session.PutBytes(2)
+	// session.PutBytes(2)
 	session.PutInt(len(stmt.connection.connOption.UserID), 4, true, true)
-	//session.PutBytes(0, 0, 0)
+	// session.PutBytes(0, 0, 0)
 	session.PutClr(stmt.connection.sStrConv.Encode(stmt.connection.connOption.UserID))
 	session.PutInt(len(typeName), 4, true, true)
-	//session.PutBytes(0, 0, 0)
+	// session.PutBytes(0, 0, 0)
 	session.PutClr(stmt.connection.sStrConv.Encode(typeName))
 	//session.PutBytes(0, 0, 0)
 	//if session.TTCVersion >= 4 {
@@ -1170,9 +1178,9 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	//session.PutBytes(0)
 	session.PutBytes(0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
 	session.PutBytes(bytes.Repeat([]byte{0}, 50)...)
-	//session.PutBytes(0)
-	//session.PutInt(0x10000, 4, true, true)
-	//session.PutBytes(0, 0)
+	// session.PutBytes(0)
+	// session.PutInt(0x10000, 4, true, true)
+	// session.PutBytes(0, 0)
 	err := session.Write()
 	if err != nil {
 		return err
@@ -1192,7 +1200,7 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) erro
 	//	stmt._hasBLOB = true
 	//}
 	if col.DataType == REFCURSOR {
-		var cursor = new(RefCursor)
+		cursor := new(RefCursor)
 		cursor.connection = stmt.connection
 		cursor.parent = stmt
 		cursor.autoClose = true
@@ -1206,7 +1214,7 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) erro
 				return err
 			}
 		}
-		//col.Value = cursor
+		// col.Value = cursor
 		col.oPrimValue = cursor
 		return nil
 	}
@@ -1292,13 +1300,14 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	}
 	if err != nil {
 		if isBadConn(err) {
-			//tracer.Print("Error: ", err)
+			// tracer.Print("Error: ", err)
 			stmt.connection.setBad()
 		}
 		return nil, err
 	}
 	return result, nil
 }
+
 func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 	structType := reflect.TypeOf(parValue)
 	structVal := reflect.ValueOf(parValue)
@@ -1321,7 +1330,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 							} else {
 								err = setNumber(fieldValue, tempVal)
 							}
-						//case *sql.NullFloat64:
+						// case *sql.NullFloat64:
 						//	if tempVal.Valid {
 						//		err = setNumber(fieldValue, tempVal.Float64)
 						//	} else {
@@ -1390,6 +1399,7 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 	}
 	return nil
 }
+
 func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars int, err error) {
 	tempType := reflect.TypeOf(parValue)
 	structValue := reflect.ValueOf(parValue)
@@ -1418,19 +1428,19 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "varchar":
-			var fieldVal = &sql.NullString{}
+			fieldVal := &sql.NullString{}
 			if !hasNullValue {
 				fieldVal.String, fieldVal.Valid = getString(fieldValue), true
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "nvarchar":
-			var fieldVal = &NullNVarChar{}
+			fieldVal := &NullNVarChar{}
 			if !hasNullValue {
 				fieldVal.NVarChar, fieldVal.Valid = NVarChar(getString(fieldValue)), true
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "date":
-			var fieldVal = &sql.NullTime{}
+			fieldVal := &sql.NullTime{}
 			if !hasNullValue {
 				fieldVal.Time, err = getDate(fieldValue)
 				if err != nil {
@@ -1441,7 +1451,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "timestamp":
-			var fieldVal = &NullTimeStamp{}
+			fieldVal := &NullTimeStamp{}
 			if !hasNullValue {
 				var tempDate time.Time
 				tempDate, err = getDate(fieldValue)
@@ -1454,7 +1464,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "timestamptz":
-			var fieldVal = &NullTimeStampTZ{}
+			fieldVal := &NullTimeStampTZ{}
 			if !hasNullValue {
 				var tempDate time.Time
 				tempDate, err = getDate(fieldValue)
@@ -1573,7 +1583,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 
 func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	var err error
-	var useNamedPars = len(args) > 0
+	useNamedPars := len(args) > 0
 	parIndex := 0
 	structPars := make([]driver.Value, 0, 2)
 	for x := 0; x < len(args); x++ {
@@ -1620,7 +1630,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				return nil, err
 			}
 		default:
-			var processedPars = 0
+			processedPars := 0
 			processedPars, err = stmt.structPar(args[x].Value, parIndex)
 			if err != nil {
 				return nil, err
@@ -1646,7 +1656,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 					}
 					// see if first item is struct
 					firstItem := tempVal.Index(0)
-					//lobData := make([]*Lob, stmt.arrayBindCount)
+					// lobData := make([]*Lob, stmt.arrayBindCount)
 					if firstItem.Kind() == reflect.Struct {
 						fieldCount := firstItem.NumField()
 						structArrayAsNamedPars := make([]driver.NamedValue, 0, fieldCount)
@@ -1692,9 +1702,9 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						Direction: Input,
 					}
 					// calculate maxLen, maxCharLen and DataType
-					//maxLen := par.MaxLen
-					//maxCharLen := par.MaxCharLen
-					//dataType := par.DataType
+					// maxLen := par.MaxLen
+					// maxCharLen := par.MaxCharLen
+					// dataType := par.DataType
 					maxLen := 0
 					maxCharLen := 0
 					dataType := TNSType(0)
@@ -1812,11 +1822,11 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 
 // useNamedParameters: re-arrange parameters according parameter defined in sql text
 func (stmt *Stmt) useNamedParameters() error {
-	names, err := parseSqlText(stmt.text)
+	names, err := parseQueryParametersNames(stmt.text)
 	if err != nil {
 		return err
 	}
-	var parCollection = make([]ParameterInfo, 0, len(names))
+	parCollection := make([]ParameterInfo, 0, len(names))
 	if stmt.stmtType == SELECT || stmt.stmtType == DML {
 		for x := 0; x < len(names); x++ {
 			found := false
@@ -1844,7 +1854,7 @@ func (stmt *Stmt) useNamedParameters() error {
 			for y := x - 1; y >= 0; y-- {
 				if names[y] == names[x] {
 					repeated = true
-					//parCollection[x].Flag = 0x80
+					// parCollection[x].Flag = 0x80
 					break
 				}
 			}
@@ -1883,7 +1893,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	if len(args) == 0 {
 		result, err = stmt._exec(nil)
 	} else {
-		var namedArgs = make([]driver.NamedValue, len(args))
+		namedArgs := make([]driver.NamedValue, len(args))
 		for x := 0; x < len(args); x++ {
 			namedArgs[x].Value = args[x]
 		}
@@ -1959,7 +1969,7 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	tracer := stmt.connection.tracer
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	stmt._hasMoreRows = true
-	var useNamedPars = len(namedArgs) > 0
+	useNamedPars := len(namedArgs) > 0
 	for x := 0; x < len(namedArgs); x++ {
 		par, err := stmt.NewParam(namedArgs[x].Name, namedArgs[x].Value, 0, Input)
 		if err != nil {
@@ -2019,7 +2029,7 @@ func (stmt *Stmt) reset() {
 	stmt._hasBLOB = false
 	stmt._hasLONG = false
 	stmt.bulkExec = false
-	//stmt.disableCompression = false
+	// stmt.disableCompression = false
 	stmt.arrayBindCount = 0
 	stmt.columns = nil
 }
@@ -2078,7 +2088,7 @@ func (stmt *defaultStmt) decodePrim(dataSet *DataSet) error {
 				}
 			case Lob:
 				if col.DataType == OCIClobLocator {
-					var tempString = sql.NullString{"", false}
+					tempString := sql.NullString{"", false}
 					err = setLob(reflect.ValueOf(&tempString).Elem(), val)
 					if err != nil {
 						return err
@@ -2126,7 +2136,7 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if len(args) == 0 {
 		dataSet, err = stmt.Query_(nil)
 	} else {
-		var namedArgs = make([]driver.NamedValue, len(args))
+		namedArgs := make([]driver.NamedValue, len(args))
 		for x := 0; x < len(args); x++ {
 			namedArgs[x].Value = args[x]
 		}

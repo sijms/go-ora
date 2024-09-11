@@ -3,6 +3,7 @@ package go_ora
 import (
 	"bytes"
 	"errors"
+
 	"github.com/sijms/go-ora/network"
 )
 
@@ -23,12 +24,14 @@ func (lob *Lob) variableWidthChar() bool {
 	}
 	return false
 }
+
 func (lob *Lob) littleEndianClob() bool {
 	if len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&64 > 0 {
 		return true
 	}
 	return false
 }
+
 func (lob *Lob) getSize(conn *Connection) (size int64, err error) {
 	session := conn.session
 	tracer := conn.connOption.Tracer
@@ -45,6 +48,7 @@ func (lob *Lob) getSize(conn *Connection) (size int64, err error) {
 	tracer.Print("Lob Size: ", size)
 	return
 }
+
 func (lob *Lob) getData(conn *Connection) (data []byte, err error) {
 	session := conn.session
 	tracer := conn.connOption.Tracer
@@ -61,6 +65,7 @@ func (lob *Lob) getData(conn *Connection) (data []byte, err error) {
 	data = lob.data.Bytes()
 	return
 }
+
 func (lob *Lob) write(session *network.Session, operationID int) error {
 	session.ResetBuffer()
 	session.PutBytes(3, 0x60, 0)
@@ -217,11 +222,12 @@ func (lob *Lob) read(session *network.Session) error {
 	}
 	return nil
 }
+
 func (lob *Lob) readData(session *network.Session) error {
 	num1 := 0 // data readed in the call of this function
 	var chunkSize byte = 0
 	var err error
-	//num3 := offset // the data readed from the start of read operation
+	// num3 := offset // the data readed from the start of read operation
 	num4 := 0
 	for num4 != 4 {
 		switch num4 {
@@ -260,7 +266,7 @@ func (lob *Lob) readData(session *network.Session) error {
 			}
 			lob.data.Write(chunk)
 			num1 += int(chunkSize)
-			//num3 += chunkSize
+			// num3 += chunkSize
 			num4 = 2
 		}
 	}

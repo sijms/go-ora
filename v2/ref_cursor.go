@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"database/sql/driver"
+
 	"github.com/sijms/go-ora/v2/configurations"
 )
 
@@ -18,7 +19,6 @@ func (cursor *RefCursor) load() error {
 	cursor._hasLONG = false
 	cursor._hasBLOB = false
 	cursor._hasReturnClause = false
-	//cursor.disableCompression = false
 	cursor.arrayBindCount = 1
 	cursor.scnForSnapshot = make([]int, 2)
 	cursor.stmtType = SELECT
@@ -92,6 +92,7 @@ func (cursor *RefCursor) load() error {
 	}
 	return nil
 }
+
 func (cursor *RefCursor) getExeOptions() int {
 	if cursor.connection.connOption.Lob == configurations.INLINE {
 		return 0x8050
@@ -99,6 +100,7 @@ func (cursor *RefCursor) getExeOptions() int {
 		return 0x8040
 	}
 }
+
 func (cursor *RefCursor) _query() (*DataSet, error) {
 	session := cursor.connection.session
 	session.ResetBuffer()
@@ -117,6 +119,7 @@ func (cursor *RefCursor) _query() (*DataSet, error) {
 	}
 	return dataSet, nil
 }
+
 func (cursor *RefCursor) Query() (*DataSet, error) {
 	if cursor.connection.State != Opened {
 		return nil, driver.ErrBadConn
@@ -140,8 +143,9 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	}
 	return dataSet, nil
 }
+
 func (cursor *RefCursor) write() error {
-	var define = false
+	define := false
 	if cursor.connection.connOption.Lob == configurations.INLINE {
 		define = true
 	}

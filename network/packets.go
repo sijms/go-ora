@@ -26,14 +26,14 @@ const (
 )
 
 type Packet struct {
-	//sessionCtx SessionContext
+	// sessionCtx SessionContext
 	dataOffset uint16
 	length     uint32
 	packetType PacketType
 	flag       uint8
-	//NSPFSID    int
-	//buffer     []byte
-	//SID        []byte
+	// NSPFSID    int
+	// buffer     []byte
+	// SID        []byte
 }
 
 //const (
@@ -63,6 +63,7 @@ func (pck *Packet) bytes() []byte {
 	output[5] = pck.flag
 	return output
 }
+
 func (pck *Packet) getPacketType() PacketType {
 	return pck.packetType
 }

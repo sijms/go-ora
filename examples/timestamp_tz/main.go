@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -21,6 +22,7 @@ func createTable(conn *sql.DB) error {
 	fmt.Println("Finish create table: ", time.Now().Sub(t))
 	return nil
 }
+
 func dropTable(conn *sql.DB) error {
 	t := time.Now()
 	_, err := conn.Exec("drop table TEMP_TABLE_322 purge")
@@ -53,19 +55,20 @@ func insertData(conn *sql.DB, loc string) error {
 
 func queryOutputPar(conn *sql.DB) error {
 	t := time.Now()
-	//var data sql.NullTime
+	// var data sql.NullTime
 	var data go_ora.NullTimeStampTZ
-	//var data go_ora.TimeStampTZ
+	// var data go_ora.TimeStampTZ
 	_, err := conn.Exec(`BEGIN SELECT DATA INTO :1 FROM TEMP_TABLE_322 WHERE ID=1; END;`, go_ora.Out{Dest: &data})
 	if err != nil {
 		return err
 	}
-	//fmt.Println(data, "\tLocation: ", data.Time.Location())
-	//fmt.Println(time.Time(data), "\tLocation: ", time.Time(data).Location())
+	// fmt.Println(data, "\tLocation: ", data.Time.Location())
+	// fmt.Println(time.Time(data), "\tLocation: ", time.Time(data).Location())
 	fmt.Println(time.Time(data.TimeStampTZ), "\tLocation: ", time.Time(data.TimeStampTZ).Location())
 	fmt.Println("Finish query data: ", time.Now().Sub(t))
 	return nil
 }
+
 func queryData(conn *sql.DB) error {
 	t := time.Now()
 	var data time.Time
@@ -89,6 +92,7 @@ func queryData(conn *sql.DB) error {
 	fmt.Println("Finish query data: ", time.Now().Sub(t))
 	return nil
 }
+
 func main() {
 	conn, err := sql.Open("oracle", os.Getenv("DSN"))
 	if err != nil {
@@ -115,7 +119,7 @@ func main() {
 		}
 	}()
 	err = insertData(conn, "Asia/Kolkata")
-	//err = insertData(conn, "")
+	// err = insertData(conn, "")
 	if err != nil {
 		fmt.Println("can't insert data: ", err)
 		return

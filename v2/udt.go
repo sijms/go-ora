@@ -8,11 +8,11 @@ import (
 type customType struct {
 	owner string
 	name  string
-	//arrayTypeName string
+	// arrayTypeName string
 	attribs []ParameterInfo
 	typ     reflect.Type
 	toid    []byte // type oid
-	//arrayTOID     []byte
+	// arrayTOID     []byte
 	isArray  bool
 	fieldMap map[string]int
 }

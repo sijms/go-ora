@@ -18,7 +18,7 @@ import (
 	"unicode/utf16"
 )
 
-//type CertificateData
+// type CertificateData
 type wallet struct {
 	file          string
 	password      []byte
@@ -27,11 +27,12 @@ type wallet struct {
 	algType       int
 	credentials   []walletCredential
 	certificates  [][]byte
-	//certificates  []*x509.Certificate
+	// certificates  []*x509.Certificate
 	privateKeys         [][]byte
 	certificateRequests [][]byte
-	//Certificates  []*x509.Certificate
+	// Certificates  []*x509.Certificate
 }
+
 type walletCredential struct {
 	dsn      string
 	username string
@@ -62,14 +63,13 @@ func (w *wallet) read() error {
 	}
 	num1 := binary.BigEndian.Uint32(fileData[index : index+4])
 	index += 4
-	//num2 := binary.BigEndian.Uint32(fileData[index: index + 4])
+	// num2 := binary.BigEndian.Uint32(fileData[index: index + 4])
 	index += 4
 	if num1 != 6 {
 		return errors.New("invalid wallet header version")
 	}
 	num3 := fileData[index]
 	if num3 == 5 {
-
 	} else if num3 == 6 {
 		index++
 		rgbKey := fileData[index : index+16]
@@ -160,8 +160,8 @@ func (w *wallet) decrypt(encryptedData []byte) error {
 		}
 		hashKey2 := produceHash(bytes.Repeat([]byte{1}, 64), To3, To2, w.sha1Iteration)
 		key = append(key, hashKey2[:4]...)
-		//fmt.Println(bytes.Equal(key, []byte{56, 91, 246, 64, 137, 26, 26, 12, 251, 136, 124, 85, 94, 207, 206, 250, 84, 246, 69, 165, 194, 0, 218, 46}))
-		//fmt.Println(bytes.Equal(iv, []byte{110, 118, 222, 233, 79, 228, 184, 70}))
+		// fmt.Println(bytes.Equal(key, []byte{56, 91, 246, 64, 137, 26, 26, 12, 251, 136, 124, 85, 94, 207, 206, 250, 84, 246, 69, 165, 194, 0, 218, 46}))
+		// fmt.Println(bytes.Equal(iv, []byte{110, 118, 222, 233, 79, 228, 184, 70}))
 		blk, err := des.NewTripleDESCipher(key)
 		if err != nil {
 			return err
@@ -206,12 +206,12 @@ func (w *wallet) readCredentials(input []byte) error {
 		temp2 struct1
 		temp3 WalletCredentialData
 	)
-	//objectType := 0
+	// objectType := 0
 	_, err := asn1.Unmarshal(input, &temp1)
 	if err != nil {
 		return err
 	}
-	//var a []asn1.RawValue
+	// var a []asn1.RawValue
 	for _, tmp := range temp1 {
 		// check the Id of the tmp first
 		switch tmp.Id.String() {
@@ -300,7 +300,6 @@ func (w *wallet) readCredentials(input []byte) error {
 		default:
 			continue
 		}
-
 	}
 	return nil
 }
@@ -363,7 +362,7 @@ func (w *wallet) decodeASN1(buffer []byte) (encryptedData []byte, err error) {
 	if err != nil {
 		return
 	}
-	var index = -1
+	index := -1
 	for idx, obj := range temp2 {
 		if obj.Id.String() == "1.2.840.113549.1.7.6" {
 			index = idx

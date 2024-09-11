@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -91,7 +92,7 @@ func dropRefCursorProc(conn *sql.DB) error {
 func UseCursor(conn *sql.DB) error {
 	t := time.Now()
 	var cursor sql.Rows
-	//sqlText := `BEGIN :1 := GOORA_TEMP_GET_VISIT(:2); END;`
+	// sqlText := `BEGIN :1 := GOORA_TEMP_GET_VISIT(:2); END;`
 	sqlText := `SELECT TEMP_FUNC_316(10) from dual`
 	rows, err := conn.Query(sqlText)
 	if err != nil {

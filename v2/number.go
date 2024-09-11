@@ -17,6 +17,7 @@ type Number struct {
 func (num *Number) isZero() bool {
 	return len(num.data) > 0 && num.data[0] == 0x80
 }
+
 func (num *Number) isPositive() bool {
 	return len(num.data) > 0 && num.data[0]&0x80 != 0
 }
@@ -54,6 +55,7 @@ func NewNumberFromString(val string) (*Number, error) {
 	}
 	return ret, nil
 }
+
 func NewNumberFromInt64(val int64) (*Number, error) {
 	mantissa := []byte(strconv.FormatInt(val, 10))
 	negative := mantissa[0] == '-'
@@ -68,6 +70,7 @@ func NewNumberFromInt64(val int64) (*Number, error) {
 	}
 	return ret, nil
 }
+
 func NewNumberFromUint64(val uint64) (*Number, error) {
 	mantissa := []byte(strconv.FormatUint(val, 10))
 	exponent := len(mantissa) - 1
@@ -161,7 +164,7 @@ func (num *Number) encode(mantissa []byte, exp int, negative bool) error {
 
 func (num *Number) decode() (strNum string, exp int, negative bool, err error) {
 	if len(num.data) == 0 {
-		err = fmt.Errorf("Invalid NUMBER")
+		err = fmt.Errorf("invalid NUMBER")
 		return
 	}
 	if num.isZero() {

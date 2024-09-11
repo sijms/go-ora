@@ -11,7 +11,7 @@ type SummaryObject struct {
 	CurRowNumber         int // uint32
 	RetCode              int // uint16
 	arrayElmWError       int // uint16
-	arrayElmErrno        int //uint16
+	arrayElmErrno        int // uint16
 	CursorID             int // uint16
 	errorPos             int // uint16
 	sqlType              uint8

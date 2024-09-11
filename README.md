@@ -664,9 +664,8 @@ db, err := sql.Open("oracle", "")
 
 ### version 2.8.19
 * add support for long input: 
-  > if input parameter (string or []byte) size is larger than 32Kb the driver will switch to oracle type 
-`LongVarchar` and `LongRaw` so now you can input data with size up to 1 GB that fit into LONG and LOB columns
-* long input: [example](https://github.com/sijms/go-ora/blob/master/examples/long_input/main.go) and [test](https://github.com/sijms/go-ora/blob/master/v2/TestIssues/long_input_test.go)
+  * if input parameter (string or []byte) larger than 32Kb the driver will swith type to `LongVarchar` and `LongRaw`
+  * so now you can input data with size up to 1 GB that fit into LONG and LOB columns
 * add function `RegisterDial` to the configuration object that accept func input
 ```golang
 config, err := go_ora.ParseConfig(`yours DSN string`)

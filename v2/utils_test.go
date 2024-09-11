@@ -87,7 +87,7 @@ func TestGetInt(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	//passing int
+	// passing int
 	err = checkGetInt(5, 5)
 	if err != nil {
 		t.Error(err)
@@ -268,6 +268,7 @@ func TestSetString(t *testing.T) {
 	}
 	t.Log(int32Var)
 }
+
 func TestSetFieldValue(t *testing.T) {
 	var testString *sql.NullString
 	err := setFieldValue(reflect.ValueOf(&testString).Elem(), nil, "this is a test")
@@ -281,7 +282,7 @@ func TestSetFieldValue(t *testing.T) {
 		Name string
 		Date sql.NullTime
 	}
-	var test = test1{}
+	test := test1{}
 	sField := reflect.Indirect(reflect.ValueOf(&test))
 	err = setFieldValue(sField.Field(0), nil, int64(15))
 	if err != nil {
@@ -319,11 +320,11 @@ func TestSetNull(t *testing.T) {
 	var x int = 10
 	var xx float64 = 3.3
 	var xxx string = "test"
-	var rx = reflect.ValueOf(&x).Elem()
-	var rxx = reflect.ValueOf(&xx).Elem()
-	var rxxx = reflect.ValueOf(&xxx).Elem()
-	//var xx = reflect.ValueOf(float64(3.3))
-	//var xxx = reflect.ValueOf("test")
+	rx := reflect.ValueOf(&x).Elem()
+	rxx := reflect.ValueOf(&xx).Elem()
+	rxxx := reflect.ValueOf(&xxx).Elem()
+	// var xx = reflect.ValueOf(float64(3.3))
+	// var xxx = reflect.ValueOf("test")
 	setNull(rx)
 	setNull(rxx)
 	setNull(rxxx)
@@ -339,7 +340,7 @@ func TestSetNull(t *testing.T) {
 }
 
 func TestParseSqlText(t *testing.T) {
-	data, err := parseSqlText(`INSERT INTO TTB_NESTED_UDT(ID, DATA1, SEP1, DATA2, SEP2) 
+	data, err := parseQueryParametersNames(`INSERT INTO TTB_NESTED_UDT(ID, DATA1, SEP1, DATA2, SEP2) 
 VALUES(:ID, :DATA1, :SEP1, :DATA2, :SEP2)`)
 	if err != nil {
 		t.Error(err)

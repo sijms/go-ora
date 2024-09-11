@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -107,8 +107,7 @@ func usage() {
 func queryCursor(conn *sql.DB, cursor *go_ora.RefCursor) error {
 	t := time.Now()
 	rows, err := go_ora.WrapRefCursor(context.Background(), conn, cursor)
-
-	//rows, err := cursor.Query()
+	// rows, err := cursor.Query()
 	if err != nil {
 		return err
 	}
@@ -138,9 +137,7 @@ func queryCursor(conn *sql.DB, cursor *go_ora.RefCursor) error {
 }
 
 func main() {
-	var (
-		server string
-	)
+	var server string
 
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()

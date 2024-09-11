@@ -2,26 +2,27 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/sijms/go-ora/v2"
 	"testing"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestLargeUDTArray(t *testing.T) {
-	var createTypes = func(db *sql.DB) error {
+	createTypes := func(db *sql.DB) error {
 		return execCmd(db, `
 		create or replace type stringsType as object(
 			STRING1 varchar2(60),
 			STRING2 varchar2(300)
 		)`, `create or replace type stringsTypeCol as table of stringsType`)
 	}
-	var dropTypes = func(db *sql.DB) error {
+	dropTypes := func(db *sql.DB) error {
 		return execCmd(db, "DROP TYPE stringsTypeCol", "DROP TYPE stringsType")
 	}
 	type StringsType struct {
 		String1 string `udt:"STRING1"`
 		String2 string `udt:"STRING2"`
 	}
-	var inputPars = func(db *sql.DB, input []StringsType) (int, error) {
+	inputPars := func(db *sql.DB, input []StringsType) (int, error) {
 		var length int
 		_, err := db.Exec(`
 	DECLARE
@@ -32,7 +33,7 @@ func TestLargeUDTArray(t *testing.T) {
 	END;`, input, go_ora.Out{Dest: &length})
 		return length, err
 	}
-	var outputPars = func(db *sql.DB, length int) ([]StringsType, error) {
+	outputPars := func(db *sql.DB, length int) ([]StringsType, error) {
 		var output []StringsType
 		_, err := db.Exec(`
 	declare
@@ -97,5 +98,4 @@ func TestLargeUDTArray(t *testing.T) {
 	if len(outputArray) != size {
 		t.Errorf("expected size: %d and got: %d", size, len(outputArray))
 	}
-
 }

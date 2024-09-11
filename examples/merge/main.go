@@ -3,15 +3,17 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 func _print(prefix string, val interface{}) {
 	fmt.Println(prefix, val)
 }
+
 func createTable(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `CREATE TABLE TEMP_TABLE_343(
@@ -63,6 +65,7 @@ func insert(conn *sql.DB) error {
 	_print("finish insert: ", time.Now().Sub(t))
 	return nil
 }
+
 func merge(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `MERGE INTO TEMP_TABLE_343 t1 USING(select :ID ID,:NAME NAME,:VAL VAL,:LDATE LDATE from dual) tmp  
@@ -90,6 +93,7 @@ ON (tmp.ID=t1.ID)
 	_print("finish merge: ", time.Now().Sub(t))
 	return nil
 }
+
 func query(conn *sql.DB) error {
 	t := time.Now()
 	rows, err := conn.Query(`SELECT ID, NAME, VAL, LDATE FROM TEMP_TABLE_343 WHERE ID <= 10 ORDER BY ID`)

@@ -18,18 +18,18 @@ func TestIssue422(t *testing.T) {
 		TimeSysdate          time.Time `db:"T_SYSDATE"`
 		TimeSystimestamp     time.Time `db:"T_SYSTIMESTAMP"`
 	}
-	var dumpJson = func(d any) {
+	dumpJson := func(d any) {
 		b, _ := json.MarshalIndent(d, "", "  ")
 		t.Logf("%s\n", string(b))
 	}
 
-	var dumpTime = func(r TimeDebug) {
+	dumpTime := func(r TimeDebug) {
 		t.Logf("%16s: %s\n", "Sysdate", r.TimeSysdate.Format(time.UnixDate))
 		t.Logf("%16s: %s\n", "Systimestamp", r.TimeSystimestamp.Format(time.UnixDate))
 		t.Logf("%16s: %s\n", "Real Time", time.Now().Format(time.UnixDate))
 	}
 
-	var query = func(db *sql.DB) error {
+	query := func(db *sql.DB) error {
 		sqlText := `
         SELECT
             to_char(CURRENT_DATE, 'YYYY-MM-DD HH24:MI:SS') "CURRENT_DATE",
@@ -41,7 +41,7 @@ func TestIssue422(t *testing.T) {
             SYSDATE as T_SYSDATE,
             SYSTIMESTAMP as T_SYSTIMESTAMP
          FROM DUAL`
-		var r = TimeDebug{}
+		r := TimeDebug{}
 		err := queryStruct(db.QueryRow(sqlText), &r)
 		if err != nil {
 			return err

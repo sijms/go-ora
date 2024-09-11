@@ -3,9 +3,6 @@ package go_ora
 import (
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/advanced_nego"
-	"github.com/sijms/go-ora/network"
-	"github.com/sijms/go-ora/trace"
 	"net"
 	"net/url"
 	"os"
@@ -15,6 +12,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/advanced_nego"
+	"github.com/sijms/go-ora/network"
+	"github.com/sijms/go-ora/trace"
 )
 
 type PromotableTransaction int
@@ -51,7 +52,7 @@ func DBAPrivilegeFromString(s string) DBAPrivilege {
 	}
 }
 
-//type EnList int
+// type EnList int
 
 //const (
 //	FALSE   EnList = 0
@@ -81,30 +82,30 @@ type ConnectionString struct {
 	WalletPath   string
 	w            *wallet
 	authType     AuthType
-	//EnList             EnList
-	//ConnectionLifeTime int
-	//IncrPoolSize       int
-	//DecrPoolSize       int
-	//MaxPoolSize        int
-	//MinPoolSize        int
+	// EnList             EnList
+	// ConnectionLifeTime int
+	// IncrPoolSize       int
+	// DecrPoolSize       int
+	// MaxPoolSize        int
+	// MinPoolSize        int
 
-	//PasswordSecurityInfo  bool
-	//Pooling               bool
+	// PasswordSecurityInfo  bool
+	// Pooling               bool
 
-	//PromotableTransaction PromotableTransaction
-	//ProxyUserID           string
-	//ProxyPassword         string
-	//ValidateConnection    bool
-	//StmtCacheSize         int
-	//StmtCachePurge        bool
-	//HaEvent               bool
-	//LoadBalance           bool
-	//MetadataBooling       bool
-	//ContextConnection     bool
-	//SelfTuning            bool
-	//ApplicationEdition    string
-	//PoolRegulator         int
-	//ConnectionPoolTimeout int
+	// PromotableTransaction PromotableTransaction
+	// ProxyUserID           string
+	// ProxyPassword         string
+	// ValidateConnection    bool
+	// StmtCacheSize         int
+	// StmtCachePurge        bool
+	// HaEvent               bool
+	// LoadBalance           bool
+	// MetadataBooling       bool
+	// ContextConnection     bool
+	// SelfTuning            bool
+	// ApplicationEdition    string
+	// PoolRegulator         int
+	// ConnectionPoolTimeout int
 
 }
 
@@ -144,19 +145,18 @@ func BuildUrl(server string, port int, service, user, password string, options m
 // newConnectionStringFromUrl create new connection string from databaseURL data and options
 func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 	u, err := url.Parse(databaseUrl)
-
 	if err != nil {
 		return nil, err
 	}
 	q := u.Query()
-	//p := u.Port()
+	// p := u.Port()
 	ret := &ConnectionString{
 		connOption: network.ConnectionOption{
 			PrefetchRows: 25,
 			SessionInfo: network.SessionInfo{
 				Timeout: time.Duration(15),
-				//TransportDataUnitSize: 0xFFFF,
-				//SessionDataUnitSize:   0xFFFF,
+				// TransportDataUnitSize: 0xFFFF,
+				// SessionDataUnitSize:   0xFFFF,
 				TransportDataUnitSize: 0x200000,
 				SessionDataUnitSize:   0x200000,
 				Protocol:              "tcp",
@@ -169,17 +169,17 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 		},
 		Port:         defaultPort,
 		DBAPrivilege: NONE,
-		//EnList:                TRUE,
-		//IncrPoolSize:          5,
-		//DecrPoolSize:          5,
-		//MaxPoolSize:           100,
-		//MinPoolSize:           1,
-		//PromotableTransaction: Promotable,
-		//StmtCacheSize:         20,
-		//MetadataBooling:       true,
-		//SelfTuning:            true,
-		//PoolRegulator:         100,
-		//ConnectionPoolTimeout: 15,
+		// EnList:                TRUE,
+		// IncrPoolSize:          5,
+		// DecrPoolSize:          5,
+		// MaxPoolSize:           100,
+		// MinPoolSize:           1,
+		// PromotableTransaction: Promotable,
+		// StmtCacheSize:         20,
+		// MetadataBooling:       true,
+		// SelfTuning:            true,
+		// PoolRegulator:         100,
+		// ConnectionPoolTimeout: 15,
 	}
 	ret.connOption.UserID = u.User.Username()
 	ret.password, _ = u.User.Password()
@@ -283,77 +283,77 @@ func newConnectionStringFromUrl(databaseUrl string) (*ConnectionString, error) {
 			ret.connOption.SessionInfo.UnixAddress = val[0]
 		case "PROXY CLIENT NAME":
 			ret.connOption.DatabaseInfo.ProxyClientName = val[0]
-			//case "ENLIST":
+			// case "ENLIST":
 			//	ret.EnList = EnListFromString(val[0])
-			//case "INC POOL SIZE":
+			// case "INC POOL SIZE":
 			//	ret.IncrPoolSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("INC POOL SIZE value must be an integer")
 			//	}
-			//case "DECR POOL SIZE":
+			// case "DECR POOL SIZE":
 			//	ret.DecrPoolSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("DECR POOL SIZE value must be an integer")
 			//	}
-			//case "MAX POOL SIZE":
+			// case "MAX POOL SIZE":
 			//	ret.MaxPoolSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("MAX POOL SIZE value must be an integer")
 			//	}
-			//case "MIN POOL SIZE":
+			// case "MIN POOL SIZE":
 			//	ret.MinPoolSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("MIN POOL SIZE value must be an integer")
 			//	}
-			//case "POOL REGULATOR":
+			// case "POOL REGULATOR":
 			//	ret.PoolRegulator, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("POOL REGULATOR value must be an integer")
 			//	}
-			//case "STATEMENT CACHE SIZE":
+			// case "STATEMENT CACHE SIZE":
 			//	ret.StmtCacheSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("STATEMENT CACHE SIZE value must be an integer")
 			//	}
-			//case "CONNECTION POOL TIMEOUT":
+			// case "CONNECTION POOL TIMEOUT":
 			//	ret.ConnectionPoolTimeout, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("CONNECTION POOL TIMEOUT value must be an integer")
 			//	}
-			//case "CONNECTION LIFETIME":
+			// case "CONNECTION LIFETIME":
 			//	ret.ConnectionLifeTime, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("CONNECTION LIFETIME value must be an integer")
 			//	}
-			//case "PERSIST SECURITY INFO":
+			// case "PERSIST SECURITY INFO":
 			//	ret.PasswordSecurityInfo = val[0] == "TRUE"
-			//case "POOLING":
+			// case "POOLING":
 			//	ret.Pooling = val[0] == "TRUE"
-			//case "VALIDATE CONNECTION":
+			// case "VALIDATE CONNECTION":
 			//	ret.ValidateConnection = val[0] == "TRUE"
-			//case "STATEMENT CACHE PURGE":
+			// case "STATEMENT CACHE PURGE":
 			//	ret.StmtCachePurge = val[0] == "TRUE"
-			//case "HA EVENTS":
+			// case "HA EVENTS":
 			//	ret.HaEvent = val[0] == "TRUE"
-			//case "LOAD BALANCING":
+			// case "LOAD BALANCING":
 			//	ret.LoadBalance = val[0] == "TRUE"
-			//case "METADATA POOLING":
+			// case "METADATA POOLING":
 			//	ret.MetadataBooling = val[0] == "TRUE"
-			//case "SELF TUNING":
+			// case "SELF TUNING":
 			//	ret.SelfTuning = val[0] == "TRUE"
-			//case "CONTEXT CONNECTION":
+			// case "CONTEXT CONNECTION":
 			//	ret.ContextConnection = val[0] == "TRUE"
-			//case "PROMOTABLE TRANSACTION":
+			// case "PROMOTABLE TRANSACTION":
 			//	if val[0] == "PROMOTABLE" {
 			//		ret.PromotableTransaction = Promotable
 			//	} else {
 			//		ret.PromotableTransaction = Local
 			//	}
-			//case "APPLICATION EDITION":
+			// case "APPLICATION EDITION":
 			//	ret.ApplicationEdition = val[0]
-			//case "PROXY USER ID":
+			// case "PROXY USER ID":
 			//	ret.ProxyUserID = val[0]
-			//case "PROXY PASSWORD":
+			// case "PROXY PASSWORD":
 			//	ret.ProxyPassword = val[0]
 		}
 	}

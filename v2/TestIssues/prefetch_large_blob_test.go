@@ -11,8 +11,8 @@ import (
 )
 
 func TestPrefetchLargeBlob(t *testing.T) {
-	var refDate = time.Now()
-	var createTable = func(db *sql.DB) error {
+	refDate := time.Now()
+	createTable := func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_PREFETCH_LARGE_BLOB (
 	ID			number(10)	NOT NULL,
 	DATA1		BLOB,
@@ -26,10 +26,10 @@ func TestPrefetchLargeBlob(t *testing.T) {
 	PRIMARY KEY(ID)
 	) NOCOMPRESS`)
 	}
-	var dropTable = func(db *sql.DB) error {
+	dropTable := func(db *sql.DB) error {
 		return execCmd(db, "drop table TTB_PREFETCH_LARGE_BLOB purge")
 	}
-	var insert = func(db *sql.DB) error {
+	insert := func(db *sql.DB) error {
 		type Table struct {
 			Id    int       `db:"ID"`
 			Data1 []byte    `db:"DATA1,blob"`
@@ -62,7 +62,7 @@ func TestPrefetchLargeBlob(t *testing.T) {
 VALUES(:ID, :DATA1, :SEP1, :DATA2, :SEP2, :DATA3, :SEP3, :DATA4, :SEP4)`, input)
 		return err
 	}
-	var query = func(db *sql.DB) error {
+	query := func(db *sql.DB) error {
 		var (
 			id    int
 			data1 []byte

@@ -51,8 +51,8 @@ func TestDataType_Money(t *testing.T) {
 	sql += ") VALUES ("
 	sql += generatePlaceholders(len(colNameList)) + ")"
 	for i := 1; i <= numRows; i++ {
-		//vMoneySmall := float64(rand.Intn(65536)) + rand.Float64()
-		//vMoneyLarge := float64(rand.Int31()) + rand.Float64()
+		// vMoneySmall := float64(rand.Intn(65536)) + rand.Float64()
+		// vMoneyLarge := float64(rand.Int31()) + rand.Float64()
 		vMoneySmall := float64(rand.Intn(65536))
 		vMoneyLarge := float64(rand.Int31())
 		row := Row{

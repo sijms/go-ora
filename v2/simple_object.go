@@ -3,19 +3,20 @@ package go_ora
 import (
 	"database/sql/driver"
 	"errors"
+
 	"github.com/sijms/go-ora/v2/network"
 )
 
 type simpleObject struct {
 	connection *Connection
-	//session     *network.Session
+	// session     *network.Session
 	operationID uint8
 	data        []byte
 	err         error
 }
 
 func (obj *simpleObject) write() *simpleObject {
-	//obj.session.ResetBuffer()
+	// obj.session.ResetBuffer()
 	session := obj.connection.session
 	session.PutBytes(3, obj.operationID, 0)
 	if obj.data != nil {

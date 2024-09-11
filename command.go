@@ -5,12 +5,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/sijms/go-ora/converters"
 	"github.com/sijms/go-ora/network"
-	"regexp"
-	"strings"
 )
 
 type StmtType int
@@ -28,13 +28,14 @@ type StmtInterface interface {
 	fetch(dataSet *DataSet) error
 	hasBLOB() bool
 	hasLONG() bool
-	//write() error
-	//getExeOption() int
+	// write() error
+	// getExeOption() int
 	read(dataSet *DataSet) error
-	//Close() error
-	//Exec(args []driver.Value) (driver.Result, error)
-	//Query(args []driver.Value) (driver.rows, error)
+	// Close() error
+	// Exec(args []driver.Value) (driver.Result, error)
+	// Query(args []driver.Value) (driver.rows, error)
 }
+
 type defaultStmt struct {
 	connection         *Connection
 	text               string
@@ -57,12 +58,15 @@ type defaultStmt struct {
 func (stmt *defaultStmt) hasMoreRows() bool {
 	return stmt._hasMoreRows
 }
+
 func (stmt *defaultStmt) noOfRowsToFetch() int {
 	return stmt._noOfRowsToFetch
 }
+
 func (stmt *defaultStmt) hasLONG() bool {
 	return stmt._hasLONG
 }
+
 func (stmt *defaultStmt) hasBLOB() bool {
 	return stmt._hasBLOB
 }
@@ -74,7 +78,6 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	session.PutUint(stmt.cursorID, 2, true, true)
 	if stmt.cursorID == 0 {
 		session.PutBytes(1)
-
 	} else {
 		session.PutBytes(0)
 	}
@@ -100,7 +103,6 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutUint(len(stmt.Pars), 2, true, true)
 	} else {
 		session.PutBytes(0, 0)
-
 	}
 	session.PutBytes(0, 0, 0, 0, 0)
 	if define {
@@ -123,7 +125,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		for x := 0; x < len(stmt.columns); x++ {
 			stmt.columns[x].Flag = 3
 			stmt.columns[x].CharsetForm = 1
-			//stmt.columns[x].MaxLen = 0x7fffffff
+			// stmt.columns[x].MaxLen = 0x7fffffff
 			err := stmt.columns[x].write(session)
 			if err != nil {
 				return err
@@ -175,13 +177,13 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 
 type Stmt struct {
 	defaultStmt
-	//reExec           bool
+	// reExec           bool
 	reSendParDef bool
 	parse        bool // means parse the command in the server this occur if the stmt is not cached
 	execute      bool
 	define       bool
 
-	//noOfDefCols        int
+	// noOfDefCols        int
 }
 
 type QueryResult struct {
@@ -199,21 +201,21 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 
 func NewStmt(text string, conn *Connection) *Stmt {
 	ret := &Stmt{
-		//connection:         conn,
-		//text:               text,
-		//reExec:             false,
+		// connection:         conn,
+		// text:               text,
+		// reExec:             false,
 		reSendParDef: false,
 		parse:        true,
 		execute:      true,
 		define:       false,
-		//hasLONG:            false,
-		//hasBLOB:            false,
-		//disableCompression: true,
-		//arrayBindCount:     1,
-		//parse:              true,
-		//execute:            true,
-		//define:             false,
-		//scnFromExe:         make([]int, 2),
+		// hasLONG:            false,
+		// hasBLOB:            false,
+		// disableCompression: true,
+		// arrayBindCount:     1,
+		// parse:              true,
+		// execute:            true,
+		// define:             false,
+		// scnFromExe:         make([]int, 2),
 	}
 	ret.connection = conn
 	ret.text = text
@@ -269,7 +271,7 @@ func (stmt *Stmt) write(session *network.Session) error {
 		session.PutUint(exeOf, 2, true, true)
 		session.PutUint(execFlag, 2, true, true)
 	} else {
-		//stmt.reExec = true
+		// stmt.reExec = true
 		err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
 		if err != nil {
 			return err
@@ -433,6 +435,7 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 	}
 	return stmt.read(dataSet)
 }
+
 func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	loop := true
 	after7 := false
@@ -461,7 +464,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				} else {
 					return stmt.connection.session.GetError()
 				}
-
 			}
 			loop = false
 		case 6:
@@ -472,7 +474,6 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			}
 			if !after7 {
 				if stmt.stmtType == SELECT {
-
 				}
 			}
 		case 7:
@@ -536,12 +537,11 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 							} else {
 								//_, err = session.GetClr()
 							}
-
 						}
 					}
 				} else {
 					// see if it is re-execute
-					//fmt.Println(dataSet.Cols)
+					// fmt.Println(dataSet.Cols)
 					if len(dataSet.Cols) == 0 && len(stmt.columns) > 0 {
 						dataSet.Cols = make([]ParameterInfo, len(stmt.columns))
 						copy(dataSet.Cols, stmt.columns)
@@ -561,7 +561,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 								continue
 							}
 							dataSet.Cols[x].BValue, err = session.GetClr()
-							//fmt.Println("buffer: ", temp)
+							// fmt.Println("buffer: ", temp)
 							if err != nil {
 								return err
 							}
@@ -755,7 +755,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 					for x := 0; x < len(dataSet.Cols); x++ {
 						newRow[x] = dataSet.Cols[x].Value
 					}
-					//copy(newRow, dataSet.currentRow)
+					// copy(newRow, dataSet.currentRow)
 					dataSet.Rows = append(dataSet.Rows, newRow)
 				}
 			}
@@ -777,8 +777,8 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				}
 			}
 			_, err = session.GetInt(2, true, true)
-			//fmt.Println(num)
-			//if (num > 0)
+			// fmt.Println(num)
+			// if (num > 0)
 			//	this.m_marshallingEngine.UnmarshalNBytes_ScanOnly(num);
 			// get session timezone
 			size, err = session.GetInt(2, true, true)
@@ -787,10 +787,10 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 				if err != nil {
 					return err
 				}
-				//fmt.Println(key, val, num)
+				// fmt.Println(key, val, num)
 				if num == 163 {
 					session.TimeZone = val
-					//fmt.Println("session time zone", session.TimeZone)
+					// fmt.Println("session time zone", session.TimeZone)
 				}
 			}
 			if session.TTCVersion >= 4 {
@@ -816,7 +816,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 			if err != nil {
 				return err
 			}
-			//dataSet.BindDirections = make([]byte, dataSet.columnCount)
+			// dataSet.BindDirections = make([]byte, dataSet.columnCount)
 			for x := 0; x < dataSet.ColumnCount; x++ {
 				direction, err := session.GetByte()
 				switch direction {
@@ -907,8 +907,9 @@ func (stmt *defaultStmt) read(dataSet *DataSet) error {
 	}
 	return nil
 }
+
 func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
-	//var ret driver.Value
+	// var ret driver.Value
 	session := stmt.connection.session
 	if param.BValue == nil {
 		param.Value = nil
@@ -1042,6 +1043,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	}
 	return result, nil
 }
+
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) *ParameterInfo {
 	param := &ParameterInfo{
 		Name:        name,
@@ -1121,10 +1123,11 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 	}
 	return param
 }
+
 func (stmt *Stmt) AddParam(name string, val driver.Value, size int, direction ParameterDirection) {
 	stmt.Pars = append(stmt.Pars, *stmt.NewParam(name, val, size, direction))
-
 }
+
 func (stmt *Stmt) AddRefCursorParam(_ string) {
 	par := stmt.NewParam("1", nil, 0, Output)
 	par.DataType = REFCURSOR

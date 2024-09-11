@@ -86,7 +86,6 @@ func main() {
 }
 
 func Header(columns []string) {
-
 }
 
 func Record(columns []string, values []driver.Value) {

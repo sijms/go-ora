@@ -6,7 +6,7 @@ import (
 )
 
 func TestIssue335(t *testing.T) {
-	var create = func(db *sql.DB) error {
+	create := func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_335 (
 	  varchar2_col VARCHAR2(10),
 	  char_col CHAR(10),
@@ -66,10 +66,10 @@ func TestIssue335(t *testing.T) {
 		)
 	}
 
-	var drop = func(db *sql.DB) error {
+	drop := func(db *sql.DB) error {
 		return execCmd(db, `DROP TABLE TTB_335 PURGE`)
 	}
-	var query = func(db *sql.DB) error {
+	query := func(db *sql.DB) error {
 		rows, err := db.Query("SELECT * FROM TTB_335")
 		if err != nil {
 			return err

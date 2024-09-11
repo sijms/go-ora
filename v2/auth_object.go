@@ -13,12 +13,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/configurations"
-	"github.com/sijms/go-ora/v2/network"
-	"github.com/sijms/go-ora/v2/network/security"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/v2/configurations"
+	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/network/security"
 )
 
 // E infront of the variable means encrypted
@@ -112,7 +113,7 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Con
 					}
 				}
 			}
-		//case 15:
+		// case 15:
 		//	warning, err := network.NewWarningObject(conn.session)
 		//	if err != nil {
 		//		return nil, err
@@ -120,7 +121,7 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Con
 		//	if warning != nil {
 		//		fmt.Println(warning)
 		//	}
-		//case 23:
+		// case 23:
 		//	opCode, err := conn.session.GetByte()
 		//	if err != nil {
 		//		return nil, err
@@ -140,7 +141,7 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Con
 				}
 				loop = false
 			}
-			//return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", messageCode))
+			// return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", messageCode))
 		}
 	}
 	if len(ret.EServerSessKey) != 64 && len(ret.EServerSessKey) != 96 {
@@ -239,9 +240,9 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Con
 
 // write authentication data to network
 func (obj *AuthObject) Write(connOption *configurations.ConnectionConfig, mode LogonMode, session *network.Session) error {
-	var keys = make([]string, 0, 20)
-	var values = make([]string, 0, 20)
-	var flags = make([]uint8, 0, 20)
+	keys := make([]string, 0, 20)
+	values := make([]string, 0, 20)
+	flags := make([]uint8, 0, 20)
 	appendKeyVal := func(key, val string, f uint8) {
 		keys = append(keys, key)
 		values = append(values, val)
@@ -326,18 +327,16 @@ func (obj *AuthObject) Write(connOption *configurations.ConnectionConfig, mode L
 		session.PutKeyValString(keys[i], values[i], flags[i])
 	}
 	return session.Write()
-
 }
 
 func generateSpeedyKey(buffer, key []byte, turns int) []byte {
-
 	mac := hmac.New(sha512.New, key)
 	mac.Write(append(buffer, 0, 0, 0, 1))
 	firstHash := mac.Sum(nil)
 	tempHash := make([]byte, len(firstHash))
 	copy(tempHash, firstHash)
 	for index1 := 2; index1 <= turns; index1++ {
-		//mac = hmac.New(sha512.New, []byte("ter1234"))
+		// mac = hmac.New(sha512.New, []byte("ter1234"))
 		mac.Reset()
 		mac.Write(tempHash)
 		tempHash = mac.Sum(nil)
@@ -447,12 +446,12 @@ func encryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, 
 	}
 	return fmt.Sprintf("%X", output), nil
 
-	//cryptoServiceProvider.Mode = CipherMode.CBC;
-	//cryptoServiceProvider.KeySize = key.Length * 8;
-	//cryptoServiceProvider.BlockSize = O5LogonHelper.d;
-	//cryptoServiceProvider.Key = key;
-	//cryptoServiceProvider.IV = O5LogonHelper.f;
-	//numArray = cryptoServiceProvider.CreateEncryptor().TransformFinalBlock(buffer, 0, buffer.Length);
+	// cryptoServiceProvider.Mode = CipherMode.CBC;
+	// cryptoServiceProvider.KeySize = key.Length * 8;
+	// cryptoServiceProvider.BlockSize = O5LogonHelper.d;
+	// cryptoServiceProvider.Key = key;
+	// cryptoServiceProvider.IV = O5LogonHelper.f;
+	// numArray = cryptoServiceProvider.CreateEncryptor().TransformFinalBlock(buffer, 0, buffer.Length);
 }
 
 // encrypt user password
@@ -530,7 +529,6 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 		default:
 			return nil, errors.New("unsupported verifier type")
 		}
-
 	}
 }
 

@@ -3,11 +3,12 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -71,6 +72,7 @@ func query(conn *sql.DB) error {
 	fmt.Println("finish query: ", time.Now().Sub(t))
 	return nil
 }
+
 func query2(conn *sql.DB) error {
 	t := time.Now()
 	temp := struct {
@@ -88,8 +90,8 @@ func query2(conn *sql.DB) error {
 SELECT ID, NAME, NAME2, VAL, VAL2, LDATE, LDATE2, LDATE3 INTO :ID,:NAME,:NAME2,:VAL,:VAL2,:LDATE,:LDATE2,:LDATE3
     FROM TEMP_TABLE_343;
 end;`
-	//sqlText := `BEGIN SELECT ID INTO :ID FROM TEMP_TABLE_343; END;`
-	//sqlText := `BEGIN SELECT 2 into :ID FROM DUAL; END;`
+	// sqlText := `BEGIN SELECT ID INTO :ID FROM TEMP_TABLE_343; END;`
+	// sqlText := `BEGIN SELECT 2 into :ID FROM DUAL; END;`
 	_, err := conn.Exec(sqlText, &temp)
 	if err != nil {
 		return err
@@ -98,6 +100,7 @@ end;`
 	fmt.Println("finish query: ", time.Now().Sub(t))
 	return nil
 }
+
 func insert(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `INSERT INTO TEMP_TABLE_343(ID, NAME, NAME2, VAL, VAL2, LDATE, LDATE2, LDATE3) VALUES(:ID, :NAME, :NAME2, :VAL, :VAL2, :LDATE, :LDATE2, :LDATE3)`
@@ -110,8 +113,10 @@ func insert(conn *sql.DB) error {
 		Date  time.Time       `db:"LDATE"`
 		Date2 time.Time       `db:"LDATE2,timestamp"`
 		Date3 string          `db:"LDATE3,timestamptz"`
-	}{1, "TEXT", "我想试的 执行存储过程返回的", &sql.NullString{String: "1.1", Valid: true}, 10, time.Now(), time.Now(),
-		"2023-04-01T12:10:44+03:00"}
+	}{
+		1, "TEXT", "我想试的 执行存储过程返回的", &sql.NullString{String: "1.1", Valid: true}, 10, time.Now(), time.Now(),
+		"2023-04-01T12:10:44+03:00",
+	}
 	_, err := conn.Exec(sqlText, temp)
 	if err != nil {
 		return err

@@ -2,12 +2,14 @@ package go_ora
 
 import (
 	"encoding/hex"
-	"github.com/sijms/go-ora/v2/converters"
-	"github.com/sijms/go-ora/v2/network"
-	"github.com/sijms/go-ora/v2/trace"
 	"log"
 	"strings"
 	"testing"
+
+	"github.com/sijms/go-ora/v2/configurations"
+	"github.com/sijms/go-ora/v2/converters"
+	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/trace"
 )
 
 var buffer = `00000000  00 00 01 93 06 00 00 00  00 00 10 17 30 77 d7 6c  |............0w.l|
@@ -39,19 +41,18 @@ var buffer = `00000000  00 00 01 93 06 00 00 00  00 00 10 17 30 77 d7 6c  |.....
 
 func TestURowid(t *testing.T) {
 	temp := extractBuffer(buffer)
-	conn := new(Connection)
-	conn.connOption = &network.ConnectionOption{}
-	conn.connOption.Tracer = trace.NilTracer()
-	conn.sStrConv = converters.NewStringConverter(871)
-	conn.session = network.NewSessionWithInputBufferForDebug(temp[10:])
-	conn.session.TTCVersion = 11
-	conn.session.StrConv = conn.sStrConv
+	c := new(Connection)
+	c.connOption = &configurations.ConnectionConfig{}
+	c.sStrConv = converters.NewStringConverter(871)
+	c.session = network.NewSessionWithInputBufferForDebug(temp[10:])
+	c.session.TTCVersion = 11
+	c.session.StrConv = c.sStrConv
+	c.tracer = trace.NilTracer()
 	stmt := new(Stmt)
-	stmt.connection = conn
+	stmt.connection = c
 	stmt.scnForSnapshot = make([]int, 2)
 	stmt._hasBLOB = false
 	stmt._hasLONG = false
-	//stmt.disableCompression = false
 	stmt.arrayBindCount = 0
 	dataSet := new(DataSet)
 	err := stmt.read(dataSet)
@@ -61,7 +62,7 @@ func TestURowid(t *testing.T) {
 }
 
 func extractBuffer(input string) []byte {
-	buffer := make([]byte, 0, 500)
+	buf := make([]byte, 0, 500)
 	lines := strings.Split(input, "\n")
 	for _, line := range lines {
 		start := strings.Index(line, " ")
@@ -73,9 +74,9 @@ func extractBuffer(input string) []byte {
 				if err != nil {
 					log.Fatalln(err)
 				}
-				buffer = append(buffer, temp...)
+				buf = append(buf, temp...)
 			}
 		}
 	}
-	return buffer
+	return buf
 }

@@ -3,6 +3,7 @@ package advanced_nego
 import (
 	"encoding/binary"
 	"errors"
+
 	"github.com/sijms/go-ora/advanced_nego/ntlmssp"
 )
 
@@ -22,21 +23,24 @@ type NTSAuthHash struct {
 func (nts *NTSAuthDefault) NewNegotiateMessage(domain, machine string) ([]byte, error) {
 	return ntlmssp.NewNegotiateMessage(domain, machine)
 }
+
 func (nts *NTSAuthDefault) ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error) {
 	return ntlmssp.ProcessChallenge(chaMsgData, user, password)
 }
+
 func (nts *NTSAuthHash) ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error) {
 	return ntlmssp.ProcessChallengeWithHash(chaMsgData, user, password)
 }
+
 func createNTSNegoPacket(domain, machine string) ([]byte, error) {
-	var packetData = []byte{
+	packetData := []byte{
 		0, 1, 0, 7, 0, 0, 0, 0, 0, 4, 0, 5, 2, 0, 0, 0,
 		0, 4, 0, 4, 0, 0, 0, 9, 0, 4, 0, 4, 0, 0, 0, 2,
 		0, 20, 0, 1, 2, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 1, 0, 0, 0, 0,
 		0, 4, 0, 1, 55, 0, 0, 0, 0, 55, 0, 1,
 	}
-	var ret = []byte{0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x99, 0x0B, 0x20, 0x02, 0x00, 0x00, 0x01, 0x00}
+	ret := []byte{0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x99, 0x0B, 0x20, 0x02, 0x00, 0x00, 0x01, 0x00}
 	ret = append(ret, packetData...)
 	sspiOffset := len(ret)
 	if NTSAuth == nil {
@@ -64,12 +68,13 @@ func createNTSNegoPacket(domain, machine string) ([]byte, error) {
 	}
 	return ret, nil
 }
+
 func createNTSAuthPacket(chaMsgData []byte, user, password string) ([]byte, error) {
-	var packetData = []byte{
+	packetData := []byte{
 		0, 1, 0, 2, 0, 0, 0, 0, 0, 4,
 		0, 1, 55, 0, 0, 0, 0, 55, 0, 1,
 	}
-	var ret = []byte{0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x90, 0x0, 0x0, 0x0, 0x0, 0x0, 0x01, 0x0}
+	ret := []byte{0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x90, 0x0, 0x0, 0x0, 0x0, 0x0, 0x01, 0x0}
 	ret = append(ret, packetData...)
 	sspiOffset := len(ret)
 	if NTSAuth == nil {

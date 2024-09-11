@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func execCmd(db *sql.DB, stmts ...string) error {
@@ -48,6 +49,7 @@ func dropTable(db *sql.DB) error {
 	fmt.Println("finish drop table: ", time.Now().Sub(t))
 	return nil
 }
+
 func raw(db *sql.DB, data []byte) error {
 	t := time.Now()
 	_, err := db.Exec(`INSERT INTO TTB_557(DATA_BLOB, ID, LDATE) VALUES(:1, :2, :3)`, data, 1, time.Now())
@@ -92,6 +94,7 @@ func raw(db *sql.DB, data []byte) error {
 	fmt.Printf("finish insert %d raw at (begin, middle and end) of sql: %v\n", len(data), time.Now().Sub(t))
 	return nil
 }
+
 func nvarchar(db *sql.DB, data string) error {
 	t := time.Now()
 	_, err := db.Exec(`INSERT INTO TTB_557(DATA_NCLOB, ID, LDATE) VALUES(:1, :2, :3)`, go_ora.NVarChar(data), 1, time.Now())
@@ -136,6 +139,7 @@ func nvarchar(db *sql.DB, data string) error {
 	fmt.Printf("finish insert %d nvarchar string at (begin, middle and end) of sql: %v\n", len(data), time.Now().Sub(t))
 	return nil
 }
+
 func varchar(db *sql.DB, data string) error {
 	t := time.Now()
 	_, err := db.Exec(`INSERT INTO TTB_557(DATA_CLOB, ID, LDATE) VALUES(:1, :2, :3)`, data, 1, time.Now())

@@ -2,6 +2,7 @@ package advanced_nego
 
 import (
 	"errors"
+
 	"github.com/sijms/go-ora/network"
 )
 
@@ -73,6 +74,7 @@ func (comm *AdvancedNegoComm) readUB1() (number uint8, err error) {
 	number, err = comm.session.GetByte()
 	return
 }
+
 func (comm *AdvancedNegoComm) writeUB1(number uint8) {
 	comm.writePacketHeader(1, 2)
 	comm.session.PutBytes(number)
@@ -130,6 +132,7 @@ func (comm *AdvancedNegoComm) readStatus() (status int, err error) {
 	status, err = comm.session.GetInt(2, false, true)
 	return
 }
+
 func (comm *AdvancedNegoComm) readVersion() (uint32, error) {
 	_, err := comm.readPacketHeader(5)
 	if err != nil {

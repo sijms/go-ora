@@ -84,21 +84,23 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, tracer
 	} else {
 		pck.length = uint32(binary.BigEndian.Uint16(packetData))
 	}
-	var err error
-	if sessionCtx.AdvancedService.CryptAlgo != nil || sessionCtx.AdvancedService.HashAlgo != nil {
-		pck.buffer = pck.buffer[:len(pck.buffer)-1]
-	}
-	if sessionCtx.AdvancedService.CryptAlgo != nil {
-		pck.buffer, err = sessionCtx.AdvancedService.CryptAlgo.Decrypt(pck.buffer)
-		if err != nil {
-			return nil, err
+	if len(pck.buffer) > 1 {
+		var err error
+		if sessionCtx.AdvancedService.CryptAlgo != nil || sessionCtx.AdvancedService.HashAlgo != nil {
+			pck.buffer = pck.buffer[:len(pck.buffer)-1]
 		}
-		tracer.LogPacket("Read packet (Decrypted): ", pck.buffer)
-	}
-	if sessionCtx.AdvancedService.HashAlgo != nil {
-		pck.buffer, err = sessionCtx.AdvancedService.HashAlgo.Validate(pck.buffer)
-		if err != nil {
-			return nil, err
+		if sessionCtx.AdvancedService.CryptAlgo != nil {
+			pck.buffer, err = sessionCtx.AdvancedService.CryptAlgo.Decrypt(pck.buffer)
+			if err != nil {
+				return nil, err
+			}
+			tracer.LogPacket("Read packet (Decrypted): ", pck.buffer)
+		}
+		if sessionCtx.AdvancedService.HashAlgo != nil {
+			pck.buffer, err = sessionCtx.AdvancedService.HashAlgo.Validate(pck.buffer)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	return pck, nil

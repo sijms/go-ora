@@ -359,7 +359,7 @@ func (stmt *Stmt) writePars() error {
 		if par.Flag == 0x80 {
 			continue
 		}
-		if !stmt.parse && par.Direction == Output && stmt.stmtType != PLSQL {
+		if !stmt.parse && par.Direction == Output {
 			continue
 		}
 		if !par.isLongType() {

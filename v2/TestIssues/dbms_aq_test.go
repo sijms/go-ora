@@ -1,6 +1,5 @@
 package TestIssues
 
-/*
 import (
 	"github.com/sijms/go-ora/dbms"
 	"testing"
@@ -56,4 +55,3 @@ func TestDBMSAQ(t *testing.T) {
 	t.Log("Dequeue message ID: ", messageID)
 	t.Log("message: ", string(output))
 }
-*/

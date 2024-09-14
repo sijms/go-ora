@@ -2,23 +2,22 @@ package TestIssues
 
 import (
 	"database/sql"
-	"testing"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"testing"
 )
 
 func TestBulkinsertBFile(t *testing.T) {
-	createTable := func(db *sql.DB) error {
+	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `create table GOORA_TEST_BFILE (
     FILE_ID NUMBER(10) NOT NULL,
     FILE_DATA BFILE
 )`)
 	}
-	dropTable := func(db *sql.DB) error {
+	var dropTable = func(db *sql.DB) error {
 		return execCmd(db, "drop table GOORA_TEST_BFILE purge")
 	}
 
-	insertEmpty := func(db *sql.DB) error {
+	var insertEmpty = func(db *sql.DB) error {
 		var files []interface{} = make([]interface{}, 2)
 		files[0] = go_ora.CreateNullBFile()
 		files[1] = go_ora.CreateNullBFile()
@@ -26,8 +25,8 @@ func TestBulkinsertBFile(t *testing.T) {
 		_, err := db.Exec("INSERT INTO GOORA_TEST_BFILE(FILE_ID, FILE_DATA) VALUES(:1, :2)", ids, files)
 		return err
 	}
-	insert := func(db *sql.DB, dirName, fileName string) error {
-		files := make([]interface{}, 3)
+	var insert = func(db *sql.DB, dirName, fileName string) error {
+		var files = make([]interface{}, 3)
 		var err error
 		files[0], err = go_ora.CreateBFile(db, dirName, fileName)
 		if err != nil {

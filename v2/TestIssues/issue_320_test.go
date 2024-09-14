@@ -3,9 +3,8 @@ package TestIssues
 import (
 	"context"
 	"database/sql"
-	"testing"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"testing"
 )
 
 func TestIssue320(t *testing.T) {
@@ -13,7 +12,7 @@ func TestIssue320(t *testing.T) {
 		Id       sql.NullString
 		Response go_ora.Clob
 	}
-	MatCol := func(colname string, mat *Mat) interface{} {
+	var MatCol = func(colname string, mat *Mat) interface{} {
 		switch colname {
 		case "ID":
 			return &mat.Id
@@ -23,7 +22,7 @@ func TestIssue320(t *testing.T) {
 			return new(string)
 		}
 	}
-	create := func(db *sql.DB) error {
+	var create = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_320(
     ID          varchar2(100),
     RESPONSE    CLOB
@@ -37,13 +36,13 @@ END TP_320;`,
 			`INSERT INTO TTB_320(ID, RESPONSE) VALUES('1', 'THIS IS A TEST')`,
 		)
 	}
-	drop := func(db *sql.DB) error {
+	var drop = func(db *sql.DB) error {
 		return execCmd(db,
 			"DROP FUNCTION TP_320",
 			"DROP TABLE TTB_320 PURGE",
 		)
 	}
-	query := func(db *sql.DB) error {
+	var query = func(db *sql.DB) error {
 		var cursor go_ora.RefCursor
 		_, err := db.Exec(`BEGIN :1 := TP_320(); END;`, sql.Out{Dest: &cursor})
 		if err != nil {

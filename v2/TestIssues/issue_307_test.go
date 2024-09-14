@@ -1,10 +1,9 @@
 package TestIssues
 
 import (
+	go_ora "github.com/sijms/go-ora/v2"
 	"testing"
 	"time"
-
-	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestIssue307(t *testing.T) {

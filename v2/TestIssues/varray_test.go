@@ -3,17 +3,16 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
+	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
-
-	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestVarray(t *testing.T) {
-	createTypes := func(db *sql.DB) error {
+	var createTypes = func(db *sql.DB) error {
 		return execCmd(db, `create type StringArray as VARRAY(10) of varchar2(20) not null`)
 	}
-	dropTypes := func(db *sql.DB) error {
+	var dropTypes = func(db *sql.DB) error {
 		return execCmd(db, `drop type StringArray`)
 	}
 	db, err := getDB()

@@ -5,9 +5,8 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"testing"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"testing"
 )
 
 type OracleBool bool
@@ -27,22 +26,21 @@ func (b *OracleBool) Scan(value interface{}) error {
 	}
 	return nil
 }
-
 func TestCustomBool(t *testing.T) {
-	createTable := func(db *sql.DB) error {
+	var createTable = func(db *sql.DB) error {
 		return execCmd(db, "CREATE TABLE TB_420(COL1  VARCHAR2(1))")
 	}
 
-	dropTable := func(db *sql.DB) error {
+	var dropTable = func(db *sql.DB) error {
 		return execCmd(db, "drop table TB_420 purge")
 	}
-	insert := func(db *sql.DB) error {
+	var insert = func(db *sql.DB) error {
 		var b OracleBool = true
 		_, err := db.Exec("INSERT INTO TB_420(col1) VALUES(:myBool)", b)
 		return err
 	}
 
-	query := func(db *sql.DB) error {
+	var query = func(db *sql.DB) error {
 		var result string
 		var result2 OracleBool
 		err := db.QueryRow("SELECT col1, col1 FROM TB_420").Scan(&result, &result2)
@@ -58,7 +56,7 @@ func TestCustomBool(t *testing.T) {
 		return nil
 	}
 
-	query2 := func(db *sql.DB) error {
+	var query2 = func(db *sql.DB) error {
 		var result string
 		var result2 OracleBool
 		_, err := db.Exec("BEGIN SELECT col1, col1 into :1, :2 FROM TB_420; END;", go_ora.Out{Dest: &result, Size: 10},
@@ -112,4 +110,5 @@ func TestCustomBool(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
 }

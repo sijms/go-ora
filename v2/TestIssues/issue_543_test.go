@@ -18,7 +18,7 @@ func TestIssue543(t *testing.T) {
 		}
 	}()
 	var result string
-	err = db.QueryRow("select column_expression from dba_ind_expressions where index_name = 'members_last_name_fi' and column_position = 1").Scan(&result)
+	err = db.QueryRow("select column_expression from dba_ind_expressions where index_owner = 'APEX_230200' and index_name = 'WWV_FLOW_WORKSHEET_RPTS_UK' and column_position = 1").Scan(&result)
 	if err != nil {
 		t.Error(err)
 		return

@@ -359,7 +359,7 @@ func (stmt *Stmt) writePars() error {
 		if par.Flag == 0x80 {
 			continue
 		}
-		if !stmt.parse && par.Direction == Output {
+		if !stmt.parse && !stmt.reSendParDef && par.Direction == Output {
 			continue
 		}
 		if !par.isLongType() {
@@ -469,10 +469,8 @@ func (stmt *Stmt) write() error {
 			//for valueIndex, values := range arrayValue {
 			//	stmt.Pars[parIndex].BValue = values[valueIndex]
 			//}
-
 			// valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
 			// each value represented an array of []byte
-
 			//}
 			//for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
 			//	for parIndex, arrayValue := range arrayValues {
@@ -553,9 +551,6 @@ func (stmt *Stmt) write() error {
 				return err
 			}
 		}
-		stmt.parse = false
-		stmt.define = false
-		stmt.reSendParDef = false
 	}
 	return session.Write()
 }
@@ -1817,6 +1812,9 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			return nil, err
 		}
 	}
+	stmt.parse = false
+	stmt.define = false
+	stmt.reSendParDef = false
 	return result, nil
 }
 
@@ -2021,29 +2019,22 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	return stmt.Query_(namedArgs)
 }
 
-func (stmt *Stmt) reset() {
-	stmt.reSendParDef = false
-	stmt.parse = true
-	stmt.execute = true
-	stmt.define = false
-	stmt._hasBLOB = false
-	stmt._hasLONG = false
-	stmt.bulkExec = false
-	// stmt.disableCompression = false
-	stmt.arrayBindCount = 0
-	stmt.columns = nil
-}
+//func (stmt *Stmt) reset() {
+//	stmt.reSendParDef = false
+//	stmt.parse = true
+//	stmt.execute = true
+//	stmt.define = false
+//	stmt._hasBLOB = false
+//	stmt._hasLONG = false
+//	stmt.bulkExec = false
+//	// stmt.disableCompression = false
+//	stmt.arrayBindCount = 0
+//	stmt.columns = nil
+//}
 
 func (stmt *Stmt) _query() (*DataSet, error) {
 	var err error
 	var dataSet *DataSet
-	//defer func() {
-	//	err = stmt.freeTemporaryLobs()
-	//	if err != nil {
-	//		stmt.connection.tracer.Printf("Error free temporary lobs: %v", err)
-	//	}
-	//}()
-
 	stmt.connection.session.ResetBuffer()
 	err = stmt.write()
 	if err != nil {
@@ -2055,7 +2046,7 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 		return nil, err
 	}
 	// deal with lobs
-	if (stmt._hasBLOB || stmt._hasLONG) && stmt.connection.connOption.Lob == configurations.INLINE {
+	if stmt.parse && (stmt._hasBLOB || stmt._hasLONG) && stmt.connection.connOption.Lob == configurations.INLINE {
 		stmt.define = true
 		stmt.execute = false
 		stmt.parse = false
@@ -2069,6 +2060,9 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	if err != nil {
 		return nil, err
 	}
+	stmt.parse = false
+	stmt.define = false
+	stmt.reSendParDef = false
 	return dataSet, err
 }
 

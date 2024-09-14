@@ -4,25 +4,23 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"reflect"
 	"strconv"
 	"time"
-
-	go_ora "github.com/sijms/go-ora/v2"
 )
 
-var (
-	server     = os.Getenv("SERVER")
-	port       int
-	service    = os.Getenv("SERVICE")
-	username   = os.Getenv("USER")
-	password   = os.Getenv("PASSWORD")
-	urlOptions = map[string]string{
-		"TRACE FILE": "trace.log",
-		"lob fetch":  "pre",
-	}
-)
+// var db *sql.DB
+var server = os.Getenv("SERVER")
+var port int
+var service = os.Getenv("SERVICE")
+var username = os.Getenv("USER")
+var password = os.Getenv("PASSWORD")
+var urlOptions = map[string]string{
+	"TRACE FILE": "trace.log",
+	"lob fetch":  "pre",
+}
 
 type Execuer interface {
 	Exec(query string, args ...any) (sql.Result, error)

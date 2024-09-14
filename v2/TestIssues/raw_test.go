@@ -9,7 +9,7 @@ import (
 )
 
 func TestRaw(t *testing.T) {
-	insert := func(db *sql.DB) error {
+	var insert = func(db *sql.DB) error {
 		sqlText := `INSERT INTO TTB_MAIN(ID, NAME, VAL, LDATE, DATA) VALUES(:ID, :NAME, :VAL, :LDATE, :DATA)`
 		length := 500
 		type TempStruct struct {

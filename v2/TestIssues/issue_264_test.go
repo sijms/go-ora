@@ -2,29 +2,28 @@ package TestIssues
 
 import (
 	"database/sql"
-	"testing"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"testing"
 )
 
 func TestIssue264(t *testing.T) {
-	createTable := func(db *sql.DB) error {
+	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_264(
     ID number(10) NOT NULL,
     SVGTEMPLATE BLOB
     )`)
 	}
-	dropTable := func(db *sql.DB) error {
+	var dropTable = func(db *sql.DB) error {
 		return execCmd(db, `DROP TABLE TTB_264 PURGE`)
 	}
-	insert := func(db *sql.DB) error {
+	var insert = func(db *sql.DB) error {
 		_, err := db.Exec("INSERT INTO TTB_264(ID, SVGTEMPLATE) VALUES(:1, :2)", 1, []byte("123456789012345678901234567890"))
 		if err != nil {
 			return err
 		}
 		return nil
 	}
-	update := func(db *sql.DB) error {
+	var update = func(db *sql.DB) error {
 		blob := go_ora.Blob{Data: []byte("123456789012345678901234567890 123456789012345678901234567890")}
 		stmt, err := db.Prepare("UPDATE TTB_264 SET SVGTEMPLATE=:1 WHERE ID=1")
 		if err != nil {

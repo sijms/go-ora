@@ -8,7 +8,7 @@ import (
 )
 
 func TestMultipleReturning(t *testing.T) {
-	createTable := func(db *sql.DB) error {
+	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_329(
     ID          NUMBER(10),
     NAME VARCHAR2(100),
@@ -16,10 +16,10 @@ func TestMultipleReturning(t *testing.T) {
     ONBOARD_DATE DATE
 	)`)
 	}
-	dropTable := func(db *sql.DB) error {
+	var dropTable = func(db *sql.DB) error {
 		return execCmd(db, "DROP TABLE TTB_329 PURGE")
 	}
-	insert := func(db *sql.DB) error {
+	var insert = func(db *sql.DB) error {
 		temp := struct {
 			Id   int       `db:"ID"`
 			Name string    `db:"NAME"`

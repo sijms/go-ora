@@ -3,14 +3,13 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
+	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
-
-	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestClientCharset(t *testing.T) {
-	createPackage := func(db *sql.DB) error {
+	var createPackage = func(db *sql.DB) error {
 		return execCmd(db,
 			// create package
 			`CREATE OR REPLACE PACKAGE GOORA_TEMP IS
@@ -36,11 +35,11 @@ END GOORA_TEMP;`,
 		)
 	}
 
-	dropPackage := func(db *sql.DB) error {
+	var dropPackage = func(db *sql.DB) error {
 		return execCmd(db, "DROP PACKAGE GOORA_TEMP")
 	}
 
-	callProc := func(db *sql.DB, strings_in []string) error {
+	var callProc = func(db *sql.DB, strings_in []string) error {
 		var string_out string
 		_, err := db.Exec(`BEGIN GOORA_TEMP.TEST_PROC(:1, :2); END;`, strings_in,
 			go_ora.Out{&string_out, 256, false})
@@ -89,4 +88,5 @@ END GOORA_TEMP;`,
 		t.Error(err)
 		return
 	}
+
 }

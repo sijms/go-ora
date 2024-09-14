@@ -2,9 +2,8 @@ package TestIssues
 
 import (
 	"database/sql"
-	"testing"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"testing"
 )
 
 func TestIssue408(t *testing.T) {
@@ -17,19 +16,19 @@ func TestIssue408(t *testing.T) {
 		Name string `udt:"NAME"`
 	}
 
-	createTypes := func(db *sql.DB) error {
+	var createTypes = func(db *sql.DB) error {
 		return execCmd(db, "create or replace type HK_GORA_ID_OBJ as object(ID number(22,0));",
 			"create or replace type HK_GORA_ID_COLL as table of HK_GORA_ID_OBJ;",
 			"create or replace type HK_GORA_TEST_OBJ as object(ID number(22,0), NAME varchar2(2000));",
 			"create or replace type HK_GORA_TEST_COLL as table of HK_GORA_TEST_OBJ;")
 	}
-	dropTypes := func(db *sql.DB) error {
+	var dropTypes = func(db *sql.DB) error {
 		return execCmd(db, "drop type HK_GORA_ID_COLL",
 			"drop type HK_GORA_ID_OBJ",
 			"drop type HK_GORA_TEST_COLL",
 			"drop type HK_GORA_TEST_OBJ")
 	}
-	createPackage := func(db *sql.DB) error {
+	var createPackage = func(db *sql.DB) error {
 		return execCmd(db, `
 create or replace package HK_GORA_TEST_PCK as
    function F_GetData(P_Ids HK_GORA_ID_COLL, P_AnzChars number) return HK_GORA_TEST_COLL;
@@ -53,11 +52,11 @@ create or replace package body HK_GORA_TEST_PCK as
    end;
 end;`)
 	}
-	dropPackage := func(db *sql.DB) error {
+	var dropPackage = func(db *sql.DB) error {
 		return execCmd(db, "DROP PACKAGE HK_GORA_TEST_PCK")
 	}
 
-	registerTypes := func(db *sql.DB) error {
+	var registerTypes = func(db *sql.DB) error {
 		err := go_ora.RegisterType(db, "HK_GORA_ID_OBJ", "HK_GORA_ID_COLL", HkGoraIdObj{})
 		if err != nil {
 			return err
@@ -68,7 +67,7 @@ end;`)
 		}
 		return nil
 	}
-	executeTest := func(db *sql.DB, anzChars int) error {
+	var executeTest = func(db *sql.DB, anzChars int) error {
 		var res []HkGoraTestObj
 		_, err := db.Exec(`BEGIN :1 := HK_GORA_TEST_PCK.F_GetData(:2, :3); END;`,
 			go_ora.Out{Dest: &res, Size: 2},

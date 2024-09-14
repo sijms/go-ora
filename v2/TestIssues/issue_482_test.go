@@ -3,36 +3,35 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
+	go_ora "github.com/sijms/go-ora/v2"
 	"testing"
 	"time"
-
-	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestIssue482(t *testing.T) {
 	type test1 struct {
 		Name string `udt:"name"`
 	}
-	createTypes := func(db *sql.DB) error {
+	var createTypes = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TYPE test1 AS OBJECT ( name varchar2(256) )`,
 			`CREATE OR REPLACE TYPE test1collection AS TABLE OF test1`)
 	}
-	dropTypes := func(db *sql.DB) error {
+	var dropTypes = func(db *sql.DB) error {
 		return execCmd(db, `DROP TYPE test1collection`, `DROP TYPE test1`)
 	}
-	setupQueue := func(db *sql.DB) error {
+	var setupQueue = func(db *sql.DB) error {
 		return execCmd(db,
 			`BEGIN DBMS_AQADM.CREATE_QUEUE_TABLE ( queue_table => 'test1table', queue_payload_type => 'test1' ); END;`,
 			`BEGIN DBMS_AQADM.CREATE_QUEUE ( queue_name => 'test1queue', queue_table => 'test1table' ); END;`,
 			`BEGIN DBMS_AQADM.START_QUEUE ( queue_name => 'test1queue', enqueue => TRUE ); END;`)
 	}
-	stopQueue := func(db *sql.DB) error {
+	var stopQueue = func(db *sql.DB) error {
 		return execCmd(db,
 			`BEGIN DBMS_AQADM.STOP_QUEUE(queue_name => 'test1queue'); END;`,
 			`BEGIN DBMS_AQADM.DROP_QUEUE(queue_name => 'test1queue'); END;`,
 			`BEGIN DBMS_AQADM.DROP_QUEUE_TABLE(queue_table => 'test1table'); END;`)
 	}
-	enqueue := func(db *sql.DB, message test1) error {
+	var enqueue = func(db *sql.DB, message test1) error {
 		_, err := db.Exec(`
 DECLARE
 	enqueueOptions			DBMS_AQ.enqueue_options_t;
@@ -50,7 +49,7 @@ END;`, message)
 		return err
 	}
 
-	dequeueArray := func(db *sql.DB, arraySize int, waitTime time.Duration) ([]test1, error) {
+	var dequeueArray = func(db *sql.DB, arraySize int, waitTime time.Duration) ([]test1, error) {
 		sqlText := fmt.Sprintf(`
 DECLARE
 	dequeueOptions			DBMS_AQ.dequeue_options_t;

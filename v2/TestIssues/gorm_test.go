@@ -1,12 +1,11 @@
 package TestIssues
 
 import (
-	"testing"
-	"time"
-
 	oracle "github.com/godoes/gorm-oracle"
 	go_ora "github.com/sijms/go-ora/v2"
 	"gorm.io/gorm"
+	"testing"
+	"time"
 )
 
 func TestGorm(t *testing.T) {
@@ -26,17 +25,18 @@ func TestGorm(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	// Create
+	//Create
 	db.Create(&Product{Model: gorm.Model{ID: 1, CreatedAt: time.Now(), UpdatedAt: time.Now()}, Code: "D42", Price: 100})
 
 	// drop
 	defer func() {
 		db.Exec("drop table products purge")
 	}()
-	// Read
+	//Read
 	var product Product
 	db.First(&product, 1) // find product with primary key = 1
 	t.Log(product)
 	db.First(&product, "code = ?", "D42") // find product with code = D42
 	t.Log(product)
+
 }

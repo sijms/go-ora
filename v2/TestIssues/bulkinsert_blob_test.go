@@ -2,17 +2,16 @@ package TestIssues
 
 import (
 	"database/sql"
-	"testing"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"testing"
 )
 
 func TestBulkinsertBlob(t *testing.T) {
-	createTable := func(db *sql.DB) error {
+	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_465(DATA BLOB)`)
 	}
-	dropTable := func(db *sql.DB) error { return execCmd(db, `DROP TABLE TTB_465 PURGE`) }
-	insert := func(db *sql.DB, data []byte) error {
+	var dropTable = func(db *sql.DB) error { return execCmd(db, `DROP TABLE TTB_465 PURGE`) }
+	var insert = func(db *sql.DB, data []byte) error {
 		datas := make([]go_ora.Blob, 3)
 		datas[0].Data = nil
 		datas[1].Data = data

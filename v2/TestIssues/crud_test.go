@@ -18,13 +18,13 @@ func TestCrud(t *testing.T) {
 		Data []byte    `db:"DATA"`
 	}
 
-	rowCount := func(db *sql.DB) (count int, err error) {
+	var rowCount = func(db *sql.DB) (count int, err error) {
 		err = db.QueryRow("SELECT COUNT(*) FROM TTB_MAIN").Scan(&count)
 		return
 	}
-	insert := func(db Execuer) error {
+	var insert = func(db Execuer) error {
 		// insert 10 rows
-		temp := INPUT{}
+		var temp = INPUT{}
 		var err error
 		for x := 0; x < 10; x++ {
 			temp.ID = x + 1
@@ -39,8 +39,8 @@ func TestCrud(t *testing.T) {
 		}
 		return nil
 	}
-	insertWithPrepare := func(db Execuer) error {
-		temp := INPUT{}
+	var insertWithPrepare = func(db Execuer) error {
+		var temp = INPUT{}
 		stmt, err := db.Prepare("INSERT INTO TTB_MAIN(ID, NAME, VAL, LDATE, DATA) VALUES(:ID, :NAME, :VAL, :LDATE, :DATA)")
 		if err != nil {
 			return err
@@ -64,10 +64,10 @@ func TestCrud(t *testing.T) {
 		}
 		return nil
 	}
-	insertBulk := func(db Execuer) error {
+	var insertBulk = func(db Execuer) error {
 		data := make([]INPUT, 100)
 		baseVal := 1.1
-		for index := range data {
+		for index, _ := range data {
 			data[index].ID = index + 1
 			data[index].Name = strings.Repeat("-", index+1)
 			data[index].Val = baseVal + float64(index)
@@ -78,7 +78,7 @@ func TestCrud(t *testing.T) {
 			data)
 		return err
 	}
-	transaction := func(db *sql.DB, dbFunc func(db Execuer) error, commit bool, rowsIncrement int) error {
+	var transaction = func(db *sql.DB, dbFunc func(db Execuer) error, commit bool, rowsIncrement int) error {
 		initialCount, err := rowCount(db)
 		if err != nil {
 			return err
@@ -116,7 +116,7 @@ func TestCrud(t *testing.T) {
 		}
 		return nil
 	}
-	delRows := func(db *sql.DB) error {
+	var delRows = func(db *sql.DB) error {
 		return execCmd(db, "DELETE FROM TTB_MAIN")
 	}
 

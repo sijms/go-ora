@@ -7,19 +7,19 @@ import (
 )
 
 func TestIssue287(t *testing.T) {
-	createTable := func(db *sql.DB) error {
+	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_287(
 	TS TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
 	}
-	dropTable := func(db *sql.DB) error {
+	var dropTable = func(db *sql.DB) error {
 		return execCmd(db, "DROP TABLE TTB_287 PURGE")
 	}
-	insert := func(db *sql.DB) error {
+	var insert = func(db *sql.DB) error {
 		_, err := db.Exec("INSERT INTO TTB_287 VALUES(DEFAULT)")
 		return err
 	}
-	query := func(db *sql.DB) error {
+	var query = func(db *sql.DB) error {
 		rows, err := db.Query("SELECT * FROM TTB_287")
 		if err != nil {
 			return err

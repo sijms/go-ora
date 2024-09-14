@@ -7,21 +7,21 @@ import (
 )
 
 func TestIssue468(t *testing.T) {
-	createTable := func(db *sql.DB) error {
+	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_468(N NUMBER)`)
 	}
-	dropTable := func(db *sql.DB) error {
+	var dropTable = func(db *sql.DB) error {
 		return execCmd(db, "DROP TABLE TTB_468 PURGE")
 	}
-	insert := func(db *sql.DB) error {
+	var insert = func(db *sql.DB) error {
 		data := make([]int, 100)
-		for index := range data {
+		for index, _ := range data {
 			data[index] = index + 1
 		}
 		_, err := db.Exec("INSERT INTO TTB_468(N) VALUES (:1)", data)
 		return err
 	}
-	query := func(db *sql.DB) error {
+	var query = func(db *sql.DB) error {
 		var (
 			n1, n2 int32
 			cursor sql.Rows

@@ -2,13 +2,12 @@ package TestIssues
 
 import (
 	"database/sql"
-	"testing"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"testing"
 )
 
 func TestIssue355(t *testing.T) {
-	createPackage := func(db *sql.DB) error {
+	var createPackage = func(db *sql.DB) error {
 		return execCmd(db, `CREATE OR REPLACE PACKAGE GOORA_TEMP IS
 	TYPE VARCHAR2TABLE_T IS TABLE OF VARCHAR2(32767) INDEX BY BINARY_INTEGER;
 	PROCEDURE TEST_PROC_STRING(
@@ -54,27 +53,27 @@ END GOORA_TEMP;`,
 	END;
 END GOORA_TEMP;`)
 	}
-	dropPackage := func(db *sql.DB) error {
+	var dropPackage = func(db *sql.DB) error {
 		return execCmd(db, "DROP PACKAGE GOORA_TEMP")
 	}
-	call_string := func(db *sql.DB, input string) error {
+	var call_string = func(db *sql.DB, input string) error {
 		_, err := db.Exec("BEGIN GOORA_TEMP.TEST_PROC_STRING(:1); END;", input)
 		return err
 	}
-	call_StringArray := func(db *sql.DB, input []string) error {
+	var call_StringArray = func(db *sql.DB, input []string) error {
 		var output sql.NullInt64
 		_, err := db.Exec("BEGIN GOORA_TEMP.TEST_PROC_STRINGARRAY2(:1, :2); END;", input, go_ora.Out{Dest: &output})
 		return err
 	}
-	call_StringPointerArray := func(db *sql.DB, input []*string) error {
+	var call_StringPointerArray = func(db *sql.DB, input []*string) error {
 		_, err := db.Exec("BEGIN GOORA_TEMP.TEST_PROC_STRINGARRAY(:1); END;", input)
 		return err
 	}
-	call_SqlNullStringArray := func(db *sql.DB, input []sql.NullString) error {
+	var call_SqlNullStringArray = func(db *sql.DB, input []sql.NullString) error {
 		_, err := db.Exec(`BEGIN GOORA_TEMP.TEST_PROC_STRINGARRAY(:1); END;`, input)
 		return err
 	}
-	call_ByteArray := func(db *sql.DB, input []byte) error {
+	var call_ByteArray = func(db *sql.DB, input []byte) error {
 		_, err := db.Exec(`BEGIN GOORA_TEMP.TEST_PROC_BYTEARRAY(:1); END;`, input)
 		return err
 	}

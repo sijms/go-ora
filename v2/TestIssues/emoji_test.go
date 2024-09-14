@@ -2,19 +2,18 @@ package TestIssues
 
 import (
 	"database/sql"
-	"testing"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"testing"
 )
 
 func TestEmoji(t *testing.T) {
-	createTable := func(db *sql.DB) error {
+	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TEST_EMOJI(
 	ID	number(10)	NOT NULL,
 	CONTENT		NCLOB
 	)`)
 	}
-	dropTable := func(db *sql.DB) error {
+	var dropTable = func(db *sql.DB) error {
 		return execCmd(db, `DROP TABLE TEST_EMOJI PURGE`)
 	}
 

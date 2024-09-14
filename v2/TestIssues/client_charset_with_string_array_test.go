@@ -2,13 +2,12 @@ package TestIssues
 
 import (
 	"database/sql"
-	"testing"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"testing"
 )
 
 func TestClientCharsetWithStringArray(t *testing.T) {
-	createPackage := func(db *sql.DB) error {
+	var createPackage = func(db *sql.DB) error {
 		return execCmd(db,
 			`CREATE OR REPLACE PACKAGE GOORA_TEMP_PKG IS
 	TYPE VARCHAR2TABLE_T IS TABLE OF VARCHAR2(32767) INDEX BY BINARY_INTEGER;
@@ -32,11 +31,11 @@ END GOORA_TEMP_PKG;`,
 		)
 	}
 
-	dropPackage := func(db *sql.DB) error {
+	var dropPackage = func(db *sql.DB) error {
 		return execCmd(db, "DROP PACKAGE GOORA_TEMP_PKG")
 	}
 	var string_out string
-	callProc := func(db *sql.DB, string_in []string) (string, error) {
+	var callProc = func(db *sql.DB, string_in []string) (string, error) {
 		_, err := db.Exec("BEGIN GOORA_TEMP_PKG.TEST_PROC(:1, :2); END;", string_in,
 			go_ora.Out{Dest: &string_out, Size: 256})
 		if err != nil {

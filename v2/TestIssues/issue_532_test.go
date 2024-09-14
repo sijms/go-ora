@@ -11,7 +11,7 @@ func TestIssue532(t *testing.T) {
 		ID   int    `db:"ID"`
 		Name string `db:"NAME"`
 	}
-	createTable := func(db *sql.DB) error {
+	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_532(
 		EMP_ID NUMBER, 
 		EMP_NAME VARCHAR2(255), 
@@ -19,11 +19,11 @@ func TestIssue532(t *testing.T) {
 	)`)
 	}
 
-	dropTable := func(db *sql.DB) error {
+	var dropTable = func(db *sql.DB) error {
 		return execCmd(db, "drop table TTB_532 purge")
 	}
 
-	insert := func(db *sql.DB, rowNum int) error {
+	var insert = func(db *sql.DB, rowNum int) error {
 		data := make([]TTB_DATA, rowNum)
 		for index := range data {
 			data[index].ID = index + 1
@@ -33,7 +33,7 @@ func TestIssue532(t *testing.T) {
 		return err
 	}
 
-	query := func(db *sql.DB) error {
+	var query = func(db *sql.DB) error {
 		rows, err := db.Query("SELECT * FROM TTB_532 FOR UPDATE")
 		if err != nil {
 			return err

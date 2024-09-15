@@ -603,12 +603,10 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 		// m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
 		maxRowSize := 0
 		for _, col := range stmt.columns {
-			if col.DataType == OCIClobLocator || col.DataType == OCIBlobLocator {
+			if col.isLobType() {
 				maxRowSize += 86
-			} else if col.DataType == LONG || col.DataType == LongRaw || col.DataType == LongVarChar {
+			} else if col.isLongType() {
 				maxRowSize += 2
-			} else if col.DataType == OCIFileLocator {
-				maxRowSize += 86
 			} else {
 				maxRowSize += col.MaxLen
 			}
@@ -1947,8 +1945,30 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 
 func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 	if pos >= 0 && pos < len(stmt.Pars) {
-		if par.MaxLen > stmt.Pars[pos].MaxLen {
+		originalPar := stmt.Pars[pos]
+		if par.MaxLen > originalPar.MaxLen {
 			stmt.reSendParDef = true
+		}
+		// resend parameter definition when string/[]byte length change from long to short and vice versa
+		switch par.DataType {
+		case NCHAR:
+			if originalPar.DataType == LONG || originalPar.DataType == LongVarChar {
+				stmt.reSendParDef = true
+			}
+		case RAW:
+			if originalPar.DataType == LongRaw {
+				stmt.reSendParDef = true
+			}
+		case LONG:
+			fallthrough
+		case LongVarChar:
+			if originalPar.DataType == NCHAR {
+				stmt.reSendParDef = true
+			}
+		case LongVarRaw:
+			if originalPar.DataType == RAW {
+				stmt.reSendParDef = true
+			}
 		}
 		stmt.Pars[pos] = par
 	} else {

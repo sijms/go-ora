@@ -95,21 +95,21 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 		},
 		ClientInfo: ClientInfo{Territory: "AMERICA", Language: "AMERICAN"},
 	}
-	//ret := &ConnectionString{
-	//Port:         defaultPort,
-	//DBAPrivilege: NONE,
-	//EnList:                TRUE,
-	//IncrPoolSize:          5,
-	//DecrPoolSize:          5,
-	//MaxPoolSize:           100,
-	//MinPoolSize:           1,
-	//PromotableTransaction: Promotable,
-	//StmtCacheSize:         20,
-	//MetadataBooling:       true,
-	//SelfTuning:            true,
-	//PoolRegulator:         100,
-	//ConnectionPoolTimeout: 15,
-	//}
+	// ret := &ConnectionString{
+	// Port:         defaultPort,
+	// DBAPrivilege: NONE,
+	// EnList:                TRUE,
+	// IncrPoolSize:          5,
+	// DecrPoolSize:          5,
+	// MaxPoolSize:           100,
+	// MinPoolSize:           1,
+	// PromotableTransaction: Promotable,
+	// StmtCacheSize:         20,
+	// MetadataBooling:       true,
+	// SelfTuning:            true,
+	// PoolRegulator:         100,
+	// ConnectionPoolTimeout: 15,
+	// }
 	config.UserID = u.User.Username()
 	config.DatabaseInfo.Password, _ = u.User.Password()
 	if strings.ToUpper(config.UserID) == "SYS" {
@@ -243,16 +243,16 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			config.SessionInfo.Timeout = time.Second * time.Duration(to)
 		case "TRACE FILE":
 			config.TraceFilePath = val[0]
-			//if len(val[0]) > 0 {
+			// if len(val[0]) > 0 {
 			//	tf, err := os.Create(val[0])
 			//	if err != nil {
 			//		//noinspection GoErrorStringFormat
 			//		return nil, fmt.Errorf("Can't open trace file: %w", err)
 			//	}
 			//	config.Tracer = trace.NewTraceWriter(tf)
-			//} else {
+			// } else {
 			//	config.Tracer = trace.NilTracer()
-			//}
+			// }
 		case "TRACE DIR":
 			fallthrough
 		case "TRACE FOLDER":
@@ -276,20 +276,20 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			config.DatabaseInfo.ProxyClientName = val[0]
 		case "FAILOVER":
 			return nil, errors.New("starting from v2.7.0 this feature (FAILOVER) is not supported and the driver use database/sql package fail over")
-			//config.Failover, err = strconv.Atoi(val[0])
-			//if err != nil {
+			// config.Failover, err = strconv.Atoi(val[0])
+			// if err != nil {
 			//	config.Failover = 0
-			//}
+			// }
 		case "RETRYTIME":
 			fallthrough
 		case "RE-TRY TIME":
 			fallthrough
 		case "RETRY TIME":
 			return nil, errors.New("starting from v2.7.0 this feature (RETRY TIME) is not supported and the driver use database/sql package fail over")
-			//config.RetryTime, err = strconv.Atoi(val[0])
-			//if err != nil {
+			// config.RetryTime, err = strconv.Atoi(val[0])
+			// if err != nil {
 			//	config.RetryTime = 0
-			//}
+			// }
 		case "LOB FETCH":
 			tempVal := strings.ToUpper(val[0])
 			if tempVal == "PRE" || tempVal == "INLINE" {
@@ -312,86 +312,88 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			}
 		case "PROGRAM":
 			config.ClientInfo.ProgramName = val[0]
+		case "SERVER LOCATION":
+			config.DatabaseInfo.Location = val[0]
 		default:
 			return nil, fmt.Errorf("unknown URL option: %s", key)
-			//else if tempVal == "IMPLICIT" || tempVal == "AUTO" {
+			// else if tempVal == "IMPLICIT" || tempVal == "AUTO" {
 			//	config.Lob = 1
-			//} else if tempVal == "EXPLICIT" || tempVal == "MANUAL" {
+			// } else if tempVal == "EXPLICIT" || tempVal == "MANUAL" {
 			//	config.Lob = 2
-			//} else {
+			// } else {
 			//	return nil, errors.New("LOB value should be: Prefetch, Implicit(AUTO) or Explicit(manual)")
-			//}
-			//case "ENLIST":
+			// }
+			// case "ENLIST":
 			//	ret.EnList = EnListFromString(val[0])
-			//case "INC POOL SIZE":
+			// case "INC POOL SIZE":
 			//	ret.IncrPoolSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("INC POOL SIZE value must be an integer")
 			//	}
-			//case "DECR POOL SIZE":
+			// case "DECR POOL SIZE":
 			//	ret.DecrPoolSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("DECR POOL SIZE value must be an integer")
 			//	}
-			//case "MAX POOL SIZE":
+			// case "MAX POOL SIZE":
 			//	ret.MaxPoolSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("MAX POOL SIZE value must be an integer")
 			//	}
-			//case "MIN POOL SIZE":
+			// case "MIN POOL SIZE":
 			//	ret.MinPoolSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("MIN POOL SIZE value must be an integer")
 			//	}
-			//case "POOL REGULATOR":
+			// case "POOL REGULATOR":
 			//	ret.PoolRegulator, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("POOL REGULATOR value must be an integer")
 			//	}
-			//case "STATEMENT CACHE SIZE":
+			// case "STATEMENT CACHE SIZE":
 			//	ret.StmtCacheSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("STATEMENT CACHE SIZE value must be an integer")
 			//	}
-			//case "CONNECTION POOL TIMEOUT":
+			// case "CONNECTION POOL TIMEOUT":
 			//	ret.ConnectionPoolTimeout, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("CONNECTION POOL TIMEOUT value must be an integer")
 			//	}
-			//case "CONNECTION LIFETIME":
+			// case "CONNECTION LIFETIME":
 			//	ret.ConnectionLifeTime, err = strconv.Atoi(val[0])
 			//	if err != nil {
 			//		return nil, errors.New("CONNECTION LIFETIME value must be an integer")
 			//	}
-			//case "PERSIST SECURITY INFO":
+			// case "PERSIST SECURITY INFO":
 			//	ret.PasswordSecurityInfo = val[0] == "TRUE"
-			//case "POOLING":
+			// case "POOLING":
 			//	ret.Pooling = val[0] == "TRUE"
-			//case "VALIDATE CONNECTION":
+			// case "VALIDATE CONNECTION":
 			//	ret.ValidateConnection = val[0] == "TRUE"
-			//case "STATEMENT CACHE PURGE":
+			// case "STATEMENT CACHE PURGE":
 			//	ret.StmtCachePurge = val[0] == "TRUE"
-			//case "HA EVENTS":
+			// case "HA EVENTS":
 			//	ret.HaEvent = val[0] == "TRUE"
-			//case "LOAD BALANCING":
+			// case "LOAD BALANCING":
 			//	ret.LoadBalance = val[0] == "TRUE"
-			//case "METADATA POOLING":
+			// case "METADATA POOLING":
 			//	ret.MetadataBooling = val[0] == "TRUE"
-			//case "SELF TUNING":
+			// case "SELF TUNING":
 			//	ret.SelfTuning = val[0] == "TRUE"
-			//case "CONTEXT CONNECTION":
+			// case "CONTEXT CONNECTION":
 			//	ret.ContextConnection = val[0] == "TRUE"
-			//case "PROMOTABLE TRANSACTION":
+			// case "PROMOTABLE TRANSACTION":
 			//	if val[0] == "PROMOTABLE" {
 			//		ret.PromotableTransaction = Promotable
 			//	} else {
 			//		ret.PromotableTransaction = Local
 			//	}
-			//case "APPLICATION EDITION":
+			// case "APPLICATION EDITION":
 			//	ret.ApplicationEdition = val[0]
-			//case "PROXY USER ID":
+			// case "PROXY USER ID":
 			//	ret.ProxyUserID = val[0]
-			//case "PROXY PASSWORD":
+			// case "PROXY PASSWORD":
 			//	ret.ProxyPassword = val[0]
 		}
 	}

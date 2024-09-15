@@ -50,7 +50,7 @@ type Querier interface {
 	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
 }
 
-/////
+// ///
 
 type NLSData struct {
 	Calender        string `db:"p_nls_calendar,,40,out"`
@@ -103,9 +103,10 @@ type Connection struct {
 		date      int
 		timestamp int
 	}
-	bad              bool
-	dbTimeZone       *time.Location
-	dbServerTimeZone *time.Location
+	bad                      bool
+	dbTimeZone               *time.Location
+	dbServerTimeZone         *time.Location
+	dbServerTimeZoneExplicit *time.Location
 }
 
 type OracleConnector struct {
@@ -213,7 +214,7 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 
 	// fmt.Println(stmt.Pars)
 
-	//if len(stmt.Pars) >= 10 {
+	// if len(stmt.Pars) >= 10 {
 	//	conn.NLSData.Calender = conn.sStrConv.Decode(stmt.Pars[0].BValue)
 	//	conn.NLSData.Comp = conn.sStrConv.Decode(stmt.Pars[1].BValue)
 	//	conn.NLSData.LengthSemantics = conn.sStrConv.Decode(stmt.Pars[2].BValue)
@@ -227,7 +228,7 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 	//	conn.NLSData.DualCurrency = conn.sStrConv.Decode(stmt.Pars[10].BValue)
 	//	conn.NLSData.Timestamp = conn.sStrConv.Decode(stmt.Pars[11].BValue)
 	//	conn.NLSData.TimestampTZ = conn.sStrConv.Decode(stmt.Pars[12].BValue)
-	//}
+	// }
 
 	/*
 		for _, par := range stmt.Pars {
@@ -315,8 +316,8 @@ func (conn *Connection) Logoff() error {
 		return err
 	}
 	return conn.read()
-	//loop := true
-	//for loop {
+	// loop := true
+	// for loop {
 	//	msg, err := session.GetByte()
 	//	if err != nil {
 	//		return err
@@ -328,8 +329,8 @@ func (conn *Connection) Logoff() error {
 	//	if msg == 4 || msg == 9 {
 	//		loop = false
 	//	}
-	//}
-	//return nil
+	// }
+	// return nil
 }
 
 func (conn *Connection) read() error {
@@ -356,7 +357,7 @@ func (conn *Connection) Open() error {
 	return conn.OpenWithContext(context.Background())
 }
 
-//func (conn *Connection) restore() error {
+// func (conn *Connection) restore() error {
 //	tracer := conn.tracer
 //	failOver := conn.connOption.Failover
 //	var err error
@@ -370,7 +371,7 @@ func (conn *Connection) Open() error {
 //		break
 //	}
 //	return err
-//}
+// }
 
 // OpenWithContext open the connection with timeout context
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
@@ -492,6 +493,21 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 }
 
 func (conn *Connection) getDBServerTimeZone() {
+
+	if conn.connOption.DatabaseInfo.Location != "" {
+		loc, err := time.LoadLocation(conn.connOption.DatabaseInfo.Location)
+		if err == nil {
+			conn.dbServerTimeZone = loc
+			return
+		}
+		conn.tracer.Printf("Unable to configure timezone from LOCATION parameter: %v", err)
+	}
+
+	if conn.dbServerTimeZoneExplicit != nil {
+		conn.dbServerTimeZone = conn.dbServerTimeZoneExplicit
+		return
+	}
+
 	var current time.Time
 	err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
 	if err != nil {
@@ -1131,12 +1147,12 @@ func (conn *Connection) readMsg(msgCode uint8) error {
 	var err error
 	switch msgCode {
 	case 4:
-		//if conn.session.IsBreak() {
+		// if conn.session.IsBreak() {
 		//	if conn.session.RestoreIndex() {
 		//		_, _ = conn.session.GetByte()
 		//	}
 		//	conn.session.ResetBreak()
-		//}
+		// }
 		conn.session.Summary, err = network.NewSummary(session)
 		if err != nil {
 			return err
@@ -1156,18 +1172,18 @@ func (conn *Connection) readMsg(msgCode uint8) error {
 				return err
 			}
 		}
-		//for x := 0; x < 2; x++ {
+		// for x := 0; x < 2; x++ {
 		//	_, err = session.GetInt(4, true, true)
 		//	if err != nil {
 		//		return err
 		//	}
-		//}
-		//for x := 2; x < size; x++ {
+		// }
+		// for x := 2; x < size; x++ {
 		//	_, err = session.GetInt(4, true, true)
 		//	if err != nil {
 		//		return err
 		//	}
-		//}
+		// }
 		_, err = session.GetInt(2, true, true)
 		if err != nil {
 			return err

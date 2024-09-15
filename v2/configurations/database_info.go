@@ -47,6 +47,7 @@ type DatabaseInfo struct {
 	AuthType        AuthType
 	Wallet          *Wallet
 	connStr         string
+	Location        string
 }
 
 func ExtractServers(connStr string) (addresses []ServerAddr, err error) {

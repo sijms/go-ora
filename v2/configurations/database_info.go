@@ -13,9 +13,14 @@ const defaultPort int = 1521
 type DBAPrivilege int
 
 const (
-	NONE    DBAPrivilege = 0
-	SYSDBA  DBAPrivilege = 0x20
-	SYSOPER DBAPrivilege = 0x40
+	NONE      DBAPrivilege = 0
+	SYSDBA    DBAPrivilege = 0x20
+	SYSOPER   DBAPrivilege = 0x40
+	SYSASM    DBAPrivilege = 0x00400000
+	SYSBACKUP DBAPrivilege = 0x01000000
+	SYSDG     DBAPrivilege = 0x02000000
+	SYSKM     DBAPrivilege = 0x04000000
+	SYSRAC    DBAPrivilege = 0x08000000
 )
 
 type AuthType int
@@ -213,12 +218,22 @@ func (info *DatabaseInfo) GetActiveServer(jump bool) *ServerAddr {
 }
 
 func DBAPrivilegeFromString(s string) DBAPrivilege {
-	S := strings.ToUpper(s)
-	if S == "SYSDBA" {
+	switch strings.ToUpper(s) {
+	case "SYSDBA":
 		return SYSDBA
-	}
-	if S == "SYSOPER" {
+	case "SYSOPER":
 		return SYSOPER
+	case "SYSASM":
+		return SYSASM
+	case "SYSBACKUP":
+		return SYSBACKUP
+	case "SYSDG":
+		return SYSDG
+	case "SYSKM":
+		return SYSKM
+	case "SYSRAC":
+		return SYSRAC
+	default:
+		return NONE
 	}
-	return NONE
 }

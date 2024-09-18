@@ -37,6 +37,11 @@ const (
 	NoNewPass   LogonMode = 0x1
 	SysDba      LogonMode = 0x20
 	SysOper     LogonMode = 0x40
+	SysAsm      LogonMode = 0x00400000
+	SysBackup   LogonMode = 0x01000000
+	SysDg       LogonMode = 0x02000000
+	SysKm       LogonMode = 0x04000000
+	SysRac      LogonMode = 0x08000000
 	UserAndPass LogonMode = 0x100
 	// WithNewPass LogonMode = 0x2
 	// PROXY       LogonMode = 0x400
@@ -402,6 +407,16 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		conn.LogonMode |= SysDba
 	case configurations.SYSOPER:
 		conn.LogonMode |= SysOper
+	case configurations.SYSASM:
+		conn.LogonMode |= SysAsm
+	case configurations.SYSBACKUP:
+		conn.LogonMode |= SysBackup
+	case configurations.SYSDG:
+		conn.LogonMode |= SysDg
+	case configurations.SYSKM:
+		conn.LogonMode |= SysKm
+	case configurations.SYSRAC:
+		conn.LogonMode |= SysRac
 	default:
 		conn.LogonMode = 0
 	}

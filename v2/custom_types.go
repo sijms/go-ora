@@ -173,8 +173,6 @@ func (val *Blob) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	if temp != nil {
-		val.Data = *temp
-	}
+	val.Data = *temp
 	return nil
 }

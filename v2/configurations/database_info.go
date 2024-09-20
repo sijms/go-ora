@@ -196,7 +196,7 @@ func (info *DatabaseInfo) AddServer(server ServerAddr) {
 }
 
 func (serv *ServerAddr) IsEqual(input *ServerAddr) bool {
-	return strings.ToUpper(serv.Addr) == strings.ToUpper(input.Addr) &&
+	return strings.EqualFold(strings.ToUpper(serv.Addr), strings.ToUpper(input.Addr)) &&
 		serv.Port == input.Port
 }
 

@@ -109,18 +109,18 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		// session.PutUint(0, 4, true, true)
 		// session.PutUint(0, 4, true, true)
 	}
-	//switch (longFetchSize)
-	//{
-	//case -1:
-	//	this.m_marshallingEngine.MarshalUB4((long) int.MaxValue);
-	//	break;
-	//case 0:
-	//	this.m_marshallingEngine.MarshalUB4(1L);
-	//	break;
-	//default:
-	//	this.m_marshallingEngine.MarshalUB4((long) longFetchSize);
-	//	break;
-	//}
+	// switch (longFetchSize)
+	// {
+	// case -1:
+	// 	this.m_marshallingEngine.MarshalUB4((long) int.MaxValue);
+	// 	break;
+	// case 0:
+	// 	this.m_marshallingEngine.MarshalUB4(1L);
+	// 	break;
+	// default:
+	// 	this.m_marshallingEngine.MarshalUB4((long) longFetchSize);
+	// 	break;
+	// }
 	// we use here int.MaxValue
 	if stmt.connection.connOption.Lob == configurations.INLINE {
 		session.PutInt(0x3FFFFFFF, 4, true, true)
@@ -237,8 +237,8 @@ func (stmt *defaultStmt) writeDefine() error {
 	session := stmt.connection.session
 	num := 0x7FFFFFFF
 	for index, col := range stmt.columns {
-		//temp := new(ParameterInfo)
-		//*temp = col
+		// temp := new(ParameterInfo)
+		// *temp = col
 		col.oaccollid = 0
 		col.Precision = 0
 		col.Scale = 0
@@ -435,10 +435,10 @@ func (stmt *Stmt) write() error {
 		session.PutUint(count, 2, true, true)
 		session.PutUint(exeOf, 2, true, true)
 		session.PutUint(execFlag, 2, true, true)
-		//err := stmt.writePars()
-		//if err != nil {
-		//	return err
-		//}
+		// err := stmt.writePars()
+		// if err != nil {
+		// 	return err
+		// }
 		var err error
 		if stmt.bulkExec {
 			// take copy of parameter values
@@ -466,25 +466,25 @@ func (stmt *Stmt) write() error {
 				}
 			}
 
-			//for valueIndex, values := range arrayValue {
-			//	stmt.Pars[parIndex].BValue = values[valueIndex]
-			//}
-			// valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
-			// each value represented an array of []byte
-			//}
-			//for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
-			//	for parIndex, arrayValue := range arrayValues {
-			//		tempVal := reflect.ValueOf(arrayValue)
-			//		err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
-			//		if err != nil {
-			//			return err
-			//		}
-			//	}
-			//	err = stmt.writePars()
-			//	if err != nil {
-			//		return err
-			//	}
-			//}
+			// for valueIndex, values := range arrayValue {
+			// 	stmt.Pars[parIndex].BValue = values[valueIndex]
+			// }
+			//  valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
+			//  each value represented an array of []byte
+			// }
+			// for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
+			// 	for parIndex, arrayValue := range arrayValues {
+			// 		tempVal := reflect.ValueOf(arrayValue)
+			// 		err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
+			// 		if err != nil {
+			// 			return err
+			// 		}
+			// 	}
+			// 	err = stmt.writePars()
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// }
 		} else {
 			err = stmt.writePars()
 			if err != nil {
@@ -522,29 +522,29 @@ func (stmt *Stmt) write() error {
 					return err
 				}
 			}
-			//arrayValues := make([]driver.Value, len(stmt.Pars))
-			//for x := 0; x < len(stmt.Pars); x++ {
-			//	if stmt.Pars[x].Flag == 0x80 {
-			//		continue
-			//	}
-			//	arrayValues[x] = stmt.Pars[x].Value
-			//}
-			//for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
-			//	for parIndex, arrayValue := range arrayValues {
-			//		if stmt.Pars[parIndex].Flag == 0x80 {
-			//			continue
-			//		}
-			//		tempVal := reflect.ValueOf(arrayValue)
-			//		err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
-			//		if err != nil {
-			//			return err
-			//		}
-			//	}
-			//	err = stmt.writePars()
-			//	if err != nil {
-			//		return err
-			//	}
-			//}
+			// arrayValues := make([]driver.Value, len(stmt.Pars))
+			// for x := 0; x < len(stmt.Pars); x++ {
+			// 	if stmt.Pars[x].Flag == 0x80 {
+			// 		continue
+			// 	}
+			// 	arrayValues[x] = stmt.Pars[x].Value
+			// }
+			// for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
+			// 	for parIndex, arrayValue := range arrayValues {
+			// 		if stmt.Pars[parIndex].Flag == 0x80 {
+			// 			continue
+			// 		}
+			// 		tempVal := reflect.ValueOf(arrayValue)
+			// 		err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
+			// 		if err != nil {
+			// 			return err
+			// 		}
+			// 	}
+			// 	err = stmt.writePars()
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// }
 		} else {
 			err = stmt.writePars()
 			if err != nil {
@@ -634,29 +634,29 @@ func (stmt *defaultStmt) fetch(dataSet *DataSet) error {
 		}
 		return err
 	}
-	//for colIndex, col := range dataSet.Cols {
-	//	if col.DataType == REFCURSOR {
-	//		for rowIndex, row := range dataSet.rows {
-	//			if cursor, ok := row[colIndex].(*RefCursor); ok {
-	//				dataSet.rows[rowIndex][colIndex], err = cursor.Query()
-	//				if err != nil {
-	//					return err
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
+	// for colIndex, col := range dataSet.Cols {
+	// 	if col.DataType == REFCURSOR {
+	// 		for rowIndex, row := range dataSet.rows {
+	// 			if cursor, ok := row[colIndex].(*RefCursor); ok {
+	// 				dataSet.rows[rowIndex][colIndex], err = cursor.Query()
+	// 				if err != nil {
+	// 					return err
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 	return nil
 }
 
 func (stmt *defaultStmt) _fetch(dataSet *DataSet) error {
 	session := stmt.connection.session
-	//defer func() {
-	//	err := stmt.freeTemporaryLobs()
-	//	if err != nil {
-	//		stmt.connection.tracer.Printf("Error free temporary lobs: %v", err)
-	//	}
-	//}()
+	// defer func() {
+	// 	err := stmt.freeTemporaryLobs()
+	// 	if err != nil {
+	// 		stmt.connection.tracer.Printf("Error free temporary lobs: %v", err)
+	// 	}
+	// }()
 	session.ResetBuffer()
 	session.PutBytes(3, 5, 0)
 	session.PutInt(stmt.cursorID, 2, true, true)
@@ -699,10 +699,10 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, dataSet *DataSet) error {
 	if err != nil {
 		return err
 	}
-	//err = stmt.writePars()
-	//if err != nil {
-	//	return err
-	//}
+	// err = stmt.writePars()
+	// if err != nil {
+	// 	return err
+	// }
 	err = stmt.connection.session.Write()
 	if err != nil {
 		return err
@@ -727,38 +727,38 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 			}
 		}
 	}()
-	//defer func() {
-	//	if _, ok := recover().(*network.ErrConnReset); ok {
-	//		loop = true
-	//		var msg uint8
-	//		for loop {
-	//			msg, err = session.GetByte()
-	//			if err != nil {
-	//				return
-	//			}
-	//			err = stmt.connection.readMsg(msg)
-	//			if err != nil {
-	//				return
-	//			}
-	//			if msg == 4 {
-	//				stmt.cursorID = stmt.connection.session.Summary.CursorID
-	//				if stmt.connection.session.HasError() {
-	//					if stmt.connection.session.Summary.RetCode == 1403 {
-	//						stmt._hasMoreRows = false
-	//						stmt.connection.session.Summary = nil
-	//					} else {
-	//						err = stmt.connection.session.GetError()
-	//						return
-	//					}
-	//
-	//				}
-	//				loop = false
-	//			} else if msg == 9 {
-	//				loop = false
-	//			}
-	//		}
-	//	}
-	//}()
+	// defer func() {
+	// 	if _, ok := recover().(*network.ErrConnReset); ok {
+	// 		loop = true
+	// 		var msg uint8
+	// 		for loop {
+	// 			msg, err = session.GetByte()
+	// 			if err != nil {
+	// 				return
+	// 			}
+	// 			err = stmt.connection.readMsg(msg)
+	// 			if err != nil {
+	// 				return
+	// 			}
+	// 			if msg == 4 {
+	// 				stmt.cursorID = stmt.connection.session.Summary.CursorID
+	// 				if stmt.connection.session.HasError() {
+	// 					if stmt.connection.session.Summary.RetCode == 1403 {
+	// 						stmt._hasMoreRows = false
+	// 						stmt.connection.session.Summary = nil
+	// 					} else {
+	// 						err = stmt.connection.session.GetError()
+	// 						return
+	// 					}
+	// 
+	// 				}
+	// 				loop = false
+	// 			} else if msg == 9 {
+	// 				loop = false
+	// 			}
+	// 		}
+	// 	}
+	// }()
 	for loop {
 		msg, err := session.GetByte()
 		if err != nil {
@@ -766,7 +766,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 		}
 		switch msg {
 		case 6:
-			//_, err = session.GetByte()
+			// _, err = session.GetByte()
 			err = dataSet.load(session)
 			if err != nil {
 				return err
@@ -840,11 +840,11 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 					}
 				} else {
 					// see if it is re-executed
-					//if len(dataSet.Cols) == 0 && len(stmt.columns) > 0 {
-					//
-					//}
-					//dataSet.Cols = make([]ParameterInfo, len(stmt.columns))
-					//copy(dataSet.Cols, stmt.columns)
+					// if len(dataSet.Cols) == 0 && len(stmt.columns) > 0 {
+					// 
+					// }
+					// dataSet.Cols = make([]ParameterInfo, len(stmt.columns))
+					// copy(dataSet.Cols, stmt.columns)
 					newRow := make(Row, dataSet.columnCount)
 					for index, col := range stmt.columns {
 						if col.getDataFromServer {
@@ -1044,19 +1044,19 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 				}
 				// what we will do with cursor?
 			}
-			//internal List<TTCResultSet> ProcessImplicitResultSet(
-			//ref List<TTCResultSet> implicitRSList)
-			//{
-			//int num = (int) this.m_marshallingEngine.UnmarshalUB4();
-			//TTCRefCursorAccessor refCursorAccessor = new TTCRefCursorAccessor((ColumnDescribeInfo) null, this.m_marshallingEngine);
-			//for (int index = 0; index < num; ++index)
-			//refCursorAccessor.UnmarshalOneRow();
-			//if (implicitRSList != null)
-			//implicitRSList.AddRange((IEnumerable<TTCResultSet>) refCursorAccessor.m_TTCResultSetList);
-			//else
-			//implicitRSList = refCursorAccessor.m_TTCResultSetList;
-			//return implicitRSList;
-			//}
+			// internal List<TTCResultSet> ProcessImplicitResultSet(
+			// ref List<TTCResultSet> implicitRSList)
+			// {
+			// int num = (int) this.m_marshallingEngine.UnmarshalUB4();
+			// TTCRefCursorAccessor refCursorAccessor = new TTCRefCursorAccessor((ColumnDescribeInfo) null, this.m_marshallingEngine);
+			// for (int index = 0; index < num; ++index)
+			// refCursorAccessor.UnmarshalOneRow();
+			// if (implicitRSList != null)
+			// implicitRSList.AddRange((IEnumerable<TTCResultSet>) refCursorAccessor.m_TTCResultSetList);
+			// else
+			// implicitRSList = refCursorAccessor.m_TTCResultSetList;
+			// return implicitRSList;
+			// }
 		default:
 			err = stmt.connection.readMsg(msg)
 			if err != nil {
@@ -1067,14 +1067,14 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 			}
 		}
 	}
-	//if session.IsBreak() {
-	//	err := (&simpleObject{
-	//		connection: stmt.connection,
-	//	}).read()
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
+	// if session.IsBreak() {
+	// 	err := (&simpleObject{
+	// 		connection: stmt.connection,
+	// 	}).read()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 	if stmt.connection.tracer.IsOn() {
 		dataSet.Trace(stmt.connection.tracer)
 	}
@@ -1089,9 +1089,9 @@ func (stmt *defaultStmt) freeTemporaryLobs() error {
 	}
 	stmt.connection.tracer.Printf("Free %d Temporary Lobs", len(stmt.temporaryLobs))
 	session := stmt.connection.session
-	//defer func(input *[][]byte) {
-	//	*input = nil
-	//}(&stmt.temporaryLobs)
+	// defer func(input *[][]byte) {
+	// 	*input = nil
+	// }(&stmt.temporaryLobs)
 	freeTemp := func(locators [][]byte) {
 		totalLen := 0
 		for _, locator := range locators {
@@ -1144,31 +1144,31 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	session.PutInt(len(typeName), 4, true, true)
 	// session.PutBytes(0, 0, 0)
 	session.PutClr(stmt.connection.sStrConv.Encode(typeName))
-	//session.PutBytes(0, 0, 0)
-	//if session.TTCVersion >= 4 {
-	//	session.PutBytes(0, 0, 1)
-	//}
-	//if session.TTCVersion >= 5 {
-	//	session.PutBytes(0, 0, 0, 0, 0)
-	//}
-	//if session.TTCVersion >= 7 {
-	//	if stmt.stmtType == DML && stmt.arrayBindCount > 0 {
-	//		session.PutBytes(1)
-	//		session.PutInt(stmt.arrayBindCount, 4, true, true)
-	//		session.PutBytes(1)
-	//	} else {
-	//		session.PutBytes(0, 0, 0)
-	//	}
-	//}
-	//if session.TTCVersion >= 8 {
-	//	session.PutBytes(0, 0, 0, 0, 0)
-	//}
-	//if session.TTCVersion >= 9 {
-	//	session.PutBytes(0, 0)
-	//}
-	//session.PutBytes(0, 0)
-	//session.PutInt(1, 4, true, true)
-	//session.PutBytes(0)
+	// session.PutBytes(0, 0, 0)
+	// if session.TTCVersion >= 4 {
+	// 	session.PutBytes(0, 0, 1)
+	// }
+	// if session.TTCVersion >= 5 {
+	// 	session.PutBytes(0, 0, 0, 0, 0)
+	// }
+	// if session.TTCVersion >= 7 {
+	// 	if stmt.stmtType == DML && stmt.arrayBindCount > 0 {
+	// 		session.PutBytes(1)
+	// 		session.PutInt(stmt.arrayBindCount, 4, true, true)
+	// 		session.PutBytes(1)
+	// 	} else {
+	// 		session.PutBytes(0, 0, 0)
+	// 	}
+	// }
+	// if session.TTCVersion >= 8 {
+	// 	session.PutBytes(0, 0, 0, 0, 0)
+	// }
+	// if session.TTCVersion >= 9 {
+	// 	session.PutBytes(0, 0)
+	// }
+	// session.PutBytes(0, 0)
+	// session.PutInt(1, 4, true, true)
+	// session.PutBytes(0)
 	session.PutBytes(0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
 	session.PutBytes(bytes.Repeat([]byte{0}, 50)...)
 	// session.PutBytes(0)
@@ -1189,9 +1189,9 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 
 func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) error {
 	session := stmt.connection.session
-	//if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
-	//	stmt._hasBLOB = true
-	//}
+	// if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
+	// 	stmt._hasBLOB = true
+	// }
 	if col.DataType == REFCURSOR {
 		cursor := new(RefCursor)
 		cursor.connection = stmt.connection
@@ -1664,13 +1664,13 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 										return nil, err
 									}
 									arrayValues[arrayIndex] = tempPar.Value
-									//if (tempVal.Index(arrayIndex).Field(fieldIndex).Kind() == reflect.Ptr ||
-									//	tempVal.Index(arrayIndex).Field(fieldIndex).Kind() == reflect.Slice ||
-									//	tempVal.Index(arrayIndex).Field(fieldIndex).Kind() == reflect.Array) && tempVal.Index(arrayIndex).Field(fieldIndex).IsNil() {
-									//	arrayValues[arrayIndex] = nil
-									//} else {
-									//
-									//}
+									// if (tempVal.Index(arrayIndex).Field(fieldIndex).Kind() == reflect.Ptr ||
+									// 	tempVal.Index(arrayIndex).Field(fieldIndex).Kind() == reflect.Slice ||
+									// 	tempVal.Index(arrayIndex).Field(fieldIndex).Kind() == reflect.Array) && tempVal.Index(arrayIndex).Field(fieldIndex).IsNil() {
+									// 	arrayValues[arrayIndex] = nil
+									// } else {
+									// 
+									// }
 								}
 								structArrayAsNamedPars = append(structArrayAsNamedPars, driver.NamedValue{Name: name, Value: arrayValues})
 							}
@@ -1680,15 +1680,15 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						}
 					}
 
-					//err := param.encodeValue(val, size, stmt.connection)
-					//if err != nil {
-					//	return nil, err
-					//}
-					//return param, err
-					//par, err = stmt.NewParam(args[x].Name, firstItem.Interface(), 0, Input)
-					//if err != nil {
-					//	return nil, err
-					//}
+					// err := param.encodeValue(val, size, stmt.connection)
+					// if err != nil {
+					// 	return nil, err
+					// }
+					// return param, err
+					// par, err = stmt.NewParam(args[x].Name, firstItem.Interface(), 0, Input)
+					// if err != nil {
+					// 	return nil, err
+					// }
 
 					par = &ParameterInfo{
 						Name:      args[x].Name,
@@ -1772,10 +1772,10 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		return nil, err
 	}
 	// need to deal with lobs
-	//err = stmt.readLobs(dataSet)
-	//if err != nil {
-	//	return nil, err
-	//}
+	// err = stmt.readLobs(dataSet)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// before release results decode parameters
 	for _, par := range stmt.Pars {
@@ -2039,18 +2039,18 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	return stmt.Query_(namedArgs)
 }
 
-//func (stmt *Stmt) reset() {
-//	stmt.reSendParDef = false
-//	stmt.parse = true
-//	stmt.execute = true
-//	stmt.define = false
-//	stmt._hasBLOB = false
-//	stmt._hasLONG = false
-//	stmt.bulkExec = false
-//	// stmt.disableCompression = false
-//	stmt.arrayBindCount = 0
-//	stmt.columns = nil
-//}
+// func (stmt *Stmt) reset() {
+// 	stmt.reSendParDef = false
+// 	stmt.parse = true
+// 	stmt.execute = true
+// 	stmt.define = false
+// 	stmt._hasBLOB = false
+// 	stmt._hasLONG = false
+// 	stmt.bulkExec = false
+// 	// stmt.disableCompression = false
+// 	stmt.arrayBindCount = 0
+// 	stmt.columns = nil
+// }
 
 func (stmt *Stmt) _query() (*DataSet, error) {
 	var err error
@@ -2170,53 +2170,53 @@ fetch = true if hasReturn or PLSQL
 define = false
 */
 
-//func ReadFromExternalBuffer(buffer []byte) error {
-//	connOption := &network.ConnectionOption{
-//		Port:                  0,
-//		TransportConnectTo:    0,
-//		SSLVersion:            "",
-//		WalletDict:            "",
-//		TransportDataUnitSize: 0,
-//		SessionDataUnitSize:   0,
-//		Protocol:              "",
-//		Host:                  "",
-//		UserID:                "",
-//		SID:                   "",
-//		ServiceName:           "",
-//		InstanceName:          "",
-//		DomainName:            "",
-//		DBName:                "",
-//		ClientData:            network.ClientData{},
-//		Tracer:                trace.NilTracer(),
-//		SNOConfig:             nil,
-//	}
-//	conn := &Connection {
-//		State:             Opened,
-//		LogonMode:         0,
-//		SessionProperties: nil,
-//		connOption: connOption,
-//	}
-//	conn.session = &network.Session{
-//		Context:         nil,
-//		Summary:         nil,
-//		UseBigClrChunks: true,
-//		ClrChunkSize:    0x40,
-//	}
-//	conn.strConv = converters.NewStringConverter(871)
-//	conn.session.StrConv = conn.strConv
-//	conn.session.FillInBuffer(buffer)
-//	conn.session.TTCVersion = 11
-//	stmt := &Stmt{
-//		defaultStmt:  defaultStmt{
-//			connection: conn,
-//			scnForSnapshot: make([]int, 2),
-//		},
-//		reSendParDef: false,
-//		parse:        true,
-//		execute:      true,
-//		define:       false,
-//	}
-//	dataSet := new(DataSet)
-//	err := stmt.read(dataSet)
-//	return err
-//}
+// func ReadFromExternalBuffer(buffer []byte) error {
+// 	connOption := &network.ConnectionOption{
+// 		Port:                  0,
+// 		TransportConnectTo:    0,
+// 		SSLVersion:            "",
+// 		WalletDict:            "",
+// 		TransportDataUnitSize: 0,
+// 		SessionDataUnitSize:   0,
+// 		Protocol:              "",
+// 		Host:                  "",
+// 		UserID:                "",
+// 		SID:                   "",
+// 		ServiceName:           "",
+// 		InstanceName:          "",
+// 		DomainName:            "",
+// 		DBName:                "",
+// 		ClientData:            network.ClientData{},
+// 		Tracer:                trace.NilTracer(),
+// 		SNOConfig:             nil,
+// 	}
+// 	conn := &Connection {
+// 		State:             Opened,
+// 		LogonMode:         0,
+// 		SessionProperties: nil,
+// 		connOption: connOption,
+// 	}
+// 	conn.session = &network.Session{
+// 		Context:         nil,
+// 		Summary:         nil,
+// 		UseBigClrChunks: true,
+// 		ClrChunkSize:    0x40,
+// 	}
+// 	conn.strConv = converters.NewStringConverter(871)
+// 	conn.session.StrConv = conn.strConv
+// 	conn.session.FillInBuffer(buffer)
+// 	conn.session.TTCVersion = 11
+// 	stmt := &Stmt{
+// 		defaultStmt:  defaultStmt{
+// 			connection: conn,
+// 			scnForSnapshot: make([]int, 2),
+// 		},
+// 		reSendParDef: false,
+// 		parse:        true,
+// 		execute:      true,
+// 		define:       false,
+// 	}
+// 	dataSet := new(DataSet)
+// 	err := stmt.read(dataSet)
+// 	return err
+// }

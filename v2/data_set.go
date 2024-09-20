@@ -59,9 +59,9 @@ func (dataSet *DataSet) load(session *network.Session) error {
 	if dataSet.columnCount == 0 {
 		dataSet.columnCount = columnCount
 	}
-	//if columnCount > dataSet.columnCount {
-	//	dataSet.columnCount = columnCount
-	//}
+	// if columnCount > dataSet.columnCount {
+	// 	dataSet.columnCount = columnCount
+	// }
 	if len(dataSet.currentRow) != dataSet.columnCount {
 		dataSet.currentRow = make(Row, dataSet.columnCount)
 	}
@@ -182,13 +182,13 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 		// if struct is custom type finish it
 		// other structure should support db tag
 		// non structure input
-		//result, err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem(), srcIndex)
-		//if err != nil {
-		//	return err
-		//}
-		//if result {
-		//	continue
-		//}
+		// result, err := dataSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem(), srcIndex)
+		// if err != nil {
+		// 	return err
+		// }
+		// if result {
+		// 	continue
+		// }
 	}
 	return nil
 }
@@ -199,100 +199,100 @@ func (dataSet *DataSet) Scan(dest ...interface{}) error {
 func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) error {
 	// value := dataSet.currentRow[colIndex]
 	col := (*dataSet.cols)[colIndex]
-	//if value == nil {
-	//	return setNull(obj)
-	//}
-	//if obj.Kind() == reflect.Interface {
-	//	obj.Set(reflect.ValueOf(value))
-	//	return nil
-	//}
+	// if value == nil {
+	// 	return setNull(obj)
+	// }
+	// if obj.Kind() == reflect.Interface {
+	// 	obj.Set(reflect.ValueOf(value))
+	// 	return nil
+	// }
 	return setFieldValue(obj, col.cusType, dataSet.currentRow[colIndex])
-	//switch val := value.(type) {
-	//case int64:
-	//	return setNumber(obj, float64(val))
-	//case float64:
-	//	return setNumber(obj, val)
-	//case string:
-	//	return setString(obj, val)
-	//case time.Time:
-	//	return setTime(obj, val)
-	//case []byte:
-	//	return setBytes(obj, val)
-	//case bool:
-	//	if val {
-	//		return setNumber(obj, 1)
-	//	} else {
-	//		return setNumber(obj, 0)
-	//	}
-	//default:
-	//	if col.cusType != nil && col.cusType.typ == obj.Type() {
-	//		obj.Set(reflect.ValueOf(value))
-	//		return nil
-	//	}
-	//	return fmt.Errorf("can't assign value: %v to object of type: %v", value, obj.Type().Name())
-	//}
-	//err := setFieldValue(obj, col.cusType, dataSet.currentRow[colIndex])
-	//if err != nil {
-	//	return err
-	//}
-	//if col.cusType != nil && col.cusType.typ == obj.Type() {
-	//	obj.Set(reflect.ValueOf(field))
-	//	return true, nil
-	//}
-	//return true, setFieldValue(obj, nil, field)
+	// switch val := value.(type) {
+	// case int64:
+	// 	return setNumber(obj, float64(val))
+	// case float64:
+	// 	return setNumber(obj, val)
+	// case string:
+	// 	return setString(obj, val)
+	// case time.Time:
+	// 	return setTime(obj, val)
+	// case []byte:
+	// 	return setBytes(obj, val)
+	// case bool:
+	// 	if val {
+	// 		return setNumber(obj, 1)
+	// 	} else {
+	// 		return setNumber(obj, 0)
+	// 	}
+	// default:
+	// 	if col.cusType != nil && col.cusType.typ == obj.Type() {
+	// 		obj.Set(reflect.ValueOf(value))
+	// 		return nil
+	// 	}
+	// 	return fmt.Errorf("can't assign value: %v to object of type: %v", value, obj.Type().Name())
+	// }
+	// err := setFieldValue(obj, col.cusType, dataSet.currentRow[colIndex])
+	// if err != nil {
+	// 	return err
+	// }
+	// if col.cusType != nil && col.cusType.typ == obj.Type() {
+	// 	obj.Set(reflect.ValueOf(field))
+	// 	return true, nil
+	// }
+	// return true, setFieldValue(obj, nil, field)
 
-	//if temp, ok := obj.Interface().(sql.Scanner); ok {
-	//	err := temp.Scan(field)
-	//	return err == nil, err
-	//}
-	//if obj.CanAddr() {
-	//	if temp, ok := obj.Addr().Interface().(sql.Scanner); ok {
-	//		err := temp.Scan(field)
-	//		return err == nil, err
-	//	}
-	//}
-	//switch obj.Type().Kind() {
-	//case reflect.String:
-	//	obj.SetString(getString(field))
-	//case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-	//	temp, err := getInt(field)
-	//	if err != nil {
-	//		return false, fmt.Errorf("go-ora: column %d require an integer", colIndex)
-	//	}
-	//	obj.SetInt(temp)
-	//case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-	//	temp, err := getInt(field)
-	//	if err != nil {
-	//		return false, fmt.Errorf("go-ora: column %d require an integer", colIndex)
-	//	}
-	//	obj.SetUint(uint64(temp))
-	//case reflect.Float32, reflect.Float64:
-	//	temp, err := getFloat(field)
-	//	if err != nil {
-	//		return false, fmt.Errorf("go-ora: column %d require type float", colIndex)
-	//	}
-	//	obj.SetFloat(temp)
-	//default:
-	//	switch obj.Type() {
-	//	case reflect.TypeOf(time.Time{}):
-	//		switch tempField := field.(type) {
-	//		case time.Time:
-	//			obj.Set(reflect.ValueOf(field))
-	//		case TimeStamp:
-	//			obj.Set(reflect.ValueOf(time.Time(tempField)))
-	//		default:
-	//			return false, fmt.Errorf("go-ora: column %d require type time.Time", colIndex)
-	//		}
-	//	case reflect.TypeOf([]byte{}):
-	//		if _, ok := field.([]byte); ok {
-	//			obj.Set(reflect.ValueOf(field))
-	//		} else {
-	//			return false, fmt.Errorf("go-ora: column %d require type []byte", colIndex)
-	//		}
-	//	default:
-	//		return false, nil
-	//	}
-	//}
+	// if temp, ok := obj.Interface().(sql.Scanner); ok {
+	// 	err := temp.Scan(field)
+	// 	return err == nil, err
+	// }
+	// if obj.CanAddr() {
+	// 	if temp, ok := obj.Addr().Interface().(sql.Scanner); ok {
+	// 		err := temp.Scan(field)
+	// 		return err == nil, err
+	// 	}
+	// }
+	// switch obj.Type().Kind() {
+	// case reflect.String:
+	// 	obj.SetString(getString(field))
+	// case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+	// 	temp, err := getInt(field)
+	// 	if err != nil {
+	// 		return false, fmt.Errorf("go-ora: column %d require an integer", colIndex)
+	// 	}
+	// 	obj.SetInt(temp)
+	// case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	// 	temp, err := getInt(field)
+	// 	if err != nil {
+	// 		return false, fmt.Errorf("go-ora: column %d require an integer", colIndex)
+	// 	}
+	// 	obj.SetUint(uint64(temp))
+	// case reflect.Float32, reflect.Float64:
+	// 	temp, err := getFloat(field)
+	// 	if err != nil {
+	// 		return false, fmt.Errorf("go-ora: column %d require type float", colIndex)
+	// 	}
+	// 	obj.SetFloat(temp)
+	// default:
+	// 	switch obj.Type() {
+	// 	case reflect.TypeOf(time.Time{}):
+	// 		switch tempField := field.(type) {
+	// 		case time.Time:
+	// 			obj.Set(reflect.ValueOf(field))
+	// 		case TimeStamp:
+	// 			obj.Set(reflect.ValueOf(time.Time(tempField)))
+	// 		default:
+	// 			return false, fmt.Errorf("go-ora: column %d require type time.Time", colIndex)
+	// 		}
+	// 	case reflect.TypeOf([]byte{}):
+	// 		if _, ok := field.([]byte); ok {
+	// 			obj.Set(reflect.ValueOf(field))
+	// 		} else {
+	// 			return false, fmt.Errorf("go-ora: column %d require type []byte", colIndex)
+	// 		}
+	// 	default:
+	// 		return false, nil
+	// 	}
+	// }
 }
 
 func (dataSet *DataSet) Err() error {
@@ -303,9 +303,9 @@ func (dataSet *DataSet) Err() error {
 func (dataSet *DataSet) Next(dest []driver.Value) error {
 	hasMoreRows := dataSet.parent.hasMoreRows()
 	noOfRowsToFetch := len(dataSet.rows) // dataSet.parent.noOfRowsToFetch()
-	//if noOfRowsToFetch == 0 {
-	//	return io.EOF
-	//}
+	// if noOfRowsToFetch == 0 {
+	// 	return io.EOF
+	// }
 	hasBLOB := dataSet.parent.hasBLOB()
 	hasLONG := dataSet.parent.hasLONG()
 	if !hasMoreRows && noOfRowsToFetch == 0 {
@@ -354,20 +354,20 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 	return io.EOF
 }
 
-//func (dataSet *DataSet) NextRow(args... interface{}) error {
-//	var values = make([]driver.Value, len(args))
-//	err := dataSet.Next(values)
-//	if err != nil {
-//		return err
-//	}
-//	for index, arg := range args {
-//		*arg = values[index]
-//		//if val, ok := values[index].(t); !ok {
-//		//
-//		//}
-//	}
-//	return nil
-//}
+// func (dataSet *DataSet) NextRow(args... interface{}) error {
+// 	var values = make([]driver.Value, len(args))
+// 	err := dataSet.Next(values)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	for index, arg := range args {
+// 		*arg = values[index]
+// 		// if val, ok := values[index].(t); !ok {
+// 		// 
+// 		// }
+// 	}
+// 	return nil
+// }
 
 // Columns return a string array that represent columns names
 func (dataSet *DataSet) Columns() []string {

@@ -862,39 +862,39 @@ func setString(value reflect.Value, input string) error {
 	case tyString:
 		value.SetString(input)
 	case tyNullString:
-		value.Set(reflect.ValueOf(sql.NullString{input, true}))
+		value.Set(reflect.ValueOf(sql.NullString{String: input, Valid: true}))
 	case tyNullByte:
 		if intErr == nil {
-			value.Set(reflect.ValueOf(sql.NullByte{uint8(tempInt), true}))
+			value.Set(reflect.ValueOf(sql.NullByte{Byte: uint8(tempInt), Valid: true}))
 		}
 		return intErr
 	case tyNullInt16:
 		if intErr == nil {
-			value.Set(reflect.ValueOf(sql.NullInt16{int16(tempInt), true}))
+			value.Set(reflect.ValueOf(sql.NullInt16{Int16: int16(tempInt), Valid: true}))
 		}
 		return intErr
 	case tyNullInt32:
 		if intErr == nil {
-			value.Set(reflect.ValueOf(sql.NullInt32{int32(tempInt), true}))
+			value.Set(reflect.ValueOf(sql.NullInt32{Int32: int32(tempInt), Valid: true}))
 		}
 		return intErr
 	case tyNullInt64:
 		if intErr == nil {
-			value.Set(reflect.ValueOf(sql.NullInt64{tempInt, true}))
+			value.Set(reflect.ValueOf(sql.NullInt64{Int64: tempInt, Valid: true}))
 		}
 		return intErr
 	case tyNullFloat64:
 		if floatErr == nil {
-			value.Set(reflect.ValueOf(sql.NullFloat64{tempFloat, true}))
+			value.Set(reflect.ValueOf(sql.NullFloat64{Float64: tempFloat, Valid: true}))
 		}
 		return floatErr
 	case tyNullBool:
 		temp := strings.ToLower(input) == "true"
-		value.Set(reflect.ValueOf(sql.NullBool{temp, true}))
+		value.Set(reflect.ValueOf(sql.NullBool{Bool: temp, Valid: true}))
 	case tyNVarChar:
 		value.Set(reflect.ValueOf(NVarChar(input)))
 	case tyNullNVarChar:
-		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(input), true}))
+		value.Set(reflect.ValueOf(NullNVarChar{NVarChar: NVarChar(input), Valid: true}))
 	case tyTime:
 		if timeErr == nil {
 			value.Set(reflect.ValueOf(tempTime))
@@ -902,7 +902,7 @@ func setString(value reflect.Value, input string) error {
 		return timeErr
 	case tyNullTime:
 		if timeErr == nil {
-			value.Set(reflect.ValueOf(sql.NullTime{tempTime, true}))
+			value.Set(reflect.ValueOf(sql.NullTime{Time: tempTime, Valid: true}))
 		}
 		return timeErr
 	case tyTimeStamp:
@@ -912,7 +912,7 @@ func setString(value reflect.Value, input string) error {
 		return timeErr
 	case tyNullTimeStamp:
 		if timeErr == nil {
-			value.Set(reflect.ValueOf(NullTimeStamp{TimeStamp(tempTime), true}))
+			value.Set(reflect.ValueOf(NullTimeStamp{TimeStamp: TimeStamp(tempTime), Valid: true}))
 		}
 		return timeErr
 	case tyTimeStampTZ:
@@ -922,7 +922,7 @@ func setString(value reflect.Value, input string) error {
 		return timeErr
 	case tyNullTimeStampTZ:
 		if timeErr == nil {
-			value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ(tempTime), true}))
+			value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ: TimeStampTZ(tempTime), Valid: true}))
 		}
 		return timeErr
 	case tyClob:

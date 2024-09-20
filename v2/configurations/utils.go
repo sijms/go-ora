@@ -9,12 +9,12 @@ func uniqueAppendString(list []string, newItem string, ignoreCase bool) ([]strin
 	found := false
 	for _, temp := range list {
 		if ignoreCase {
-			if strings.ToUpper(temp) == strings.ToUpper(newItem) {
+			if strings.EqualFold(strings.ToUpper(temp), strings.ToUpper(newItem)) {
 				found = true
 				break
 			}
 		} else {
-			if temp == newItem {
+			if strings.EqualFold(temp, newItem) {
 				found = true
 				break
 			}

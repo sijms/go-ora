@@ -31,24 +31,24 @@ func (obj *simpleObject) read() error {
 		return obj.err
 	}
 	return obj.connection.read()
-	//loop := true
-	//for loop {
-	//	msg, err := session.GetByte()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	err = obj.connection.readMsg(msg)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if msg == 4 || msg == 9 {
-	//		loop = false
-	//	}
-	//}
-	//if session.HasError() {
-	//	return session.GetError()
-	//}
-	//return nil
+	// loop := true
+	// for loop {
+	// 	msg, err := session.GetByte()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	err = obj.connection.readMsg(msg)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if msg == 4 || msg == 9 {
+	// 		loop = false
+	// 	}
+	// }
+	// if session.HasError() {
+	// 	return session.GetError()
+	// }
+	// return nil
 }
 
 func (obj *simpleObject) exec() error {
@@ -71,20 +71,20 @@ func (obj *simpleObject) exec() error {
 		return err
 	}
 	return nil
-	//var reconnect bool
-	//for writeTrials := 0; writeTrials < failOver; writeTrials++ {
-	//	reconnect, err = obj.connection.reConnect(err, writeTrials)
-	//	if err != nil {
-	//		tracer.Print("Error: ", err)
-	//		if !reconnect {
-	//			return err
-	//		}
-	//		continue
-	//	}
-	//	break
-	//}
-	//if reconnect {
-	//	return &network.OracleError{ErrCode: 3135}
-	//}
-	//return err
+	// var reconnect bool
+	// for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+	// 	reconnect, err = obj.connection.reConnect(err, writeTrials)
+	// 	if err != nil {
+	// 		tracer.Print("Error: ", err)
+	// 		if !reconnect {
+	// 			return err
+	// 		}
+	// 		continue
+	// 	}
+	// 	break
+	// }
+	// if reconnect {
+	// 	return &network.OracleError{ErrCode: 3135}
+	// }
+	// return err
 }

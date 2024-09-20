@@ -1262,8 +1262,14 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 						return err
 					}
 					err = decodeObject(conn, &tempPar, temporaryLobs)
+					if err != nil {
+						return err
+					}
 				} else {
 					err = tempPar.decodePrimValue(conn, temporaryLobs, true)
+					if err != nil {
+						return err
+					}
 				}
 				if err != nil {
 					return err

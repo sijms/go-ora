@@ -2102,7 +2102,7 @@ func (stmt *defaultStmt) decodePrim(dataSet *DataSet) error {
 				}
 			case Lob:
 				if col.DataType == OCIClobLocator {
-					tempString := sql.NullString{"", false}
+					tempString := sql.NullString{String: "", Valid: false}
 					err = setLob(reflect.ValueOf(&tempString).Elem(), val)
 					if err != nil {
 						return err

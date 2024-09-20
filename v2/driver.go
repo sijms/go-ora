@@ -117,84 +117,84 @@ func AddSessionParam(db *sql.DB, key, value string) error {
 	return nil
 }
 
-//func RegisterRegularTypeArray(conn *sql.DB, regularTypeName, arrayTypeName string, itemMaxSize int) error {
-//	err := conn.Ping()
-//	if err != nil {
-//		return err
-//	}
-//
-//	if drv, ok := conn.Driver().(*OracleDriver); ok {
-//		return RegisterRegularTypeArrayWithOwner(conn, drv.UserId, regularTypeName, arrayTypeName, itemMaxSize)
-//	}
-//	return errors.New("the driver used is not a go-ora driver type")
-//}
-//func RegisterRegularTypeArrayWithOwner(conn *sql.DB, owner, regularTypeName, arrayTypeName string, itemMaxSize int) error {
-//	drv := conn.Driver().(*OracleDriver)
-//	regularTypeName = strings.TrimSpace(regularTypeName)
-//	arrayTypeName = strings.TrimSpace(arrayTypeName)
-//	if len(regularTypeName) == 0 {
-//		return errors.New("typeName shouldn't be empty")
-//	}
-//	if len(arrayTypeName) == 0 {
-//		return errors.New("array type name shouldn't be empty")
-//	}
-//	cust := customType{
-//		owner:         owner,
-//		name:          regularTypeName,
-//		arrayTypeName: arrayTypeName,
-//		isArray:       true,
-//	}
-//	var err error
-//	cust.arrayTOID, err = getTOID2(conn, owner, arrayTypeName)
-//	if err != nil {
-//		return err
-//	}
-//	param := ParameterInfo{Direction: Input, Flag: 3, TypeName: regularTypeName, MaxLen: 1, MaxCharLen: 1}
-//	switch strings.ToUpper(regularTypeName) {
-//	case "NUMBER":
-//		param.DataType = NUMBER
-//	case "VARCHAR2":
-//		param.DataType = NCHAR
-//		param.CharsetForm = 1
-//		param.ContFlag = 16
-//		param.CharsetID = drv.sStrConv.GetLangID()
-//	case "NVARCHAR2":
-//		param.DataType = NCHAR
-//		param.CharsetForm = 2
-//		param.ContFlag = 16
-//		param.CharsetID = drv.nStrConv.GetLangID()
-//	case "TIMESTAMP":
-//		param.DataType = TimeStampDTY
-//	case "DATE":
-//		param.DataType = DATE
-//	case "TIMESTAMP WITH LOCAL TIME ZONE":
-//		param.DataType = TimeStampLTZ_DTY
-//	//case "TIMESTAMP WITH TIME ZONE":
-//	//	param.DataType = TimeStampTZ_DTY
-//	//	param.MaxLen = converters.MAX_LEN_TIMESTAMP
-//	case "RAW":
-//		param.DataType = RAW
-//	case "BLOB":
-//		param.DataType = OCIBlobLocator
-//	case "CLOB":
-//		param.DataType = OCIClobLocator
-//		param.CharsetForm = 1
-//		param.ContFlag = 16
-//		param.CharsetID = drv.sStrConv.GetLangID()
-//	case "NCLOB":
-//		param.DataType = OCIClobLocator
-//		param.CharsetForm = 2
-//		param.ContFlag = 16
-//		param.CharsetID = drv.nStrConv.GetLangID()
-//	default:
-//		return fmt.Errorf("unsupported regular type: %s", regularTypeName)
-//	}
-//	cust.attribs = append(cust.attribs, param)
-//	drv.mu.Lock()
-//	defer drv.mu.Unlock()
-//	drv.cusTyp[strings.ToUpper(arrayTypeName)] = cust
-//	return nil
-//}
+// func RegisterRegularTypeArray(conn *sql.DB, regularTypeName, arrayTypeName string, itemMaxSize int) error {
+// 	err := conn.Ping()
+// 	if err != nil {
+// 		return err
+// 	}
+// 
+// 	if drv, ok := conn.Driver().(*OracleDriver); ok {
+// 		return RegisterRegularTypeArrayWithOwner(conn, drv.UserId, regularTypeName, arrayTypeName, itemMaxSize)
+// 	}
+// 	return errors.New("the driver used is not a go-ora driver type")
+// }
+// func RegisterRegularTypeArrayWithOwner(conn *sql.DB, owner, regularTypeName, arrayTypeName string, itemMaxSize int) error {
+// 	drv := conn.Driver().(*OracleDriver)
+// 	regularTypeName = strings.TrimSpace(regularTypeName)
+// 	arrayTypeName = strings.TrimSpace(arrayTypeName)
+// 	if len(regularTypeName) == 0 {
+// 		return errors.New("typeName shouldn't be empty")
+// 	}
+// 	if len(arrayTypeName) == 0 {
+// 		return errors.New("array type name shouldn't be empty")
+// 	}
+// 	cust := customType{
+// 		owner:         owner,
+// 		name:          regularTypeName,
+// 		arrayTypeName: arrayTypeName,
+// 		isArray:       true,
+// 	}
+// 	var err error
+// 	cust.arrayTOID, err = getTOID2(conn, owner, arrayTypeName)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	param := ParameterInfo{Direction: Input, Flag: 3, TypeName: regularTypeName, MaxLen: 1, MaxCharLen: 1}
+// 	switch strings.ToUpper(regularTypeName) {
+// 	case "NUMBER":
+// 		param.DataType = NUMBER
+// 	case "VARCHAR2":
+// 		param.DataType = NCHAR
+// 		param.CharsetForm = 1
+// 		param.ContFlag = 16
+// 		param.CharsetID = drv.sStrConv.GetLangID()
+// 	case "NVARCHAR2":
+// 		param.DataType = NCHAR
+// 		param.CharsetForm = 2
+// 		param.ContFlag = 16
+// 		param.CharsetID = drv.nStrConv.GetLangID()
+// 	case "TIMESTAMP":
+// 		param.DataType = TimeStampDTY
+// 	case "DATE":
+// 		param.DataType = DATE
+// 	case "TIMESTAMP WITH LOCAL TIME ZONE":
+// 		param.DataType = TimeStampLTZ_DTY
+// 	// case "TIMESTAMP WITH TIME ZONE":
+// 	// 	param.DataType = TimeStampTZ_DTY
+// 	// 	param.MaxLen = converters.MAX_LEN_TIMESTAMP
+// 	case "RAW":
+// 		param.DataType = RAW
+// 	case "BLOB":
+// 		param.DataType = OCIBlobLocator
+// 	case "CLOB":
+// 		param.DataType = OCIClobLocator
+// 		param.CharsetForm = 1
+// 		param.ContFlag = 16
+// 		param.CharsetID = drv.sStrConv.GetLangID()
+// 	case "NCLOB":
+// 		param.DataType = OCIClobLocator
+// 		param.CharsetForm = 2
+// 		param.ContFlag = 16
+// 		param.CharsetID = drv.nStrConv.GetLangID()
+// 	default:
+// 		return fmt.Errorf("unsupported regular type: %s", regularTypeName)
+// 	}
+// 	cust.attribs = append(cust.attribs, param)
+// 	drv.mu.Lock()
+// 	defer drv.mu.Unlock()
+// 	drv.cusTyp[strings.ToUpper(arrayTypeName)] = cust
+// 	return nil
+// }
 
 func RegisterType(conn *sql.DB, typeName, arrayTypeName string, typeObj interface{}) error {
 	// ping first to avoid error when calling register type after open connection
@@ -380,15 +380,15 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 						param.ToID = value.toid
 						break
 					}
-					//if strings.EqualFold(value.arrayTypeName, attTypeName.String) {
-					//	found = true
-					//	param.cusType = new(customType)
-					//	param.DataType = XMLType
-					//	*param.cusType = value
-					//	param.cusType.isArray = true
-					//	param.ToID = value.arrayTOID
-					//	break
-					//}
+					// if strings.EqualFold(value.arrayTypeName, attTypeName.String) {
+					// 	found = true
+					// 	param.cusType = new(customType)
+					// 	param.DataType = XMLType
+					// 	*param.cusType = value
+					// 	param.cusType.isArray = true
+					// 	param.ToID = value.arrayTOID
+					// 	break
+					// }
 				}
 				if !found {
 					return fmt.Errorf("unsupported attribute type: %s", attTypeName.String)
@@ -432,11 +432,11 @@ func ParseConfig(dsn string) (*configurations.ConnectionConfig, error) {
 		SetNTSAuth(&advanced_nego.NTSAuthHash{})
 	}
 	return config, nil
-	//connStr, err := newConnectionStringFromUrl(dsn)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//return &connStr.connOption, nil
+	// connStr, err := newConnectionStringFromUrl(dsn)
+	//i f err != nil {
+	// 	return nil, err
+	// }
+	// return &connStr.connOption, nil
 }
 
 func RegisterConnConfig(config *configurations.ConnectionConfig) {

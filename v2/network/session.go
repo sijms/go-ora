@@ -336,13 +336,20 @@ func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
 // used to create sslConn object
 func (session *Session) negotiate() {
 	connOption := session.Context.connConfig
+	host := connOption.GetActiveServer(false)
+
+	if tlsConfig := connOption.TLSConfig; tlsConfig != nil {
+		tlsConfig.ServerName = host.Addr
+		session.sslConn = tls.Client(session.conn, tlsConfig)
+		return
+	}
+
 	if session.SSL.roots == nil && len(session.SSL.Certificates) > 0 {
 		session.SSL.roots = x509.NewCertPool()
 		for _, cert := range session.SSL.Certificates {
 			session.SSL.roots.AddCert(cert)
 		}
 	}
-	host := connOption.GetActiveServer(false)
 	config := &tls.Config{
 		ServerName: host.Addr,
 	}

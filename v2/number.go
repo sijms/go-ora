@@ -180,6 +180,7 @@ func (num *Number) decode() (strNum string, exp int, negative bool, err error) {
 
 	if _isPosInf(num.data) || _isNegInf(num.data) {
 		strNum = "Infinity"
+		exp = 0
 		return
 	}
 

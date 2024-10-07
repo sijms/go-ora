@@ -2,6 +2,7 @@ package configurations
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"strings"
@@ -22,6 +23,7 @@ type SessionInfo struct {
 	Protocol              string
 	SSL                   bool
 	SSLVerify             bool
+	TLSConfig             *tls.Config
 	Dialer                DialerContext
 }
 

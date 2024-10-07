@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
@@ -118,6 +119,7 @@ type OracleConnector struct {
 	drv           *OracleDriver
 	connectString string
 	dialer        configurations.DialerContext
+	tlsConfig     *tls.Config
 }
 
 func NewConnector(connString string) driver.Connector {
@@ -144,6 +146,9 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	if conn.connOption.Dialer == nil {
 		conn.connOption.Dialer = connector.dialer
 	}
+	if conn.connOption.TLSConfig == nil {
+		conn.connOption.TLSConfig = connector.tlsConfig
+	}
 	err = conn.OpenWithContext(ctx)
 	if err != nil {
 		return nil, err
@@ -161,6 +166,10 @@ func (connector *OracleConnector) Driver() driver.Driver {
 
 func (connector *OracleConnector) Dialer(dialer configurations.DialerContext) {
 	connector.dialer = dialer
+}
+
+func (connector *OracleConnector) WithTLSConfig(config *tls.Config) {
+	connector.tlsConfig = config
 }
 
 // Open return a new open connection

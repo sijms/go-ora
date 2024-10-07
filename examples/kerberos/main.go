@@ -1,6 +1,7 @@
 package main
 
 import (
+	"C" // Import cgo to avoid project-wide go fmt failures.
 	"database/sql"
 	"flag"
 	"fmt"

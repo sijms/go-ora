@@ -106,91 +106,91 @@ func (id *urowid) getBytes() []byte {
 	}
 }
 
-//private void ConvertToRestrictedFormat(riddef ridRowId, byte[] bytes)
-//{
-//	char paddingChar = '0';
-//	StringBuilder stringBuilder = new StringBuilder();
-//	stringBuilder.Append(Convert.ToString((long) ridRowId.ridblocknum, 16).PadLeft(8, paddingChar));
-//	stringBuilder.Append('.');
-//	stringBuilder.Append(Convert.ToString((int) ridRowId.ridslotnum, 16).PadLeft(4, paddingChar));
-//	stringBuilder.Append('.');
-//	stringBuilder.Append(Convert.ToString((int) ridRowId.idfilenum, 16).PadLeft(4, paddingChar));
-//	string upperInvariant = stringBuilder.ToString().ToUpperInvariant();
-//	int num = 0;
-//	foreach (char ch in upperInvariant)
-//	bytes[num++] = (byte) ch;
-//}
+// private void ConvertToRestrictedFormat(riddef ridRowId, byte[] bytes)
+// {
+// 	char paddingChar = '0';
+// 	StringBuilder stringBuilder = new StringBuilder();
+// 	stringBuilder.Append(Convert.ToString((long) ridRowId.ridblocknum, 16).PadLeft(8, paddingChar));
+// 	stringBuilder.Append('.');
+// 	stringBuilder.Append(Convert.ToString((int) ridRowId.ridslotnum, 16).PadLeft(4, paddingChar));
+// 	stringBuilder.Append('.');
+// 	stringBuilder.Append(Convert.ToString((int) ridRowId.idfilenum, 16).PadLeft(4, paddingChar));
+// 	string upperInvariant = stringBuilder.ToString().ToUpperInvariant();
+// 	int num = 0;
+// 	foreach (char ch in upperInvariant)
+// 	bytes[num++] = (byte) ch;
+// }
 
-//private void ConvertToExtendedFormat(riddef ridRowID, byte[] byteArray)
-//{
-//	int offset1 = 0;
-//	uint ridobjnum = ridRowID.ridobjnum;
-//	int offset2 = this.kgrd42b(byteArray, (long) ridobjnum, 6, offset1);
-//	uint idfilenum = (uint) ridRowID.idfilenum;
-//	int offset3 = this.kgrd42b(byteArray, (long) idfilenum, 3, offset2);
-//	uint ridblocknum = ridRowID.ridblocknum;
-//	int offset4 = this.kgrd42b(byteArray, (long) ridblocknum, 6, offset3);
-//	uint ridslotnum = (uint) ridRowID.ridslotnum;
-//	this.kgrd42b(byteArray, (long) ridslotnum, 3, offset4);
-//}
+// private void ConvertToExtendedFormat(riddef ridRowID, byte[] byteArray)
+// {
+// 	int offset1 = 0;
+// 	uint ridobjnum = ridRowID.ridobjnum;
+// 	int offset2 = this.kgrd42b(byteArray, (long) ridobjnum, 6, offset1);
+// 	uint idfilenum = (uint) ridRowID.idfilenum;
+// 	int offset3 = this.kgrd42b(byteArray, (long) idfilenum, 3, offset2);
+// 	uint ridblocknum = ridRowID.ridblocknum;
+// 	int offset4 = this.kgrd42b(byteArray, (long) ridblocknum, 6, offset3);
+// 	uint ridslotnum = (uint) ridRowID.ridslotnum;
+// 	this.kgrd42b(byteArray, (long) ridslotnum, 3, offset4);
+// }
 
-//private byte[] LogicalROWIDToByteArray(byte[] byteStream)
-//{
-//byte[] dstBytes = (byte[]) null;
-//int length1 = byteStream.Length;
-//int num1 = length1 / 3;
-//int num2 = length1 % 3;
-//int num3 = 4 * num1;
-//int num4;
-//switch (num2)
-//{
-//case 0:
-//num4 = 0;
-//break;
-//case 1:
-//num4 = 1;
-//break;
-//default:
-//num4 = 3;
-//break;
-//}
-//int length2 = num3 + num4;
-//if (length2 > 0)
-//{
-//dstBytes = new byte[length2];
-//this.kgrdub2c(byteStream, length1, 0, dstBytes, 0);
-//}
-//return dstBytes;
-//}
+// private byte[] LogicalROWIDToByteArray(byte[] byteStream)
+// {
+// byte[] dstBytes = (byte[]) null;
+// int length1 = byteStream.Length;
+// int num1 = length1 / 3;
+// int num2 = length1 % 3;
+// int num3 = 4 * num1;
+// int num4;
+// switch (num2)
+// {
+// case 0:
+// num4 = 0;
+// break;
+// case 1:
+// num4 = 1;
+// break;
+// default:
+// num4 = 3;
+// break;
+// }
+// int length2 = num3 + num4;
+// if (length2 > 0)
+// {
+// dstBytes = new byte[length2];
+// this.kgrdub2c(byteStream, length1, 0, dstBytes, 0);
+// }
+// return dstBytes;
+// }
 
-//private void kgrdub2c(byte[] id.data, int size, int offset, byte[] output, int dstOffset)
-//{
-//	output[dstOffset] = TTCRowIdAccessor.KGRD_INDBYTE_CHAR[(int)id.data[offset] - 1];
-//	int num1 = size - 1;
-//	offset ++;
-//	dstOffset ++;
-//	while (num1 > 0)
-//	{
-//		output[dstOffset] = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)id.data[offset] & (int)byte.MaxValue) >> 2];
-//		if (num1 == 1)
-//		{
-//			output[dstOffset + 1] = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)id.data[offset] & 3) << 4];
-//			break;
-//		}
-//		byte num11 = (byte)((uint)id.data[offset + 1] & (uint)byte.MaxValue);
-//		int num15 = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)id.data[offset] & 3) << 4 | ((int)num11 & 240) >> 4];
-//		output[dstOffset + 1] = (byte)num15;
-//		if (num1 == 2)
-//		{
-//			int num10 = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)num11 & 15) << 2];
-//			output[dstOffset + 2] = (byte)num10;
-//			break;
-//		}
-//		int num19 = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)num11 & 15) << 2 | ((int)id.data[offset + 2] & 192) >> 6];
-//		output[dstOffset + 2] = (byte)num19;
-//		output[dstOffset + 3] = TTCRowIdAccessor.KGRD_BASIS_64[(int)id.data[offset + 2] & 63];
-//		num1 -= 3;
-//		offset += 3;
-//		dstOffset += 3;
-//	}
-//}
+// private void kgrdub2c(byte[] id.data, int size, int offset, byte[] output, int dstOffset)
+// {
+// 	output[dstOffset] = TTCRowIdAccessor.KGRD_INDBYTE_CHAR[(int)id.data[offset] - 1];
+// 	int num1 = size - 1;
+// 	offset ++;
+// 	dstOffset ++;
+// 	while (num1 > 0)
+// 	{
+// 		output[dstOffset] = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)id.data[offset] & (int)byte.MaxValue) >> 2];
+// 		if (num1 == 1)
+// 		{
+// 			output[dstOffset + 1] = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)id.data[offset] & 3) << 4];
+// 			break;
+// 		}
+// 		byte num11 = (byte)((uint)id.data[offset + 1] & (uint)byte.MaxValue);
+// 		int num15 = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)id.data[offset] & 3) << 4 | ((int)num11 & 240) >> 4];
+// 		output[dstOffset + 1] = (byte)num15;
+// 		if (num1 == 2)
+// 		{
+// 			int num10 = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)num11 & 15) << 2];
+// 			output[dstOffset + 2] = (byte)num10;
+// 			break;
+// 		}
+// 		int num19 = (int)TTCRowIdAccessor.KGRD_BASIS_64[((int)num11 & 15) << 2 | ((int)id.data[offset + 2] & 192) >> 6];
+// 		output[dstOffset + 2] = (byte)num19;
+// 		output[dstOffset + 3] = TTCRowIdAccessor.KGRD_BASIS_64[(int)id.data[offset + 2] & 63];
+// 		num1 -= 3;
+// 		offset += 3;
+// 		dstOffset += 3;
+// 	}
+// }

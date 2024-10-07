@@ -9,12 +9,12 @@ func uniqueAppendString(list []string, newItem string, ignoreCase bool) ([]strin
 	found := false
 	for _, temp := range list {
 		if ignoreCase {
-			if strings.ToUpper(temp) == strings.ToUpper(newItem) {
+			if strings.EqualFold(strings.ToUpper(temp), strings.ToUpper(newItem)) {
 				found = true
 				break
 			}
 		} else {
-			if temp == newItem {
+			if strings.EqualFold(temp, newItem) {
 				found = true
 				break
 			}
@@ -261,19 +261,19 @@ func getCharsetID(charset string) (int, error) {
 		"UTFE":              0x368,
 		"AL32UTF8":          0x369,
 		"ZHT16HKSCS31":      0x3E0,
-		//"ZHS32GB18030" : 854,
-		//"JA16EUCFIXED" : 1830,
-		//"JA16SJISFIXED" : 1832,
-		//"JA16DBCSFIXED" : 1833,
-		//"KO16KSC5601FIXED" : 1840,
-		//"KO16DBCSFIXED" : 1842,
-		//"ZHS16CGB231280FIXED" : 1850,
-		//"ZHS16GBKFIXED" : 1852,
-		//"ZHS16DBCSFIXED" : 1853,
-		//"ZHT32EUCFIXED" : 1860,
-		//"ZHT32TRISFIXED" : 1863,
-		//"ZHT16DBCSFIXED" : 1864,
-		//"ZHT16BIG5FIXED" : 1865,
+		// "ZHS32GB18030" : 854,
+		// "JA16EUCFIXED" : 1830,
+		// "JA16SJISFIXED" : 1832,
+		// "JA16DBCSFIXED" : 1833,
+		// "KO16KSC5601FIXED" : 1840,
+		// "KO16DBCSFIXED" : 1842,
+		// "ZHS16CGB231280FIXED" : 1850,
+		// "ZHS16GBKFIXED" : 1852,
+		// "ZHS16DBCSFIXED" : 1853,
+		// "ZHT32EUCFIXED" : 1860,
+		// "ZHT32TRISFIXED" : 1863,
+		// "ZHT16DBCSFIXED" : 1864,
+		// "ZHT16BIG5FIXED" : 1865,
 		"AL16UTF16": 0x7D0,
 	}
 	id, found := charsetMap[strings.ToUpper(charset)]

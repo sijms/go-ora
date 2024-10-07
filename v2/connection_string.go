@@ -10,78 +10,78 @@ import (
 
 // type PromotableTransaction int
 
-//const (
-//	Promotable PromotableTransaction = 1
-//	Local      PromotableTransaction = 0
-//)
+// const (
+// 	Promotable PromotableTransaction = 1
+// 	Local      PromotableTransaction = 0
+// )
 
-//type DBAPrivilege int
-//
-//const (
-//	NONE    DBAPrivilege = 0
-//	SYSDBA  DBAPrivilege = 0x20
-//	SYSOPER DBAPrivilege = 0x40
-//)
+// type DBAPrivilege int
+// 
+// const (
+// 	NONE    DBAPrivilege = 0
+// 	SYSDBA  DBAPrivilege = 0x20
+// 	SYSOPER DBAPrivilege = 0x40
+// )
 
 // const defaultPort int = 1521
 
 // type EnList int
 
-//const (
-//	FALSE   EnList = 0
-//	TRUE    EnList = 1
-//	DYNAMIC EnList = 2
-//)
+// const (
+// 	FALSE   EnList = 0
+// 	TRUE    EnList = 1
+// 	DYNAMIC EnList = 2
+// )
 
-//func EnListFromString(s string) EnList {
-//	S := strings.ToUpper(s)
-//	if S == "TRUE" {
-//		return TRUE
-//	} else if S == "DYNAMIC" {
-//		return DYNAMIC
-//	} else {
-//		return FALSE
-//	}
-//}
+// func EnListFromString(s string) EnList {
+// 	S := strings.ToUpper(s)
+// 	if S == "TRUE" {
+// 		return TRUE
+// 	} else if S == "DYNAMIC" {
+// 		return DYNAMIC
+// 	} else {
+// 		return FALSE
+// 	}
+// }
 
 // type ConnectionString struct {
-// connOption network.ConnectionOption
-// DataSource string
-// Host         string
-// Port         int
-// DBAPrivilege DBAPrivilege
-// password string
-// Trace        string // Trace file
-// traceDir     string
-// WalletPath string
-// walletPass string
-// w          *wallet
-// authType     AuthType
-// EnList             EnList
-// ConnectionLifeTime int
-// IncrPoolSize       int
-// DecrPoolSize       int
-// MaxPoolSize        int
-// MinPoolSize        int
+//  connOption network.ConnectionOption
+//  DataSource string
+//  Host         string
+//  Port         int
+//  DBAPrivilege DBAPrivilege
+//  password string
+//  Trace        string //  Trace file
+//  traceDir     string
+//  WalletPath string
+//  walletPass string
+//  w          *wallet
+//  authType     AuthType
+//  EnList             EnList
+//  ConnectionLifeTime int
+//  IncrPoolSize       int
+//  DecrPoolSize       int
+//  MaxPoolSize        int
+//  MinPoolSize        int
 
-// PasswordSecurityInfo  bool
-// Pooling               bool
+//  PasswordSecurityInfo  bool
+//  Pooling               bool
 
-//PromotableTransaction PromotableTransaction
-//ProxyUserID           string
-//ProxyPassword         string
-//ValidateConnection    bool
-//StmtCacheSize         int
-//StmtCachePurge        bool
-//HaEvent               bool
-//LoadBalance           bool
-//MetadataBooling       bool
-//ContextConnection     bool
-//SelfTuning            bool
-//ApplicationEdition    string
-//PoolRegulator         int
-//ConnectionPoolTimeout int
-//}
+//  PromotableTransaction PromotableTransaction
+//  ProxyUserID           string
+//  ProxyPassword         string
+//  ValidateConnection    bool
+//  StmtCacheSize         int
+//  StmtCachePurge        bool
+//  HaEvent               bool
+//  LoadBalance           bool
+//  MetadataBooling       bool
+//  ContextConnection     bool
+//  SelfTuning            bool
+//  ApplicationEdition    string
+//  PoolRegulator         int
+//  ConnectionPoolTimeout int
+// }
 
 // BuildJDBC create url from user, password and JDBC description string
 func BuildJDBC(user, password, connStr string, options map[string]string) string {

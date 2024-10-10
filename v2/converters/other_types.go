@@ -74,11 +74,11 @@ INTERVAL_xxx encoding described at https://www.orafaq.com/wiki/Interval
 func ConvertIntervalYM_DTY(val []byte) string {
 	/*
 	   The first 4 bytes gives the number of years, the fifth byte gives the number of months in the following format:
-	   years + 2147483648
+	   years + 0x80000000
 	   months + 60
 	*/
 	uyears := binary.BigEndian.Uint32(val)
-	years := int64(uyears) - 2147483648
+	years := int64(uyears) - 0x80000000
 	if years >= 0 {
 		months := val[4] - 60
 		return fmt.Sprintf("+%02d-%02d", years, months)
@@ -92,20 +92,20 @@ func ConvertIntervalDS_DTY(val []byte) string {
 	/*
 	   The first 4 bytes gives the number of days, the last 4 ones the number of nanoseconds and the 3 in the middle the number of hours, minutes and seconds in the following format:
 
-	   days + 2147483648
+	   days + 0x80000000
 	   hours + 60
 	   minutes + 60
 	   seconds + 60
 	   nanoseconds
 	*/
 	udays := binary.BigEndian.Uint32(val)
-	days := int64(udays) - 2147483648
+	days := int64(udays) - 0x80000000
 	if days >= 0 {
 		hours := val[4] - 60
 		mins := val[5] - 60
 		secs := val[6] - 60
 		uns := binary.BigEndian.Uint32(val[7:])
-		ns := (int64(uns) - 2147483648) / 1000
+		ns := (int64(uns) - 0x80000000) / 1000
 		return fmt.Sprintf("+%02d %02d:%02d:%02d.%06d", days, hours, mins, secs, ns)
 	}
 	days = -days
@@ -113,6 +113,6 @@ func ConvertIntervalDS_DTY(val []byte) string {
 	mins := 60 - val[5]
 	secs := 60 - val[6]
 	uns := binary.BigEndian.Uint32(val[7:])
-	ns := -(int64(uns) - 2147483648) / 1000
+	ns := -(int64(uns) - 0x80000000) / 1000
 	return fmt.Sprintf("-%02d %02d:%02d:%02d.%06d", days, hours, mins, secs, ns)
 }

@@ -750,7 +750,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 	// 						err = stmt.connection.session.GetError()
 	// 						return
 	// 					}
-	// 
+	//
 	// 				}
 	// 				loop = false
 	// 			} else if msg == 9 {
@@ -841,7 +841,7 @@ func (stmt *defaultStmt) read(dataSet *DataSet) (err error) {
 				} else {
 					// see if it is re-executed
 					// if len(dataSet.Cols) == 0 && len(stmt.columns) > 0 {
-					// 
+					//
 					// }
 					// dataSet.Cols = make([]ParameterInfo, len(stmt.columns))
 					// copy(dataSet.Cols, stmt.columns)
@@ -1407,12 +1407,18 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 				fieldType = fieldType.Elem()
 			}
 		}
+		// if field is empty ptr create type
+		//if field.Kind() == reflect.Ptr  && field.IsNil() {
+		//	field.Set(reflect.New(fieldType))
+		//}
 		// if type mentioned so driver should create a temporary type and then update the current value
 		typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
 		switch _type {
 		case "number":
 			var fieldVal *Number
-			if !hasNullValue {
+			if hasNullValue {
+				fieldVal = &Number{}
+			} else {
 				fieldVal, err = NewNumber(fieldValue)
 				if err != nil {
 					err = typeErr
@@ -1669,7 +1675,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 									// 	tempVal.Index(arrayIndex).Field(fieldIndex).Kind() == reflect.Array) && tempVal.Index(arrayIndex).Field(fieldIndex).IsNil() {
 									// 	arrayValues[arrayIndex] = nil
 									// } else {
-									// 
+									//
 									// }
 								}
 								structArrayAsNamedPars = append(structArrayAsNamedPars, driver.NamedValue{Name: name, Value: arrayValues})

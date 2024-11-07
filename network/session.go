@@ -1031,8 +1031,7 @@ func (session *Session) GetInt64(size int, compress bool, bigEndian bool) (int64
 	if size == 0 {
 		return 0, nil
 	} else if size > 8 {
-		// compress is true
-		// size = int(rb[0]) may be > 8
+		// When compress is true, "size" may be a value greater than 8 in some cases
 		return 0, errors.New("invalid size for GetInt64: " + strconv.Itoa(size))
 	}
 	rb, err := session.read(size)

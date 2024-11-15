@@ -8,6 +8,8 @@ require (
 	xorm.io/xorm v1.3.9
 )
 
+require github.com/google/go-cmp v0.5.9 // indirect
+
 require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/goccy/go-json v0.8.1 // indirect
@@ -19,5 +21,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1
+	gotest.tools/v3 v3.5.1
 	xorm.io/builder v0.3.11-0.20220531020008-1bd24a7dc978 // indirect
 )

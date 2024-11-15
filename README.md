@@ -71,6 +71,29 @@ connStr := go_ora.BuildJDBC("username", "password", "JDBC string", urlOptions)
 conn, err := sql.Open("oracle", connStr)
 // check for error
 ```
+
+* ### Connect using TNS names file
+
+To use connection data from a TNS names file, you should specify it explicitly via url options
+
+```golang
+urlOptions := map[string] string {
+	"tns names": "path to a TNS names file (not a folder, a file!)",
+}
+connStr := go_ora.BuildUrl("server", port, "service_name", "username", "password", urlOptions)
+```
+
+or place your file to the `${TNS_ADMIN}/` folder (in this case TNS names file **must be named** `tnsnames.ora`).
+
+Another example of a connection URL which specifies TNS names file explicitly:
+
+`oracle://myhost:1523/db?TNS NAMES=escaped/path/to/your/tnsnames.ora`.
+
+Only a small subset of features/properties of TNS names files is supported - in case you specify something `go-ora`
+doesn't support at the moment, `go-ora` will fail. Don't expect failover, load balancing or other such features to be working.
+
+TNS names file format description can be found [here](https://docs.oracle.com/en/database/oracle/oracle-database/21/netrf/local-naming-parameters-in-tns-ora-file.html#GUID-47DAB4DF-1D35-46E5-B227-339FF912E058).
+
 * ### SSL Connection
 to use ssl connection you should pass required url options.
 ```golang

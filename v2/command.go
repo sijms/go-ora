@@ -1407,10 +1407,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 				fieldType = fieldType.Elem()
 			}
 		}
-		// if field is empty ptr create type
-		//if field.Kind() == reflect.Ptr  && field.IsNil() {
-		//	field.Set(reflect.New(fieldType))
-		//}
+
 		// if type mentioned so driver should create a temporary type and then update the current value
 		typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
 		switch _type {

@@ -105,7 +105,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		par.DataType = NCHAR
 		par.CharsetForm = 1
 		par.ContFlag = 16
-		par.CharsetID = conn.tcpNego.ServerCharset
+		par.CharsetID = conn.getDefaultCharsetID()
 	case tyNVarChar, tyNullNVarChar:
 		par.DataType = NCHAR
 		par.CharsetForm = 2
@@ -154,7 +154,7 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 	case tyClob:
 		par.DataType = OCIClobLocator
 		par.CharsetForm = 1
-		par.CharsetID = conn.tcpNego.ServerCharset
+		par.CharsetID = conn.getDefaultCharsetID()
 	case tyNClob:
 		par.DataType = OCIClobLocator
 		par.CharsetForm = 2
@@ -584,6 +584,16 @@ func (par *ParameterInfo) encodeValue(size int, connection *Connection) error {
 
 	if par.Direction == Output && !(par.DataType == XMLType) {
 		par.BValue = nil
+		// fix max size for each array item (non-xml arrays)
+		if par.MaxNoOfArrayElements > 0 {
+			switch par.DataType {
+			case NCHAR:
+				par.MaxLen = connection.maxLen.varchar
+				par.MaxCharLen = connection.maxLen.varchar
+			case RAW:
+				par.MaxLen = connection.maxLen.raw
+			}
+		}
 	}
 	return nil
 }

@@ -1,26 +1,27 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
-	"database/sql/driver"
 	"flag"
 	"fmt"
-	"os"
-	"time"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"os"
+	"strings"
+	"time"
 )
 
-func createTable(conn *sql.DB) error {
+func createTable(db *sql.DB) error {
 	t := time.Now()
-	sqlText := `CREATE TABLE GOORA_TEMP_VISIT(
-	VISIT_ID	number(10)	NOT NULL,
-	NAME		VARCHAR(200),
+	sqlText := `CREATE TABLE TTB_MAIN(
+	ID	number(10)	NOT NULL,
+	NAME		VARCHAR(500),
 	VAL			number(10,2),
-	VISIT_DATE	date,
-	PRIMARY KEY(VISIT_ID)
+	LDATE   		date,
+	DATA			RAW(100),
+	PRIMARY KEY(ID)
 	)`
-	_, err := conn.Exec(sqlText)
+	_, err := db.Exec(sqlText)
 	if err != nil {
 		return err
 	}
@@ -30,7 +31,7 @@ func createTable(conn *sql.DB) error {
 
 func dropTable(conn *sql.DB) error {
 	t := time.Now()
-	_, err := conn.Exec("drop table GOORA_TEMP_VISIT purge")
+	_, err := conn.Exec("drop table TTB_MAIN purge")
 	if err != nil {
 		return err
 	}
@@ -38,51 +39,37 @@ func dropTable(conn *sql.DB) error {
 	return nil
 }
 
-func bulkInsert(databaseUrl string) error {
-	conn, err := go_ora.NewConnection(databaseUrl)
-	if err != nil {
-		return err
-	}
-	err = conn.Open()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		err = conn.Close()
-		if err != nil {
-			fmt.Println("Can't close connection: ", err)
-		}
-	}()
+func insert(db *sql.DB) error {
 	t := time.Now()
-	sqlText := `INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, NAME, VAL, VISIT_DATE) VALUES(:1, :2, :3, :4)`
-	rowNum := 100
-	visitID := make([]driver.Value, rowNum)
-	nameText := make([]driver.Value, rowNum)
-	val := make([]driver.Value, rowNum)
-	date := make([]driver.Value, rowNum)
-	initalVal := 1.1
-	for index := 0; index < rowNum; index++ {
-		visitID[index] = index + 1
-		nameText[index] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		val[index] = initalVal
-		date[index] = time.Now().AddDate(0, index, 0)
-		initalVal += 1.1
-		//if index%5 == 0 {
-		//	_, err = stmt.Exec(index, nameText, val, nil)
-		//} else {
-		//	_, err = stmt.Exec(index, nameText, val, time.Now())
-		//}
-		//if err != nil {
-		//	return err
-		//}
-		//val += 1.1
+	sqlText := `INSERT INTO TTB_MAIN(ID, NAME, VAL, LDATE, DATA) VALUES(:ID, :NAME, :VAL, :LDATE, :DATA)`
+	length := 10
+	type TempStruct struct {
+		Id   int             `db:"ID"`
+		Name sql.NullString  `db:"NAME"`
+		Val  sql.NullFloat64 `db:"VAL"`
+		Date sql.NullTime    `db:"LDATE"`
+		Data []byte          `db:"DATA"`
 	}
-	result, err := conn.BulkInsert(sqlText, rowNum, visitID, nameText, val, date)
+	args := make([]TempStruct, length)
+	for x := 0; x < length; x++ {
+		args[x] = TempStruct{
+			Id:   x + 1,
+			Name: sql.NullString{strings.Repeat("*", 20), true},
+			Val:  sql.NullFloat64{float64(length) / float64(x+1), true},
+			Date: sql.NullTime{time.Now(), true},
+			Data: bytes.Repeat([]byte{55}, 20),
+		}
+		if x == 2 {
+			args[x].Name.Valid = false
+			args[x].Val.Valid = false
+			args[x].Date.Valid = false
+		}
+	}
+	_, err := db.Exec(sqlText, args)
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := result.RowsAffected()
-	fmt.Printf("%d rows inserted: %v\n", rowsAffected, time.Now().Sub(t))
+	fmt.Printf("%d rows inserted: %v\n", length, time.Now().Sub(t))
 	return nil
 }
 
@@ -99,10 +86,10 @@ func dropPackage(conn *sql.DB) error {
 func createPackage(conn *sql.DB) error {
 	t := time.Now()
 	sqlText := `create or replace package GOORA_TEMP_PKG as
-	type t_visit_id is table of GOORA_TEMP_VISIT.visit_id%type index by binary_integer;
-    type t_visit_name is table of GOORA_TEMP_VISIT.name%type index by binary_integer;
-	type t_visit_val is table of GOORA_TEMP_VISIT.val%type index by binary_integer;
-    type t_visit_date is table of GOORA_TEMP_VISIT.visit_date%type index by binary_integer;
+	type t_visit_id is table of TTB_MAIN.id%type index by binary_integer;
+    type t_visit_name is table of TTB_MAIN.name%type index by binary_integer;
+	type t_visit_val is table of TTB_MAIN.val%type index by binary_integer;
+    type t_visit_date is table of TTB_MAIN.ldate%type index by binary_integer;
     
 	procedure test_get1(p_visit_id t_visit_id, l_cursor out SYS_REFCURSOR);
     procedure test_get2(p_visit_id t_visit_id, p_visit_name out t_visit_name,
@@ -117,22 +104,22 @@ end GOORA_TEMP_PKG;
 	procedure test_get1(p_visit_id t_visit_id, l_cursor out SYS_REFCURSOR) as 
 		temp t_visit_id := p_visit_id;
 	begin
-		OPEN l_cursor for select visit_id, name, val, visit_date from GOORA_TEMP_VISIT 
-		    where visit_id in (select column_value from table(temp));
+		OPEN l_cursor for select id, name, val, ldate from TTB_MAIN 
+		    where id in (select column_value from table(temp));
 	end test_get1;
     
     procedure test_get2(p_visit_id t_visit_id, p_visit_name out t_visit_name,
         p_visit_val out t_visit_val, p_visit_date out t_visit_date) as
         temp t_visit_id := p_visit_id;
-        cursor tempCur is select visit_id, name, val, visit_date from GOORA_TEMP_VISIT
-            where visit_id in (select column_value from table(temp));
+        cursor tempCur is select id, name, val, ldate from TTB_MAIN
+            where id in (select column_value from table(temp));
         tempRow tempCur%rowtype;
         idx number := 1;
     begin
         for tempRow in tempCur loop
             p_visit_name(idx) := tempRow.name;
             p_visit_val(idx) := tempRow.val;
-            p_visit_date(idx) := tempRow.visit_date;
+            p_visit_date(idx) := tempRow.ldate;
             idx := idx + 1;
         end loop;
     end test_get2;
@@ -169,19 +156,20 @@ func query1(conn *sql.DB) error {
 	return nil
 }
 
-// this function take one input array and return 3 output arraies of different types
+// this function take one input array and return 3 output arrays of different types
 func query2(conn *sql.DB) error {
 	t := time.Now()
 	var (
-		nameArray []string
-		valArray  []float32
+		nameArray []sql.NullString
+		valArray  []sql.NullFloat64
 		dateArray []sql.NullTime
 	)
+	outputSize := 5
 	// note size here is important and equal to max number of items that array can accommodate
 	_, err := conn.Exec(`BEGIN GOORA_TEMP_PKG.TEST_GET2(:1, :2, :3, :4); END;`,
-		[]int{1, 3, 5}, go_ora.Out{Dest: &nameArray, Size: 10},
-		go_ora.Out{Dest: &valArray, Size: 10},
-		go_ora.Out{Dest: &dateArray, Size: 10})
+		[]int{1, 3, 5, 7, 8}, go_ora.Out{Dest: &nameArray, Size: outputSize},
+		go_ora.Out{Dest: &valArray, Size: outputSize},
+		go_ora.Out{Dest: &dateArray, Size: outputSize})
 	if err != nil {
 		return err
 	}
@@ -230,10 +218,12 @@ func usage() {
 }
 
 func main() {
-	var server string
+	var (
+		server string
+	)
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
-
+	server = os.Getenv("LOCAL_DSN")
 	connStr := os.ExpandEnv(server)
 	if connStr == "" {
 		fmt.Println("Missing -server option")
@@ -273,7 +263,7 @@ func main() {
 		}
 	}()
 
-	err = bulkInsert(connStr)
+	err = insert(conn)
 	if err != nil {
 		fmt.Println("Can't bulkInsert: ", err)
 		return
@@ -292,11 +282,11 @@ func main() {
 		}
 	}()
 
-	err = query1(conn)
-	if err != nil {
-		fmt.Println("Can't call query1: ", err)
-		return
-	}
+	//err = query1(conn)
+	//if err != nil {
+	//	fmt.Println("Can't call query1: ", err)
+	//	return
+	//}
 	err = query2(conn)
 	if err != nil {
 		fmt.Println("Can't call query2: ", err)

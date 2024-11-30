@@ -76,7 +76,7 @@ BEGIN
 		else
 			p_int_array(x) := x;
 			p_array(x) := 'varchar_' || x;
-			p_array2(x) := '안녕하세요AAA_' || x;
+			p_array2(x) := :1 || x;
 		    p_date_array(x) := sysdate;
 		    p_raw_array(x) := utl_raw.cast_to_raw('raw_' || x);
 		END IF;
@@ -86,7 +86,8 @@ BEGIN
 	:output3 := p_int_array;
 	:output4 := p_date_array;
 	:output6 := p_raw_array;
-end;`, go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
+end;`, go_ora.NVarChar("안녕하세요AAA_"),
+			go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
 			go_ora.Out{Dest: go_ora.Object{Name: "SLICE2", Value: &output2}},
 			go_ora.Out{Dest: go_ora.Object{Name: "IntArray", Value: &output3}},
 			go_ora.Out{Dest: go_ora.Object{Name: "DateArray", Value: &output4}},
@@ -184,7 +185,7 @@ end;`, go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
 				input1[x] = sql.NullString{"varchar_", true}
 				input2[x] = sql.NullString{"안녕하세요AAA_", true}
 				input3[x] = sql.NullInt64{int64(x), true}
-				input4[x] = sql.NullTime{time.Now(), true}
+				input4[x] = sql.NullTime{time.Date(2024, 11, 11, 11, 11, 11, 11, time.UTC), true}
 				//input5[x] = sql.NullTime{Time: time.Now(), Valid: true}
 				input6[x] = []byte("test_")
 				input7[x] = go_ora.Blob{Data: []byte("BLOB")}
@@ -331,7 +332,7 @@ END;`, length,
 		return r, err
 	}
 	var nestedRegularArray = func(db *sql.DB) error {
-		refDate := time.Now()
+		refDate := time.Date(2024, 11, 11, 11, 11, 11, 11, time.UTC)
 		var customer = Customer{
 			Id: 10, Name: "Name1", BirthDate: refDate,
 		}

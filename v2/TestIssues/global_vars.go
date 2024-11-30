@@ -30,7 +30,7 @@ type Execuer interface {
 func createMainTable(db *sql.DB) error {
 	sqlText := `CREATE TABLE TTB_MAIN(
 	ID	number(10)	NOT NULL,
-	NAME		VARCHAR(500),
+	NAME		VARCHAR2(500),
 	VAL			number(10,2),
 	LDATE   		date,
 	DATA			RAW(100),

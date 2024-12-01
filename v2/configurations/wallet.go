@@ -536,3 +536,13 @@ func (w *Wallet) getCredential(server string, port int, service, username string
 	}
 	return nil, nil
 }
+
+func (w *Wallet) getCredentialByDsn(dsn string) *WalletCredential {
+	for _, cred := range w.credentials {
+		if cred.dsn == dsn {
+			credential := cred
+			return &credential
+		}
+	}
+	return nil
+}

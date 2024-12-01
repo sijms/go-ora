@@ -16,7 +16,7 @@ import (
 // )
 
 // type DBAPrivilege int
-// 
+//
 // const (
 // 	NONE    DBAPrivilege = 0
 // 	SYSDBA  DBAPrivilege = 0x20

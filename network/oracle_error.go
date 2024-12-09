@@ -10,6 +10,7 @@ func (err *OracleError) Error() string {
 	return err.ErrMsg
 }
 
+// ErrPos return sql error position。
 func (err *OracleError) ErrPos() int {
 	return err.errPos
 }

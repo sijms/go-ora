@@ -1277,6 +1277,24 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 				pars = append(pars, tempPar)
 			}
 			parent.oPrimValue = pars
+		case 0x85: // xmltype
+			_, err = session.GetByte() // represent 1
+			if err != nil {
+				return err
+			}
+			_, err = session.GetInt(4, false, true) // represent 0x14
+			if err != nil {
+				return err
+			}
+			value, err := session.GetBytes(len(parent.BValue) - 8)
+			if err != nil {
+				return err
+			}
+			conv, err := conn.getDefaultStrConv()
+			if err != nil {
+				return err
+			}
+			parent.oPrimValue = conv.Decode(value)
 		case 0x84:
 			// pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
 			// collect all attributes in one list

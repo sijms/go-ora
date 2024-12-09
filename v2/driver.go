@@ -122,7 +122,7 @@ func AddSessionParam(db *sql.DB, key, value string) error {
 // 	if err != nil {
 // 		return err
 // 	}
-// 
+//
 // 	if drv, ok := conn.Driver().(*OracleDriver); ok {
 // 		return RegisterRegularTypeArrayWithOwner(conn, drv.UserId, regularTypeName, arrayTypeName, itemMaxSize)
 // 	}

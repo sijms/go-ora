@@ -3,7 +3,6 @@ package go_ora
 import (
 	"database/sql/driver"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -457,12 +456,12 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		return nil
 	}
 	if par.DataType == XMLType && par.parent == nil {
-		if par.TypeName == "XMLTYPE" {
-			return errors.New("unsupported data type: XMLTYPE")
-		}
-		if par.cusType == nil {
-			return fmt.Errorf("unregister custom type: %s. call RegisterType first", par.TypeName)
-		}
+		//if par.TypeName == "XMLTYPE" {
+		//	return errors.New("unsupported data type: XMLTYPE")
+		//}
+		//if par.cusType == nil {
+		//	return fmt.Errorf("unregister custom type: %s. call RegisterType first", par.TypeName)
+		//}
 		_, err = session.GetDlc() // contain toid and some 0s
 		if err != nil {
 			return err

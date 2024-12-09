@@ -67,7 +67,7 @@ type customType struct {
 // 	}
 // 	sqlText := `SELECT ATTR_NAME, ATTR_TYPE_NAME, LENGTH, ATTR_NO
 // FROM ALL_TYPE_ATTRS WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
-// 
+//
 // 	stmt := NewStmt(sqlText, conn)
 // 	defer func(stmt *Stmt) {
 // 		_ = stmt.Close()
@@ -87,7 +87,7 @@ type customType struct {
 // 		if err != nil {
 // 			return err
 // 		}
-// 
+//
 // 		for int(attOrder) > len(cust.attribs) {
 // 			cust.attribs = append(cust.attribs, ParameterInfo{
 // 				Direction: Input,
@@ -188,7 +188,7 @@ type customType struct {
 // 	if attOrder, ok = values[3].(int64); !ok {
 // 		return fmt.Errorf("error reading attribute properties for type: %s", typeName)
 // 	}
-// 
+//
 // }
 // 	if len(cust.attribs) == 0 {
 // 		return fmt.Errorf("unknown or empty type: %s", typeName)

@@ -8,6 +8,7 @@ import (
 type OracleError struct {
 	ErrCode int
 	ErrMsg  string
+	errPos  int
 }
 
 func (err *OracleError) Error() string {
@@ -15,6 +16,11 @@ func (err *OracleError) Error() string {
 		err.translate()
 	}
 	return err.ErrMsg
+}
+
+// ErrPos return sql error position。
+func (err *OracleError) ErrPos() int {
+	return err.errPos
 }
 
 func (err *OracleError) translate() {

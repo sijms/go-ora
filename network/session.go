@@ -506,6 +506,7 @@ func (session *Session) GetError() *OracleError {
 		} else {
 			err.ErrMsg = string(session.Summary.ErrorMessage)
 		}
+		err.errPos = session.Summary.errorPos
 	}
 	return err
 }

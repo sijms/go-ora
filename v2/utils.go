@@ -1282,7 +1282,7 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 			if err != nil {
 				return err
 			}
-			_, err = session.GetInt(4, false, true) // represent 0x14
+			dataType, err := session.GetInt(4, false, true) // represent 0x14
 			if err != nil {
 				return err
 			}
@@ -1290,11 +1290,27 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 			if err != nil {
 				return err
 			}
-			conv, err := conn.getDefaultStrConv()
-			if err != nil {
-				return err
+			switch dataType {
+			case 0x14:
+				conv, err := conn.getDefaultStrConv()
+				if err != nil {
+					return err
+				}
+				parent.oPrimValue = conv.Decode(value)
+			case 0x11:
+				lob := Lob{
+					sourceLocator: value,
+					sourceLen:     len(value),
+					connection:    conn,
+					charsetID:     conn.getDefaultCharsetID(),
+				}
+				var strValue string
+				err = setLob(reflect.ValueOf(&strValue), lob)
+				if err != nil {
+					return err
+				}
+				parent.oPrimValue = strValue
 			}
-			parent.oPrimValue = conv.Decode(value)
 		case 0x84:
 			// pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
 			// collect all attributes in one list

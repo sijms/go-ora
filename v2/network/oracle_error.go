@@ -15,7 +15,10 @@ func (err *OracleError) Error() string {
 	if len(err.ErrMsg) == 0 {
 		err.translate()
 	}
-	return err.ErrMsg
+	var output string
+	output = err.ErrMsg + "error occur at position(column) " + strconv.Itoa(err.errPos)
+	//return err.ErrMsg
+	return output
 }
 
 // ErrPos return sql error position。

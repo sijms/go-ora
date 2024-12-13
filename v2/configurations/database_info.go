@@ -57,7 +57,7 @@ type DatabaseInfo struct {
 
 func ExtractServers(connStr string) (addresses []ServerAddr, err error) {
 	var connectionAddressRegexp *regexp.Regexp
-	connectionAddressRegexp, err = regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w.-]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(COMMUNITY)\s*=\s*([\w.-]+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\)\s*)+\)`)
+	connectionAddressRegexp, err = regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w\.\-\:]+)\s*\)|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)|\(\s*(COMMUNITY)\s*=\s*([\w.-]+)\s*\)|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\)\s*)+\)`)
 	if err != nil {
 		return nil, err
 	}

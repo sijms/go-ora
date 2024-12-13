@@ -477,7 +477,7 @@ func (w *Wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 // getCredential read one credential dsn, username, password from encrypted data
 func (w *Wallet) getCredential(server string, port int, service, username string) (credential *WalletCredential, err error) {
 	var hostRegexp *regexp.Regexp
-	hostRegexp, err = regexp.Compile(`\(\s*HOST\s*=\s*([A-z0-9._%+-]+)\)`)
+	hostRegexp, err = regexp.Compile(`\(\s*HOST\s*=\s*([A-z0-9\.\_\%\+\-\:]+)\)`)
 	if err != nil {
 		return nil, err
 	}

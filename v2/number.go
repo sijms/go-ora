@@ -185,6 +185,10 @@ func (num *Number) decode() (strNum string, exp int, negative bool, err error) {
 	}
 
 	buf := num.data[1:]
+	if len(buf) == 0 {
+		err = fmt.Errorf("invalid NUMBER")
+		return
+	}
 	if negative && buf[len(buf)-1] == 0x66 {
 		buf = buf[:len(buf)-1]
 	}

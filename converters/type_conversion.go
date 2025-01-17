@@ -588,7 +588,19 @@ func DecodeDate(data []byte) (time.Time, error) {
 		//}
 	}
 	if zone == nil {
-		zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHour, tzMin), tzHour*60*60+tzMin*60)
+		// zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHour, tzMin), tzHour*60*60+tzMin*60)
+		if tzHour < 0 || tzMin < 0 {
+			offset := tzHour*60*60 + tzMin*60
+			if tzHour < 0 {
+				tzHour = -tzHour
+			}
+			if tzMin < 0 {
+				tzMin = -tzMin
+			}
+			zone = time.FixedZone(fmt.Sprintf("-%02d:%02d", tzHour, tzMin), offset)
+		} else {
+			zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHour, tzMin), tzHour*60*60+tzMin*60)
+		}
 	}
 	return time.Date(year, time.Month(data[2]), int(data[3]),
 		int(data[4]-1), int(data[5]-1), int(data[6]-1), nanoSec, zone), nil

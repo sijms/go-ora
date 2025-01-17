@@ -365,7 +365,7 @@ func (stmt *Stmt) writePars() error {
 		if !par.isLongType() {
 			if par.DataType == REFCURSOR {
 				session.WriteBytes(&buffer, 1, 0)
-			} else if par.Direction == Input && par.isLobType() {
+			} else if (par.Direction == Input || par.Direction == InOut) && par.isLobType() {
 				if len(par.BValue) > 0 {
 					session.WriteUint(&buffer, len(par.BValue), 2, true, true)
 				}

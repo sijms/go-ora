@@ -1135,9 +1135,12 @@ func (conn *Connection) QueryRowContext(ctx context.Context, query string, args 
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
 	rows, err := stmt.QueryContext(ctx, args)
-	dataSet := rows.(*DataSet)
 	if err != nil {
 		return &DataSet{lasterr: err}
+	}
+	dataSet, ok := rows.(*DataSet)
+	if !ok {
+		return &DataSet{lasterr: errors.New("type object should be *DataSet")}
 	}
 	dataSet.Next_()
 	return dataSet

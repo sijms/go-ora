@@ -13,9 +13,8 @@ import (
 
 var version = 0xB200200
 
-type KerberosAuthInterface interface {
-	Authenticate(server, service string) ([]byte, error)
-}
+// KerberosAuthInterface is an alias for configurations.KerberosAuthInterface, maintained for backwards compatibility.
+type KerberosAuthInterface = configurations.KerberosAuthInterface
 
 var kerberosAuth KerberosAuthInterface = nil
 
@@ -171,9 +170,17 @@ func (nego *AdvNego) Read() error {
 		}
 	}
 	if authKerberos {
-		if kerberosAuth == nil {
-			return errors.New("advanced negotiation error: you need to call SetKerberosAuth with valid interface before use kerberos5 authentication")
+		// Validate configuration
+		if kerberosAuth == nil && nego.negoInfo.Kerberos == nil {
+			return fmt.Errorf("advanced negotiation error: Kerberos authenticator not set; call SetKerberosAuth to set it globally or WithKerberosAuth to set it per session")
 		}
+
+		// Prefer session-specific Kerberos auth object
+		auth := nego.negoInfo.Kerberos
+		if auth == nil {
+			auth = kerberosAuth
+		}
+
 		if authServ, ok := nego.serviceList[1].(*authService); ok {
 			authServ.writeHeader(4)
 			nego.comm.writeVersion(authServ.getVersion())
@@ -184,7 +191,7 @@ func (nego *AdvNego) Read() error {
 			if err != nil {
 				return err
 			}
-			return nego.kerberosHandshake(authServ)
+			return nego.kerberosHandshake(auth, authServ)
 		}
 	}
 	if authNTS {
@@ -273,7 +280,7 @@ func (nego *AdvNego) StartServices() error {
 	return nil
 }
 
-func (nego *AdvNego) kerberosHandshake(authServ *authService) error {
+func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ *authService) error {
 	header, err := nego.readHeader()
 	if err != nil {
 		return err
@@ -301,7 +308,7 @@ func (nego *AdvNego) kerberosHandshake(authServ *authService) error {
 	if len(serverHostName) == 0 {
 		return errors.New("kerberos negotiation error: Server hostname not received")
 	}
-	ticketData, err := kerberosAuth.Authenticate(serverHostName, serviceName)
+	ticketData, err := kerberos.Authenticate(serverHostName, serviceName)
 	if err != nil {
 		return err
 	}

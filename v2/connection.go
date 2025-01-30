@@ -1135,10 +1135,10 @@ func (conn *Connection) QueryRowContext(ctx context.Context, query string, args 
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
 	rows, err := stmt.QueryContext(ctx, args)
-	dataSet := rows.(*DataSet)
 	if err != nil {
 		return &DataSet{lasterr: err}
 	}
+	dataSet := rows.(*DataSet)
 	dataSet.Next_()
 	return dataSet
 }

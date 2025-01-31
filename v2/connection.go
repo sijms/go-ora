@@ -1138,7 +1138,10 @@ func (conn *Connection) QueryRowContext(ctx context.Context, query string, args 
 	if err != nil {
 		return &DataSet{lasterr: err}
 	}
-	dataSet := rows.(*DataSet)
+	dataSet, ok := rows.(*DataSet)
+	if !ok {
+		return &DataSet{lasterr: errors.New("type object should be *DataSet")}
+	}
 	dataSet.Next_()
 	return dataSet
 }

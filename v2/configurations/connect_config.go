@@ -21,10 +21,16 @@ const (
 	STREAM LobFetch = 1
 )
 
+type KerberosAuthInterface interface {
+	Authenticate(server, service string) ([]byte, error)
+}
+
 type AdvNegoServiceInfo struct {
 	AuthService     []string
 	EncServiceLevel int
 	IntServiceLevel int
+	// Kerberos is an optional session-specific auth, which will be preferred over the global interface if present.
+	Kerberos KerberosAuthInterface
 }
 type ConnectionConfig struct {
 	ClientInfo

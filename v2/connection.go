@@ -120,6 +120,7 @@ type OracleConnector struct {
 	connectString string
 	dialer        configurations.DialerContext
 	tlsConfig     *tls.Config
+	kerberos      configurations.KerberosAuthInterface
 }
 
 func NewConnector(connString string) driver.Connector {
@@ -149,6 +150,9 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	if conn.connOption.TLSConfig == nil {
 		conn.connOption.TLSConfig = connector.tlsConfig
 	}
+	if conn.connOption.Kerberos == nil {
+		conn.connOption.Kerberos = connector.kerberos
+	}
 	err = conn.OpenWithContext(ctx)
 	if err != nil {
 		return nil, err
@@ -170,6 +174,11 @@ func (connector *OracleConnector) Dialer(dialer configurations.DialerContext) {
 
 func (connector *OracleConnector) WithTLSConfig(config *tls.Config) {
 	connector.tlsConfig = config
+}
+
+// WithKerberosAuth sets the Kerberos authenticator to be used by this connector. It does not enable the Kerberos; set AUTH TYPE to KERBEROS to do so.
+func (connector *OracleConnector) WithKerberosAuth(auth configurations.KerberosAuthInterface) {
+	connector.kerberos = auth
 }
 
 // Open return a new open connection

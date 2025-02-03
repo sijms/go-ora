@@ -184,10 +184,10 @@ func (connector *OracleConnector) WithKerberosAuth(auth configurations.KerberosA
 // Open return a new open connection
 func (driver *OracleDriver) Open(name string) (driver.Conn, error) {
 	conn, err := NewConnection(name, driver.connOption)
-	conn.cusTyp = driver.cusTyp
 	if err != nil {
 		return nil, err
 	}
+	conn.cusTyp = driver.cusTyp
 	err = conn.Open()
 	if err != nil {
 		return nil, err
@@ -551,7 +551,7 @@ func (conn *Connection) getDBServerTimeZone() {
 	}
 
 	var current time.Time
-	err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
+	err := conn.QueryRowContext(context.Background(), "SELECT systimestamp FROM dual", nil).Scan(&current)
 	if err != nil {
 		conn.dbServerTimeZone = time.UTC
 	}
@@ -560,7 +560,7 @@ func (conn *Connection) getDBServerTimeZone() {
 
 func (conn *Connection) getDBTimeZone() error {
 	var result string
-	err := conn.QueryRowContext(context.Background(), "SELECT DBTIMEZONE FROM DUAL", nil).Scan(&result)
+	err := conn.QueryRowContext(context.Background(), "SELECT dbtimezone FROM dual", nil).Scan(&result)
 	// var current time.Time
 	// err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
 	if err != nil {

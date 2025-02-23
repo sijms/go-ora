@@ -505,6 +505,8 @@ complete code can be found in [examples/struct_par](https://github.com/sijms/go-
 > 
 > you can also pass an array of tagged structure to do same thing.
 > complete code for bulk-insert/merge can be found in [examples/merge](https://github.com/sijms/go-ora/blob/master/examples/merge/main.go)
+> 
+> from version 2.8.24 bulk update/delete also supported
 
 * ### Oracle Objects (user defined types)
 > * Created inside oracle using `create type`
@@ -661,6 +663,11 @@ db, err := sql.Open("oracle", "")
 [//]: # (### Supported DBMS features)
 ### releases
 <details>
+
+### version 2.8.24
+* Implement per-session Kerberos auth settings
+* Add support for Bulk update & delete. it will be activated when you pass an array same as inert/merge
+* Bug Fixes
 
 ### version 2.8.19
 * add support for long input: 

@@ -328,12 +328,11 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
 		stmt.stmtType = SELECT
 	} else if strings.HasPrefix(uCmdText, "INSERT") ||
-		strings.HasPrefix(uCmdText, "MERGE") {
-		stmt.stmtType = DML
-		stmt.bulkExec = true
-	} else if strings.HasPrefix(uCmdText, "UPDATE") ||
+		strings.HasPrefix(uCmdText, "MERGE") ||
+		strings.HasPrefix(uCmdText, "UPDATE") ||
 		strings.HasPrefix(uCmdText, "DELETE") {
 		stmt.stmtType = DML
+		stmt.bulkExec = true
 	} else if strings.HasPrefix(uCmdText, "DECLARE") || strings.HasPrefix(uCmdText, "BEGIN") {
 		stmt.stmtType = PLSQL
 	} else {

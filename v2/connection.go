@@ -184,10 +184,10 @@ func (connector *OracleConnector) WithKerberosAuth(auth configurations.KerberosA
 // Open return a new open connection
 func (driver *OracleDriver) Open(name string) (driver.Conn, error) {
 	conn, err := NewConnection(name, driver.connOption)
-	conn.cusTyp = driver.cusTyp
 	if err != nil {
 		return nil, err
 	}
+	conn.cusTyp = driver.cusTyp
 	err = conn.Open()
 	if err != nil {
 		return nil, err

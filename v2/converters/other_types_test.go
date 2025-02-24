@@ -90,6 +90,11 @@ Typ=182 Len=5: 128,0,0,0,70
 SQL> SELECT cast(TO_YMINTERVAL('00-10') as INTERVAL YEAR TO MONTH) FROM dual;
 +00-10
 
+SQL> SELECT dump(cast(TO_YMINTERVAL('-0-3') as INTERVAL YEAR TO MONTH)) FROM dual;
+Typ=182 Len=5: 128,0,0,0,57
+SQL> SELECT cast(TO_YMINTERVAL('-0-3') as INTERVAL YEAR TO MONTH) FROM dual;
+-00-03
+
 Note that heading + is expected in the string representation
 */
 
@@ -120,6 +125,10 @@ func TestIntervalYM(t *testing.T) {
 			[]byte{128, 0, 0, 0, 70},
 			"+00-10",
 		},
+		{
+			[]byte{128, 0, 0, 0, 57},
+			"-00-03",
+		},
 	}
 
 	for _, c := range cases {
@@ -146,6 +155,16 @@ Typ=183 Len=11: 128,0,0,0,70,80,90,155,58,12,8
 SQL> SELECT cast(TO_DSINTERVAL('0 10:20:30.456789') as INTERVAL DAY TO SECOND) FROM dual;
 +00 10:20:30.456789
 
+SQL> SELECT dump(cast(TO_DSINTERVAL('-0 10:20:30.456789') as INTERVAL DAY TO SECOND)) FROM dual;
+Typ=183 Len=11: 128,0,0,0,50,40,30,100,197,243,248
+SQL> SELECT cast(TO_DSINTERVAL('-0 10:20:30.456789') as INTERVAL DAY TO SECOND) FROM dual;
+-00 10:20:30.456789
+
+SQL> SELECT dump(cast(TO_DSINTERVAL('-0 10:20:30.0') as INTERVAL DAY TO SECOND)) FROM dual;
+Typ=183 Len=11: 128,0,0,0,50,40,30,128,0,0,0
+SQL> SELECT cast(TO_DSINTERVAL('-0 10:20:30.0') as INTERVAL DAY TO SECOND) FROM dual;
+-00 10:20:30.000000
+
 Note that heading + is expected in the string representation
 */
 func TestIntervalDS(t *testing.T) {
@@ -161,6 +180,14 @@ func TestIntervalDS(t *testing.T) {
 		{
 			[]byte{128, 0, 0, 0, 70, 80, 90, 155, 58, 12, 8},
 			"+00 10:20:30.456789",
+		},
+		{
+			[]byte{128, 0, 0, 0, 50, 40, 30, 100, 197, 243, 248},
+			"-00 10:20:30.456789",
+		},
+		{
+			[]byte{128, 0, 0, 0, 50, 40, 30, 128, 0, 0, 0},
+			"-00 10:20:30.000000",
 		},
 	}
 

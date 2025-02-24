@@ -84,7 +84,7 @@ func ConvertIntervalYM_DTY(val []byte) string {
 		return fmt.Sprintf("+%02d-%02d", years, months)
 	}
 	years = -years
-	months := val[4] - 40
+	months := 60 - val[4]
 	return fmt.Sprintf("-%02d-%02d", years, months)
 }
 

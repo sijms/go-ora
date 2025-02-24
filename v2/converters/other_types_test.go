@@ -80,6 +80,11 @@ Typ=182 Len=5: 127,255,255,251,50
 SQL> SELECT cast(TO_YMINTERVAL('-5-10') as INTERVAL YEAR TO MONTH) FROM dual;
 -05-10
 
+SQL> SELECT dump(cast(TO_YMINTERVAL('-5-3') as INTERVAL YEAR TO MONTH)) FROM dual;
+Typ=182 Len=5: 127,255,255,251,57
+SQL> SELECT cast(TO_YMINTERVAL('-5-3') as INTERVAL YEAR TO MONTH) FROM dual;
+-05-03
+   
 SQL> SELECT dump(cast(TO_YMINTERVAL('00-10') as INTERVAL YEAR TO MONTH)) FROM dual;
 Typ=182 Len=5: 128,0,0,0,70
 SQL> SELECT cast(TO_YMINTERVAL('00-10') as INTERVAL YEAR TO MONTH) FROM dual;
@@ -106,6 +111,10 @@ func TestIntervalYM(t *testing.T) {
 		{
 			[]byte{127, 255, 255, 251, 50},
 			"-05-10",
+		},
+		{
+			[]byte{127, 255, 255, 251, 57},
+			"-05-03",
 		},
 		{
 			[]byte{128, 0, 0, 0, 70},

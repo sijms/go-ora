@@ -79,12 +79,13 @@ func ConvertIntervalYM_DTY(val []byte) string {
 	*/
 	uyears := binary.BigEndian.Uint32(val)
 	years := int64(uyears) - 0x80000000
-	if years >= 0 {
+	if years >= 0 && val[4] >= 60 {
 		months := val[4] - 60
 		return fmt.Sprintf("+%02d-%02d", years, months)
 	}
+
 	years = -years
-	months := val[4] - 40
+	months := 60 - val[4]
 	return fmt.Sprintf("-%02d-%02d", years, months)
 }
 
@@ -99,20 +100,22 @@ func ConvertIntervalDS_DTY(val []byte) string {
 	   nanoseconds
 	*/
 	udays := binary.BigEndian.Uint32(val)
+	uns := binary.BigEndian.Uint32(val[7:])
+
 	days := int64(udays) - 0x80000000
-	if days >= 0 {
+	ns := (int64(uns) - 0x80000000) / 1000
+
+	if days >= 0 && ns >= 0 && val[4] >= 60 && val[5] >= 60 && val[6] >= 60 {
 		hours := val[4] - 60
 		mins := val[5] - 60
 		secs := val[6] - 60
-		uns := binary.BigEndian.Uint32(val[7:])
-		ns := (int64(uns) - 0x80000000) / 1000
+
 		return fmt.Sprintf("+%02d %02d:%02d:%02d.%06d", days, hours, mins, secs, ns)
 	}
 	days = -days
 	hours := 60 - val[4]
 	mins := 60 - val[5]
 	secs := 60 - val[6]
-	uns := binary.BigEndian.Uint32(val[7:])
-	ns := -(int64(uns) - 0x80000000) / 1000
+	ns = -ns
 	return fmt.Sprintf("-%02d %02d:%02d:%02d.%06d", days, hours, mins, secs, ns)
 }

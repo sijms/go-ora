@@ -317,11 +317,10 @@ func (conn *Connection) getDefaultStrConv() (converters.IStringConverter, error)
 	return conn.getStrConv(conn.getDefaultCharsetID())
 }
 func (conn *Connection) getStrConv(charsetID int) (converters.IStringConverter, error) {
-	if conn.cStrConv != nil && charsetID == conn.cStrConv.GetLangID() {
-		return conn.cStrConv, nil
-	}
-
 	if conn.sStrConv != nil && charsetID == conn.sStrConv.GetLangID() {
+		if conn.cStrConv != nil {
+			return conn.cStrConv, nil
+		}
 		return conn.sStrConv, nil
 	}
 

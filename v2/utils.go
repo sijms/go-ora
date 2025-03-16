@@ -33,6 +33,7 @@ var (
 	tyNClob           = reflect.TypeOf((*NClob)(nil)).Elem()
 	tyBlob            = reflect.TypeOf((*Blob)(nil)).Elem()
 	tyBFile           = reflect.TypeOf((*BFile)(nil)).Elem()
+	tyVector          = reflect.TypeOf((*Vector)(nil)).Elem()
 	tyNullByte        = reflect.TypeOf((*sql.NullByte)(nil)).Elem()
 	tyNullInt16       = reflect.TypeOf((*sql.NullInt16)(nil)).Elem()
 	tyNullInt32       = reflect.TypeOf((*sql.NullInt32)(nil)).Elem()
@@ -48,6 +49,9 @@ var (
 	tyPLBool          = reflect.TypeOf((*PLBool)(nil)).Elem()
 	tyObject          = reflect.TypeOf((*Object)(nil)).Elem()
 	tyNumber          = reflect.TypeOf((*Number)(nil)).Elem()
+	tyFloat32Array    = reflect.TypeOf((*[]float32)(nil)).Elem()
+	tyUint8Array      = reflect.TypeOf((*[]uint8)(nil)).Elem()
+	tyFloat64Array    = reflect.TypeOf((*[]float64)(nil)).Elem()
 )
 
 func refineSqlText(text string) string {
@@ -437,6 +441,11 @@ func getLob(col interface{}, conn *Connection) (*Lob, error) {
 		byteVar = val
 	case Blob:
 		byteVar = val.Data
+	case Vector:
+		byteVar, err = val.encode()
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(stringVar) > 0 {
 		lob := newLob(conn)
@@ -585,6 +594,8 @@ func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}
 		return setLob(fieldValue, val)
 	case BFile:
 		return setBFile(fieldValue, val)
+	case Vector:
+		return setVector(fieldValue, val)
 	case []ParameterInfo:
 		return setUDTObject(fieldValue, cust, val)
 	default:
@@ -611,7 +622,38 @@ func setNull(value reflect.Value) error {
 	// value.SetZero()
 	return nil
 }
-
+func setVector(value reflect.Value, input Vector) error {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setVector(value.Elem(), input)
+	}
+	err := input.load()
+	if err != nil {
+		return err
+	}
+	switch value.Type() {
+	case tyVector:
+		value.Set(reflect.ValueOf(input))
+	case tyUint8Array, tyFloat32Array, tyFloat64Array:
+		value.Set(reflect.ValueOf(input.Data))
+	default:
+		if temp, ok := value.Interface().(sql.Scanner); ok {
+			if temp != nil && !reflect.ValueOf(temp).IsNil() {
+				return temp.Scan(input)
+			}
+		}
+		if value.CanAddr() {
+			if temp, ok := value.Addr().Interface().(sql.Scanner); ok {
+				err := temp.Scan(input)
+				return err
+			}
+		}
+		return fmt.Errorf("can't assign Vector to type: %v", value.Type().Name())
+	}
+	return nil
+}
 func setBFile(value reflect.Value, input BFile) error {
 	if value.Kind() == reflect.Ptr {
 		if value.IsNil() {

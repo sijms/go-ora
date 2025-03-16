@@ -161,6 +161,8 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		par.CharsetID = conn.tcpNego.ServernCharset
 	case tyBlob:
 		par.DataType = OCIBlobLocator
+	case tyVector:
+		par.DataType = VECTOR
 	case tyBFile:
 		par.DataType = OCIFileLocator
 	case tyRefCursor:
@@ -311,6 +313,8 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 			par.DataType = LongRaw
 		}
 	case OCIClobLocator:
+		fallthrough
+	case VECTOR:
 		fallthrough
 	case OCIBlobLocator:
 		var temp *Lob

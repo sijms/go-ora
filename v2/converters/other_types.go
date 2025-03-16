@@ -23,6 +23,21 @@ func DecodeBool(data []byte) bool {
 	return bytes.Compare(data, []byte{1, 1}) == 0
 }
 
+func EncodeFloat32(number float32) []byte {
+	b := make([]byte, 4)
+	temp := math.Float32bits(number)
+	binary.BigEndian.PutUint32(b, uint32(temp))
+	if number > 0 {
+		b[0] = b[0] | 128
+	} else {
+		b[0] = ^b[0]
+		b[1] = ^b[1]
+		b[2] = ^b[2]
+		b[3] = ^b[3]
+	}
+	return b
+
+}
 func ConvertBinaryFloat(bytes []byte) float32 {
 	if bytes[0]&128 != 0 {
 		bytes[0] = bytes[0] & 127
@@ -43,6 +58,24 @@ func ConvertBinaryFloat(bytes []byte) float32 {
 	//return math.Float32frombits(^u)
 }
 
+func EncodeFloat64(number float64) []byte {
+	b := make([]byte, 8)
+	temp := math.Float64bits(number)
+	binary.BigEndian.PutUint64(b, uint64(temp))
+	if number > 0 {
+		b[0] = b[0] | 128
+	} else {
+		b[0] = ^b[0]
+		b[1] = ^b[1]
+		b[2] = ^b[2]
+		b[3] = ^b[3]
+		b[4] = ^b[4]
+		b[5] = ^b[5]
+		b[6] = ^b[6]
+		b[7] = ^b[7]
+	}
+	return b
+}
 func ConvertBinaryDouble(bytes []byte) float64 {
 	if bytes[0]&128 != 0 {
 		bytes[0] = bytes[0] & 127

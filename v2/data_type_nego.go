@@ -28,6 +28,7 @@ const (
 	TNS_TYPE_REP_NATIVE    int16 = 0
 	TNS_TYPE_REP_UNIVERSAL int16 = 1
 	TNS_TYPE_REP_ORACLE    int16 = 10
+	TNS_DATA_TYPE_VBI      int16 = 15
 	TNS_DATA_TYPE_UB2      int16 = 25
 	TNS_DATA_TYPE_UB4      int16 = 26
 	TNS_DATA_TYPE_SB1      int16 = 27
@@ -38,6 +39,22 @@ const (
 	TNS_DATA_TYPE_PTRB     int16 = 32
 	TNS_DATA_TYPE_PTRW     int16 = 33
 	TNS_DATA_TYPE_TIDDEF   int16 = 10
+	TNS_DATA_TYPE_CURSOR   int16 = 102
+	TNS_DATA_TYPE_RDD      int16 = 104
+	TNS_DATA_TYPE_CLOB     int16 = 112
+	TNS_DATA_TYPE_BLOB     int16 = 113
+	TNS_DATA_TYPE_BFILE    int16 = 114
+	TNS_DATA_TYPE_CFILE    int16 = 115
+	TNS_DATA_TYPE_RSET     int16 = 116
+	//TNS_DATA_TYPE_VECTOR    int16 = 127
+	TNS_DATA_TYPE_DCLOB     int16 = 195
+	TNS_DATA_TYPE_DBLOB     int16 = 196
+	TNS_DATA_TYPE_DBFILE    int16 = 197
+	TNS_DATA_TYPE_UROWID    int16 = 208
+	TNS_DATA_TYPE_EXT_NAMED int16 = 108
+	TNS_DATA_TYPE_INT_NAMED int16 = 109
+	TNS_DATA_TYPE_EXT_REF   int16 = 110
+	TNS_DATA_TYPE_INT_REF   int16 = 111
 )
 
 func (n *DataTypeNego) addTypeRep(dty int16, ndty int16, rep int16) {
@@ -69,7 +86,8 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 			1, 1, 1, 1, 1, 1, 0, 41,
 			144, 3, 7, 3, 0, 1, 0, 235,
 			1, 0, 5, 1, 0, 0, 0, 24,
-			0, 0, 7, 32, 2, 58, 0, 0, 5,
+			0, 0, 7, 32, 2, 58, 0, 0,
+			5, 0, 0, 0, 8,
 		},
 		// CompileTimeCaps: []byte{0x6, 0x1, 0x1, 0x1, 0x6f, 0x1, 0x1, 0x10,
 		//	0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x7f,
@@ -335,16 +353,16 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	result.addTypeRep(int16(VarNum), int16(NUMBER), TNS_TYPE_REP_ORACLE)
 	result.addTypeRep(int16(PDN), int16(NUMBER), TNS_TYPE_REP_ORACLE)
 	result.addTypeRep(int16(VARCHAR), int16(NCHAR), TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(13, 0, TNS_TYPE_REP_NATIVE)
-	result.addTypeRep(14, 0, TNS_TYPE_REP_NATIVE)
-	result.addTypeRep(15, 23, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(16, 0, TNS_TYPE_REP_NATIVE)
-	result.addTypeRep(17, 0, TNS_TYPE_REP_NATIVE)
-	result.addTypeRep(18, 0, TNS_TYPE_REP_NATIVE)
-	result.addTypeRep(19, 0, TNS_TYPE_REP_NATIVE)
-	result.addTypeRep(20, 0, TNS_TYPE_REP_NATIVE)
-	result.addTypeRep(21, 0, TNS_TYPE_REP_NATIVE)
-	result.addTypeRep(22, 0, TNS_TYPE_REP_NATIVE)
+	//result.addTypeRep(13, 0, TNS_TYPE_REP_NATIVE)
+	//result.addTypeRep(14, 0, TNS_TYPE_REP_NATIVE)
+	result.addTypeRep(TNS_DATA_TYPE_VBI, int16(NCHAR), TNS_TYPE_REP_UNIVERSAL)
+	//result.addTypeRep(16, 0, TNS_TYPE_REP_NATIVE)
+	//result.addTypeRep(17, 0, TNS_TYPE_REP_NATIVE)
+	//result.addTypeRep(18, 0, TNS_TYPE_REP_NATIVE)
+	//result.addTypeRep(19, 0, TNS_TYPE_REP_NATIVE)
+	//result.addTypeRep(20, 0, TNS_TYPE_REP_NATIVE)
+	//result.addTypeRep(21, 0, TNS_TYPE_REP_NATIVE)
+	//result.addTypeRep(22, 0, TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(39, 120, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(58, 0, TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(68, 2, TNS_TYPE_REP_ORACLE)
@@ -359,24 +377,25 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	result.addTypeRep(97, 96, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(100, 100, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(101, 101, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(102, 102, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(104, 11, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_CURSOR, TNS_DATA_TYPE_CURSOR, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_RDD, int16(ROWID), TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(105, 0, TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(106, 106, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(108, 109, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(109, 109, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(110, 111, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(111, 111, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(112, 112, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(113, 113, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(114, 114, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(115, 115, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(116, 102, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_EXT_NAMED, TNS_DATA_TYPE_INT_NAMED, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_INT_NAMED, TNS_DATA_TYPE_INT_NAMED, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_EXT_REF, TNS_DATA_TYPE_INT_REF, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_INT_REF, TNS_DATA_TYPE_INT_REF, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_CLOB, TNS_DATA_TYPE_CLOB, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_BLOB, TNS_DATA_TYPE_BLOB, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_BFILE, TNS_DATA_TYPE_BFILE, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_CFILE, TNS_DATA_TYPE_CFILE, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_RSET, TNS_DATA_TYPE_CURSOR, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(118, 0, TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(int16(JSON), int16(JSON), TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(121, 0, TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(122, 0, TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(123, 0, TNS_TYPE_REP_NATIVE)
+	result.addTypeRep(int16(VECTOR), int16(VECTOR), TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(136, 0, TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(146, 146, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(147, 0, TNS_TYPE_REP_NATIVE)
@@ -401,16 +420,16 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 	result.addTypeRep(190, 190, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(191, 0, TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(192, 0, TNS_TYPE_REP_NATIVE)
-	result.addTypeRep(195, 112, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(196, 113, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(197, 114, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(208, 208, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_DCLOB, TNS_DATA_TYPE_CLOB, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_DBLOB, TNS_DATA_TYPE_BLOB, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_DBFILE, TNS_DATA_TYPE_BFILE, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(TNS_DATA_TYPE_UROWID, TNS_DATA_TYPE_UROWID, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(209, 0, TNS_TYPE_REP_NATIVE)
 	result.addTypeRep(231, 231, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(232, 231, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(233, 233, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(252, 252, TNS_TYPE_REP_UNIVERSAL)
-	result.addTypeRep(241, 109, TNS_TYPE_REP_UNIVERSAL)
+	result.addTypeRep(241, TNS_DATA_TYPE_INT_NAMED, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(515, 0, TNS_TYPE_REP_NATIVE)
 
 	result.DataTypeRepFor1100 = result.TypeAndRep[0]

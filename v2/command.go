@@ -243,13 +243,13 @@ func (stmt *defaultStmt) writeDefine() error {
 		col.Precision = 0
 		col.Scale = 0
 		col.MaxCharLen = 0
-		if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator {
+		if col.DataType == OCIBlobLocator || col.DataType == OCIClobLocator || col.DataType == VECTOR {
 			num = 0
 			// temp.ContFlag |= 0x2000000
 			if stmt.connection.connOption.Lob == configurations.INLINE && !col.IsJson {
 				num = 0x3FFFFFFF
 				// col.MaxCharLen = 0
-				if col.DataType == OCIBlobLocator {
+				if col.DataType == OCIBlobLocator || col.DataType == VECTOR {
 					col.DataType = LongRaw
 					// change data type in the original array
 					stmt.columns[index].DataType = LongRaw
@@ -2102,6 +2102,13 @@ func (stmt *defaultStmt) decodePrim(dataSet *DataSet) error {
 				if err != nil {
 					return err
 				}
+			case Vector:
+				// read data from lob
+				err = val.load()
+				if err != nil {
+					return err
+				}
+				dataSet.rows[rowIndex][colIndex] = val.Data
 			case Lob:
 				if col.DataType == OCIClobLocator {
 					tempString := sql.NullString{String: "", Valid: false}

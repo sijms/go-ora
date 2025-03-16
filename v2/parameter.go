@@ -81,6 +81,7 @@ const (
 	ResultSet                 TNSType = 116
 	JSON                      TNSType = 119
 	TNS_DATA_TYPE_OAC122      TNSType = 120
+	VECTOR                    TNSType = 127
 	OCIString                 TNSType = 155
 	OCIDate                   TNSType = 156
 	TimeStampDTY              TNSType = 180
@@ -420,7 +421,7 @@ func (par *ParameterInfo) isLongType() bool {
 }
 
 func (par *ParameterInfo) isLobType() bool {
-	return par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator || par.DataType == OCIFileLocator
+	return par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator || par.DataType == OCIFileLocator || par.DataType == VECTOR
 }
 
 func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]byte, udt bool) error {
@@ -646,6 +647,13 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 	//	} else {
 	//
 	//	}
+	//case VECTOR:
+	//	temp, err := session.GetClr()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	fmt.Println(temp)
+	//	return errors.New("vector is not supported")
 	case OCIClobLocator, OCIBlobLocator:
 		var locator []byte
 		if !udt {
@@ -666,6 +674,28 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			*temporaryLobs = append(*temporaryLobs, locator)
 		}
 		par.oPrimValue = lob
+	case VECTOR:
+		var locator []byte
+		if !udt {
+			locator, err = session.GetClr()
+		} else {
+			locator = par.BValue
+		}
+		if err != nil {
+			return err
+		}
+		v := Vector{
+			lob: Lob{
+				sourceLocator: locator,
+				sourceLen:     len(locator),
+				connection:    conn,
+				charsetID:     par.CharsetID,
+			},
+		}
+		if v.lob.isTemporary() {
+			*temporaryLobs = append(*temporaryLobs, locator)
+		}
+		par.oPrimValue = v
 	case OCIFileLocator:
 		var locator []byte
 		if !udt {
@@ -688,7 +718,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			fileName = conn.sStrConv.Decode(locator[index : index+length])
 			index += length
 		}
-		par.oPrimValue = BFile{
+		f := BFile{
 			dirName:  dirName,
 			fileName: fileName,
 			Valid:    len(locator) > 0,
@@ -700,6 +730,10 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 				charsetID:     par.CharsetID,
 			},
 		}
+		if f.lob.isTemporary() {
+			*temporaryLobs = append(*temporaryLobs, locator)
+		}
+		par.oPrimValue = f
 	case IBFloat:
 		par.oPrimValue = converters.ConvertBinaryFloat(par.BValue)
 	case IBDouble:
@@ -725,7 +759,8 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection, temporary
 
 func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLobs *[][]byte, udt bool) error {
 	// var err error
-	if !udt && connection.connOption.Lob == configurations.INLINE && (par.DataType == OCIBlobLocator || par.DataType == OCIClobLocator) {
+	if !udt && connection.connOption.Lob == configurations.INLINE && (par.DataType == OCIBlobLocator ||
+		par.DataType == OCIClobLocator || par.DataType == VECTOR) {
 		session := connection.session
 		maxSize, err := session.GetInt(4, true, true)
 		if err != nil {
@@ -736,7 +771,7 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLob
 			if err != nil {
 				return err
 			}
-			/*chunkSize*/ _, err := session.GetInt(4, true, true)
+			/*chunkSize*/ _, err = session.GetInt(4, true, true)
 			if err != nil {
 				return err
 			}
@@ -775,6 +810,14 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLob
 					return err
 				}
 				par.oPrimValue = strConv.Decode(par.BValue)
+			} else if par.DataType == VECTOR {
+				v := Vector{}
+				err = v.decode(par.BValue)
+				if err != nil {
+					return err
+				}
+				par.oPrimValue = v.Data
+
 			} else {
 				par.oPrimValue = par.BValue
 			}

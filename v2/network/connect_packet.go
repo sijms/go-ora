@@ -55,8 +55,7 @@ func newConnectPacket(sessionCtx *SessionContext) *ConnectPacket {
 	sessionCtx.ACFL1 = 1
 	// sessionCtx.ACFL0 = 4
 	// sessionCtx.ACFL1 = 4
-
-	return &ConnectPacket{
+	pck := &ConnectPacket{
 		Packet: Packet{
 			sessionCtx: sessionCtx,
 			dataOffset: 70,
@@ -66,4 +65,8 @@ func newConnectPacket(sessionCtx *SessionContext) *ConnectPacket {
 		},
 		buffer: []byte(connectData),
 	}
+	if sessionCtx.isRedirect {
+		pck.flag = 4
+	}
+	return pck
 }

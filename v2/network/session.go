@@ -600,6 +600,7 @@ func (session *Session) Connect(ctx context.Context) error {
 			return err
 		}
 		session.Context.connConfig.ResetServerIndex()
+		session.Context.isRedirect = true
 		return session.Connect(ctx)
 	}
 	if refusePacket, ok := pck.(*RefusePacket); ok {

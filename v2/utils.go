@@ -1108,6 +1108,15 @@ func setNumber(value reflect.Value, input *Number) error {
 	return nil
 }
 
+func processReset(err error, conn *Connection) error {
+	if errors.Is(err, network.ErrConnReset) {
+		err = conn.read()
+	}
+	if err != nil && isBadConn(err) {
+		conn.setBad()
+	}
+	return err
+}
 func isBadConn(err error) bool {
 	var opError *net.OpError
 	var oraError *network.OracleError

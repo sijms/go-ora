@@ -263,7 +263,8 @@ func (lob *Lob) open(mode, opID int) error {
 		if err != nil {
 			return err
 		}
-		return lob.read()
+		err = lob.read()
+		return processReset(err, lob.connection)
 	}
 }
 
@@ -283,7 +284,8 @@ func (lob *Lob) close(opID int) error {
 	if err != nil {
 		return err
 	}
-	return lob.read()
+	err = lob.read()
+	return processReset(err, lob.connection)
 	//}
 }
 
@@ -446,19 +448,19 @@ func (lob *Lob) read() error {
 			if err != nil {
 				return err
 			}
-			if msg == 4 {
-				if session.HasError() {
-					if session.Summary.RetCode == 1403 {
-						session.Summary = nil
-					} else {
-						return session.GetError()
-					}
-				}
+			if msg == 4 || msg == 9 {
+				//if session.HasError() {
+				//	if session.Summary.RetCode == 1403 {
+				//		session.Summary = nil
+				//	} else {
+				//		return session.GetError()
+				//	}
+				//}
 				loop = false
 			}
-			if msg == 9 {
-				loop = false
-			}
+			//if msg == 9 {
+			//	loop = false
+			//}
 			// return errors.New(fmt.Sprintf("TTC error: received code %d during LOB reading", msg))
 		}
 	}
@@ -585,7 +587,8 @@ func (lob *Lob) append(dest []byte) error {
 	if err != nil {
 		return err
 	}
-	return lob.read()
+	err = lob.read()
+	return processReset(err, lob.connection)
 }
 
 func (lob *Lob) copy(srcLocator, dstLocator []byte, srcOffset, dstOffset, length int64) error {
@@ -604,7 +607,8 @@ func (lob *Lob) copy(srcLocator, dstLocator []byte, srcOffset, dstOffset, length
 	if err != nil {
 		return err
 	}
-	return lob.read()
+	err = lob.read()
+	return processReset(err, lob.connection)
 }
 
 func (val *Clob) Scan(value interface{}) error {

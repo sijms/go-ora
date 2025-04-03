@@ -57,6 +57,8 @@ var (
 func refineSqlText(text string) string {
 	index := 0
 	length := len(text)
+	inSingleQuote := false
+	inDoubleQuote := false
 	skip := false
 	lineComment := false
 	textBuffer := make([]byte, 0, len(text))
@@ -77,9 +79,13 @@ func refineSqlText(text string) string {
 				skip = false
 			}
 		case '\'':
-			skip = !skip
+			if !skip && !inDoubleQuote {
+				inSingleQuote = !inSingleQuote
+			}
 		case '"':
-			skip = !skip
+			if !skip && !inSingleQuote {
+				inDoubleQuote = !inDoubleQuote
+			}
 		case '-':
 			if !skip {
 				if index+1 < length && text[index+1] == '-' {
@@ -97,7 +103,7 @@ func refineSqlText(text string) string {
 				textBuffer = append(textBuffer, ch) // oheurtel : keep the line feed character
 			}
 		default:
-			if skip || lineComment {
+			if skip || lineComment || inSingleQuote || inDoubleQuote {
 				continue
 			}
 			textBuffer = append(textBuffer, text[index])

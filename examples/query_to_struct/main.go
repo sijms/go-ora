@@ -1,13 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"flag"
 	"fmt"
+	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
-
-	go_ora "github.com/sijms/go-ora/v2"
 )
 
 type test1 struct {
@@ -20,11 +20,11 @@ func (t *test1) Scan(src any) error {
 }
 
 type visit struct {
-	// Id   int64  `db:"name:visit_id"`
+	//Id   int64  `db:"name:visit_id"`
 	// string replaced with new type that implement sql.Scanner interface
-	Name test1   `db:"name:name"`
-	Val  float32 `db:"name:val"`
-	// Date time.Time	`db:"name:visit_date"`
+	Name test1   `db:"name"`
+	Val  float32 `db:"val"`
+	//Date time.Time	`db:"name:visit_date"`
 }
 
 func createTable(conn *go_ora.Connection) error {
@@ -90,7 +90,7 @@ func queryData(conn *go_ora.Connection) error {
 	//)
 	var vi visit
 	var Id int
-	var Date time.Time
+	var Date sql.NullTime
 	for rows.Next_() {
 		err = rows.Scan(&Id, &vi, &Date)
 		if err != nil {
@@ -103,10 +103,10 @@ func queryData(conn *go_ora.Connection) error {
 }
 
 type db_TS struct {
-	S1C1 string `db:"name:s1c1"`
-	S1C2 string `db:"name:s1c2"`
-	S2C1 string `db:"name:s2c1"`
-	S2C2 string `db:"name:s2c2"`
+	S1C1 string `db:"s1c1"`
+	S1C2 string `db:"s1c2"`
+	S2C1 string `db:"s2c1"`
+	S2C2 string `db:"s2c2"`
 }
 
 func queryTest2(conn *go_ora.Connection) error {
@@ -131,7 +131,6 @@ func queryTest2(conn *go_ora.Connection) error {
 	fmt.Printf("%#v\n", DBID)
 	return nil
 }
-
 func queryTest(conn *go_ora.Connection) error {
 	queries := []string{
 		"select 's1c1' as s1c1, 's1c2' as s1c2 from dual",
@@ -163,7 +162,6 @@ func queryTest(conn *go_ora.Connection) error {
 	}
 	return nil
 }
-
 func dropTable(conn *go_ora.Connection) error {
 	t := time.Now()
 	stmt := go_ora.NewStmt("drop table GOORA_TEMP_VISIT purge", conn)
@@ -190,11 +188,14 @@ func usage() {
 }
 
 func main() {
-	var server string
+	var (
+		server string
+	)
 
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
 
+	server = os.Getenv("DSN")
 	connStr := os.ExpandEnv(server)
 	if connStr == "" {
 		fmt.Println("Missing -server option")
@@ -202,7 +203,7 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("Connection string: ", connStr)
-	conn, err := go_ora.NewConnection(connStr)
+	conn, err := go_ora.NewConnection(connStr, nil)
 	if err != nil {
 		fmt.Println("Can't create connection: ", err)
 		return

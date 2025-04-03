@@ -96,7 +96,7 @@ func structsInsert(databaseUrl string) error {
 		Val:       4.2,
 		VisitDate: time.Now(),
 	})
-	conn, err := go_ora.NewConnection(databaseUrl)
+	conn, err := go_ora.NewConnection(databaseUrl, nil)
 	if err != nil {
 		return err
 	}

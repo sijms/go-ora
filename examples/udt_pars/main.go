@@ -5,10 +5,9 @@ import (
 	"database/sql/driver"
 	"flag"
 	"fmt"
+	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
-
-	go_ora "github.com/sijms/go-ora/v2"
 )
 
 type test2 struct {
@@ -86,7 +85,6 @@ END;`
 	fmt.Println("Finish query output par: ", time.Now().Sub(t))
 	return nil
 }
-
 func queryData(conn *go_ora.Connection) error {
 	t := time.Now()
 	stmt := go_ora.NewStmt("SELECT VISIT_ID, TEST_TYPE FROM GOORA_TEMP_VISIT", conn)
@@ -187,7 +185,9 @@ func usage() {
 }
 
 func main() {
-	var server string
+	var (
+		server string
+	)
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
 	connStr := os.ExpandEnv(server)
@@ -200,7 +200,7 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("Connection string: ", connStr)
-	conn, err := go_ora.NewConnection(connStr)
+	conn, err := go_ora.NewConnection(connStr, nil)
 	if err != nil {
 		fmt.Println("Can't open driver", err)
 		return
@@ -251,14 +251,15 @@ func main() {
 		fmt.Println("Can't insert data: ", err)
 		return
 	}
-	//err = queryData(conn)
-	//if err != nil {
-	//	fmt.Println("Can't query data: ", err)
-	//	return
-	//}
+	err = queryData(conn)
+	if err != nil {
+		fmt.Println("Can't query data: ", err)
+		return
+	}
 	err = outputPar(conn)
 	if err != nil {
 		fmt.Println("Can't query output par: ", err)
 		return
 	}
+
 }

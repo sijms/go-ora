@@ -3,9 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-
 	go_ora "github.com/sijms/go-ora/v2"
+	"os"
 )
 
 //func dieOnError(msg string, err error) {
@@ -52,7 +51,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	DB, err := go_ora.NewConnection(connStr)
+	DB, err := go_ora.NewConnection(connStr, nil)
 	if err != nil {
 		fmt.Println("Can't create new connection", err)
 		return

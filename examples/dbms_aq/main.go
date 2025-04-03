@@ -3,12 +3,11 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"os"
-	"time"
-
 	"github.com/sijms/go-ora/dbms"
 	_ "github.com/sijms/go-ora/v2"
 	go_ora "github.com/sijms/go-ora/v2"
+	"os"
+	"time"
 )
 
 type test1 struct {
@@ -118,7 +117,7 @@ func main() {
 	fmt.Println("enqueue message id: ", messageID)
 	var test test1
 	t = time.Now()
-	messageID, err = aq.Dequeue(&test)
+	messageID, err = aq.Dequeue(&test, 100)
 	if err != nil {
 		fmt.Println("can't dequeue: ", err)
 		return

@@ -2,7 +2,9 @@ package go_ora
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/binary"
 	"errors"
 )
@@ -89,6 +91,8 @@ func (file *BFile) Open() error {
 	if !file.isInit() {
 		return errors.New("BFile is not initialized")
 	}
+	tracer := file.lob.connection.tracer
+	tracer.Print("Open BFile: ")
 	err := file.lob.open(0xB, 0x100)
 	if err != nil {
 		return err
@@ -97,6 +101,29 @@ func (file *BFile) Open() error {
 	return nil
 }
 
+func (file *BFile) OpenContext(ctx context.Context) error {
+	if file.isOpened {
+		return nil
+	}
+	if !file.isInit() {
+		return errors.New("BFile is not initialized")
+	}
+	if file.lob.connection.State != Opened {
+		file.lob.connection.setBad()
+		return driver.ErrBadConn
+	}
+	tracer := file.lob.connection.tracer
+	tracer.Print("Open BFile with Context: ")
+	session := file.lob.connection.session
+	done := session.StartContext(ctx)
+	defer session.EndContext(done)
+	err := file.lob.open(0xB, 0x100)
+	if err != nil {
+		return err
+	}
+	file.isOpened = true
+	return nil
+}
 func (file *BFile) Close() error {
 	if !file.isOpened {
 		return nil
@@ -143,15 +170,22 @@ func (file *BFile) GetLength() (int64, error) {
 }
 
 func (file *BFile) Read() ([]byte, error) {
-	return file.lob.getDataWithOffsetSize(0, 0)
+	return file.ReadContext(context.Background())
 }
-
+func (file *BFile) ReadContext(ctx context.Context) ([]byte, error) {
+	return file.lob.getDataWithOffsetSize(ctx, 0, 0)
+}
 func (file *BFile) ReadFromPos(pos int64) ([]byte, error) {
-	return file.lob.getDataWithOffsetSize(pos, 0)
+	return file.ReadFromPosContext(context.Background(), pos)
 }
-
+func (file *BFile) ReadFromPosContext(ctx context.Context, pos int64) ([]byte, error) {
+	return file.lob.getDataWithOffsetSize(ctx, pos, 0)
+}
 func (file *BFile) ReadBytesFromPos(pos, count int64) ([]byte, error) {
-	return file.lob.getDataWithOffsetSize(pos, count)
+	return file.ReadBytesFromPosContext(context.Background(), pos, count)
+}
+func (file *BFile) ReadBytesFromPosContext(ctx context.Context, pos, count int64) ([]byte, error) {
+	return file.lob.getDataWithOffsetSize(ctx, pos, count)
 }
 
 func (file *BFile) Scan(value interface{}) error {

@@ -197,7 +197,7 @@ urlOptions := map[string]string{
 }
 ```
 * ### Using Timeout
-  * activate global timeout value (default=120 sec) to protect against block read/write if no timeout context specified
+  * activate global timeout value (default=10 minute and should be updated according to your network speed) to protect against block read/write if no or failed timeout context
   * timeout value should be numeric string which represent number of seconds that should pass before operation finish or canceled by the driver
   * to disable this option pass 0 value start from v2.7.15
 ```golang
@@ -541,6 +541,47 @@ passing typeName, arrayTypeName (for that type or empty) and empty instance of s
 >   * [examples/regular_type_array](https://github.com/sijms/go-ora/blob/master/examples/regular_type_array/main.go) a complete example for all supported regullar type arrays
 >   * [examples/null_udt](https://github.com/sijms/go-ora/blob/master/examples/null_udt/main.go) example represent null object as input and output
 >   * [examples/varray](https://github.com/sijms/go-ora/blob/master/examples/varray/main.go) for varray types
+
+* ### Vector
+> support start from client v2.8.25. (require oracle server v23ai)
+> * creating new vector datatype then passing them as input parameters:
+> ```golang
+> v1, err := go_ora.NewVector([]uint8{10, 20, 30})
+> v2, err := go_ora.NewVector([]float32{-10.1, -20.2, -30.3})
+> v3, err := go_ora.NewVector([]float64{10.1, 20.2, 30.3})
+> ```
+> vectors can be queried as vector or golang slice
+> * query as vector
+> ```golang
+> var data1, data2, data3 go_ora.Vector
+> rows, err := db.Query("SELECT v01, v02, v03 FROM table")
+> for rows.Next() {
+>   err := rows.Scan(&data1, &data2, &data3)
+> }
+> ```
+> * query as slice
+> ```golang
+> var (
+>   data1 []uint8
+>   data2 []float32
+>   data3 []float64
+> )
+> rows, err := db.Query("SELECT v01, v02, v03 FROM table")
+> for rows.Next() {
+>   err := rows.Scan(&data1, &data2, &data3)
+> }
+> ```
+> * for output parameter vector type should be used
+> ```golang
+> var data1, data2, data3 go_ora.Vector
+> _, err := db.Exec("BEGIN SELECT v01, v02, v03 INTO :1, :2, :3 FROM table WHERE ID=:4; END;"),
+>   go_ora.Out{Dest: &data1},
+>   go_ora.Out{Dest: &data2},
+>   go_ora.Out{Dest: &data3},
+> 1)
+> ```
+> Vector data is store in field `Vector.Data` (interface type). which can
+> be casted to []uint8, []float32 or []float64
 
 * ### RefCursor
 > as an output parameter

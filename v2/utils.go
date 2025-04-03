@@ -1569,3 +1569,10 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 	}
 	return
 }
+
+func isEqualLoc(zone1, zone2 *time.Location) bool {
+	t := time.Now()
+	t1 := t.In(zone1)
+	t2 := t.In(zone2)
+	return t1.Equal(t2)
+}

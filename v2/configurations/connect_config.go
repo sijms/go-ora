@@ -87,7 +87,7 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 	config := &ConnectionConfig{
 		PrefetchRows: 25,
 		SessionInfo: SessionInfo{
-			Timeout: time.Second * time.Duration(10*60), // 10 minutes
+			Timeout: time.Second * time.Duration(120), // 120 seconds
 			// TransportDataUnitSize: 0xFFFF,
 			// SessionDataUnitSize:   0xFFFF,
 			TransportDataUnitSize: 0x200000,

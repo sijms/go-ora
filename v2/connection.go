@@ -110,8 +110,8 @@ type Connection struct {
 		timestamp int
 	}
 	bad                      bool
-	dbTimeZone               *time.Location
-	dbServerTimeZone         *time.Location
+	dbTimeZone               *time.Location // equivalent to database timezone used for timestamp with local timezone
+	dbServerTimeZone         *time.Location // equivalent to timezone of the server carry the database
 	dbServerTimeZoneExplicit *time.Location
 }
 
@@ -526,7 +526,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	if len(conn.NLSData.Language) == 0 {
 		_, err = conn.GetNLS()
 		if err != nil {
-			return err
+			tracer.Print("Error getting NLS: ", err)
 		}
 	}
 	conn.getDBServerTimeZone()
@@ -571,6 +571,7 @@ func (conn *Connection) getDBTimeZone() error {
 		return err
 	}
 	conn.dbTimeZone = time.FixedZone(result, tzHours*60*60+tzMin*60)
+
 	return nil
 }
 

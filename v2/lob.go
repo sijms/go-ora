@@ -2,6 +2,7 @@ package go_ora
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"go/types"
 
@@ -91,7 +92,7 @@ func (lob *Lob) getSize() (size int64, err error) {
 	return
 }
 
-func (lob *Lob) getDataWithOffsetSize(offset, count int64) (data []byte, err error) {
+func (lob *Lob) getDataWithOffsetSize(ctx context.Context, offset, count int64) (data []byte, err error) {
 	if offset == 0 && count == 0 {
 		lob.connection.tracer.Print("Read Lob Data:")
 	} else {
@@ -104,6 +105,8 @@ func (lob *Lob) getDataWithOffsetSize(offset, count int64) (data []byte, err err
 	lob.data.Reset()
 	session := lob.connection.session
 	session.ResetBuffer()
+	done := session.StartContext(ctx)
+	defer session.EndContext(done)
 	lob.writeOp(2)
 	err = session.Write()
 	if err != nil {
@@ -119,7 +122,7 @@ func (lob *Lob) getDataWithOffsetSize(offset, count int64) (data []byte, err err
 
 // getData return lob data
 func (lob *Lob) getData() (data []byte, err error) {
-	return lob.getDataWithOffsetSize(0, 0)
+	return lob.getDataWithOffsetSize(context.Background(), 0, 0)
 }
 
 func (lob *Lob) putData(data []byte) error {

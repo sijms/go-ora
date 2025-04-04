@@ -327,12 +327,12 @@ func (conn *Connection) getStrConv(charsetID int) (converters.IStringConverter, 
 	if conn.nStrConv != nil && charsetID == conn.nStrConv.GetLangID() {
 		return conn.nStrConv, nil
 	}
-
-	temp := converters.NewStringConverter(charsetID)
-	if temp == nil {
-		return nil, fmt.Errorf("server requested charset id: %d which is not supported by the driver", charsetID)
-	}
-	return temp, nil
+	return conn.sStrConv, nil
+	//temp := converters.NewStringConverter(charsetID)
+	//if temp == nil {
+	//	return nil, fmt.Errorf("server requested charset id: %d which is not supported by the driver", charsetID)
+	//}
+	//return temp, nil
 }
 
 func (conn *Connection) Logoff() error {

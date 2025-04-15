@@ -1137,7 +1137,7 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 }
 
 func (conn *Connection) CheckNamedValue(_ *driver.NamedValue) error {
-	return nil
+	return driver.ErrSkip
 }
 
 func (conn *Connection) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) *DataSet {

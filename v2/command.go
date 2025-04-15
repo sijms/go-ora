@@ -1916,7 +1916,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 
 func (stmt *Stmt) CheckNamedValue(_ *driver.NamedValue) error {
-	return nil
+	return driver.ErrSkip
 }
 
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) (*ParameterInfo, error) {

@@ -1136,8 +1136,12 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 	return result, err
 }
 
-func (conn *Connection) CheckNamedValue(_ *driver.NamedValue) error {
-	return driver.ErrSkip
+func (conn *Connection) CheckNamedValue(nv *driver.NamedValue) error {
+	if _, ok := nv.Value.(driver.Valuer); ok {
+		return driver.ErrSkip
+	}
+
+	return nil
 }
 
 func (conn *Connection) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) *DataSet {

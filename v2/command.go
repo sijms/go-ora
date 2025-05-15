@@ -1829,7 +1829,7 @@ func (stmt *Stmt) useNamedParameters() error {
 		for x := 0; x < len(names); x++ {
 			found := false
 			for _, par := range stmt.Pars {
-				if par.Name == names[x] {
+				if strings.ToLower(par.Name) == strings.ToLower(names[x]) {
 					parCollection = append(parCollection, par)
 					found = true
 					break
@@ -1858,7 +1858,7 @@ func (stmt *Stmt) useNamedParameters() error {
 			}
 			found := false
 			for _, par := range stmt.Pars {
-				if par.Name == names[x] {
+				if strings.ToLower(par.Name) == strings.ToLower(names[x]) {
 					if !repeated {
 						parCollection = append(parCollection, par)
 					}

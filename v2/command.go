@@ -1915,7 +1915,10 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	return result, err
 }
 
-func (stmt *Stmt) CheckNamedValue(_ *driver.NamedValue) error {
+func (stmt *Stmt) CheckNamedValue(nv *driver.NamedValue) error {
+	if _, ok := nv.Value.(driver.Valuer); ok {
+		return driver.ErrSkip
+	}
 	return nil
 }
 

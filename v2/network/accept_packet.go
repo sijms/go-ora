@@ -78,7 +78,6 @@ func newAcceptPacketFromData(packetData []byte, config *configurations.Connectio
 		pck.sessionCtx.TransportDataUnit = binary.BigEndian.Uint32(packetData[36:])
 	}
 	if (pck.flag & 1) > 0 {
-		fmt.Println("contain SID data")
 		pck.length -= 16
 		pck.sessionCtx.SID = packetData[int(pck.length):]
 	}

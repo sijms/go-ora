@@ -78,7 +78,7 @@ const (
 	OCIClobLocator            TNSType = 112
 	OCIBlobLocator            TNSType = 113
 	OCIFileLocator            TNSType = 114
-	ResultSet                 TNSType = 116
+	RESULTSET                 TNSType = 116
 	JSON                      TNSType = 119
 	TNS_DATA_TYPE_OAC122      TNSType = 120
 	VECTOR                    TNSType = 127
@@ -552,67 +552,17 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		par.oPrimValue = par.BValue
 	case NUMBER:
 		num := Number{data: par.BValue}
-		//strNum, err := num.String()
-		//if err != nil {
-		//	return err
-		//}
-		//if strings.Contains(strNum, ".") {
-		//	par.oPrimValue, err = num.Float64()
-		//} else {
-		//	par.oPrimValue, err = num.Uint64()
-		//}
 		par.oPrimValue, err = num.String()
 		if err != nil {
 			return err
 		}
-		//if par.Scale == 0 && par.Precision == 0 {
-		//	var tempFloat string
-		//	tempFloat, err = converters.NumberToString(par.BValue)
-		//	if err != nil {
-		//		return err
-		//	}
-		//	if strings.Contains(tempFloat, ".") {
-		//		par.oPrimValue, err = strconv.ParseFloat(tempFloat, 64)
-		//	} else {
-		//		par.oPrimValue, err = strconv.ParseInt(tempFloat, 10, 64)
-		//	}
-		//} else if par.Scale == 0 && par.Precision <= 18 {
-		//	par.oPrimValue, err = converters.NumberToInt64(par.BValue)
-		//	if err != nil {
-		//		return err
-		//	}
-		//} else if par.Scale == 0 && (converters.CompareBytes(par.BValue, converters.Int64MaxByte) > 0 &&
-		//	converters.CompareBytes(par.BValue, converters.Uint64MaxByte) < 0) {
-		//	par.oPrimValue, err = converters.NumberToUInt64(par.BValue)
-		//	if err != nil {
-		//		return err
-		//	}
-		//} else if par.Scale > 0 {
-		//	//par.oPrimValue, err = converters.NumberToString(par.BValue)
-		//	var tempFloat string
-		//	tempFloat, err = converters.NumberToString(par.BValue)
-		//	if err != nil {
-		//		return err
-		//	}
-		//	if strings.Contains(tempFloat, ".") {
-		//		par.oPrimValue, err = strconv.ParseFloat(tempFloat, 64)
-		//	} else {
-		//		if strings.Contains(tempFloat, "-") {
-		//			par.oPrimValue, err = strconv.ParseInt(tempFloat, 10, 64)
-		//		} else {
-		//			par.oPrimValue, err = strconv.ParseUint(tempFloat, 10, 64)
-		//		}
-		//	}
-		//} else {
-		//	par.oPrimValue = converters.DecodeNumber(par.BValue)
-		//}
 	case DATE, TIMESTAMP, TimeStampDTY:
 		tempTime, err := converters.DecodeDate(par.BValue)
 		if err != nil {
 			return err
 		}
 
-		if isEqualLoc(conn.dbTimeZone, time.UTC) {
+		if !isEqualLoc(conn.dbServerTimeZone, time.UTC) {
 			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
 				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbServerTimeZone)
 		} else {
@@ -631,7 +581,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			return err
 		}
 		par.oPrimValue = tempTime
-		if conn.dbTimeZone != time.UTC {
+		if !isEqualLoc(conn.dbTimeZone, time.UTC) {
 			par.oPrimValue = time.Date(tempTime.Year(), tempTime.Month(), tempTime.Day(),
 				tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbTimeZone)
 		}

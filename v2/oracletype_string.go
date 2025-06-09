@@ -37,7 +37,7 @@ func _() {
 	_ = x[OCIClobLocator-112]
 	_ = x[OCIBlobLocator-113]
 	_ = x[OCIFileLocator-114]
-	_ = x[ResultSet-116]
+	_ = x[RESULTSET-116]
 	_ = x[OCIString-155]
 	_ = x[OCIDate-156]
 	_ = x[TimeStampDTY-180]

@@ -117,7 +117,12 @@ func queryCursor(conn *sql.DB, cursor *go_ora.RefCursor) error {
 		val  float64
 		date time.Time
 	)
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			fmt.Println("can't close cursor rows: ", err)
+		}
+	}(rows)
 	for rows.Next() {
 		err = rows.Scan(&id, &name, &val, &date)
 		if err != nil {
@@ -125,13 +130,6 @@ func queryCursor(conn *sql.DB, cursor *go_ora.RefCursor) error {
 		}
 		fmt.Println("ID: ", id, "\tName: ", name, "\tval: ", val, "\tDate: ", date)
 	}
-	//for rows.Next_() {
-	//	err = rows.Scan(&id, &name, &val, &date)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	fmt.Println("ID: ", id, "\tName: ", name, "\tval: ", val, "\tDate: ", date)
-	//}
 	fmt.Println("Finish query RefCursor: ", time.Now().Sub(t))
 	return nil
 }

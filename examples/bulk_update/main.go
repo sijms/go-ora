@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/sijms/go-ora/v2"
+	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strconv"
 	"time"
@@ -67,7 +68,8 @@ func insert(db *sql.DB, count int) error {
 		data[x].Date = time.Now()
 
 	}
-	_, err := db.Exec(fmt.Sprintf("INSERT INTO %s (ID, NAME, VAL, LDATE) VALUES(:ID, :NAME, :VAL, :LDATE)", tableName), data)
+	_, err := db.Exec(fmt.Sprintf("INSERT INTO %s (ID, NAME, VAL, LDATE) VALUES(:ID, :NAME, :VAL, :LDATE)", tableName),
+		go_ora.NewBatch(data))
 	if err != nil {
 		return err
 	}
@@ -77,8 +79,9 @@ func insert(db *sql.DB, count int) error {
 
 func update(db *sql.DB) error {
 	t := time.Now()
-	_, err := db.Exec(fmt.Sprintf("UPDATE %s SET VAL=:val WHERE ID=:id", tableName), sql.Named("val", []float64{10.1, 10.1, 10.1}),
-		sql.Named("id", []int{1, 2, 3}))
+	_, err := db.Exec(fmt.Sprintf("UPDATE %s SET VAL=:val WHERE ID=:id", tableName),
+		sql.Named("val", go_ora.NewBatch([]float64{10.1, 10.1, 10.1})),
+		sql.Named("id", go_ora.NewBatch([]int{1, 2, 3})))
 	if err != nil {
 		return err
 	}
@@ -88,7 +91,7 @@ func update(db *sql.DB) error {
 
 func delete(db *sql.DB) error {
 	t := time.Now()
-	_, err := db.Exec(fmt.Sprintf("DELETE FROM %s WHERE ID=:1", tableName), []int{6, 7, 8, 9, 10})
+	_, err := db.Exec(fmt.Sprintf("DELETE FROM %s WHERE ID=:1", tableName), go_ora.NewBatch([]int{6, 7, 8, 9, 10}))
 	if err != nil {
 		return err
 	}

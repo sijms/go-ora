@@ -3,6 +3,7 @@ package go_ora
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"github.com/sijms/go-ora/v2/converters"
 )
 
 type ValueEncoder interface {
@@ -12,8 +13,56 @@ type ValueEncoder interface {
 type (
 	PLBool   bool
 	NVarChar string
+	batch    struct {
+		array driver.Value
+	}
 )
 
+func NewBatch(array driver.Value) driver.Value {
+	return &batch{array: array}
+}
+func (val PLBool) SetDataType(_ *Connection, par *ParameterInfo) error {
+	par.DataType = Boolean
+	par.MaxLen = converters.MAX_LEN_BOOL
+	return nil
+}
+
+func (val NVarChar) SetDataType(conn *Connection, par *ParameterInfo) error {
+	par.DataType = NCHAR
+	par.CharsetForm = 2
+	par.ContFlag = 16
+	par.CharsetID = conn.tcpNego.ServernCharset
+	return nil
+}
+
+func (val NullNVarChar) SetDataType(conn *Connection, par *ParameterInfo) error {
+	par.DataType = NCHAR
+	par.CharsetForm = 2
+	par.ContFlag = 16
+	par.CharsetID = conn.tcpNego.ServernCharset
+	return nil
+}
+
+func (val TimeStamp) SetDataType(_ *Connection, par *ParameterInfo) error {
+	par.DataType = TIMESTAMP
+	par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	return nil
+}
+func (val NullTimeStamp) SetDataType(_ *Connection, par *ParameterInfo) error {
+	par.DataType = TIMESTAMP
+	par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	return nil
+}
+func (val TimeStampTZ) SetDataType(_ *Connection, par *ParameterInfo) error {
+	par.DataType = TimeStampTZ_DTY
+	par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	return nil
+}
+func (val NullTimeStampTZ) SetDataType(_ *Connection, par *ParameterInfo) error {
+	par.DataType = TimeStampTZ_DTY
+	par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	return nil
+}
 func (val *NVarChar) Value() (driver.Value, error) {
 	return val, nil
 }
@@ -138,6 +187,22 @@ func (val *NClob) UnmarshalJSON(data []byte) error {
 		val.Valid = true
 		val.String = *temp
 	}
+	return nil
+}
+func (val Clob) SetDataType(conn *Connection, par *ParameterInfo) error {
+	par.DataType = OCIClobLocator
+	par.CharsetForm = 1
+	par.CharsetID = conn.getDefaultCharsetID()
+	return nil
+}
+func (val NClob) SetDataType(conn *Connection, par *ParameterInfo) error {
+	par.DataType = OCIClobLocator
+	par.CharsetForm = 2
+	par.CharsetID = conn.tcpNego.ServernCharset
+	return nil
+}
+func (val Blob) SetDataType(conn *Connection, par *ParameterInfo) error {
+	par.DataType = OCIBlobLocator
 	return nil
 }
 

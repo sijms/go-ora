@@ -207,3 +207,8 @@ func (file *BFile) Scan(value interface{}) error {
 	}
 	return nil
 }
+
+func (file BFile) SetDataType(_ *Connection, par *ParameterInfo) error {
+	par.DataType = OCIFileLocator
+	return nil
+}

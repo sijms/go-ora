@@ -1,6 +1,7 @@
 package go_ora
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -242,6 +243,28 @@ func NewObject(owner, name string, value interface{}) *Object {
 		Value:       value,
 		itemMaxSize: 0,
 	}
+}
+
+func (obj Object) SetDataType(conn *Connection, par *ParameterInfo) error {
+	par.DataType = XMLType
+	par.Value = obj.Value
+	for name, cusType := range conn.cusTyp {
+		if strings.EqualFold(name, obj.Name) {
+			par.cusType = new(customType)
+			*par.cusType = cusType
+			par.ToID = cusType.toid
+			if cusType.isArray {
+				par.MaxNoOfArrayElements = 1
+			} else {
+				par.Version = 1
+			}
+			break
+		}
+	}
+	if par.cusType == nil {
+		return fmt.Errorf("type %s is not created or not registered", obj.Name)
+	}
+	return nil
 }
 
 // NewArrayObject call this function for creation of array of regular type

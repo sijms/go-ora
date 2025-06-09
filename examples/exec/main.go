@@ -1,9 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 )
 
@@ -50,35 +50,20 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
-
-	DB, err := go_ora.NewConnection(connStr, nil)
+	db, err := sql.Open("oracle", connStr)
 	if err != nil {
 		fmt.Println("Can't create new connection", err)
 		return
 	}
-	err = DB.Open()
-	if err != nil {
-		fmt.Println("Can't open the connection:", err)
-		return
-	}
 
 	defer func() {
-		err = DB.Close()
+		err = db.Close()
 		if err != nil {
 			fmt.Println("Can't close connection", err)
 		}
 	}()
 
-	stmt := go_ora.NewStmt(sqlText, DB)
-
-	defer func() {
-		err = stmt.Close()
-		if err != nil {
-			fmt.Println("Can't close stmt", err)
-		}
-	}()
-
-	result, err := stmt.Exec(nil)
+	result, err := db.Exec(sqlText)
 	if err != nil {
 		fmt.Println("Can't execute sql", err)
 		return

@@ -188,7 +188,7 @@ urlOptions := map[string]string {
     "data integrity": "rejected",
 }
 ```
-* ### Using Unix Socket
+* ### Unix Socket
 you can use this option if server and client on same linux machine by specify the following url option
 ```golang
 urlOptions := map[string]string{
@@ -196,23 +196,28 @@ urlOptions := map[string]string{
 	"unix socket": "/usr/tmp/.oracle/sEXTPROC1",
 }
 ```
-* ### Using Timeout
-  * activate global timeout value (default=10 minute and should be updated according to your network speed) to protect against block read/write if no or failed timeout context
-  * timeout value should be numeric string which represent number of seconds that should pass before operation finish or canceled by the driver
+* ### Timeout
+  * activate socket timeout value (default=0 no timeout)
+  * timeout value should be numeric string which represent number of seconds the driver will wait on socket for read/write.
   * to disable this option pass 0 value start from v2.7.15
 ```golang
 urlOptions := map[string]string {
 	"TIMEOUT": "60",
 }
 ```
-* ### Using Proxy user
+* ### Connect Timeout
+  * define timeout for connection (default = 1 minute)
+  * timeout value should be numeric string which represent number of seconds.
+  * to disable this option pass 0 value start from v2.9.0
+
+* ### Proxy user
 ```golang
 urlOptions := map[string]string {
 	"proxy client name": "schema_owner",
 }
 connStr := go_ora.BuildUrl("server", 1521, "service", "proxy_user", "proxy_password", urlOptions)
 ```
-* ### Define DBA Privilege
+* ### DBA Privilege
   * define dba privilege of the connection
   * default value is `NONE`
   * using user `sys` automatically set its value to `SYSDBA`
@@ -221,7 +226,7 @@ urlOptions := map[string]string {
 	"dba privilege" : "sysdba", // other values "SYSOPER"
 }
 ```
-* ### Define Lob Fetching Mode
+* ### Lob Fetching Mode
   * this option define how lob data will be loaded
   * default value is `pre` or `inline` means lob data is send inline with other values
   * other value is `post` or `stream` means lob data will be loaded after finish loading other value through a separate network call
@@ -230,7 +235,7 @@ urlOptions := map[string]string {
 	"lob fetch": "stream",
 }
 ```
-* ### Define Client Charset
+* ### Client Charset
   * this option will allow controlling string encoding and decoding at client level
   * so using this option you can define a charset for the client that is different from the server
   * client charset will work in the following situation
@@ -698,6 +703,11 @@ db, err := sql.Open("oracle", "")
     // error handling
   }
   ```
+  
+* ### Multiple ResultSets
+  * the driver support multiple resultsets start from v2.9.0
+  * example code can be reviewed [here](https://github.com/sijms/go-ora/blob/master/examples/multi_resultsets/main.go)
+
 [//]: # (### Go and Oracle type mapping + special types)
 
 [//]: # ()
@@ -723,6 +733,13 @@ config.RegisterDial(func(ctx context.Context, network, address string) (net.Conn
 go_ora.RegisterConfig(config)
 db, err := sql.Open("oracle", "")
 ```
+
+### version 2.9.0
+* modify parameter encoding to fix support for Valuer interface issue
+* add connect timeout url parameter (default=60 seconds)
+* change default timeout for socket to 0 (no-timeout)
+* add support for multiple result sets
+* fix issue related to using RefCursor without opening
 
 ### version 2.8.12
 * add 2 functions

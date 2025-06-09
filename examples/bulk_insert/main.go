@@ -113,12 +113,12 @@ func bulkInsert3(db *sql.DB, rowNum int) error {
 
 		}
 	}
-	_, err := db.Exec(sqlText, sql.Named("id", id),
-		sql.Named("name", name),
-		sql.Named("val", val),
-		sql.Named("dat", date),
-		sql.Named("major", major),
-		sql.Named("data", data))
+	_, err := db.Exec(sqlText, sql.Named("id", go_ora.NewBatch(id)),
+		sql.Named("name", go_ora.NewBatch(name)),
+		sql.Named("val", go_ora.NewBatch(val)),
+		sql.Named("dat", go_ora.NewBatch(date)),
+		sql.Named("major", go_ora.NewBatch(major)),
+		sql.Named("data", go_ora.NewBatch(data)))
 	if err != nil {
 		return err
 	}
@@ -162,12 +162,12 @@ func bulkInsert2(db *sql.DB, rowNum int) error {
 
 		}
 	}
-	_, err := db.Exec(sqlText, sql.Named("id", id),
-		sql.Named("name", name),
-		sql.Named("val", val),
-		sql.Named("dat", date),
-		sql.Named("major", major),
-		sql.Named("data", data))
+	_, err := db.Exec(sqlText, sql.Named("id", go_ora.NewBatch(id)),
+		sql.Named("name", go_ora.NewBatch(name)),
+		sql.Named("val", go_ora.NewBatch(val)),
+		sql.Named("dat", go_ora.NewBatch(date)),
+		sql.Named("major", go_ora.NewBatch(major)),
+		sql.Named("data", go_ora.NewBatch(data)))
 	if err != nil {
 		return err
 	}
@@ -274,18 +274,18 @@ func main() {
 		return
 	}
 
-	//err = createTable(conn)
-	//if err != nil {
-	//	fmt.Println("Can't create table: ", err)
-	//	return
-	//}
+	err = createTable(conn)
+	if err != nil {
+		fmt.Println("Can't create table: ", err)
+		return
+	}
 
-	//defer func() {
-	//	err = dropTable(conn)
-	//	if err != nil {
-	//		fmt.Println("Can't drop table: ", err)
-	//	}
-	//}()
+	defer func() {
+		err = dropTable(conn)
+		if err != nil {
+			fmt.Println("Can't drop table: ", err)
+		}
+	}()
 
 	//err = insertData(conn)
 	//if err != nil {
@@ -293,13 +293,13 @@ func main() {
 	//	return
 	//}
 	//
-	err = deleteData(conn)
-	if err != nil {
-		fmt.Println("Can't delete data: ", err)
-		return
-	}
+	//err = deleteData(conn)
+	//if err != nil {
+	//	fmt.Println("Can't delete data: ", err)
+	//	return
+	//}
 
-	err = bulkInsert3(conn, 10)
+	err = bulkInsert3(conn, 100000)
 	if err != nil {
 		fmt.Println("Can't insert: ", err)
 		return

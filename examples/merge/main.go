@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
@@ -55,10 +56,10 @@ func insert(conn *sql.DB) error {
 		vals[x] = float32(length) / float32(x+1)
 		dates[x] = time.Now()
 	}
-	_, err := conn.Exec(sqlText, sql.Named("ID", ids),
-		sql.Named("NAME", names),
-		sql.Named("VAL", vals),
-		sql.Named("LDATE", dates))
+	_, err := conn.Exec(sqlText, sql.Named("ID", go_ora.NewBatch(ids)),
+		sql.Named("NAME", go_ora.NewBatch(names)),
+		sql.Named("VAL", go_ora.NewBatch(vals)),
+		sql.Named("LDATE", go_ora.NewBatch(dates)))
 	if err != nil {
 		return err
 	}
@@ -83,10 +84,10 @@ ON (tmp.ID=t1.ID)
 		vals[x] = float32(length) / float32(x+1)
 		dates[x] = time.Now()
 	}
-	_, err := conn.Exec(sqlText, sql.Named("ID", ids),
-		sql.Named("NAME", names),
-		sql.Named("VAL", vals),
-		sql.Named("LDATE", dates))
+	_, err := conn.Exec(sqlText, sql.Named("ID", go_ora.NewBatch(ids)),
+		sql.Named("NAME", go_ora.NewBatch(names)),
+		sql.Named("VAL", go_ora.NewBatch(vals)),
+		sql.Named("LDATE", go_ora.NewBatch(dates)))
 	if err != nil {
 		return err
 	}

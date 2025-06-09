@@ -77,16 +77,16 @@ func merge(conn *sql.DB) error {
 		code[x] = "code text"
 		updateTime[x] = go_ora.TimeStamp(time.Now())
 	}
-	_, err := conn.Exec(sqlText, sql.Named("ID", id),
-		sql.Named("TM", tm),
-		sql.Named("SN", sn),
-		sql.Named("CUS", cus),
-		sql.Named("AID", aid),
-		sql.Named("TR", tr),
-		sql.Named("PID", pid),
-		sql.Named("CODE", code),
-		sql.Named("TTNO", ttno),
-		sql.Named("UPDATETIME", updateTime))
+	_, err := conn.Exec(sqlText, sql.Named("ID", go_ora.NewBatch(id)),
+		sql.Named("TM", go_ora.NewBatch(tm)),
+		sql.Named("SN", go_ora.NewBatch(sn)),
+		sql.Named("CUS", go_ora.NewBatch(cus)),
+		sql.Named("AID", go_ora.NewBatch(aid)),
+		sql.Named("TR", go_ora.NewBatch(tr)),
+		sql.Named("PID", go_ora.NewBatch(pid)),
+		sql.Named("CODE", go_ora.NewBatch(code)),
+		sql.Named("TTNO", go_ora.NewBatch(ttno)),
+		sql.Named("UPDATETIME", go_ora.NewBatch(updateTime)))
 	if err != nil {
 		return err
 	}
@@ -112,12 +112,12 @@ func main() {
 		fmt.Println("can't create table: ", err)
 		return
 	}
-	//defer func() {
-	//	err = dropTable(conn)
-	//	if err != nil {
-	//		fmt.Println("can't drop table: ", err)
-	//	}
-	//}()
+	defer func() {
+		err = dropTable(conn)
+		if err != nil {
+			fmt.Println("can't drop table: ", err)
+		}
+	}()
 	err = merge(conn)
 	if err != nil {
 		fmt.Println("can't merge: ", err)

@@ -518,9 +518,9 @@ func (session *Session) Connect(ctx context.Context) error {
 	dialer := connOption.Dialer
 	if dialer == nil {
 		dialer = &net.Dialer{}
-		if session.Context.connConfig.Timeout > 0 {
+		if session.Context.connConfig.ConnectTimeout > 0 {
 			dialer = &net.Dialer{
-				Timeout: session.Context.connConfig.Timeout,
+				Timeout: session.Context.connConfig.ConnectTimeout,
 			}
 		} else {
 			dialer = &net.Dialer{}
@@ -616,7 +616,7 @@ func (session *Session) Connect(ctx context.Context) error {
 		host = connOption.GetActiveServer(true)
 		if host == nil {
 			session.Disconnect()
-			return &refusePacket.Err
+			return refusePacket.Err
 		}
 		return session.Connect(ctx)
 	}

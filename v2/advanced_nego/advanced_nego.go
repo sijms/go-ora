@@ -319,7 +319,7 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 	}
 	// if address is ipv6 then num1 = 24 otherwise = 2
 	num1 := 2
-	localAddress = net.IP{172, 17, 0, 2}
+	//localAddress = net.IP{172, 17, 0, 2}
 	if len(localAddress) > 4 {
 		num1 = 24
 	}
@@ -352,8 +352,7 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 			return err
 		}
 		if serviceHeader[2] != 0 {
-			return &network.OracleError{ErrCode: serviceHeader[2]}
-			// return fmt.Errorf("advanced negotiation error: during receive service header: network exception: ora-%d", serviceHeader[2])
+			return network.NewOracleError(serviceHeader[2])
 		}
 	}
 	// get packet header (2)

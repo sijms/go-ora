@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strconv"
 	"strings"
@@ -142,7 +143,7 @@ func bulkInsert(conn *sql.DB) error {
 		tableArray[x].Val = strconv.FormatFloat(float64(length)/float64(x+1), 'f', 2, 32)
 		tableArray[x].Date = time.Now()
 	}
-	_, err := conn.Exec(sqlText, tableArray)
+	_, err := conn.Exec(sqlText, go_ora.NewBatch(tableArray))
 	if err != nil {
 		return err
 	}

@@ -65,7 +65,7 @@ func insert(db *sql.DB) error {
 			args[x].Date.Valid = false
 		}
 	}
-	_, err := db.Exec(sqlText, args)
+	_, err := db.Exec(sqlText, go_ora.NewBatch(args))
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func main() {
 	)
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
-	server = os.Getenv("LOCAL_DSN")
+	server = os.Getenv("DSN")
 	connStr := os.ExpandEnv(server)
 	if connStr == "" {
 		fmt.Println("Missing -server option")

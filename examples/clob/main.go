@@ -239,7 +239,8 @@ func insertData(db *sql.DB) error {
 		}
 		input[x-1] = temp
 	}
-	_, err = db.Exec("INSERT INTO GOORA_TEMP_LOB(ID, DATA1, DATA2, DATA3, DATA4) VALUES(:ID, :DATA1, :DATA2, :DATA3, :DATA4)", input)
+	_, err = db.Exec("INSERT INTO GOORA_TEMP_LOB(ID, DATA1, DATA2, DATA3, DATA4) VALUES(:ID, :DATA1, :DATA2, :DATA3, :DATA4)",
+		go_ora.NewBatch(input))
 	if err != nil {
 		return err
 	}

@@ -277,3 +277,8 @@ func (v *Vector) Scan(input interface{}) error {
 	}
 	return nil
 }
+
+func (v Vector) SetDataType(conn *Connection, par *ParameterInfo) error {
+	par.DataType = VECTOR
+	return nil
+}

@@ -87,7 +87,8 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 	config := &ConnectionConfig{
 		PrefetchRows: 25,
 		SessionInfo: SessionInfo{
-			Timeout: time.Second * time.Duration(120), // 120 seconds
+			ConnectTimeout: time.Duration(60 * time.Second),
+			Timeout:        0,
 			// TransportDataUnitSize: 0xFFFF,
 			// SessionDataUnitSize:   0xFFFF,
 			TransportDataUnitSize: 0x200000,
@@ -239,14 +240,22 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			config.DBAPrivilege = DBAPrivilegeFromString(val[0])
 		case "TIMEOUT":
 			fallthrough
+		case "READ TIMEOUT":
+			fallthrough
+		case "SOCKET TIMEOUT":
+			to, err := strconv.Atoi(val[0])
+			if err != nil {
+				return nil, errors.New("TIMEOUT value must be an integer")
+			}
+			config.SessionInfo.Timeout = time.Second * time.Duration(to)
 		case "CONNECT TIMEOUT":
 			fallthrough
 		case "CONNECTION TIMEOUT":
 			to, err := strconv.Atoi(val[0])
 			if err != nil {
-				return nil, errors.New("CONNECTION TIMEOUT value must be an integer")
+				return nil, errors.New("TIMEOUT value must be an integer")
 			}
-			config.SessionInfo.Timeout = time.Second * time.Duration(to)
+			config.SessionInfo.ConnectTimeout = time.Second * time.Duration(to)
 		case "TRACE FILE":
 			config.TraceFilePath = val[0]
 			// if len(val[0]) > 0 {

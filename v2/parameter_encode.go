@@ -6,13 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/sijms/go-ora/v2/converters"
 )
 
-func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, conn *Connection) error {
+func (par *ParameterInfo) setDataType(conn *Connection, goType reflect.Type, data driver.Value) error {
+	if par.DataType > 0 {
+		return nil
+	}
+	// step to find the data type
+	// 1- check for nil
 	if goType == nil {
 		par.DataType = NCHAR
 		return nil
@@ -20,49 +24,63 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 	for goType.Kind() == reflect.Ptr {
 		goType = goType.Elem()
 	}
-	if goType == tyObject {
-		val, err := getValue(value)
-		if err != nil {
-			return err
-		}
-		if obj, ok := val.(Object); ok {
-			par.DataType = XMLType
-			par.Value = obj.Value
-			// set custom type
-			for name, cusTyp := range conn.cusTyp {
-				if strings.EqualFold(name, obj.Name) {
-					par.cusType = new(customType)
-					*par.cusType = cusTyp
-					par.ToID = cusTyp.toid
-					if cusTyp.isArray {
-						par.MaxNoOfArrayElements = 1
-					} else {
-						par.Version = 1
-					}
-					break
-				}
-			}
-			if par.cusType == nil {
-				return fmt.Errorf("type %s is not created or not registered", obj.Name)
-			}
-			return nil
-		}
+	// 2- check for common types
+	if tNumber(goType) || tNullNumber(goType) {
+		par.DataType = NUMBER
+		par.MaxLen = converters.MAX_LEN_NUMBER
+		return nil
 	}
-	if goType != tyBytes && (goType.Kind() == reflect.Array || goType.Kind() == reflect.Slice) {
-		val, err := getValue(value)
-		if err != nil {
-			return err
+	switch goType {
+	case tyString, tyNullString:
+		par.DataType = NCHAR
+		par.CharsetForm = 1
+		par.ContFlag = 16
+		par.CharsetID = conn.getDefaultCharsetID()
+		return nil
+	case tyTime, tyNullTime:
+		if par.Flag&0x40 > 0 {
+			par.DataType = DATE
+			par.MaxLen = converters.MAX_LEN_DATE
+		} else {
+			par.DataType = TimeStampTZ_DTY
+			par.MaxLen = converters.MAX_LEN_TIMESTAMP
 		}
+		return nil
+	case tyBytes:
+		par.DataType = RAW
+		return nil
+	}
+	// 3- call getValue
+	vData, err := getValue(data)
+	if err != nil {
+		return err
+	}
+	// 4- call setType again
+	if reflect.TypeOf(vData) != reflect.TypeOf(data) {
+		return par.setDataType(conn, reflect.TypeOf(vData), vData)
+	}
+	value := reflect.ValueOf(data)
+	if value.Kind() == reflect.Ptr && value.IsNil() {
+		data = reflect.New(goType).Interface()
+	}
+	if temp, ok := data.(OracleTypeInterface); ok {
+		err := temp.SetDataType(conn, par)
+		return err
+	}
+	switch goType.Kind() {
+	case reflect.Array, reflect.Slice:
 		var inVal driver.Value = nil
-		if val != nil {
-			rValue := reflect.ValueOf(val)
-			size := rValue.Len()
-			if size > 0 && rValue.Index(0).CanInterface() {
-				inVal = rValue.Index(0).Interface()
+		var err error
+		rValue := reflect.ValueOf(data)
+		size := rValue.Len()
+		if size > 0 && rValue.Index(0).CanInterface() {
+			inVal, err = getValue(rValue.Index(0).Interface())
+			if err != nil {
+				return err
 			}
 		}
 		par.Flag = 0x43
-		err = par.setDataType(goType.Elem(), inVal, conn)
+		err = par.setDataType(conn, goType.Elem(), inVal)
 		if err != nil {
 			return err
 		}
@@ -87,49 +105,142 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 		}
 		par.MaxNoOfArrayElements = 1
 		return nil
-	}
-	if tNumber(goType) || tNullNumber(goType) {
-		par.DataType = NUMBER
-		par.MaxLen = converters.MAX_LEN_NUMBER
-		return nil
-	}
+	case reflect.Struct:
+		// see if the struct is support valuer interface
 
-	switch goType {
-	case tyNumber:
-		par.DataType = NUMBER
-		par.MaxLen = converters.MAX_LEN_NUMBER
-	case tyPLBool:
-		par.DataType = Boolean
-		par.MaxLen = converters.MAX_LEN_BOOL
-	case tyString, tyNullString:
-		par.DataType = NCHAR
-		par.CharsetForm = 1
-		par.ContFlag = 16
-		par.CharsetID = conn.getDefaultCharsetID()
-	case tyNVarChar, tyNullNVarChar:
-		par.DataType = NCHAR
-		par.CharsetForm = 2
-		par.ContFlag = 16
-		par.CharsetID = conn.tcpNego.ServernCharset
-	case tyTime, tyNullTime:
-		if par.Flag&0x40 > 0 {
-			par.DataType = DATE
-			par.MaxLen = converters.MAX_LEN_DATE
-		} else {
-			par.DataType = TimeStampTZ_DTY
-			par.MaxLen = converters.MAX_LEN_TIMESTAMP
+		for _, cusTyp := range conn.cusTyp {
+			if goType == cusTyp.typ {
+				par.cusType = new(customType)
+				*par.cusType = cusTyp
+				par.ToID = cusTyp.toid
+				// par.TypeName = cusTyp.name
+			}
 		}
-	case tyTimeStamp, tyNullTimeStamp:
-		// if par.Flag&0x43 > 0 {
-		par.DataType = TIMESTAMP
-		par.MaxLen = converters.MAX_LEN_DATE
-		//} else {
-		//	par.DataType = TimeStampTZ_DTY
-		//	par.MaxLen = converters.MAX_LEN_TIMESTAMP
-		//}
-	case tyTimeStampTZ, tyNullTimeStampTZ:
-		par.DataType = TimeStampTZ_DTY
-		par.MaxLen = converters.MAX_LEN_TIMESTAMP
+		if par.cusType == nil {
+			return errors.New("call register type before use user defined type (UDT)")
+		}
+		par.Version = 1
+		par.DataType = XMLType
+		par.MaxLen = 2000
+	default:
+		return fmt.Errorf("unsupported go type: %v", goType.Name())
+	}
+	//temp := defaultType{}
+	//err := temp.SetDataType(conn, par)
+	//if err != nil {
+	//	return err
+	//}
+
+	//if goType == tyObject {
+	//	val, err := getValue(value)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	if obj, ok := val.(Object); ok {
+	//		par.DataType = XMLType
+	//		par.Value = obj.Value
+	//		// set custom type
+	//		for name, cusTyp := range conn.cusTyp {
+	//			if strings.EqualFold(name, obj.Name) {
+	//				par.cusType = new(customType)
+	//				*par.cusType = cusTyp
+	//				par.ToID = cusTyp.toid
+	//				if cusTyp.isArray {
+	//					par.MaxNoOfArrayElements = 1
+	//				} else {
+	//					par.Version = 1
+	//				}
+	//				break
+	//			}
+	//		}
+	//		if par.cusType == nil {
+	//			return fmt.Errorf("type %s is not created or not registered", obj.Name)
+	//		}
+	//		return nil
+	//	}
+	//}
+	//if goType != tyBytes && (goType.Kind() == reflect.Array || goType.Kind() == reflect.Slice) {
+	//val, err := getValue(value)
+	//if err != nil {
+	//	return err
+	//}
+	//var inVal driver.Value = nil
+	//if val != nil {
+	//	rValue := reflect.ValueOf(val)
+	//	size := rValue.Len()
+	//	if size > 0 && rValue.Index(0).CanInterface() {
+	//		inVal = rValue.Index(0).Interface()
+	//	}
+	//}
+	//par.Flag = 0x43
+	//err = par.setDataType(goType.Elem(), inVal, conn)
+	//if err != nil {
+	//	return err
+	//}
+	//if par.DataType == XMLType {
+	//	// par.cusType is for item I should get that of array
+	//	found := false
+	//	for _, cust := range conn.cusTyp {
+	//		if cust.isArray && len(cust.attribs) > 0 {
+	//			if par.cusType.name == cust.attribs[0].cusType.name {
+	//				found = true
+	//				// par.TypeName = name
+	//				par.ToID = cust.toid
+	//				*par.cusType = cust
+	//				par.Flag = 0x3
+	//				break
+	//			}
+	//		}
+	//	}
+	//	if !found {
+	//		return fmt.Errorf("can't get the collection of type %s", par.cusType.name)
+	//	}
+	//}
+	//par.MaxNoOfArrayElements = 1
+	//return nil
+	//}
+	//if tNumber(goType) || tNullNumber(goType) {
+	//	par.DataType = NUMBER
+	//	par.MaxLen = converters.MAX_LEN_NUMBER
+	//	return nil
+	//}
+
+	//switch goType {
+	//case tyNumber:
+	//	par.DataType = NUMBER
+	//	par.MaxLen = converters.MAX_LEN_NUMBER
+	//case tyPLBool:
+	//	par.DataType = Boolean
+	//	par.MaxLen = converters.MAX_LEN_BOOL
+	//case tyString, tyNullString:
+	//	par.DataType = NCHAR
+	//	par.CharsetForm = 1
+	//	par.ContFlag = 16
+	//	par.CharsetID = conn.getDefaultCharsetID()
+	//case tyNVarChar, tyNullNVarChar:
+	//	par.DataType = NCHAR
+	//	par.CharsetForm = 2
+	//	par.ContFlag = 16
+	//	par.CharsetID = conn.tcpNego.ServernCharset
+	//case tyTime, tyNullTime:
+	//	if par.Flag&0x40 > 0 {
+	//		par.DataType = DATE
+	//		par.MaxLen = converters.MAX_LEN_DATE
+	//	} else {
+	//		par.DataType = TimeStampTZ_DTY
+	//		par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	//	}
+	//case tyTimeStamp, tyNullTimeStamp:
+	//	// if par.Flag&0x43 > 0 {
+	//	par.DataType = TIMESTAMP
+	//	par.MaxLen = converters.MAX_LEN_DATE
+	//} else {
+	//	par.DataType = TimeStampTZ_DTY
+	//	par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	//}
+	//case tyTimeStampTZ, tyNullTimeStampTZ:
+	//	par.DataType = TimeStampTZ_DTY
+	//	par.MaxLen = converters.MAX_LEN_TIMESTAMP
 	// case tyTime, tyNullTime:
 	//	if par.Direction == Input {
 	//		par.DataType = TIMESTAMP
@@ -149,73 +260,43 @@ func (par *ParameterInfo) setDataType(goType reflect.Type, value driver.Value, c
 	// case tyTimeStampTZ, tyNullTimeStampTZ:
 	//	par.DataType = TimeStampTZ_DTY
 	//	par.MaxLen = converters.MAX_LEN_TIMESTAMP
-	case tyBytes:
-		par.DataType = RAW
-	case tyClob:
-		par.DataType = OCIClobLocator
-		par.CharsetForm = 1
-		par.CharsetID = conn.getDefaultCharsetID()
-	case tyNClob:
-		par.DataType = OCIClobLocator
-		par.CharsetForm = 2
-		par.CharsetID = conn.tcpNego.ServernCharset
-	case tyBlob:
-		par.DataType = OCIBlobLocator
-	case tyVector:
-		par.DataType = VECTOR
-	case tyBFile:
-		par.DataType = OCIFileLocator
-	case tyRefCursor:
-		par.DataType = REFCURSOR
-	default:
-		rOriginal := reflect.ValueOf(value)
-		if value != nil && !(rOriginal.Kind() == reflect.Ptr && rOriginal.IsNil()) {
-			proVal := reflect.Indirect(rOriginal)
-			if valuer, ok := proVal.Interface().(driver.Valuer); ok {
-				val, err := valuer.Value()
-				if err != nil {
-					return err
-				}
-				if val == nil {
-					par.DataType = NCHAR
-					return nil
-				}
-				if val != value {
-					return par.setDataType(reflect.TypeOf(val), val, conn)
-				}
-			}
-		}
+	//case tyBytes:
+	//	par.DataType = RAW
+	//case tyClob:
+	//	par.DataType = OCIClobLocator
+	//	par.CharsetForm = 1
+	//	par.CharsetID = conn.getDefaultCharsetID()
+	//case tyNClob:
+	//	par.DataType = OCIClobLocator
+	//	par.CharsetForm = 2
+	//	par.CharsetID = conn.tcpNego.ServernCharset
+	//case tyBlob:
+	//	par.DataType = OCIBlobLocator
+	//case tyVector:
+	//	par.DataType = VECTOR
+	//case tyBFile:
+	//	par.DataType = OCIFileLocator
+	//case tyRefCursor:
+	//	par.DataType = REFCURSOR
+	//default:
+	//	rOriginal := reflect.ValueOf(value)
+	//	if value != nil && !(rOriginal.Kind() == reflect.Ptr && rOriginal.IsNil()) {
+	//		proVal := reflect.Indirect(rOriginal)
+	//		if valuer, ok := proVal.Interface().(driver.Valuer); ok {
+	//			val, err := valuer.Value()
+	//			if err != nil {
+	//				return err
+	//			}
+	//			if val == nil {
+	//				par.DataType = NCHAR
+	//				return nil
+	//			}
+	//			if val != value {
+	//				return par.setDataType(reflect.TypeOf(val), val, conn)
+	//			}
+	//		}
+	//	}
 
-		//val, err := getValue(value)
-		//if err != nil {
-		//	return err
-		//}
-		//if val == nil {
-		//	par.DataType = NCHAR
-		//	return nil
-		//}
-
-		if goType.Kind() == reflect.Struct {
-			// see if the struct is support valuer interface
-
-			for _, cusTyp := range conn.cusTyp {
-				if goType == cusTyp.typ {
-					par.cusType = new(customType)
-					*par.cusType = cusTyp
-					par.ToID = cusTyp.toid
-					// par.TypeName = cusTyp.name
-				}
-			}
-			if par.cusType == nil {
-				return errors.New("call register type before use user defined type (UDT)")
-			}
-			par.Version = 1
-			par.DataType = XMLType
-			par.MaxLen = 2000
-		} else {
-			return fmt.Errorf("unsupported go type: %v", goType.Name())
-		}
-	}
 	return nil
 }
 
@@ -535,7 +616,7 @@ func (par *ParameterInfo) init() {
 
 func (par *ParameterInfo) encodeValue(size int, connection *Connection) error {
 	par.init()
-	err := par.setDataType(reflect.TypeOf(par.Value), par.Value, connection)
+	err := par.setDataType(connection, reflect.TypeOf(par.Value), par.Value)
 	if err != nil {
 		return err
 	}

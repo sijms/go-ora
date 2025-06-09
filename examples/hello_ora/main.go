@@ -1,13 +1,9 @@
 package main
 
 import (
-	"context"
-	"database/sql/driver"
+	"database/sql"
 	"fmt"
-	"io"
 	"os"
-
-	go_ora "github.com/sijms/go-ora"
 )
 
 func dieOnError(msg string, err error) {
@@ -27,37 +23,32 @@ func main() {
 		fmt.Println()
 		os.Exit(1)
 	}
-	connStr := os.ExpandEnv(os.Args[1])
 
-	conn, err := go_ora.NewConnection(connStr)
+	connStr := os.ExpandEnv(os.Args[1])
+	db, err := sql.Open("oracle", connStr)
 	dieOnError("Can't create connection:", err)
 
-	err = conn.Open()
-	dieOnError("Can't open connection:", err)
-
-	defer conn.Close()
-
-	err = conn.Ping(context.Background())
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			fmt.Println("Can't close connection: ", err)
+		}
+	}()
+	err = db.Ping()
 	dieOnError("Can't ping connection:", err)
 
 	fmt.Println("\nSuccessfully connected.\n")
-	stmt := go_ora.NewStmt("SELECT * FROM v$version", conn)
-	defer stmt.Close()
-
-	rows, err := stmt.Query(nil)
+	rows, err := db.Query("SELECT * FROM v$version")
 	dieOnError("Can't create query:", err)
-
-	defer rows.Close()
-
-	values := make([]driver.Value, 1)
-	for {
-		err = rows.Next(values)
+	defer func() {
+		err = rows.Close()
 		if err != nil {
-			break
+			fmt.Println("Can't close rows: ", err)
 		}
-		fmt.Println(values[0])
-	}
-	if err != nil && err != io.EOF {
-		dieOnError("Can't fetch row:", err)
+	}()
+	var version string
+	for rows.Next() {
+		err = rows.Scan(&version)
+		dieOnError("Can't scan row:", err)
 	}
 }

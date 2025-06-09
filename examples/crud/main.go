@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"os"
-	"time"
-
 	_ "github.com/sijms/go-ora/v2"
+	go_ora "github.com/sijms/go-ora/v2"
+	"os"
+	"strings"
+	"time"
 )
 
 func createTable(conn *sql.DB) error {
@@ -23,10 +24,29 @@ func createTable(conn *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Finish create table GOORA_TEMP_VISIT :", time.Now().Sub(t))
+	fmt.Println("Finish create table :", time.Now().Sub(t))
 	return nil
 }
 
+func bulkInsertStruct(conn *sql.DB) error {
+	type INPUT struct {
+		ID   int       `db:"ID"`
+		Name string    `db:"NAME"`
+		Val  float64   `db:"VAL"`
+		Date time.Time `db:"LDATE"`
+	}
+	data := make([]INPUT, 100)
+	baseVal := 1.1
+	for index, _ := range data {
+		data[index].ID = index + 1
+		data[index].Name = strings.Repeat("-", index+1)
+		data[index].Val = baseVal + float64(index)
+		data[index].Date = time.Now()
+	}
+	_, err := conn.Exec("INSERT INTO GOORA_TEMP_VISIT(VISIT_ID, NAME, VAL, VISIT_DATE) VALUES(:ID, :NAME, :VAL, :LDATE)",
+		go_ora.NewBatch(data))
+	return err
+}
 func insertData(conn *sql.DB) error {
 	t := time.Now()
 	index := 1
@@ -42,7 +62,8 @@ VALUES(:1, :2, :3, :4)`)
 	val := 1.1
 	for index = 1; index <= 100; index++ {
 		if index%5 == 0 {
-			_, err = stmt.Exec(index, nameText, val, nil)
+			tempTime := &sql.NullTime{time.Now(), false}
+			_, err = stmt.Exec(index, nameText, val, tempTime)
 		} else {
 			_, err = stmt.Exec(index, nameText, val, time.Now())
 		}
@@ -139,11 +160,13 @@ func usage() {
 }
 
 func main() {
-	var server string
+	var (
+		server string
+	)
 
 	flag.StringVar(&server, "server", "", "Server's URL, oracle://user:pass@server/service_name")
 	flag.Parse()
-
+	server = os.Getenv("DSN")
 	connStr := os.ExpandEnv(server)
 	if connStr == "" {
 		fmt.Println("Missing -server option")
@@ -169,7 +192,6 @@ func main() {
 		fmt.Println("Can't ping connection: ", err)
 		return
 	}
-
 	err = createTable(conn)
 	if err != nil {
 		fmt.Println("Can't create table: ", err)
@@ -182,7 +204,8 @@ func main() {
 		}
 	}()
 
-	err = insertData(conn)
+	err = bulkInsertStruct(conn)
+	//err = insertData(conn)
 	if err != nil {
 		fmt.Println("Can't insert data: ", err)
 		return
@@ -207,4 +230,5 @@ func main() {
 		fmt.Println("Can't delete data: ", err)
 		return
 	}
+
 }

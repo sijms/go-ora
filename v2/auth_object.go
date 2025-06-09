@@ -79,20 +79,14 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Con
 					if len(ret.pbkdf2ChkSalt) == 0 {
 						ret.pbkdf2ChkSalt = string(val)
 						if len(ret.pbkdf2ChkSalt) != 32 {
-							return nil, &network.OracleError{
-								ErrCode: 28041,
-								ErrMsg:  "ORA-28041: Authentication protocol internal error",
-							}
+							return nil, network.NewOracleError(28041)
 						}
 					}
 				} else if bytes.Compare(key, []byte("AUTH_PBKDF2_VGEN_COUNT")) == 0 {
 					if ret.pbkdf2VgenCount == 0 {
 						ret.pbkdf2VgenCount, err = strconv.Atoi(string(val))
 						if err != nil {
-							return nil, &network.OracleError{
-								ErrCode: 28041,
-								ErrMsg:  "ORA-28041: Authentication protocol internal error",
-							}
+							return nil, network.NewOracleError(28041)
 						}
 						if ret.pbkdf2VgenCount < 4096 || ret.pbkdf2VgenCount > 100000000 {
 							ret.pbkdf2VgenCount = 4096
@@ -102,10 +96,7 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Con
 					ret.pbkdf2SderCount, err = strconv.Atoi(string(val))
 					if ret.pbkdf2SderCount == 0 {
 						if err != nil {
-							return nil, &network.OracleError{
-								ErrCode: 28041,
-								ErrMsg:  "ORA-28041: Authentication protocol internal error",
-							}
+							return nil, network.NewOracleError(28041)
 						}
 						if ret.pbkdf2SderCount < 3 || ret.pbkdf2SderCount > 100000000 {
 							ret.pbkdf2SderCount = 3

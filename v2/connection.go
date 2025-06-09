@@ -1258,7 +1258,7 @@ func (conn *Connection) readMsg(msgCode uint8) error {
 				}
 				if len(bty) >= 8 {
 					queryID := binary.LittleEndian.Uint64(bty[size-8:])
-					fmt.Println("query ID: ", queryID)
+					os.Stderr.WriteString(fmt.Sprintln("query ID: ", queryID))
 				}
 			}
 		}
@@ -1299,7 +1299,7 @@ func (conn *Connection) readMsg(msgCode uint8) error {
 			return err
 		}
 		if warning != nil {
-			fmt.Println(warning)
+			os.Stderr.WriteString(fmt.Sprintln(warning))
 		}
 	case 23:
 		opCode, err := session.GetByte()

@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sijms/go-ora/v2/tns"
 )
 
 type LobFetch int
@@ -122,19 +124,9 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 		config.DBAPrivilege = SYSDBA
 	}
 
-	host, p, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		return nil, err
-	}
-	if len(host) > 0 {
-		tempAddr := ServerAddr{Addr: host, Port: defaultPort}
-		tempAddr.Port, err = strconv.Atoi(p)
-		if err != nil {
-			tempAddr.Port = defaultPort
-		}
-		config.Servers = append(config.Servers, tempAddr)
-	}
-	config.ServiceName = strings.Trim(u.Path, "/")
+	var servers []ServerAddr
+	var serviceName, tnsNamesExplicitPath string
+
 	for key, val := range q {
 		switch strings.ToUpper(key) {
 		case "CID":
@@ -145,6 +137,7 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 				return nil, err
 			}
 		case "SERVER":
+			// These values are to be used as is - TNS names resolution won't be applied to them.
 			for _, srv := range val {
 				srv = strings.TrimSpace(srv)
 				if srv != "" {
@@ -159,11 +152,12 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 							tempAddr.Port = defaultPort
 						}
 					}
-					config.Servers = append(config.Servers, tempAddr)
+					servers = append(servers, tempAddr)
 				}
 			}
 		case "SERVICE NAME":
-			config.ServiceName = val[0]
+			// Override service name
+			serviceName = val[0]
 		case "SID":
 			config.SID = val[0]
 		case "INSTANCE NAME":
@@ -194,7 +188,6 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			fallthrough
 		case "OS PASSWORD HASH":
 			config.ClientInfo.OSPassword = val[0]
-
 		case "DOMAIN":
 			config.DomainName = val[0]
 		case "AUTH SERV":
@@ -320,6 +313,8 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			config.ClientInfo.ProgramName = val[0]
 		case "SERVER LOCATION":
 			config.DatabaseInfo.Location = val[0]
+		case "TNS NAMES":
+			tnsNamesExplicitPath = val[0]
 		default:
 			return nil, fmt.Errorf("unknown URL option: %s", key)
 			// else if tempVal == "IMPLICIT" || tempVal == "AUTO" {
@@ -334,7 +329,7 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			// case "INC POOL SIZE":
 			//	ret.IncrPoolSize, err = strconv.Atoi(val[0])
 			//	if err != nil {
-			//		return nil, errors.New("INC POOL SIZE value must be an integer")
+			//		return nil, errors.NewserviceName("INC POOL SIZE value must be an integer")
 			//	}
 			// case "DECR POOL SIZE":
 			//	ret.DecrPoolSize, err = strconv.Atoi(val[0])
@@ -403,13 +398,81 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			//	ret.ProxyPassword = val[0]
 		}
 	}
+
+	if serviceName != "" {
+		// We have an explicitly specified service name => use it
+		config.ServiceName = serviceName
+	}
+
+	// Generate a net service name. It will be a path part of the connection URL
+	// or a full "<host>:<port>/<path>" if "<host>:<port>" is present.
+	urlPath := strings.Trim(u.Path, "/")
+	netServiceName := urlPath
+	if u.Host != "" {
+		// Prepend "<host>:<port>/" as they've been specified
+		netServiceName = u.Host + "/" + netServiceName
+	}
+
+	// Split host and port
+	urlHost, strUrlPort, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to split '<host>:<port>' part of the connection URL: %w", err)
+	}
+	urlPort := defaultPort
+	if urlPort, err = strconv.Atoi(strUrlPort); err != nil {
+		urlPort = defaultPort
+	}
+
+	// Resolve TNS names filepath
+	tnsNamesPath, err := tns.ResolveFilepath(tnsNamesExplicitPath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot resolve TNS names filepath: %w", err)
+	}
+
+	// Set servers
+	if len(servers) > 0 {
+		// We have explicitly specified server addresses => use them
+		config.Servers = servers
+	} else if tnsNamesPath != "" {
+		// We have a non-empty path to a TNS names file => load connection data from it
+		resolvedServiceName, resolvedServers, err := getConnParamsFromTNS(tnsNamesPath, netServiceName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get connection params from TNS Names file: %w", err)
+		}
+		if len(resolvedServers) > 0 {
+			// Set servers if we've found at least one of them in TNS names file
+			config.Servers = resolvedServers
+		}
+		if config.ServiceName == "" && resolvedServiceName != "" {
+			// If service name has not been specified explicitly and we've resolved a service name via TNS names,
+			// use the resolved service name
+			config.ServiceName = resolvedServiceName
+		}
+	}
+
+	if len(config.Servers) == 0 {
+		// We still don't have information about servers to connect to - try to use server address from the connection URL
+		if len(urlHost) > 0 {
+			config.Servers = []ServerAddr{{Addr: urlHost, Port: urlPort}}
+		}
+	}
+
+	// Check that we have at least one server to connect to
 	if len(config.Servers) == 0 {
 		return nil, errors.New("empty connection servers")
 	}
+
+	if config.ServiceName == "" {
+		// We still don't have information about a service name => use a path part of the connection URL
+		config.ServiceName = urlPath
+	}
+
 	if len(walletPath) > 0 {
+		// Work with Oracle wallet
 		if len(config.ServiceName) == 0 {
 			return nil, errors.New("you should specify server/service if you will use wallet")
 		}
+
 		if _, err = os.Stat(path.Join(walletPath, "ewallet.p12")); err == nil && len(walletPass) > 0 {
 			fileData, err := os.ReadFile(path.Join(walletPath, "ewallet.p12"))
 			if err != nil {
@@ -428,20 +491,30 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 		}
 
 		if len(config.UserID) > 0 {
+			// We have explicitly specified a user => we need to use it to find creds in the wallet
 			if len(config.Password) == 0 {
-				serv := config.Servers[0]
-				cred, err := config.Wallet.getCredential(serv.Addr, serv.Port, config.ServiceName, config.UserID)
+				// Try to find a password in the wallet
+				creds, err := config.Wallet.getCredential(urlHost, urlPort, urlPath, config.UserID)
 				if err != nil {
 					return nil, err
 				}
-				if cred == nil {
-					return nil, errors.New(
-						fmt.Sprintf("cannot find credentials for server: %s:%d, service: %s,  username: %s",
-							serv.Addr, serv.Port, config.ServiceName, config.UserID))
+				if creds == nil {
+					return nil, fmt.Errorf(
+						"cannot find credentials for server: '%s:%d', service: '%s', username: '%s' in the wallet",
+						urlHost, urlPort, urlPath, config.UserID,
+					)
 				}
-				config.UserID = cred.username
-				config.Password = cred.password
+				config.UserID = creds.username
+				config.Password = creds.password
 			}
+		} else {
+			// We don't have an explicitly specified user => try to find creds in the wallet by DSN (net service name)
+			creds := config.Wallet.getCredentialByDsn(netServiceName)
+			if creds == nil {
+				return nil, fmt.Errorf("cannot find credentials for net service with name '%s' in the wallet", netServiceName)
+			}
+			config.UserID = creds.username
+			config.Password = creds.password
 		}
 	}
 	return config, config.validate()

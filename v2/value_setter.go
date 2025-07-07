@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"github.com/sijms/go-ora/v2/converters"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var truthy = []string{"true", "1"}
 
 // set null value from supported types
 func setNull(value reflect.Value) error {
@@ -169,7 +172,7 @@ func setString(value reflect.Value, input string) error {
 		}
 		value.Set(reflect.ValueOf(*tempNum))
 	case tyBool:
-		if strings.ToLower(input) == "true" {
+		if slices.Contains(truthy, strings.ToLower(input)) {
 			value.SetBool(true)
 		} else {
 			value.SetBool(false)
@@ -204,7 +207,7 @@ func setString(value reflect.Value, input string) error {
 		}
 		return floatErr
 	case tyNullBool:
-		temp := strings.ToLower(input) == "true"
+		temp := slices.Contains(truthy, strings.ToLower(input))
 		value.Set(reflect.ValueOf(sql.NullBool{Bool: temp, Valid: true}))
 	case tyNVarChar:
 		value.Set(reflect.ValueOf(NVarChar(input)))

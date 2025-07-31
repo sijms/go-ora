@@ -405,9 +405,6 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		}
 		par.iPrimValue = temp
 		if temp == nil {
-			//if par.Direction == Input {
-			//	par.DataType = NCHAR
-			//}
 			par.MaxLen = 1
 			par.iPrimValue = nil
 			par.IsNull = true

@@ -1029,7 +1029,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			// return implicitRSList;
 			// }
 		default:
-			err = stmt.connection.readMsg(msg)
+			err = stmt.connection.processTCCResponse(msg)
 			if err != nil {
 				return err
 			}

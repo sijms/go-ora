@@ -1487,12 +1487,12 @@ func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, c
 			session.outBuffer.WriteByte(0)
 			// session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
-			if num < 0 {
-				num = num * -1
-				size = size & 0x80
-			}
+			//if num < 0 {
+			//	num = num * -1
+			//	size = size & 0x80
+			//}
 			session.outBuffer.WriteByte(size)
-			session.outBuffer.Write(temp)
+			session.outBuffer.Write(temp[:size])
 		}
 	} else {
 		if size == 1 {

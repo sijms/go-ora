@@ -149,7 +149,7 @@ func (bulk *BulkCopy) readStreamResponse() error {
 				}
 			}
 		default:
-			err = bulk.conn.readMsg(msg)
+			err = bulk.conn.processTCCResponse(msg)
 			if err != nil {
 				return err
 			}
@@ -302,7 +302,7 @@ func (bulk *BulkCopy) readPrepareResponse() error {
 				bulk.dbaBits = 0
 			}
 		default:
-			err = bulk.conn.readMsg(msg)
+			err = bulk.conn.processTCCResponse(msg)
 			if err != nil {
 				return err
 			}
@@ -368,7 +368,7 @@ func (bulk *BulkCopy) readFinalResponse() error {
 				}
 			}
 		default:
-			err = bulk.conn.readMsg(msg)
+			err = bulk.conn.processTCCResponse(msg)
 			if err != nil {
 				return err
 			}

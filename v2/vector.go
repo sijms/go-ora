@@ -116,9 +116,6 @@ func (v *Vector) decode(value []byte) error {
 		return err
 	}
 	if v.flag&0x10 > 0 {
-		//temp := converters.ConvertBinaryDouble(value[index : index+8])
-		//fmt.Println(temp)
-		//index += 8
 		rem := len(value) - index
 		cnt := 8
 		if cnt > rem {

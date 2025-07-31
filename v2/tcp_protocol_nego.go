@@ -24,6 +24,8 @@ type TCPNego struct {
 // newTCPNego create TCPNego object by reading data from network session
 func newTCPNego(session *network.Session) (*TCPNego, error) {
 	session.ResetBuffer()
+	// 1 = ttc message code
+	// 6, 0 = client version
 	session.PutBytes(1, 6, 0)
 	session.PutBytes([]byte("OracleClientGo\x00")...)
 	err := session.Write()

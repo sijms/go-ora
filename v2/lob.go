@@ -3,6 +3,7 @@ package go_ora
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"go/types"
 
@@ -178,13 +179,20 @@ func (lob *Lob) putString(data string) error {
 // isTemporary: return true if the lob is temporary
 func (lob *Lob) isTemporary() bool {
 	if len(lob.sourceLocator) > 7 {
-		if lob.sourceLocator[7]&1 == 1 || lob.sourceLocator[4]&0x40 == 0x40 {
+		if lob.sourceLocator[7]&1 == 1 || lob.sourceLocator[4]&0x40 == 0x40 || lob.isValueBasedLocator() {
 			return true
 		}
 	}
 	return false
 }
 
+func (lob *Lob) isQuasiLocator() bool {
+	return lob.sourceLocator[3] == 4
+}
+
+func (lob *Lob) isValueBasedLocator() bool {
+	return lob.sourceLocator[4]&0x20 > 0
+}
 func (lob *Lob) freeTemporary() error {
 	lob.initialize()
 	lob.connection.session.ResetBuffer()
@@ -196,6 +204,15 @@ func (lob *Lob) freeTemporary() error {
 	return lob.read()
 }
 
+func (lob *Lob) createQuasiLocator(dataLength uint64) {
+	lob.sourceLocator = make([]byte, 40)
+	lob.sourceLocator[1] = 38
+	lob.sourceLocator[3] = 4
+	lob.sourceLocator[4] = 97
+	lob.sourceLocator[5] = 8
+	lob.sourceLocator[9] = 1
+	binary.BigEndian.PutUint64(lob.sourceLocator[10:], dataLength)
+}
 func (lob *Lob) createTemporaryBLOB() error {
 	lob.connection.tracer.Print("Create Temporary BLob:")
 	lob.sourceLocator = make([]byte, 0x28)
@@ -447,7 +464,7 @@ func (lob *Lob) read() error {
 			//	session.RestoreIndex()
 			//}
 		default:
-			err = lob.connection.readMsg(msg)
+			err = lob.connection.processTCCResponse(msg)
 			if err != nil {
 				return err
 			}

@@ -122,7 +122,7 @@ func newAuthObject(username string, password string, tcpNego *TCPNego, conn *Con
 		//		return nil, err
 		//	}
 		default:
-			err = conn.readMsg(messageCode)
+			err = conn.processTCCResponse(messageCode)
 			if err != nil {
 				return nil, err
 			}

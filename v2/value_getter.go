@@ -183,6 +183,10 @@ func getLob(col interface{}, conn *Connection) (*Lob, error) {
 		if err != nil {
 			return nil, err
 		}
+		//lob := newLob(conn)
+		//lob.createQuasiLocator(uint64(len(byteVar)))
+		//lob.data.Reset()
+
 	}
 	if len(stringVar) > 0 {
 		lob := newLob(conn)

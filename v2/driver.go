@@ -34,10 +34,14 @@ type OracleDriver struct {
 	// SerialNum int
 }
 
-var oracleDriver = &OracleDriver{
-	cusTyp:       map[string]customType{},
-	sessionParam: map[string]string{},
+func NewDriver() *OracleDriver {
+	return &OracleDriver{
+		cusTyp:       map[string]customType{},
+		sessionParam: map[string]string{},
+	}
 }
+
+var oracleDriver = NewDriver()
 
 type GetDriverInterface interface {
 	Driver() driver.Driver
@@ -49,13 +53,6 @@ func init() {
 
 func GetDefaultDriver() *OracleDriver {
 	return oracleDriver
-}
-
-func NewDriver() *OracleDriver {
-	return &OracleDriver{
-		cusTyp:       map[string]customType{},
-		sessionParam: map[string]string{},
-	}
 }
 
 func (driver *OracleDriver) init(conn *Connection) error {
@@ -90,9 +87,9 @@ func (driver *OracleDriver) init(conn *Connection) error {
 // that will be used to encode and decode strings and bytearrays
 // passing nil will use driver string converter for supported langs
 func SetStringConverter(db GetDriverInterface, charset, nCharset converters.IStringConverter) {
-	if driver, ok := db.Driver().(*OracleDriver); ok {
-		driver.sStrConv = charset
-		driver.nStrConv = nCharset
+	if drv, ok := db.Driver().(*OracleDriver); ok {
+		drv.sStrConv = charset
+		drv.nStrConv = nCharset
 	}
 }
 

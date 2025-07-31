@@ -8,7 +8,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/sijms/go-ora/v2/aq"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -49,11 +51,16 @@ const (
 
 // from GODROR
 const wrapResultset = "--WRAP_RESULTSET--"
+const createQueue = "--CREATE_QUEUE--"
 
 // Querier is the QueryContext of sql.Conn.
 type Querier interface {
 	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
 }
+
+//type Executer interface {
+//	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
+//}
 
 // ///
 
@@ -352,7 +359,7 @@ func (conn *Connection) Logoff() error {
 	//	if err != nil {
 	//		return err
 	//	}
-	//	err = conn.readMsg(msg)
+	//	err = conn.processTCCResponse(msg)
 	//	if err != nil {
 	//		return err
 	//	}
@@ -371,7 +378,7 @@ func (conn *Connection) read() error {
 		if err != nil {
 			return err
 		}
-		err = conn.readMsg(msg)
+		err = conn.processTCCResponse(msg)
 		if err != nil {
 			return err
 		}
@@ -713,7 +720,7 @@ func (conn *Connection) doAuth() error {
 		//	this.ProcessImplicitResultSet(ref implicitRSList);
 		//	continue;
 		default:
-			err = conn.readMsg(msg)
+			err = conn.processTCCResponse(msg)
 			if err != nil {
 				return err
 			}
@@ -973,64 +980,6 @@ var insertQueryBracketsRegexp = lazy_init.NewLazyInit(func() (interface{}, error
 	return regexp.Compile(`\((.*?)\)`)
 })
 
-// StructsInsert support interface{} array
-//func (conn *Connection) StructsInsert(sqlText string, values []interface{}) (driver.Result, error) {
-//	return conn.BulkInsert(sqlText, len(values), values...)
-//	//if len(values) == 0 {
-//	//	return nil, nil
-//	//}
-//	//
-//	//var insertQueryBracketsRegexpAny interface{}
-//	//insertQueryBracketsRegexpAny, err = insertQueryBracketsRegexp.GetValue()
-//	//if err != nil {
-//	//	return nil, err
-//	//}
-//	//
-//	//matchArray := insertQueryBracketsRegexpAny.(*regexp.Regexp).FindStringSubmatch(sqlText)
-//	//if len(matchArray) < 2 {
-//	//	return nil, fmt.Errorf("invalid sql must be like: insert into a (name,age) values (:1,:2)")
-//	//}
-//	//fields := strings.Split(matchArray[1], ",")
-//	//fieldsMap := make(map[string]int)
-//	//for i, field := range fields {
-//	//	fieldsMap[strings.TrimSpace(strings.ToLower(field))] = i
-//	//}
-//	//_type := reflect.TypeOf(values[0])
-//	//result := make([][]driver.Value, _type.NumField())
-//	//idx := 0
-//	//for i := 0; i < _type.NumField(); i++ {
-//	//	db := _type.Field(i).Tag.Get("db")
-//	//	db = strings.TrimSpace(strings.ToLower(db))
-//	//	if db != "" {
-//	//		if _, ok := fieldsMap[db]; ok {
-//	//			f := make([]driver.Value, len(values))
-//	//			result[idx] = f
-//	//			idx++
-//	//		}
-//	//	}
-//	//}
-//	//if idx != len(fieldsMap) {
-//	//	return nil, &network.OracleError{ErrCode: 947, ErrMsg: "ORA-00947: Not enough values"}
-//	//}
-//	//for i, item := range values {
-//	//	_value := reflect.ValueOf(item)
-//	//	for j := 0; j < _type.NumField(); j++ {
-//	//		db := _type.Field(j).Tag.Get("db")
-//	//		if db != "" {
-//	//			if v, ok := fieldsMap[strings.ToLower(db)]; ok {
-//	//				if !_value.Field(j).IsValid() {
-//	//					result[v][i] = nil
-//	//				} else {
-//	//					result[v][i] = _value.Field(j).Interface()
-//	//				}
-//	//			}
-//	//		}
-//	//
-//	//	}
-//	//}
-//	//return conn.BulkInsert(sqlText, len(values), result...)
-//}
-
 // BulkInsert mass insert column values into a table
 // all columns should pass as an array of values
 func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driver.Value) (driver.Result, error) {
@@ -1137,18 +1086,6 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 	//return result, nil
 }
 
-func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	stmt := NewStmt(query, conn)
-	stmt.autoClose = true
-	result, err := stmt.ExecContext(ctx, args)
-	if err != nil {
-		_ = stmt.Close()
-		return nil, err
-	}
-	err = stmt.Close()
-	return result, err
-}
-
 func (conn *Connection) CheckNamedValue(nv *driver.NamedValue) error {
 	if _, ok := nv.Value.(driver.Valuer); ok {
 		return driver.ErrSkip
@@ -1183,9 +1120,87 @@ func WrapRefCursor(ctx context.Context, q Querier, cursor *RefCursor) (*sql.Rows
 	return q.QueryContext(ctx, wrapResultset, rows)
 }
 
+func NewQueue(q Querier, name string, messageType aq.MessageType, udtName string) (*aq.Queue, error) {
+	rows, err := q.QueryContext(context.Background(), createQueue, name, messageType, udtName)
+	if err != nil {
+		return nil, err
+	}
+	var output aq.Queue
+	if rows.Next() {
+		err = rows.Scan(&output)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &output, nil
+}
+
+func (conn *Connection) encodeData(data interface{}) ([]byte, error) {
+	par := ParameterInfo{}
+	par.Value = data
+	err := par.encodeValue(0, conn)
+	return par.BValue, err
+}
+
+func (conn *Connection) decodeData(data []byte, messageType aq.MessageType, udtName string) (interface{}, error) {
+	par := ParameterInfo{
+		BValue: data,
+	}
+	switch messageType {
+	case aq.UDT:
+		par.DataType = XMLType
+		for name, cust := range conn.cusTyp {
+			if name == strings.ToUpper(udtName) {
+				par.cusType = new(customType)
+				*par.cusType = cust
+				par.ToID = cust.toid
+			}
+		}
+		err := decodeObject(conn, &par, nil)
+		if err != nil {
+			return nil, err
+		}
+		output := reflect.New(par.cusType.typ)
+		err = setFieldValue(output, par.cusType, par.oPrimValue)
+		return output.Interface(), err
+	default:
+		return nil, errors.New("unsupported message type")
+	}
+	//err := par.decodeParameterValue(conn, nil)
+	//return par.Value, err
+}
+func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	stmt := NewStmt(query, conn)
+	stmt.autoClose = true
+	result, err := stmt.ExecContext(ctx, args)
+	if err != nil {
+		_ = stmt.Close()
+		return nil, err
+	}
+	err = stmt.Close()
+	return result, err
+}
+
 func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	if query == wrapResultset {
 		return args[0].Value.(driver.Rows), nil
+	}
+	if query == createQueue {
+		name := args[0].Value.(string)
+		messageType := args[1].Value.(aq.MessageType)
+		udtName := args[2].Value.(string)
+		var toid []byte = nil
+		if len(udtName) > 0 {
+			cust, ok := conn.cusTyp[strings.ToUpper(udtName)]
+			if ok {
+				toid = cust.toid
+			} else {
+				return nil, fmt.Errorf("unregister user define type: %s", udtName)
+			}
+		}
+		holder := aq.NewQueueHolder(conn.session, name, messageType, udtName, toid,
+			conn.processTCCResponse, conn.encodeData, conn.decodeData)
+		return holder, nil
 	}
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
@@ -1206,7 +1221,7 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 	return NewStmt(query, conn), nil
 }
 
-func (conn *Connection) readMsg(msgCode uint8) error {
+func (conn *Connection) processTCCResponse(msgCode uint8) error {
 	session := conn.session
 	tracer := conn.tracer
 	var err error

@@ -37,7 +37,7 @@ func (obj *simpleObject) read() error {
 	// 	if err != nil {
 	// 		return err
 	// 	}
-	// 	err = obj.connection.readMsg(msg)
+	// 	err = obj.connection.processTCCResponse(msg)
 	// 	if err != nil {
 	// 		return err
 	// 	}

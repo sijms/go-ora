@@ -366,10 +366,14 @@ func (stmt *Stmt) writePars() error {
 			if par.DataType == REFCURSOR {
 				session.WriteBytes(&buffer, 1, 0)
 			} else if (par.Direction == Input || par.Direction == InOut) && par.isLobType() {
-				if len(par.BValue) > 0 {
-					session.WriteUint(&buffer, len(par.BValue), 2, true, true)
+				if par.DataType == VECTOR {
+					session.WriteBytes(&buffer, par.BValue...)
+				} else {
+					if len(par.BValue) > 0 {
+						session.WriteUint(&buffer, len(par.BValue), 4, true, true)
+					}
+					session.WriteClr(&buffer, par.BValue)
 				}
-				session.WriteClr(&buffer, par.BValue)
 			} else {
 				if par.cusType != nil {
 					session.WriteBytes(&buffer, 0, 0, 0, 0)

@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/aq"
 	"os"
 	"reflect"
 	"regexp"
@@ -16,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sijms/go-ora/v2/aq"
 	"github.com/sijms/go-ora/v2/lazy_init"
 
 	"github.com/sijms/go-ora/v2/configurations"
@@ -121,6 +121,20 @@ type Connection struct {
 	dbServerTimeZoneExplicit *time.Location
 }
 
+type ConnectionProperties struct {
+	cusTyp map[string]customType
+	maxLen struct {
+		varchar   int
+		nvarchar  int
+		raw       int
+		number    int
+		date      int
+		timestamp int
+	}
+	dbTimeZone               *time.Location // equivalent to database timezone used for timestamp with local timezone
+	dbServerTimeZone         *time.Location // equivalent to timezone of the server carry the database
+	dbServerTimeZoneExplicit *time.Location
+}
 type OracleConnector struct {
 	drv           *OracleDriver
 	connectString string

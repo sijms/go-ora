@@ -3,7 +3,6 @@ package go_ora
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"go/types"
 
@@ -204,15 +203,6 @@ func (lob *Lob) freeTemporary() error {
 	return lob.read()
 }
 
-func (lob *Lob) createQuasiLocator(dataLength uint64) {
-	lob.sourceLocator = make([]byte, 40)
-	lob.sourceLocator[1] = 38
-	lob.sourceLocator[3] = 4
-	lob.sourceLocator[4] = 97
-	lob.sourceLocator[5] = 8
-	lob.sourceLocator[9] = 1
-	binary.BigEndian.PutUint64(lob.sourceLocator[10:], dataLength)
-}
 func (lob *Lob) createTemporaryBLOB() error {
 	lob.connection.tracer.Print("Create Temporary BLob:")
 	lob.sourceLocator = make([]byte, 0x28)

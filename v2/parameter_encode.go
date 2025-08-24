@@ -396,7 +396,15 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 	case OCIClobLocator:
 		fallthrough
 	case VECTOR:
-		fallthrough
+		temp, err := getVector(val)
+		if err != nil {
+			return err
+		}
+		par.iPrimValue = temp
+		if temp == nil {
+			par.MaxLen = 1
+			par.IsNull = true
+		}
 	case OCIBlobLocator:
 		var temp *Lob
 		temp, err = getLob(val, connection)
@@ -504,6 +512,12 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 		}
 	case *Lob:
 		par.BValue = value.sourceLocator
+	case *Vector:
+		buffer := bytes.Buffer{}
+		conn.session.WriteUint(&buffer, len(value.lob.sourceLocator), 4, true, true)
+		conn.session.WriteClr(&buffer, value.lob.sourceLocator)
+		conn.session.WriteClr(&buffer, value.bValue)
+		par.BValue = buffer.Bytes()
 	case *BFile:
 		par.BValue = value.lob.sourceLocator
 	case []byte:

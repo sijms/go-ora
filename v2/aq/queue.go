@@ -4,6 +4,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/sijms/go-ora/v2/utils"
+
 	//go_ora "github.com/sijms/go-ora/v2"
 	"github.com/sijms/go-ora/v2/network"
 )
@@ -65,6 +67,21 @@ func (queue *Queue) NewMessage(data interface{}) (*Message, error) {
 		message.payloadInBytes, err = queue.encodeData(data)
 	case UDT:
 		message.payloadInBytes, err = queue.encodeData(data)
+	case JSON:
+		//if temp, ok := data.(string); ok {
+		//	buffer := bytes.Buffer{}
+		//	conn.session.WriteUint(&buffer, len(value.lob.sourceLocator), 4, true, true)
+		//	conn.session.WriteClr(&buffer, value.lob.sourceLocator)
+		//	conn.session.WriteClr(&buffer, value.bValue)
+		//	par.BValue = buffer.Bytes()
+		//
+		//	data, err = json.EncodeJsonString(temp, true)
+		//	Locator := utils.CreateQuasiLocator(uint64(len(val.bValue)))
+		//
+		//} else {
+		//	return nil, errors.New("invalid JSON data type (string required)")
+		//}
+
 		//par.Value = go_ora.NewObject("", queue.UdtTypeName, data)
 	default:
 		return nil, errors.New("unsupported message type")
@@ -162,6 +179,7 @@ func (queue *Queue) Enqueue(message *Message) error {
 	}
 	session.PutBytes(queue.toid...)
 	switch queue.messageType {
+	case JSON:
 	case RAW:
 		session.PutBytes(message.payloadInBytes...)
 	case UDT:
@@ -187,6 +205,16 @@ func (queue *Queue) Enqueue(message *Message) error {
 	}
 	for _, extension := range message.extensions {
 		session.PutKeyVal(extension.key, extension.value, extension.num)
+	}
+	if queue.messageType == JSON {
+		// create quasi locator
+		quasi := utils.CreateQuasiLocator(uint64(len(message.payloadInBytes)))
+		// pass uint4 length of locator
+		session.PutUint(len(quasi), 4, true, true)
+		// pass locator as clr
+		session.PutBytes(quasi...)
+		// pass data as clr
+		session.PutClr(message.payloadInBytes)
 	}
 	err := session.Write()
 	if err != nil {

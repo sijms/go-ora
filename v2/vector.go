@@ -14,6 +14,7 @@ type Vector struct {
 	flag    int
 	Count   int
 	Data    interface{}
+	bValue  []byte
 	lob     Lob
 }
 

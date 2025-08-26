@@ -705,5 +705,7 @@ func isEqualLoc(zone1, zone2 *time.Location) bool {
 	t := time.Now()
 	t1 := t.In(zone1)
 	t2 := t.In(zone2)
-	return t1.Equal(t2)
+	name1, offset1 := t1.Zone()
+	name2, offset2 := t2.Zone()
+	return name1 == name2 && offset1 == offset2
 }

@@ -55,7 +55,7 @@ func TestURowid(t *testing.T) {
 	stmt._hasLONG = false
 	stmt.arrayBindCount = 0
 	dataSet := new(DataSet)
-	err := stmt.read(dataSet)
+	err := stmt.read(dataSet.currentResultSet())
 	if err != nil {
 		t.Error(err)
 	}

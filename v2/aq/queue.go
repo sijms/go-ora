@@ -4,8 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/sijms/go-ora/v2/utils"
-
 	//go_ora "github.com/sijms/go-ora/v2"
 	"github.com/sijms/go-ora/v2/network"
 )
@@ -68,6 +66,7 @@ func (queue *Queue) NewMessage(data interface{}) (*Message, error) {
 	case UDT:
 		message.payloadInBytes, err = queue.encodeData(data)
 	case JSON:
+		message.payloadInBytes, err = queue.encodeData(data)
 		//if temp, ok := data.(string); ok {
 		//	buffer := bytes.Buffer{}
 		//	conn.session.WriteUint(&buffer, len(value.lob.sourceLocator), 4, true, true)
@@ -207,14 +206,15 @@ func (queue *Queue) Enqueue(message *Message) error {
 		session.PutKeyVal(extension.key, extension.value, extension.num)
 	}
 	if queue.messageType == JSON {
-		// create quasi locator
-		quasi := utils.CreateQuasiLocator(uint64(len(message.payloadInBytes)))
-		// pass uint4 length of locator
-		session.PutUint(len(quasi), 4, true, true)
-		// pass locator as clr
-		session.PutBytes(quasi...)
-		// pass data as clr
-		session.PutClr(message.payloadInBytes)
+		session.PutBytes(message.payloadInBytes...)
+		//// create quasi locator
+		//quasi := utils.CreateQuasiLocator(uint64(len(message.payloadInBytes)))
+		//// pass uint4 length of locator
+		//session.PutUint(len(quasi), 4, true, true)
+		//// pass locator as clr
+		//session.PutBytes(quasi...)
+		//// pass data as clr
+		//session.PutClr(message.payloadInBytes)
 	}
 	err := session.Write()
 	if err != nil {

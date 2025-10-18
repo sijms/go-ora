@@ -1,11 +1,12 @@
-package json
+package oson
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/sijms/go-ora/v2/types"
 	"reflect"
+
+	"github.com/sijms/go-ora/v2/types"
 )
 
 type ArrayField struct {

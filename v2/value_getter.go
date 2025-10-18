@@ -4,10 +4,11 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/utils"
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/sijms/go-ora/v2/utils"
 )
 
 // ======== get primitive data from original data types ========//
@@ -161,6 +162,27 @@ func getVector(col interface{}) (*Vector, error) {
 		return &val, nil
 	default:
 		return nil, errors.New("conversion of unsupported type to Vector")
+	}
+}
+func getJson(col interface{}) (*Json, error) {
+	var err error
+	col, err = getValue(col)
+	if err != nil {
+		return nil, err
+	}
+	if col == nil {
+		return nil, nil
+	}
+	switch val := col.(type) {
+	case Json:
+		err = val.encode()
+		if err != nil {
+			return nil, err
+		}
+		val.lob.sourceLocator = utils.CreateQuasiLocator(uint64(len(val.bValue)))
+		return &val, nil
+	default:
+		return nil, errors.New("conversion of unsupported type to Json")
 	}
 }
 

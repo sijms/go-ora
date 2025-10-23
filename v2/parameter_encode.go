@@ -531,7 +531,8 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 	case *Json:
 		buffer := bytes.Buffer{}
 		conn.session.WriteUint(&buffer, len(value.lob.sourceLocator), 4, true, true)
-		conn.session.WriteClr(&buffer, value.lob.sourceLocator)
+		//conn.session.WriteClr(&buffer, value.lob.sourceLocator)
+		conn.session.WriteBytes(&buffer, value.lob.sourceLocator...)
 		conn.session.WriteClr(&buffer, value.bValue)
 		par.BValue = buffer.Bytes()
 	case *BFile:

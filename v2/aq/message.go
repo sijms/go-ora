@@ -1,9 +1,10 @@
 package aq
 
 import (
+	"time"
+
 	"github.com/sijms/go-ora/v2/converters"
 	"github.com/sijms/go-ora/v2/network"
-	"time"
 )
 
 var XMLTYPE_TOID = []byte{
@@ -277,7 +278,7 @@ func (message *Message) write(session *network.Session) {
 		session.PutBytes(0)
 	}
 	if session.TTCVersion >= 16 {
-		session.PutUint(message.shareNum, 4, true, true)
+		session.PutUint(message.shareNum, 2, true, true)
 	}
 }
 

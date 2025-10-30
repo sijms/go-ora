@@ -1197,7 +1197,16 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 }
 
 func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	if conn.State != Opened {
+	if conn.State != Opened || !conn.session.Connected {
+		if !conn.session.Connected {
+			t := time.Now().Local()
+			err := conn.OpenWithContext(ctx)
+			if err != nil {
+				fmt.Printf("[%s][oracle] bad connection, reconnect error [ela: %v][err: %v]\n", time.Now().Format("2006-01-02 15:04:05.000"), time.Since(t), err)
+			} else {
+				fmt.Printf("[%s][oracle] bad connection, reconnect successful [ela: %v]\n", time.Now().Format("2006-01-02 15:04:05.000"), time.Since(t))
+			}
+		}
 		return nil, driver.ErrBadConn
 	}
 	conn.tracer.Print("Prepare With Context\n", query)

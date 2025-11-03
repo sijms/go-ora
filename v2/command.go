@@ -1233,45 +1233,6 @@ func (stmt *defaultStmt) Close() error {
 	return err
 }
 
-// func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-// 	if stmt.connection.State != Opened {
-// 		stmt.connection.setBad()
-// 		return nil, driver.ErrBadConn
-// 	}
-// 	tracer := stmt.connection.tracer
-// 	tracer.Printf("Exec With Context:")
-// 	done := stmt.connection.session.StartContext(ctx)
-// 	defer stmt.connection.session.EndContext(done)
-// 	tracer.Printf("Exec:\n%s", stmt.text)
-// 	stmt.arrayBindCount = 0
-// 	result, err := stmt._exec(args)
-// 	if errors.Is(err, network.ErrConnReset) {
-// 		if stmt._hasReturnClause {
-// 			dataSet := &DataSet{}
-// 			err = stmt.read(dataSet.currentResultSet())
-// 			if !errors.Is(err, network.ErrConnReset) {
-// 				if isBadConn(err) {
-// 					stmt.connection.setBad()
-// 				}
-// 				return nil, err
-// 			}
-// 		}
-// 		err = stmt.connection.read()
-// 		session := stmt.connection.session
-// 		if session.Summary != nil {
-// 			stmt.cursorID = session.Summary.CursorID
-// 		}
-// 	}
-// 	if err != nil {
-// 		if isBadConn(err) {
-// 			// tracer.Print("Error: ", err)
-// 			stmt.connection.setBad()
-// 		}
-// 		return nil, err
-// 	}
-// 	return result, nil
-// }
-
 func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
@@ -2042,19 +2003,6 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	}
 	return dataSet, nil
 }
-
-// func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
-// 	if stmt.connection.State != Opened {
-// 		stmt.connection.setBad()
-// 		return nil, driver.ErrBadConn
-// 	}
-// 	tracer := stmt.connection.tracer
-// 	tracer.Print("Query With Context:", stmt.text)
-
-// 	done := stmt.connection.session.StartContext(ctx)
-// 	defer stmt.connection.session.EndContext(done)
-// 	return stmt.Query_(namedArgs)
-// }
 
 func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
 	if stmt.connection.State != Opened {

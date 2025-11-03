@@ -210,9 +210,9 @@ func (session *Session) StartContext(ctx context.Context) chan struct{} {
 			case <-done:
 				return
 			default:
-				session.mu.Lock()
+				mu.Lock()
 				connected := session.Connected
-				session.mu.Unlock()
+				mu.Unlock()
 				if connected {
 					if err = session.BreakConnection(); err != nil {
 						tracer.Print("Connection Break Error: ", err)

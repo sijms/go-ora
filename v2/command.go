@@ -1008,30 +1008,8 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				if err != nil {
 					return err
 				}
-
 				stmt.multiSet = append(stmt.multiSet, cursor)
-				// what we will do with cursor?
 			}
-			//for _, cursor := range cursors {
-			//	err = cursor.Close()
-			//	if err != nil {
-			//		return err
-			//	}
-			//}
-			//return errors.New("stmt read facing code: 27 (returning multiple ref cursor) still not implemented")
-			// internal List<TTCResultSet> ProcessImplicitResultSet(
-			// ref List<TTCResultSet> implicitRSList)
-			// {
-			// int num = (int) this.m_marshallingEngine.UnmarshalUB4();
-			// TTCRefCursorAccessor refCursorAccessor = new TTCRefCursorAccessor((ColumnDescribeInfo) null, this.m_marshallingEngine);
-			// for (int index = 0; index < num; ++index)
-			// refCursorAccessor.UnmarshalOneRow();
-			// if (implicitRSList != null)
-			// implicitRSList.AddRange((IEnumerable<TTCResultSet>) refCursorAccessor.m_TTCResultSetList);
-			// else
-			// implicitRSList = refCursorAccessor.m_TTCResultSetList;
-			// return implicitRSList;
-			// }
 		default:
 			err = stmt.connection.processTCCResponse(msg)
 			if err != nil {
@@ -2022,8 +2000,8 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 	}
 	// deal with multiSet
 	if len(stmt.multiSet) > 0 {
-		for _, cursor := range stmt.multiSet {
-			tempSet, err := cursor.Query()
+		for index, _ := range stmt.multiSet {
+			tempSet, err := stmt.multiSet[index].Query()
 			if err != nil {
 				return nil, err
 			}

@@ -381,7 +381,7 @@ func isArrayValue(val interface{}) bool {
 func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]byte) error {
 	session := conn.session
 	if parent.parent == nil {
-		newState := network.SessionState{InBuffer: parent.BValue}
+		newState := network.SessionState{InBuffer: *bytes.NewBuffer(parent.BValue)}
 		session.SaveState(&newState)
 		defer session.LoadState()
 		objectType, err := session.GetByte()
@@ -503,11 +503,11 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 				attrib.parent = parent
 				// check if this an object or array and comming value is nil
 				if attrib.DataType == XMLType {
-					temp, err := session.Peek(1)
+					temp, err := session.Peek()
 					if err != nil {
 						return err
 					}
-					if temp[0] == 0xFD || temp[0] == 0xFF {
+					if temp == 0xFD || temp == 0xFF {
 						_, err = session.GetByte()
 						if err != nil {
 							return err
@@ -554,11 +554,11 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 			attrib.parent = parent
 			// check if this an object or array and comming value is nil
 			if attrib.DataType == XMLType {
-				temp, err := session.Peek(1)
+				temp, err := session.Peek()
 				if err != nil {
 					return err
 				}
-				if temp[0] == 0xFD || temp[0] == 0xFF {
+				if temp == 0xFD || temp == 0xFF {
 					_, err = session.GetByte()
 					if err != nil {
 						return err

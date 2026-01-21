@@ -395,6 +395,18 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		}
 	case OCIClobLocator:
 		fallthrough
+	case OCIBlobLocator:
+		var temp *Lob
+		temp, err = getLob(val, connection)
+		if err != nil {
+			return err
+		}
+		par.iPrimValue = temp
+		if temp == nil {
+			par.MaxLen = 1
+			par.iPrimValue = nil
+			par.IsNull = true
+		}
 	case VECTOR:
 		temp, err := getVector(val)
 		if err != nil {
@@ -413,18 +425,6 @@ func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 		par.iPrimValue = temp
 		if temp == nil {
 			par.MaxLen = 1
-			par.IsNull = true
-		}
-	case OCIBlobLocator:
-		var temp *Lob
-		temp, err = getLob(val, connection)
-		if err != nil {
-			return err
-		}
-		par.iPrimValue = temp
-		if temp == nil {
-			par.MaxLen = 1
-			par.iPrimValue = nil
 			par.IsNull = true
 		}
 	case OCIFileLocator:

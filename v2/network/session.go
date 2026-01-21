@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"reflect"
 	"strconv"
@@ -37,7 +38,7 @@ type Data interface {
 type SessionState struct {
 	summary   *SummaryObject
 	sendPcks  []PacketInterface
-	InBuffer  []byte
+	InBuffer  bytes.Buffer
 	OutBuffer bytes.Buffer
 	index     int
 }
@@ -51,10 +52,10 @@ type Session struct {
 	lastPacket     bytes.Buffer
 	Context        *SessionContext
 	sendPcks       []PacketInterface
-	inBuffer       []byte
+	inBuffer       bytes.Buffer
 	outBuffer      bytes.Buffer
-	index          int
-	breakIndex     int
+	//index          int
+	breakIndex int
 	// doneContext       []chan struct{}
 	TimeZone          []byte
 	TTCVersion        uint8
@@ -89,9 +90,9 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 	}
 	return &Session{
 		// ctx:        context.Background(),
-		conn:       nil,
-		inBuffer:   input,
-		index:      0,
+		conn:     nil,
+		inBuffer: *bytes.NewBuffer(input),
+		//index:      0,
 		lastPacket: bytes.Buffer{},
 		// connOption:      *connOption,
 		Context:         NewSessionContext(options),
@@ -105,9 +106,9 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 func NewSession(config *configurations.ConnectionConfig, tracer trace.Tracer) *Session {
 	return &Session{
 		// ctx:             context.Background(),
-		conn:            nil,
-		inBuffer:        nil,
-		index:           0,
+		conn:     nil,
+		inBuffer: bytes.Buffer{},
+		//index:           0,
 		Context:         NewSessionContext(config),
 		Summary:         nil,
 		UseBigClrChunks: false,
@@ -127,20 +128,20 @@ func (session *Session) SaveState(newState *SessionState) {
 		sendPcks:  session.sendPcks,
 		InBuffer:  session.inBuffer,
 		OutBuffer: session.outBuffer,
-		index:     session.index,
+		//index:     session.index,
 	})
 	if newState == nil {
 		session.Summary = nil
 		session.sendPcks = nil
-		session.inBuffer = nil
+		session.inBuffer = bytes.Buffer{}
 		session.outBuffer = bytes.Buffer{}
-		session.index = 0
+		//session.index = 0
 	} else {
 		session.Summary = newState.summary
 		session.sendPcks = newState.sendPcks
 		session.inBuffer = newState.InBuffer
 		session.outBuffer = newState.OutBuffer
-		session.index = newState.index
+		//session.index = newState.index
 	}
 }
 
@@ -157,7 +158,7 @@ func (session *Session) LoadState() (oldState *SessionState) {
 		session.sendPcks = currentState.sendPcks
 		session.inBuffer = currentState.InBuffer
 		session.outBuffer = currentState.OutBuffer
-		session.index = currentState.index
+		//session.index = currentState.index
 		if index == 0 {
 			session.states = nil
 		} else {
@@ -175,8 +176,9 @@ func (session *Session) resetWrite() {
 }
 
 func (session *Session) resetRead() {
-	session.inBuffer = nil
-	session.index = 0
+	session.inBuffer.Reset()
+	//session.inBuffer = nil
+	//session.index = 0
 }
 
 // ResetBuffer empty in and out buffer and set read index to 0
@@ -439,13 +441,13 @@ func (session *Session) IsBreak() bool {
 // 	return session.readPacket()
 // }
 
-func (session *Session) RestoreIndex() bool {
-	if session.index < session.breakIndex {
-		session.index = session.breakIndex
-		return true
-	}
-	return false
-}
+//func (session *Session) RestoreIndex() bool {
+//	if session.index < session.breakIndex {
+//		session.index = session.breakIndex
+//		return true
+//	}
+//	return false
+//}
 
 // BreakConnection elicit connection break to cancel the current operation
 func (session *Session) BreakConnection() error {
@@ -741,7 +743,6 @@ func (session *Session) processMarker() error {
 
 	return nil
 	// breakConn, resetConn := false, false
-
 	// switch input.markerType {
 	// case 0:
 	// 	breakConn = true
@@ -781,11 +782,12 @@ func (session *Session) processMarker() error {
 	// }
 }
 
-func (session *Session) Peek(numBytes int) ([]byte, error) {
-	oldIndex := session.index
-	ret, err := session.read(numBytes)
-	session.index = oldIndex
-	return ret, err
+func (session *Session) Peek() (uint8, error) {
+	ret, err := session.GetByte()
+	if err != nil {
+		return 0, err
+	}
+	return ret, session.inBuffer.UnreadByte()
 }
 
 // Read numBytes of data from input buffer if requested data is larger
@@ -794,22 +796,20 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 	var err error
 	var pck PacketInterface
 
-	requiredLen := numBytes
+	//requiredLen := numBytes
+	ret := make([]byte, numBytes)
+	index := 0
+	actualRead, err := session.inBuffer.Read(ret)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	numBytes -= actualRead
+	index += actualRead
+	for numBytes > 0 {
+		// this mean we need to add more data in the buffer
 
-	// first discard remaining bytes
-	// if session.remainingBytes > 0 {
-	// 	_, err = session.readPacket()
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// }
-	for session.index+numBytes > len(session.inBuffer) {
 		// if break connection send break message
 		if session.IsBreak() {
-			// _, err = session.BreakConnection()
-			// if err != nil {
-			// 	return nil, err
-			// }
 			session.ResetBreak()
 		}
 		pck, err = session.readPacket()
@@ -828,83 +828,30 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 			// }
 			return nil, err
 		}
-
-		// if session.IsBreak() {
-		// 	for pck == nil {
-		// 		pck, err = session.readPacket()
-		// 		if err != nil {
-		// 			return nil, err
-		// 		}
-		// 	}
-		// } else {
-		// 	if pck == nil {
-		// 		continue
-		// 	}
-		// }
+		// pck == nil means successful read data packet
 		if pck == nil {
+			actualRead, err = session.inBuffer.Read(ret[index:])
+			numBytes -= actualRead
+			index += actualRead
 			continue
 		}
 		if _, ok := pck.(*MarkerPacket); ok {
-			session.breakIndex = len(session.inBuffer)
+			//session.breakIndex = len(session.inBuffer)
 			err = session.processMarker()
 			if err != nil {
 				return nil, err
 			}
-			session.index = session.breakIndex
+			//session.index = session.breakIndex
 			// session.ResetBreak()
 			return nil, ErrConnReset
-		} else {
-			return nil, fmt.Errorf("receive abnormal packet type %d instead of data packet", pck.getPacketType())
 		}
-		// pcks := []PacketInterface{pck}
-		// for _, pck := range pcks {
-		// 	if dataPck, ok := pck.(*DataPacket); ok {
-		// 		session.inBuffer = append(session.inBuffer, dataPck.buffer...)
-		// 	} else {
-		// 		return nil, errors.New("the packet received is not data packet")
-		// 	}
-		// }
-		// if session.IsBreak() {
-		// 	if session.index+numBytes > len(session.inBuffer) {
-		// 		numBytes = len(session.inBuffer) - session.index
-		// 	}
-		// 	break
-		// }
+		return nil, fmt.Errorf("receive abnormal packet type %d instead of data packet", pck.getPacketType())
 	}
-	// for session.index+numBytes > len(session.inBuffer) {
-	// 	tempPck, err := session.readPacket()
-	// 	if err != nil {
-	// 		if e, ok := err.(net.Error); ok && e.Timeout() {
-	// 			session.Context.connConfig.Tracer.Print("Read Timeout")
-	// 			var breakErr error
-	// 			tempPck, breakErr = session.BreakConnection()
-	// 			if breakErr != nil {
-	// 				// return nil, err
-	// 				session.Context.connConfig.Tracer.Print("Connection Break With Error: ", breakErr)
-	// 				return nil, err
-	// 			}
-	// 		} else {
-	// 			return nil, err
-	// 		}
-	// 	}
-	// 	loop := true
-	// 	for loop {
-	// 		switch pck := tempPck.(type) {
-	// 		case *DataPacket:
-	// 			session.inBuffer = append(session.inBuffer, pck.buffer...)
-	// 			loop = false
-	// 		case *MarkerPacket:
-	// 			tempPck, err = session.resetConnection()
-	// 		default:
-	// 			return nil, errors.New("the packet received is not data packet")
-	// 		}
-	// 	}
-	// }
-	ret := session.inBuffer[session.index : session.index+numBytes]
-	session.index += numBytes
-	if len(ret) < requiredLen {
-		return nil, errors.New("buffer under-run during read operation")
-	}
+	//ret := session.inBuffer[session.index : session.index+numBytes]
+	//session.index += numBytes
+	//if len(ret) < requiredLen {
+	//	return nil, errors.New("buffer under-run during read operation")
+	//}
 	return ret, nil
 }
 
@@ -1061,23 +1008,6 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			}
 			return nil
 		}
-		// for _, pck := range session.sendPcks {
-		// 	//log.Printf("Request: %#v\n\n", pck.bytes())
-		// 	err := session.initWrite()
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// 	if session.sslConn != nil {
-		// 		_, err = session.sslConn.Write(pck.bytes())
-		// 	} else if session.conn != nil {
-		// 		_, err = session.conn.Write(pck.bytes())
-		// 	} else {
-		// 		return nil, errors.New("attempt to write on closed connection")
-		// 	}
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// }
 		err = resend()
 		if err != nil {
 			return nil, err
@@ -1123,234 +1053,12 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				session.Disconnect()
 				err = driver.ErrBadConn
 			}
-			session.inBuffer = append(session.inBuffer, dataPck.buffer...)
+			_, err = session.inBuffer.Write(dataPck.buffer)
+			//session.inBuffer = append(session.inBuffer, dataPck.buffer...)
 		}
 		return nil, err
 	case MARKER:
 		return newMarkerPacketFromData(packetData, session.Context), nil
-		// switch pck.markerType {
-		// case 0:
-		// 	session.breakConn = true
-		// case 1:
-		// 	if pck.markerData == 2 {
-		// 		session.resetConn = true
-		// 	} else {
-		// 		session.breakConn = true
-		// 	}
-		// default:
-		// 	return nil, errors.New("unknown marker type")
-		// }
-		// trials := 1
-		// for session.breakConn && !session.resetConn {
-		// 	if trials > 5 {
-		// 		return nil, errors.New("connection break")
-		// 	}
-		// 	packetData, err = readPacketData()
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// 	pck = newMarkerPacketFromData(packetData, session.Context)
-		// 	if pck == nil {
-		// 		return nil, errors.New("connection break")
-		// 	}
-		// 	switch pck.markerType {
-		// 	case 0:
-		// 		session.breakConn = true
-		// 	case 1:
-		// 		if pck.markerData == 2 {
-		// 			session.resetConn = true
-		// 		} else {
-		// 			session.breakConn = true
-		// 		}
-		// 	default:
-		// 		return nil, errors.New("unknown marker type")
-		// 	}
-		// 	trials++
-		// }
-		// session.ResetBuffer()
-		// err = session.writePacket(newMarkerPacket(2, session.Context))
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// if session.resetConn && session.Context.AdvancedService.HashAlgo != nil {
-		// 	err = session.Context.AdvancedService.HashAlgo.Init()
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// }
-		// if session.resetConn && session.Context.AdvancedService.CryptAlgo != nil {
-		// 	err = session.Context.AdvancedService.CryptAlgo.Reset()
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// }
-		// session.breakConn = false
-		// session.resetConn = false
-		// // return nil, ErrConnectionReset
-		// packetData, err = readPacketData()
-		// if err != nil {
-		//	return nil, err
-		// }
-		// dataPck, err := newDataPacketFromData(packetData, session.Context)
-		// //session.breakConn = true
-		// return dataPck, err
-		// return newMarkerPacketFromData(packetData, session.Context), nil
-		// switch pck.markerType {
-		// case 0:
-		// 	session.breakConn = true
-		// case 1:
-		// 	if pck.markerData == 2 {
-		// 		session.resetConn = true
-		// 	} else {
-		// 		session.breakConn = true
-		// 	}
-		// default:
-		// 	return nil, errors.New("unknown marker type")
-		// }
-		// trials := 1
-		// for session.breakConn && !session.resetConn {
-		// 	// if trials > 3 {
-		// 	// 	return nil, errors.New("connection break")
-		// 	// }
-		// 	packetData, err = readPacketData()
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// 	pck = newMarkerPacketFromData(packetData, session.Context)
-		// 	if pck == nil {
-		// 		return nil, errors.New("connection break")
-		// 	}
-		// 	switch pck.markerType {
-		// 	case 0:
-		// 		session.breakConn = true
-		// 	case 1:
-		// 		if pck.markerData == 2 {
-		// 			session.resetConn = true
-		// 		} else {
-		// 			session.breakConn = true
-		// 		}
-		// 	default:
-		// 		return nil, errors.New("unknown marker type")
-		// 	}
-		// 	trials++
-		// }
-		// session.ResetBuffer()
-		// err = session.writePacket(newMarkerPacket(2, session.Context))
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// if session.resetConn && session.Context.AdvancedService.HashAlgo != nil {
-		// 	err = session.Context.AdvancedService.HashAlgo.Init()
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// }
-		// if session.resetConn && session.Context.AdvancedService.CryptAlgo != nil {
-		// 	err = session.Context.AdvancedService.CryptAlgo.Reset()
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// }
-		// session.breakConn = false
-		// session.resetConn = false
-		// //return nil, ErrConnectionReset
-		// packetData, err = readPacketData()
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// dataPck, err := newDataPacketFromData(packetData, session.Context)
-		// return dataPck, err
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// if dataPck == nil {
-		// 	return nil, errors.New("connection break")
-		// }
-		//
-		// session.inBuffer = dataPck.buffer
-		// session.index = 0
-		// loop := true
-		// for loop {
-		// 	msg, err := session.GetByte()
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// 	switch msg {
-		// 	case 4:
-		// 		loop = false
-		// 		session.Summary, err = NewSummary(session)
-		// 		if err != nil {
-		// 			return nil, err
-		// 		}
-		// 		if session.HasError() {
-		// 			return nil, session.GetError()
-		// 		}
-		// 	case 8:
-		// 		size, err := session.GetInt(2, true, true)
-		// 		if err != nil {
-		// 			return nil, err
-		// 		}
-		// 		for x := 0; x < 2; x++ {
-		// 			_, err = session.GetInt(4, true, true)
-		// 			if err != nil {
-		// 				return nil, err
-		// 			}
-		// 		}
-		// 		for x := 2; x < size; x++ {
-		// 			_, err = session.GetInt(4, true, true)
-		// 			if err != nil {
-		// 				return nil, err
-		// 			}
-		// 		}
-		// 		_, err = session.GetInt(2, true, true)
-		// 		if err != nil {
-		//			return nil, err
-		// 		}
-		// 		size, err = session.GetInt(2, true, true)
-		// 		for x := 0; x < size; x++ {
-		// 			_, val, num, err := session.GetKeyVal()
-		// 			if err != nil {
-		// 				return nil, err
-		// 			}
-		// 			if num == 163 {
-		// 				session.TimeZone = val
-		// 			}
-		// 		}
-		// 		if session.TTCVersion >= 4 {
-		// 			// get queryID
-		// 			size, err = session.GetInt(4, true, true)
-		// 			if err != nil {
-		// 				return nil, err
-		// 			}
-		// 			if size > 0 {
-		// 				bty, err := session.GetBytes(size)
-		// 				if err != nil {
-		// 					return nil, err
-		// 				}
-		// 				if len(bty) >= 8 {
-		// 					queryID := binary.LittleEndian.Uint64(bty[size-8:])
-		// 					fmt.Println("query ID: ", queryID)
-		// 				}
-		// 			}
-		// 		}
-		// 		if session.TTCVersion >= 7 {
-		// 			length, err := session.GetInt(4, true, true)
-		// 			if err != nil {
-		// 				return nil, err
-		// 			}
-		// 			for i := 0; i < length; i++ {
-		// 				_, err = session.GetInt(8, true, true)
-		// 				if err != nil {
-		// 					return nil, err
-		// 				}
-		// 			}
-		// 		}
-		// 	default:
-		// 		return nil, errors.New(fmt.Sprintf("TTC error: received code %d during stmt reading", msg))
-		// 	}
-		//
-		// }
-		// fallthrough
 	default:
 		// fmt.Printf("Packet Data: %#v\n", packetData)
 		return nil, fmt.Errorf("unsupported packet type: %d", pckType)
@@ -1638,19 +1346,20 @@ func (session *Session) GetInt(size int, compress bool, bigEndian bool) (int, er
 
 // GetNullTermString read a null terminated string from input buffer
 func (session *Session) GetNullTermString(maxSize int) (result string, err error) {
-	oldIndex := session.index
-	temp, err := session.read(maxSize)
-	if err != nil {
-		return
-	}
-	find := bytes.Index(temp, []byte{0})
-	if find > 0 {
-		result = string(temp[:find])
-		session.index = oldIndex + find + 1
-	} else {
-		result = string(temp)
-	}
-	return
+	return session.inBuffer.ReadString(0)
+	//oldIndex := session.index
+	//temp, err := session.read(maxSize)
+	//if err != nil {
+	//	return
+	//}
+	//find := bytes.Index(temp, []byte{0})
+	//if find > 0 {
+	//	result = string(temp[:find])
+	//	session.index = oldIndex + find + 1
+	//} else {
+	//	result = string(temp)
+	//}
+	//return
 }
 
 // GetClr reed variable length bytearray from input buffer

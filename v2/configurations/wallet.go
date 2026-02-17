@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -39,12 +40,24 @@ type WalletCredential struct {
 	password string
 }
 
-// newWallet create new Wallet object from file path
+// NewWallet create new Wallet object from file path
 func NewWallet(filePath string) (*Wallet, error) {
 	ret := new(Wallet)
 	ret.file = filePath
 	err := ret.read()
 	return ret, err
+}
+
+// NewWalletFromReader creates a new Wallet object from an io.Reader containing cwallet.sso data.
+// This allows loading wallets from embedded files, remote sources, or any io.Reader.
+// For file-based wallets, use NewWallet() instead.
+func NewWalletFromReader(r io.Reader) (*Wallet, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read wallet data: %w", err)
+	}
+	ret := new(Wallet)
+	return ret, ret.readFromBytes(data)
 }
 
 // read will read the file data decrypting file chunk to get Wallet information
@@ -53,6 +66,17 @@ func (w *Wallet) read() error {
 	if err != nil {
 		return err
 	}
+	return w.readFromBytes(fileData)
+}
+
+// readFromBytes processes wallet data from a byte slice.
+// This is the internal implementation used by both file-based and reader-based loading.
+func (w *Wallet) readFromBytes(fileData []byte) error {
+	// Check minimum size for wallet header
+	if len(fileData) < 12 {
+		return errors.New("wallet data too small")
+	}
+
 	index := 0
 	if !bytes.Equal(fileData[index:index+3], []byte{161, 248, 78}) {
 		return errors.New("TCPS: Invalid SSL Wallet (Magic)")
@@ -147,7 +171,7 @@ func (w *Wallet) read() error {
 	} else {
 		return errors.New("invalid Wallet header")
 	}
-	err = w.readPKCS12(fileData[index:])
+	err := w.readPKCS12(fileData[index:])
 	if err != nil {
 		if autoLoginLocal {
 			return fmt.Errorf("can't read Wallet with auto login local properties: %v", err)

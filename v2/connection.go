@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"regexp"
@@ -141,6 +142,7 @@ type OracleConnector struct {
 	dialer        configurations.DialerContext
 	tlsConfig     *tls.Config
 	kerberos      configurations.KerberosAuthInterface
+	wallet        *configurations.Wallet
 }
 
 func NewConnector(connString string) driver.Connector {
@@ -158,12 +160,16 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 		return nil, err
 	}
 	conn.cusTyp = connector.drv.cusTyp
-	if connector.drv.sStrConv != nil {
-		conn.sStrConv = connector.drv.sStrConv.Clone()
-	}
-	if connector.drv.nStrConv != nil {
-		conn.nStrConv = connector.drv.nStrConv.Clone()
-	}
+	//"TCP negotiation for character set updates fails when multiple database connections 
+	// with varying encodings coexist in the same process, 
+	// due to the cloning of the character converter."
+	// eg. Chinese GBK and UTF8
+	// if connector.drv.sStrConv != nil {
+	// 	conn.sStrConv = connector.drv.sStrConv.Clone()
+	// }
+	// if connector.drv.nStrConv != nil {
+	// 	conn.nStrConv = connector.drv.nStrConv.Clone()
+	// }
 	if conn.connOption.Dialer == nil {
 		conn.connOption.Dialer = connector.dialer
 	}
@@ -172,6 +178,9 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	}
 	if conn.connOption.Kerberos == nil {
 		conn.connOption.Kerberos = connector.kerberos
+	}
+	if conn.connOption.Wallet == nil && connector.wallet != nil {
+		conn.connOption.Wallet = connector.wallet
 	}
 	err = conn.OpenWithContext(ctx)
 	if err != nil {
@@ -194,6 +203,15 @@ func (connector *OracleConnector) Dialer(dialer configurations.DialerContext) {
 
 func (connector *OracleConnector) WithTLSConfig(config *tls.Config) {
 	connector.tlsConfig = config
+}
+
+func (connector *OracleConnector) WithWallet(reader io.Reader) error {
+	wallet, err := configurations.NewWalletFromReader(reader)
+	if err != nil {
+		return err
+	}
+	connector.wallet = wallet
+	return nil
 }
 
 // WithKerberosAuth sets the Kerberos authenticator to be used by this connector. It does not enable the Kerberos; set AUTH TYPE to KERBEROS to do so.
@@ -1379,11 +1397,18 @@ func (conn *Connection) setBad() {
 	conn.bad = true
 }
 
+// ResetSession decides responsible for resetting a connection. Part of a keepConnOnRollback condition to decide if to keep a transaction after rollback.
 func (conn *Connection) ResetSession(_ context.Context) error {
 	if conn.bad {
 		return driver.ErrBadConn
 	}
 	return nil
+}
+
+// IsValid validates if a connection has to be discarded. Part of a keepConnOnRollback condition to decide if to keep a transaction after rollback.
+func (conn *Connection) IsValid() bool {
+	// Connection is valid if it's not marked as bad and is in opened state
+	return !conn.bad && conn.State == Opened
 }
 
 func (conn *Connection) dataTypeNegotiation() error {

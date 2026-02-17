@@ -139,12 +139,16 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 		return nil, err
 	}
 	conn.cusTyp = connector.drv.cusTyp
-	if connector.drv.sStrConv != nil {
-		conn.sStrConv = connector.drv.sStrConv.Clone()
-	}
-	if connector.drv.nStrConv != nil {
-		conn.nStrConv = connector.drv.nStrConv.Clone()
-	}
+	//"TCP negotiation for character set updates fails when multiple database connections 
+	// with varying encodings coexist in the same process, 
+	// due to the cloning of the character converter."
+	// eg. Chinese GBK and UTF8
+	// if connector.drv.sStrConv != nil {
+	// 	conn.sStrConv = connector.drv.sStrConv.Clone()
+	// }
+	// if connector.drv.nStrConv != nil {
+	// 	conn.nStrConv = connector.drv.nStrConv.Clone()
+	// }
 	if conn.connOption.Dialer == nil {
 		conn.connOption.Dialer = connector.dialer
 	}

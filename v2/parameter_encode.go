@@ -605,7 +605,15 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 				switch attrib.DataType {
 				case XMLType:
 					if attrib.cusType.isArray {
-						session.WriteFixedClr(&objectBuffer, attrib.BValue)
+						if attrib.IsNull {
+							// Null VARRAY/collection: write the null marker directly
+							// without length-prefix wrapping. WriteFixedClr would add
+							// an extra length byte (0x01) before 0xFF, which corrupts
+							// the Oracle wire format for null collections.
+							objectBuffer.Write(attrib.BValue)
+						} else {
+							session.WriteFixedClr(&objectBuffer, attrib.BValue)
+						}
 					} else {
 						objectBuffer.Write(attrib.BValue)
 					}

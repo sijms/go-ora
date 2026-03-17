@@ -3,6 +3,7 @@ package go_ora
 import (
 	"bytes"
 	"database/sql/driver"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"reflect"
@@ -605,7 +606,23 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 				switch attrib.DataType {
 				case XMLType:
 					if attrib.cusType.isArray {
-						session.WriteFixedClr(&objectBuffer, attrib.BValue)
+						if attrib.IsNull {
+							// Null VARRAY/collection: write the null marker directly
+							// without length-prefix wrapping. WriteFixedClr would add
+							// an extra length byte (0x01) before 0xFF, which corrupts
+							// the Oracle wire format for null collections.
+							objectBuffer.Write(attrib.BValue)
+						} else {
+							// Use Oracle's object image length encoding for VARRAY
+							// data inside UDT objects. WriteFixedClr uses TNS CLR
+							// encoding (0xFE + compressed varint) which Oracle's KOPI
+							// deserializer cannot parse for data > 252 bytes, causing
+							// ORA-00600 [kopi2_readlen083]. The correct format uses
+							// 0xFF + 4-byte big-endian length, matching the encoding
+							// used by python-oracledb (DbObjectPickleBuffer.write_length).
+							// For data <= 245 bytes both formats produce identical output.
+							writeObjImageBytes(&objectBuffer, attrib.BValue)
+						}
 					} else {
 						objectBuffer.Write(attrib.BValue)
 					}
@@ -626,6 +643,28 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 		return fmt.Errorf("unsupported primitive type: %v", reflect.TypeOf(par.iPrimValue).Name())
 	}
 	return nil
+}
+
+// writeObjImageBytes writes data with Oracle's object image length encoding.
+// This is the correct format for VARRAY/collection data inside UDT objects:
+//   - data <= 245 bytes: [1-byte length] [data]
+//   - data > 245 bytes:  [0xFF] [4-byte big-endian length] [data]
+//
+// This differs from WriteFixedClr which uses TNS CLR encoding (0xFE marker
+// with compressed varint length). Oracle's KOPI object deserializer expects
+// the object image format, not CLR, for nested collection attributes.
+// Reference: python-oracledb DbObjectPickleBuffer.write_length()
+func writeObjImageBytes(buf *bytes.Buffer, data []byte) {
+	n := len(data)
+	if n <= 245 {
+		buf.WriteByte(byte(n))
+	} else {
+		buf.WriteByte(0xFF)
+		temp := make([]byte, 4)
+		binary.BigEndian.PutUint32(temp, uint32(n))
+		buf.Write(temp)
+	}
+	buf.Write(data)
 }
 
 func (par *ParameterInfo) init() {

@@ -11,6 +11,9 @@
       always ensure that you get latest release
     - See examples for more help
 ```
+### Powered by
+
+[![JetBrains logo.](https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.svg)](https://jb.gg/OpenSource)
 
 # Sponsors
 <p>

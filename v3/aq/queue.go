@@ -90,7 +90,7 @@ func (queue *Queue) NewMessage(data interface{}) (*Message, error) {
 func (queue *Queue) Enqueue(message *Message) error {
 	session := queue.session
 	session.ResetBuffer()
-	session.PutTTCFunc(0x79)
+	session.PutTTCFunc(0x3, 0x79)
 	queueNameBytes := session.StrConv.Encode(queue.Name)
 	if len(queueNameBytes) > 0 {
 		session.PutBytes(1)
@@ -233,7 +233,7 @@ func (queue *Queue) Dequeue(options *DequeueOptions) (*Message, error) {
 	outMsg := &Message{}
 	session := queue.session
 	session.ResetBuffer()
-	session.PutTTCFunc(0x7A)
+	session.PutTTCFunc(0x3, 0x7A)
 	queueNameBytes := session.StrConv.Encode(queue.Name)
 	if len(queueNameBytes) > 0 {
 		session.PutBytes(1)

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"github.com/sijms/go-ora/v3/converters"
 	oraTypes "github.com/sijms/go-ora/v3/types"
 )
+
+var truthy = []string{"true", "1"}
 
 // set null value from supported types
 func setNull(value reflect.Value) error {
@@ -145,7 +148,7 @@ func setString(value reflect.Value, input string) error {
 	}
 	tempFloat, err := strconv.ParseFloat(input, 64)
 	if err != nil {
-		floatErr = fmt.Errorf(`can't assign string "%v" to float variablle`, input)
+		floatErr = fmt.Errorf(`can't assign string "%v" to float variable`, input)
 	}
 	tempTime, err := time.Parse(time.RFC3339, input)
 	if err != nil {
@@ -177,7 +180,7 @@ func setString(value reflect.Value, input string) error {
 		}
 		value.Set(reflect.ValueOf(*tempNum))
 	case tyBool:
-		if strings.ToLower(input) == "true" {
+		if slices.Contains(truthy, strings.ToLower(input)) {
 			value.SetBool(true)
 		} else {
 			value.SetBool(false)
@@ -212,7 +215,7 @@ func setString(value reflect.Value, input string) error {
 		}
 		return floatErr
 	case tyNullBool:
-		temp := strings.ToLower(input) == "true"
+		temp := slices.Contains(truthy, strings.ToLower(input))
 		value.Set(reflect.ValueOf(sql.NullBool{Bool: temp, Valid: true}))
 	//case tyNVarChar:
 	//	value.Set(reflect.ValueOf(NVarChar(input)))
@@ -284,18 +287,19 @@ func setBytes(value reflect.Value, input []byte) error {
 	case tyNullNVarChar:
 		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(input), true}))
 	default:
-		if temp, ok := value.Interface().(sql.Scanner); ok {
-			if temp != nil && !reflect.ValueOf(temp).IsNil() {
-				return temp.Scan(input)
-			}
-		}
-		if value.CanAddr() {
-			if temp, ok := value.Addr().Interface().(sql.Scanner); ok {
-				err := temp.Scan(input)
-				return err
-			}
-		}
-		return fmt.Errorf("can not assign []byte to type: %v", value.Type().Name())
+		return setWithScanner(value, input)
+		//if temp, ok := value.Interface().(sql.Scanner); ok {
+		//	if temp != nil && !reflect.ValueOf(temp).IsNil() {
+		//		return temp.Scan(input)
+		//	}
+		//}
+		//if value.CanAddr() {
+		//	if temp, ok := value.Addr().Interface().(sql.Scanner); ok {
+		//		err := temp.Scan(input)
+		//		return err
+		//	}
+		//}
+		//return fmt.Errorf("can not assign []byte to type: %v", value.Type().Name())
 	}
 	return nil
 }
@@ -601,7 +605,6 @@ func setLob(value reflect.Value, input LobStream) error {
 //	}
 //	return nil
 //}
-
 //func setBFile(value reflect.Value, input BFile) error {
 //	if value.Kind() == reflect.Ptr {
 //		if value.IsNil() {

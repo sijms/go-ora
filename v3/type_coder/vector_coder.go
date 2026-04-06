@@ -22,6 +22,9 @@ func NewVectorEncoder(vector types.Vector) (OracleTypeEncoder, error) {
 	ret := new(VectorCoder)
 	ret.SetDefault()
 	ret.DataType = types.VECTOR
+	if vector == nil {
+		return ret, nil
+	}
 	if vector.VectorType() == types.VECTOR_NIL {
 		return ret, nil
 	}

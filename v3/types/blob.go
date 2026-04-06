@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 )
 
@@ -69,7 +70,23 @@ func (l *blob) Read(ctx context.Context) error {
 	l.data, err = l.ReadFromPos(ctx, 0)
 	return err
 }
-
+func (l *blob) CopyTo(dest driver.Value) error {
+	switch dst := dest.(type) {
+	case *[]byte:
+		*dst = l.data
+	case *string:
+		*dst = string(l.data)
+	case *sql.NullString:
+		if l.data == nil {
+			*dst = sql.NullString{Valid: false}
+		} else {
+			*dst = sql.NullString{String: string(l.data), Valid: true}
+		}
+	default:
+		return fmt.Errorf("cannot copy blob to variable of type %T ", dest)
+	}
+	return nil
+}
 func (l *blob) Scan(src interface{}) error {
 	var err error
 	if src == nil {

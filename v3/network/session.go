@@ -203,9 +203,9 @@ func (session *Session) StartContext(ctx context.Context) chan struct{} {
 			case <-done:
 				return
 			default:
-				session.mu.Lock()
+				mu.Lock()
 				connected := session.Connected
-				session.mu.Unlock()
+				mu.Unlock()
 				if connected {
 					if err = session.BreakConnection(); err != nil {
 						tracer.Print("Connection Break Error: ", err)
@@ -1031,14 +1031,14 @@ func (session *Session) readPacket() (PacketInterface, error) {
 }
 
 // PutTTCFunc write bytes that represent ttc function with specific code
-func (session *Session) PutTTCFunc(code uint8) {
+func (session *Session) PutTTCFunc(ttcCode, funcCode uint8) {
 	if session.ttcIndex == 0 || session.ttcIndex == 255 {
 		session.ttcIndex = 1
 	}
 	if session.TTCVersion >= 18 {
-		session.PutBytes(3, code, session.ttcIndex, 0)
+		session.PutBytes(ttcCode, funcCode, session.ttcIndex, 0)
 	} else {
-		session.PutBytes(3, code, session.ttcIndex)
+		session.PutBytes(ttcCode, funcCode, session.ttcIndex)
 	}
 	session.ttcIndex++
 }

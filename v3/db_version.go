@@ -22,7 +22,7 @@ type DBVersion struct {
 // database version from network session
 func GetDBVersion(session *network.Session) (*DBVersion, error) {
 	session.ResetBuffer()
-	session.PutTTCFunc(0x3B)
+	session.PutTTCFunc(0x3, 0x3B)
 	session.PutBytes(1)
 	// session.PutUint(1, 1, false, false)
 	session.PutUint(0x100, 2, true, true)

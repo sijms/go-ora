@@ -301,7 +301,7 @@ func (obj *AuthObject) Write() error {
 		index++
 	}
 	session.ResetBuffer()
-	session.PutTTCFunc(0x73)
+	session.PutTTCFunc(0x3, 0x73)
 	if len(connOption.UserID) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(connOption.UserID), 4, true, true)

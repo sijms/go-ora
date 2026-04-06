@@ -29,22 +29,36 @@ func getValue(origVal driver.Value) (driver.Value, error) {
 	return proVal.Interface(), nil
 }
 
+//	func setWithScanner(dest reflect.Value, input interface{}) error {
+//		if temp, ok := dest.Interface().(sql.Scanner); ok {
+//			if temp != nil && !reflect.ValueOf(temp).IsNil() {
+//				return temp.Scan(input)
+//			}
+//		}
+//		if dest.CanAddr() {
+//			if temp, ok := dest.Addr().Interface().(sql.Scanner); ok {
+//				err := temp.Scan(input)
+//				return err
+//			}
+//		}
+//		return fmt.Errorf("can't set %T to type: %v", input, dest.Type().Name())
+//	}
+//
 // get string value from supported types
 func getString(col interface{}) string {
-	if val, ok := col.(oraTypes.Clob); ok {
+	//if val, ok := col.(oraTypes.Clob); ok {
+	//	return val.Data().String
+	//}
+	// common types
+	switch val := col.(type) {
+	case oraTypes.Clob:
 		return val.Data().String
+	case *oraTypes.Clob:
+		return (*val).Data().String
 	}
 	col, _ = getValue(col)
 	if col == nil {
 		return ""
-	}
-	switch val := col.(type) {
-	case oraTypes.Clob:
-		return val.Data().String
-		//case Clob:
-		//	return val.String
-		//case NClob:
-		//	return val.String
 	}
 	if temp, ok := col.(string); ok {
 		return temp
@@ -129,8 +143,11 @@ func getDate(col interface{}) (time.Time, error) {
 // get []byte from supported types
 func getBytes(col interface{}) ([]byte, error) {
 	var err error
-	if val, ok := col.(oraTypes.Blob); ok {
+	switch val := col.(type) {
+	case oraTypes.Blob:
 		return val.Data(), nil
+	case *oraTypes.Blob:
+		return (*val).Data(), nil
 	}
 	col, err = getValue(col)
 	if err != nil {

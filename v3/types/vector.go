@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 )
@@ -284,6 +285,7 @@ func (v *vector) Scan(input interface{}) error {
 		}
 		v.Type = value.Type
 		v.data = value.data
+		v.decoder = value.decoder
 	default:
 		temp, err := CreateVector(value)
 		if err != nil {
@@ -295,6 +297,14 @@ func (v *vector) Scan(input interface{}) error {
 		}
 	}
 	return nil
+}
+func (v *vector) CopyTo(dest driver.Value) error {
+	//switch dst := dest.(type) {
+	//case *[]uint8:
+	//case *[]float32:
+	//case *[]float64:
+	//}
+	return fmt.Errorf("unsupported copy from vector to type %T", dest)
 }
 
 //func (vector *Vector) Value() (driver.Value, error) {

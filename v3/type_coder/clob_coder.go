@@ -102,6 +102,7 @@ func (coder *ClobCoder) DecodeClob(data []byte) (types.Clob, error) {
 	}
 	return types.NewClob(coder.streamer, coder.copy(), sql.NullString{Valid: true, String: charsetConv.Decode(data)}, false)
 }
+
 func (coder *ClobCoder) Decode(data []byte) (interface{}, error) {
 	if coder.streamer.GetLocator() == nil {
 		return nil, nil

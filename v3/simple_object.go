@@ -18,7 +18,7 @@ type simpleObject struct {
 func (obj *simpleObject) write() *simpleObject {
 	// obj.session.ResetBuffer()
 	session := obj.connection.session
-	session.PutTTCFunc(obj.operationID)
+	session.PutTTCFunc(0x3, obj.operationID)
 	if obj.data != nil {
 		session.PutBytes(obj.data...)
 	}

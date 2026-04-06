@@ -381,6 +381,20 @@ func (par *ParameterInfo) clone() ParameterInfo {
 }
 
 func (par *ParameterInfo) collectLocators() [][]byte {
+	var ret [][]byte = nil
+	if temp, ok := par.Value.(oraTypes.Lob); ok {
+		locator := temp.GetLocator()
+		if locator != nil {
+			ret = append(ret, locator)
+		}
+	}
+	if temp, ok := par.oPrimValue.(oraTypes.Lob); ok {
+		locator := temp.GetLocator()
+		if locator != nil {
+			ret = append(ret, locator)
+		}
+	}
+	return ret
 	//switch value := par.iPrimValue.(type) {
 	//case *Lob:
 	//	if value != nil && value.sourceLocator != nil {
@@ -397,7 +411,7 @@ func (par *ParameterInfo) collectLocators() [][]byte {
 	//	}
 	//	return output
 	//}
-	return [][]byte{}
+	//return [][]byte{}
 }
 
 func (par *ParameterInfo) isLongType() bool {

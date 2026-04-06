@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"regexp"
@@ -145,6 +146,7 @@ type OracleConnector struct {
 	dialer        configurations.DialerContext
 	tlsConfig     *tls.Config
 	kerberos      configurations.KerberosAuthInterface
+	wallet        *configurations.Wallet
 }
 
 func NewConnector(connString string) driver.Connector {
@@ -163,12 +165,16 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	}
 	conn.buildTypeDecodersMap(connector.drv)
 	conn.cusTyp = connector.drv.cusTyp
-	if connector.drv.sStrConv != nil {
-		conn.sStrConv = connector.drv.sStrConv.Clone()
-	}
-	if connector.drv.nStrConv != nil {
-		conn.nStrConv = connector.drv.nStrConv.Clone()
-	}
+	//"TCP negotiation for character set updates fails when multiple database connections
+	// with varying encodings coexist in the same process,
+	// due to the cloning of the character converter."
+	// eg. Chinese GBK and UTF8
+	// if connector.drv.sStrConv != nil {
+	// 	conn.sStrConv = connector.drv.sStrConv.Clone()
+	// }
+	// if connector.drv.nStrConv != nil {
+	// 	conn.nStrConv = connector.drv.nStrConv.Clone()
+	// }
 	if conn.connOption.Dialer == nil {
 		conn.connOption.Dialer = connector.dialer
 	}
@@ -177,6 +183,9 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	}
 	if conn.connOption.Kerberos == nil {
 		conn.connOption.Kerberos = connector.kerberos
+	}
+	if conn.connOption.Wallet == nil && connector.wallet != nil {
+		conn.connOption.Wallet = connector.wallet
 	}
 	err = conn.OpenWithContext(ctx)
 	if err != nil {
@@ -199,6 +208,15 @@ func (connector *OracleConnector) Dialer(dialer configurations.DialerContext) {
 
 func (connector *OracleConnector) WithTLSConfig(config *tls.Config) {
 	connector.tlsConfig = config
+}
+
+func (connector *OracleConnector) WithWallet(reader io.Reader) error {
+	wallet, err := configurations.NewWalletFromReader(reader)
+	if err != nil {
+		return err
+	}
+	connector.wallet = wallet
+	return nil
 }
 
 // WithKerberosAuth sets the Kerberos authenticator to be used by this connector. It does not enable the Kerberos; set AUTH TYPE to KERBEROS to do so.
@@ -413,7 +431,7 @@ func (conn *Connection) Logoff() error {
 	// session.PutBytes(0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11, 0x1, 0, 0, 0, 0x1, 0, 0, 0, 0, 0, 0x1, 0, 0, 0, 0, 0,
 	//	3, 9, 0)
 	//session.PutBytes(3, 9, 0)
-	session.PutTTCFunc(9)
+	session.PutTTCFunc(3, 9)
 	err := session.Write()
 	if err != nil {
 		return err
@@ -730,7 +748,7 @@ func (conn *Connection) doAuth() error {
 	var authObject *AuthObject
 	if len(conn.connOption.UserID) > 0 && len(conn.connOption.Password) > 0 {
 		conn.session.ResetBuffer()
-		conn.session.PutTTCFunc(0x76)
+		conn.session.PutTTCFunc(0x3, 0x76)
 		conn.session.PutBytes(1)
 		conn.session.PutUint(len(conn.connOption.UserID), 4, true, true)
 		conn.LogonMode = conn.LogonMode | NoNewPass
@@ -1319,7 +1337,19 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 }
 
 func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	if conn.State != Opened {
+	//if conn.State != Opened {
+	//	return nil, driver.ErrBadConn
+	//}
+	if conn.State != Opened || !conn.session.Connected {
+		if !conn.session.Connected {
+			t := time.Now().Local()
+			err := conn.OpenWithContext(ctx)
+			if err != nil {
+				fmt.Printf("[%s][oracle] bad connection, reconnect error [ela: %v][err: %v]\n", time.Now().Format("2006-01-02 15:04:05.000"), time.Since(t), err)
+			} else {
+				fmt.Printf("[%s][oracle] bad connection, reconnect successful [ela: %v]\n", time.Now().Format("2006-01-02 15:04:05.000"), time.Since(t))
+			}
+		}
 		return nil, driver.ErrBadConn
 	}
 	conn.tracer.Print("Prepare With Context\n", query)
@@ -1400,7 +1430,7 @@ func (conn *Connection) processTCCResponse(msgCode uint8) error {
 				}
 				if len(bty) >= 8 {
 					queryID := binary.LittleEndian.Uint64(bty[size-8:])
-					os.Stderr.WriteString(fmt.Sprintln("query ID: ", queryID))
+					_, _ = os.Stderr.WriteString(fmt.Sprintln("query ID: ", queryID))
 				}
 			}
 		}
@@ -1441,7 +1471,7 @@ func (conn *Connection) processTCCResponse(msgCode uint8) error {
 			return err
 		}
 		if warning != nil {
-			os.Stderr.WriteString(fmt.Sprintln(warning))
+			_, _ = os.Stderr.WriteString(fmt.Sprintln(warning))
 		}
 	case 23:
 		opCode, err := session.GetByte()
@@ -1472,11 +1502,18 @@ func (conn *Connection) setBad() {
 	conn.bad = true
 }
 
+// ResetSession decides responsible for resetting a connection. Part of a keepConnOnRollback condition to decide if to keep a transaction after rollback.
 func (conn *Connection) ResetSession(_ context.Context) error {
 	if conn.bad {
 		return driver.ErrBadConn
 	}
 	return nil
+}
+
+// IsValid validates if a connection has to be discarded. Part of a keepConnOnRollback condition to decide if to keep a transaction after rollback.
+func (conn *Connection) IsValid() bool {
+	// Connection is valid if it's not marked as bad and is in opened state
+	return !conn.bad && conn.State == Opened
 }
 
 func (conn *Connection) dataTypeNegotiation() error {

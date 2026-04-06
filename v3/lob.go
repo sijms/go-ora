@@ -383,7 +383,7 @@ func (lob *LobStream) Close(opID int) error {
 
 func (lob *LobStream) writeOp(operationID int) {
 	session := lob.conn.session
-	session.PutTTCFunc(0x60)
+	session.PutTTCFunc(0x3, 0x60)
 	if len(lob.sourceLocator) == 0 {
 		session.PutBytes(0)
 	} else {

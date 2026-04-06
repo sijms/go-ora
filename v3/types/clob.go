@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 
 	"github.com/sijms/go-ora/v3/converters"
@@ -119,6 +120,28 @@ func NewClob(streamer LobStreamer, decoder ClobDecoder, data sql.NullString, use
 func (l *clob) Charset() (charsetID int, charsetForm int) {
 	return l.charsetID, l.charsetForm
 }
+func (l *clob) CopyTo(dest driver.Value) error {
+	switch dst := dest.(type) {
+	case *string:
+		if l.Valid {
+			*dst = l.String
+		} else {
+			*dst = ""
+		}
+	case *sql.NullString:
+		dst.Valid = l.Valid
+		dst.String = l.String
+	case *[]byte:
+		if l.Valid {
+			*dst = []byte(l.String)
+		} else {
+			*dst = nil
+		}
+	default:
+		return fmt.Errorf("cannot copy clob to variable of type %T ", dest)
+	}
+	return nil
+}
 func (l *clob) Scan(value interface{}) error {
 	var err error
 	if value == nil {
@@ -217,92 +240,3 @@ func (l *clob) Read(ctx context.Context) error {
 	l.String = temp.String
 	return nil
 }
-
-//
-//func NewClob(data sql.NullString, useNCharset bool) *Clob {
-//	charsetForm := 1
-//	if useNCharset {
-//		charsetForm = 2
-//	}
-//	return &Clob{
-//		String: String{
-//			//TypeInfo: type_coder.TypeInfo{
-//			//	CharsetForm: charsetForm,
-//			//},
-//			//Data: data,
-//		},
-//		//TypeInfo: type_coder.TypeInfo{
-//		//	DataType: OCIClobLocator,
-//		//},
-//	}
-//}
-//
-//func (clob *Clob) Read(session network.SessionReader, tnsType uint16, isUDTPar bool) error {
-//	var err error
-//	var bValue []byte
-//	if clob.isInline {
-//		maxSize, err := session.GetInt(4, true, true)
-//		if err != nil {
-//			return err
-//		}
-//		if maxSize > 0 {
-//			/*size*/ _, err = session.GetInt64(8, true, true)
-//			if err != nil {
-//				return err
-//			}
-//			/*chunkSize*/ _, err = session.GetInt(4, true, true)
-//			if err != nil {
-//				return err
-//			}
-//			var flag uint8
-//			flag, err = session.GetByte()
-//			if err != nil {
-//				return err
-//			}
-//			clob.TypeInfo.CharsetID = 0
-//			if flag == 1 {
-//				clob.TypeInfo.CharsetID, err = session.GetInt(2, true, true)
-//				if err != nil {
-//					return err
-//				}
-//			}
-//			var temp uint8
-//			temp, err = session.GetByte()
-//			if err != nil {
-//				return err
-//			}
-//			clob.TypeInfo.CharsetForm = int(temp)
-//			bValue, err = session.GetClr()
-//			if err != nil {
-//				return err
-//			}
-//			clob.locator, err = session.GetClr()
-//			if err != nil {
-//				return err
-//			}
-//
-//		} else {
-//			clob.locator = nil
-//		}
-//		_, err = clob.Decode(bValue, tnsType)
-//		return err
-//	}
-//
-//	if isUDTPar {
-//		clob.locator, err = session.GetFixedClr()
-//	} else {
-//		clob.locator, err = session.GetClr()
-//	}
-//	return err
-//}
-//
-//func (clob *Clob) Write(session network.SessionWriter) error {
-//	var err error
-//	var bValue []byte
-//	bValue, err = clob.Encode()
-//	if err != nil {
-//		return err
-//	}
-//	return clob.write(session, bValue, false)
-//}
-//

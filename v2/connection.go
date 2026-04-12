@@ -116,6 +116,7 @@ type Connection struct {
 		date      int
 		timestamp int
 	}
+	DisableBatchErrors       bool // When true, array DML skips batch-error mode (enables APPEND_VALUES)
 	bad                      bool
 	dbTimeZone               *time.Location // equivalent to database timezone used for timestamp with local timezone
 	dbServerTimeZone         *time.Location // equivalent to timezone of the server carry the database

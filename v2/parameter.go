@@ -481,11 +481,10 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			return err
 		}
 		if size == 0 {
-			// the object is null
-			_, err = session.GetBytes(2) // 0x81 0x01
-			if err != nil {
-				return err
-			}
+			// NULL UDT in a result set: the per-row image ends with the
+			// 0x01 0x01 flags pair already consumed above (matching
+			// python-oracledb's read_dbobject layout). No further bytes
+			// follow before the next TTC opcode.
 			par.oPrimValue = nil
 			par.IsNull = true
 			return nil

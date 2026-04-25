@@ -378,11 +378,20 @@ func (stmt *Stmt) writePars() error {
 				}
 			} else {
 				if par.cusType != nil {
+					// Per-row UDT envelope. For non-NULL the wire layout is
+					//   <4 zero bytes>  <ub4 packed-length>  <ub4 flags=TNS_OBJ_TOP_LEVEL>  <packed-data>
+					// For NULL the trailing packed-data block must be omitted entirely,
+					// matching python-oracledb (write_ub4(0) for the four header
+					// fields plus write_ub4(TNS_OBJ_TOP_LEVEL) and nothing else).
+					// Sending an extra zero length byte trips ORA-03146 "invalid
+					// buffer length for TTC field" on bulk binds with mixed-NULL UDT rows.
 					session.WriteBytes(&buffer, 0, 0, 0, 0)
 					size := len(par.BValue)
 					session.WriteUint(&buffer, size, 4, true, true)
 					session.WriteBytes(&buffer, 1, 1)
-					session.WriteClr(&buffer, par.BValue)
+					if size > 0 {
+						session.WriteClr(&buffer, par.BValue)
+					}
 				} else {
 					if par.MaxNoOfArrayElements > 0 {
 						if par.BValue == nil {

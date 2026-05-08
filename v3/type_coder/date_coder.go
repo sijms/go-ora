@@ -54,6 +54,7 @@ func NewTimestamp(data sql.NullTime) *DateCoder {
 	}
 	return ret
 }
+
 func NewTimestampTZ(data sql.NullTime, asUTC bool) *DateCoder {
 	ret := new(DateCoder)
 	ret.SetDefault()
@@ -191,6 +192,7 @@ func (coder *DateCoder) DecodeDate(data []byte) (sql.NullTime, error) {
 	//			tempTime.Hour(), tempTime.Minute(), tempTime.Second(), tempTime.Nanosecond(), conn.dbTimeZone)
 	//	}
 }
+
 func (coder *DateCoder) Decode(data []byte) (interface{}, error) {
 	if data == nil {
 		return nil, nil

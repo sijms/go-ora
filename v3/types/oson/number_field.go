@@ -26,16 +26,16 @@ func (field *NumberField) Value() interface{} {
 			return "E"
 		}
 		return ret
-	} else {
-		ret, success := big.NewInt(0).SetString(strNum, 10)
-		if !success {
-			return "E"
-		}
-		return ret
 	}
+
+	ret, success := big.NewInt(0).SetString(strNum, 10)
+	if !success {
+		return "E"
+	}
+	return ret
 }
 func (field *NumberField) Encode() ([]byte, error) {
-	data := field.value.Data()
+	data := field.value.Data
 	length := len(data)
 	buffer := bytes.NewBuffer(nil)
 	var err error

@@ -180,6 +180,7 @@ func CreateVector(array interface{}) (Vector, error) {
 //
 //		}
 //	}
+
 func NewVector(array interface{}, stream LobStreamer, decoder VectorDecoder) (Vector, error) {
 	v, err := CreateVector(array)
 	if err != nil {

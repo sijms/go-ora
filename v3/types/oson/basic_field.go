@@ -1,5 +1,12 @@
 package oson
 
+type (
+	FieldEncoder interface {
+		Encode() ([]byte, error)
+	}
+	FieldDecoder interface {
+	}
+)
 type Field interface {
 	Encode() ([]byte, error)
 	OpCode() uint8

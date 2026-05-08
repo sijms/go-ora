@@ -14,11 +14,14 @@ import (
 	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/type_coder"
 	"github.com/sijms/go-ora/v3/types"
+	"github.com/sijms/go-ora/v3/types/oson"
 )
 
 type OracleDriver struct {
 	dataCollected bool
 	typeDecoder   map[uint16]type_coder.OracleTypeDecoder
+	jsonEncoder   map[reflect.Type]oson.FieldEncoder
+	jsonDecoder   map[int]oson.FieldDecoder
 	cusTyp        map[string]customType
 	sessionParam  map[string]string
 	mu            sync.Mutex
@@ -93,6 +96,13 @@ func (driver *OracleDriver) init() {
 	driver.typeDecoder[types.VECTOR] = type_coder.NewVectorDecoder()
 	driver.typeDecoder[types.OCIBlobLocator] = type_coder.NewBlobDecoder()
 	driver.typeDecoder[types.OCIClobLocator] = type_coder.NewClobDecoder()
+
+	// JsonFieldEncoder
+	driver.jsonEncoder[tyString] = &oson.StringField{}
+	driver.jsonEncoder[tyInt64] = &oson.NumberField{}
+	driver.jsonEncoder[tyFloat32] = &oson.NumberField{}
+	driver.jsonEncoder[tyFloat64] = &oson.NumberField{}
+	// JsonFieldDecoder
 }
 func (driver *OracleDriver) initFromConn(conn *Connection) error {
 	driver.mu.Lock()
@@ -154,6 +164,25 @@ func AddSessionParam(db *sql.DB, key, value string) error {
 	return nil
 }
 
+func RegisterJsonFieldEncoder(db GetDriverInterface, key reflect.Type, encoder oson.FieldEncoder) error {
+	if drv, ok := db.Driver().(*OracleDriver); ok {
+		drv.mu.Lock()
+		drv.jsonEncoder[key] = encoder
+		drv.mu.Unlock()
+		return nil
+	}
+	return errors.New("the driver used is not a go-ora driver type")
+}
+
+func RegisterJsonFieldDecoder(db GetDriverInterface, opCode int, decoder oson.FieldDecoder) error {
+	if drv, ok := db.Driver().(*OracleDriver); ok {
+		drv.mu.Lock()
+		drv.jsonDecoder[opCode] = decoder
+		drv.mu.Unlock()
+		return nil
+	}
+	return errors.New("the driver used is not a go-ora driver type")
+}
 func RegisterTypeDecoder(db GetDriverInterface, oracleType uint16, decoder type_coder.OracleTypeDecoder) error {
 	if drv, ok := db.Driver().(*OracleDriver); ok {
 		drv.mu.Lock()

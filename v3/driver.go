@@ -14,7 +14,7 @@ import (
 	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/type_coder"
 	"github.com/sijms/go-ora/v3/types"
-	"github.com/sijms/go-ora/v3/types/oson"
+	"github.com/sijms/go-ora/v3/oson"
 )
 
 type OracleDriver struct {

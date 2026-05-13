@@ -18,6 +18,7 @@ func NewNumberCoder(number *types.Number) (*NumberCoder, error) {
 	ret.MaxLen = 0x16
 	return ret, nil
 }
+
 func (coder *NumberCoder) Write(session network.SessionWriter) error {
 	session.PutClr(coder.BValue)
 	return nil

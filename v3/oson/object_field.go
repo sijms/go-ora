@@ -40,7 +40,7 @@ func NewObjectField(value map[string]interface{}, header *Header) (*ObjectField,
 				if err != nil {
 					return nil, err
 				}
-				field = &NumberField{value: *temp}
+				field = &NumberField{data: temp.Data}
 			case reflect.String:
 				field = NewStringField(rValue.String())
 			case reflect.Bool:

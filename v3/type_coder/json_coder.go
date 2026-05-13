@@ -5,7 +5,7 @@ import (
 
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
-	"github.com/sijms/go-ora/v3/types/oson"
+	"github.com/sijms/go-ora/v3/oson"
 )
 
 type JsonCoder struct {

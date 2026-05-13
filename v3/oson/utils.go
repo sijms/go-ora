@@ -5,9 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-
-	"github.com/sijms/go-ora/v3/converters"
-	"github.com/sijms/go-ora/v3/types"
+	"reflect"
 )
 
 /*
@@ -79,47 +77,54 @@ op = 62 and length = 11
 2- parse input
 */
 
-//func ReadJsonString(input []byte) error {
-//	var output = make(map[string]interface{})
-//	err := json.Unmarshal(input, &output)
-//	fmt.Println(output)
-//	return err
-//	//inObject := false
-//	//inArray := false
-//	//inExp := false
-//	//keys := make([][]byte, 0, 20)
-//	//values := make([][]byte, 0, 20)
-//	//exp := make([]byte, 0, 50)
-//	//for i := 0; i < len(input); i++ {
-//	//	c := input[i]
-//	//	switch c {
-//	//	case '{':
-//	//		inObject = true
-//	//	case '}':
-//	//		inObject = false
-//	//
-//	//	case '[':
-//	//		inArray = true
-//	//	case ']':
-//	//		inArray = false
-//	//	case '"':
-//	//		inExp = !inExp
-//	//	case ':':
-//	//		keys = append(keys, exp)
-//	//		exp = nil
-//	//	case ',':
-//	//		values = append(values, exp)
-//	//		exp = nil
-//	//	case '%':
-//	//	case '\\':
-//	//	default:
-//	//		if inExp {
-//	//			exp = append(exp, c)
-//	//		}
-//	//	}
-//	//}
-//}
+//	func ReadJsonString(input []byte) error {
+//		var output = make(map[string]interface{})
+//		err := json.Unmarshal(input, &output)
+//		fmt.Println(output)
+//		return err
+//		//inObject := false
+//		//inArray := false
+//		//inExp := false
+//		//keys := make([][]byte, 0, 20)
+//		//values := make([][]byte, 0, 20)
+//		//exp := make([]byte, 0, 50)
+//		//for i := 0; i < len(input); i++ {
+//		//	c := input[i]
+//		//	switch c {
+//		//	case '{':
+//		//		inObject = true
+//		//	case '}':
+//		//		inObject = false
+//		//
+//		//	case '[':
+//		//		inArray = true
+//		//	case ']':
+//		//		inArray = false
+//		//	case '"':
+//		//		inExp = !inExp
+//		//	case ':':
+//		//		keys = append(keys, exp)
+//		//		exp = nil
+//		//	case ',':
+//		//		values = append(values, exp)
+//		//		exp = nil
+//		//	case '%':
+//		//	case '\\':
+//		//	default:
+//		//		if inExp {
+//		//			exp = append(exp, c)
+//		//		}
+//		//	}
+//		//}
+//	}
+var tyDictionary = reflect.TypeOf((*map[string]interface{})(nil)).Elem()
+var jsonEncoder map[reflect.Type]FieldCreator
+var jsonDecoder map[int]FieldDecoder
 
+func RegisterCoder(tyValue reflect.Type, value FieldCreator) error {
+	jsonEncoder[tyValue] = value
+	return nil
+}
 func Encode(mainObj interface{}) ([]byte, error) {
 	header := &Header{
 		flags: 0x2106,
@@ -133,6 +138,17 @@ func Encode(mainObj interface{}) ([]byte, error) {
 	}
 	header.keyDataLen = len(keyBuffer)
 	var objectData []byte
+	creator := jsonEncoder[reflect.TypeOf(mainObj)]
+	if creator != nil {
+		obj, err := creator.CreateField(mainObj, header)
+		if err != nil {
+			return nil, err
+		}
+		objectData, err = obj.Encode()
+		if err != nil {
+			return nil, err
+		}
+	}
 	if dict, ok := mainObj.(map[string]interface{}); ok {
 		obj, err := NewObjectField(dict, header)
 		if err != nil {
@@ -433,7 +449,7 @@ func decodeNode(buffer *bytes.Reader, header *Header) (Field, error) {
 		var temp = make([]byte, 8)
 		_, err = buffer.Read(temp)
 		return &BinaryDoubleField{
-			value: converters.ConvertBinaryDouble(temp),
+			data: temp,
 			basicField: basicField{
 				opCode: opCode,
 			},
@@ -478,19 +494,15 @@ func decodeNode(buffer *bytes.Reader, header *Header) (Field, error) {
 		if err != nil {
 			return nil, err
 		}
-		number, err := types.NewNumber(numberBytes)
-		if err != nil {
-			return nil, err
-		}
 		return &NumberField{
-			value:      *number,
+			data:      numberBytes,
 			basicField: basicField{opCode: opCode},
 		}, nil
 	case 0x7F:
 		var temp = make([]byte, 4)
 		_, err = buffer.Read(temp)
 		return &BinaryFloatField{
-			value: converters.ConvertBinaryFloat(temp),
+			data: temp,
 			basicField: basicField{
 				opCode: opCode,
 			},
@@ -503,15 +515,8 @@ func decodeNode(buffer *bytes.Reader, header *Header) (Field, error) {
 		if err != nil {
 			return nil, err
 		}
-		number, err := types.NewNumber(numberBytes)
-		if err != nil {
-			return nil, err
-		}
-		var temp NumberField
-		temp.value = *number
-		temp.opCode = opCode
 		return &NumberField{
-			value:      *number,
+			data:      numberBytes,
 			basicField: basicField{opCode: opCode},
 		}, nil
 	}

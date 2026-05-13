@@ -5,18 +5,17 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-
-	"github.com/sijms/go-ora/v3/converters"
-	"github.com/sijms/go-ora/v3/types"
 )
 
 type NumberField struct {
-	value types.Number
+	//value types.Number
+	data    []byte
+	decoder NumberDecoder
 	basicField
 }
 
 func (field *NumberField) Value() interface{} {
-	strNum, err := field.value.String()
+	strNum, err := field.decoder.DecodeNumber(field.data)
 	if err != nil {
 		return "E"
 	}
@@ -35,8 +34,7 @@ func (field *NumberField) Value() interface{} {
 	return ret
 }
 func (field *NumberField) Encode() ([]byte, error) {
-	data := field.value.Data
-	length := len(data)
+	length := len(field.data)
 	buffer := bytes.NewBuffer(nil)
 	var err error
 	if length <= 8 {
@@ -59,7 +57,7 @@ func (field *NumberField) Encode() ([]byte, error) {
 		return nil, fmt.Errorf("unsupported number length (%d) >= 256", length)
 	}
 	var written int
-	written, err = buffer.Write(data)
+	written, err = buffer.Write(field.data)
 	if written != length {
 		return nil, fmt.Errorf("invalid buffer write: expected to write %d, got %d", length, written)
 	}
@@ -89,45 +87,43 @@ func (field *NumberField) Decode(input []byte) error {
 	} else {
 		return fmt.Errorf("invalid opCode(%d) for NumberField", field.opCode)
 	}
-	data := make([]byte, length)
+	field.data = make([]byte, length)
 	var read int
-	read, err = buffer.Read(data)
+	read, err = buffer.Read(field.data)
 	if read != length {
 		return fmt.Errorf("invalid buffer read: expected to read %d, got %d", length, read)
 	}
-	var temp *types.Number
-	temp, err = types.NewNumber(data)
-	if err != nil {
-		return err
-	}
-	field.value = *temp
 	return nil
 }
 
 type BinaryDoubleField struct {
-	value float64
+	data    []byte
+	decoder BinaryDoubleDecoder
 	basicField
 }
 
 func (field *BinaryDoubleField) Value() interface{} {
-	return field.value
+	ret, _ := field.decoder.DecodeBinaryDouble(field.data)
+	return ret
 }
 func (field *BinaryDoubleField) Encode() ([]byte, error) {
 	output := []uint8{0x36}
-	output = append(output, converters.EncodeFloat64(field.value)...)
+	output = append(output, field.data...)
 	return output, nil
 }
 
 type BinaryFloatField struct {
-	value float32
+	data    []byte
+	decoder BinaryFloatDecoder
 	basicField
 }
 
 func (field *BinaryFloatField) Value() interface{} {
-	return field.value
+	ret, _ := field.decoder.DecodeBinaryFloat(field.data)
+	return ret
 }
 func (field *BinaryFloatField) Encode() ([]byte, error) {
 	output := []uint8{0x7F}
-	output = append(output, converters.EncodeFloat32(field.value)...)
+	output = append(output, field.data...)
 	return output, nil
 }

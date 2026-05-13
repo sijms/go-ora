@@ -41,7 +41,7 @@ func NewArrayField(value interface{}, header *Header) (*ArrayField, error) {
 				if err != nil {
 					return nil, err
 				}
-				field = &NumberField{value: *temp}
+				field = &NumberField{data: temp.Data}
 			case reflect.String:
 				field = NewStringField(item.String())
 			case reflect.Bool:

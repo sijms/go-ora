@@ -386,6 +386,18 @@ func (number *Number) Scan(value interface{}) error {
 	return nil
 }
 
+func (number *Number) Encode(input interface{}) ([]byte, error) {
+	temp, err := NewNumber(input)
+	if err != nil {
+		return nil, err
+	}
+	return temp.Data, nil
+}
+func (number *Number) Decode(input []byte) (interface{}, error) {
+	temp := &Number{Data: input}
+	return temp.String()
+}
+
 //func (number *Number) Value() (driver.Value, error) {
 //	return number.Int64()
 //}

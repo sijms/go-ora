@@ -57,6 +57,7 @@ var (
 	tyFloat32Array    = reflect.TypeOf((*[]float32)(nil)).Elem()
 	tyUint8Array      = reflect.TypeOf((*[]uint8)(nil)).Elem()
 	tyFloat64Array    = reflect.TypeOf((*[]float64)(nil)).Elem()
+	tyDictionary      = reflect.TypeOf((*map[string]interface{})(nil)).Elem()
 )
 
 func refineSqlText(text string) string {

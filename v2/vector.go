@@ -35,7 +35,7 @@ func NewVector(array interface{}) (*Vector, error) {
 		v.Data = *value
 	case []*uint8:
 		v.format = 4
-		temp := make([]byte, len(value))
+		temp := make([]byte, 0, len(value))
 		for _, val := range value {
 			temp = append(temp, *val)
 		}
@@ -51,7 +51,7 @@ func NewVector(array interface{}) (*Vector, error) {
 		v.Data = *value
 	case []*float32:
 		v.format = 2
-		temp := make([]float32, len(value))
+		temp := make([]float32, 0, len(value))
 		for _, val := range value {
 			temp = append(temp, *val)
 		}
@@ -67,7 +67,7 @@ func NewVector(array interface{}) (*Vector, error) {
 		v.Data = *value
 	case []*float64:
 		v.format = 3
-		temp := make([]float64, len(value))
+		temp := make([]float64, 0, len(value))
 		for _, val := range value {
 			temp = append(temp, *val)
 		}

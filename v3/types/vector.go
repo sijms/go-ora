@@ -58,7 +58,7 @@ func CreateVector(array interface{}) (Vector, error) {
 		v.Type = VECTOR_UINT8
 		v.data = *value
 	case []*uint8:
-		temp := make([]byte, len(value))
+		temp := make([]byte, 0, len(value))
 		for _, val := range value {
 			temp = append(temp, *val)
 		}
@@ -71,7 +71,7 @@ func CreateVector(array interface{}) (Vector, error) {
 		v.Type = VECTOR_FL32
 		v.data = *value
 	case []*float32:
-		temp := make([]float32, len(value))
+		temp := make([]float32, 0, len(value))
 		for _, val := range value {
 			temp = append(temp, *val)
 		}
@@ -84,7 +84,7 @@ func CreateVector(array interface{}) (Vector, error) {
 		v.Type = VECTOR_FL64
 		v.data = *value
 	case []*float64:
-		temp := make([]float64, len(value))
+		temp := make([]float64, 0, len(value))
 		for _, val := range value {
 			temp = append(temp, *val)
 		}

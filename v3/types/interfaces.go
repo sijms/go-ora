@@ -13,10 +13,8 @@ import (
 type LobStreamer interface {
 	StartContext(ctx context.Context) chan struct{}
 	EndContext(done chan struct{})
-	GetLocator() []byte
-	SetLocator(locator []byte)
-	IsVarWidthChar() bool
-	IsLittleEndian() bool
+	GetLocator() Locator
+	SetLocator(locator Locator)
 	DatabaseVersionNumber() int
 	GetStringCoder() converters.StringCoder
 	GetLobStreamMode() configurations.LobFetch
@@ -24,7 +22,7 @@ type LobStreamer interface {
 	GetTracer() trace.Tracer
 	GetSize() (int64, error)
 	Exists() (bool, error)
-	CreateTemporaryLocator(charsetID, charsetForm int) ([]byte, error)
+	CreateTemporaryLocator(charsetID, charsetForm int) (Locator, error)
 	FreeTemporaryLocator() error
 	Open(mode, opID int) error
 	Read(offset, count int64) ([]byte, error)
@@ -33,6 +31,7 @@ type LobStreamer interface {
 }
 
 type OracleType interface {
+	SetValue(input interface{}, typeId uint16) error
 	CopyTo(dest driver.Value) error
 	sql.Scanner
 }

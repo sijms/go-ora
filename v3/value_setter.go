@@ -428,15 +428,23 @@ func setClob(dest reflect.Value, input oraTypes.Clob) error {
 			return err
 		}
 	}
-	temp := input.Data()
-	switch dest.Type() {
-	case tyString:
-		dest.SetString(temp.String)
-	case tyNullString:
-		dest.Set(reflect.ValueOf(temp))
-	default:
-		return setWithScanner(dest, input)
+	temp, err := input.Value(0)
+	if err != nil {
+		return err
 	}
+	if temp == nil {
+		dest.Set(reflect.Zero(dest.Type()))
+	} else {
+		switch dest.Type() {
+		case tyString:
+			dest.SetString(temp.(string))
+		case tyNullString:
+			dest.Set(reflect.ValueOf(sql.NullString{String: temp.(string), Valid: true}))
+		default:
+			return setWithScanner(dest, input)
+		}
+	}
+
 	return nil
 }
 func setWithScanner(dest reflect.Value, input interface{}) error {
@@ -468,11 +476,19 @@ func setBlob(dest reflect.Value, input oraTypes.Blob) error {
 			return err
 		}
 	}
-	switch dest.Type() {
-	case tyBytes:
-		dest.SetBytes(input.Data())
-	default:
-		return setWithScanner(dest, input)
+	temp, err := input.Value(0)
+	if err != nil {
+		return err
+	}
+	if temp == nil {
+		dest.Set(reflect.Zero(dest.Type()))
+	} else {
+		switch dest.Type() {
+		case tyBytes:
+			dest.SetBytes(temp.([]byte))
+		default:
+			return setWithScanner(dest, input)
+		}
 	}
 	return nil
 }
@@ -500,8 +516,8 @@ func setLob(value reflect.Value, input LobStream) error {
 	}
 	getStrConv := func() (converters.IStringConverter, error) {
 		var ret converters.IStringConverter
-		if input.IsVarWidthChar() {
-			if conn.dBVersion.Number < 10200 && input.IsLittleEndian() {
+		if input.GetLocator().IsVarWidthChar() {
+			if conn.dBVersion.Number < 10200 && input.GetLocator().IsLittleEndian() {
 				ret, _ = conn.GetStringCoder(2002, 0)
 			} else {
 				ret, _ = conn.GetStringCoder(2000, 0)

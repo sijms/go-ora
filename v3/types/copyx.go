@@ -21,13 +21,13 @@ func copyTime(dest any, src time.Time) error {
 	dstValue := reflect.ValueOf(dest).Elem()
 	dstType := reflect.TypeOf(dest).Elem()
 	switch dstType {
-	case tyString:
+	case TyString:
 		dstValue.SetString(src.Format(time.RFC3339))
-	case tyTime:
+	case TyTime:
 		dstValue.Set(reflect.ValueOf(src))
-	case tyNullString:
+	case TyNullString:
 		dstValue.Set(reflect.ValueOf(sql.NullString{String: src.Format(time.RFC3339), Valid: true}))
-	case tyNullTime:
+	case TyNullTime:
 		dstValue.Set(reflect.ValueOf(sql.NullTime{Time: src, Valid: true}))
 	default:
 		return defaultCopy(dest, src)
@@ -38,11 +38,11 @@ func copyBytes(dest any, src []uint8) error {
 	dstValue := reflect.ValueOf(dest).Elem()
 	dstType := reflect.TypeOf(dest).Elem()
 	switch dstType {
-	case tyString:
+	case TyString:
 		dstValue.SetString(string(src))
-	case tyBytes:
+	case TyBytes:
 		dstValue.SetBytes(src)
-	case tyNullString:
+	case TyNullString:
 		dstValue.Set(reflect.ValueOf(sql.NullString{String: string(src), Valid: src != nil}))
 	default:
 		return defaultCopy(dest, src)
@@ -85,17 +85,17 @@ func copyString(dest any, src string) error {
 		return floatErr
 	}
 	switch dstType {
-	case tyBool:
+	case TyBool:
 		dstValue.SetBool(strings.ToLower(src) == "true")
-	case tyString:
+	case TyString:
 		dstValue.SetString(src)
-	case tyNullString:
+	case TyNullString:
 		if src == "" {
 			dstValue.Set(reflect.ValueOf(sql.NullString{}))
 		} else {
 			dstValue.Set(reflect.ValueOf(sql.NullString{String: src, Valid: true}))
 		}
-	case tyNullByte:
+	case TyNullByte:
 		if src == "" {
 			dstValue.Set(reflect.ValueOf(sql.NullByte{}))
 		} else {
@@ -104,7 +104,7 @@ func copyString(dest any, src string) error {
 			}
 			return intErr
 		}
-	case tyNullInt16:
+	case TyNullInt16:
 		if src == "" {
 			dstValue.Set(reflect.ValueOf(sql.NullInt16{}))
 		} else {
@@ -113,7 +113,7 @@ func copyString(dest any, src string) error {
 			}
 			return intErr
 		}
-	case tyNullInt32:
+	case TyNullInt32:
 		if src == "" {
 			dstValue.Set(reflect.ValueOf(sql.NullInt32{}))
 		} else {
@@ -122,7 +122,7 @@ func copyString(dest any, src string) error {
 			}
 			return intErr
 		}
-	case tyNullInt64:
+	case TyNullInt64:
 		if src == "" {
 			dstValue.Set(reflect.ValueOf(sql.NullInt64{}))
 		} else {
@@ -132,7 +132,7 @@ func copyString(dest any, src string) error {
 			return intErr
 		}
 
-	case tyNullFloat64:
+	case TyNullFloat64:
 		if src == "" {
 			dstValue.Set(reflect.ValueOf(sql.NullFloat64{}))
 		} else {
@@ -142,7 +142,7 @@ func copyString(dest any, src string) error {
 			return floatErr
 		}
 
-	case tyNullBool:
+	case TyNullBool:
 		if src == "" {
 			dstValue.Set(reflect.ValueOf(sql.NullBool{}))
 		} else {
@@ -150,12 +150,12 @@ func copyString(dest any, src string) error {
 			dstValue.Set(reflect.ValueOf(sql.NullBool{Bool: temp, Valid: true}))
 		}
 
-	case tyTime:
+	case TyTime:
 		if timeErr == nil {
 			dstValue.Set(reflect.ValueOf(tempTime))
 		}
 		return timeErr
-	case tyNullTime:
+	case TyNullTime:
 		if src == "" {
 			dstValue.Set(reflect.ValueOf(sql.NullTime{}))
 		} else {

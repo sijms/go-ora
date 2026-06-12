@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/sijms/go-ora/v3/type_coder"
+	"github.com/sijms/go-ora/v3/parameter_coder"
 )
 
 var (
@@ -48,7 +48,7 @@ func (bulk *BulkCopy) AddRow(values ...interface{}) error {
 		}
 		par := &ParameterInfo{
 			Direction: Input,
-			TypeInfo: type_coder.TypeInfo{
+			BasicParameter: parameter_coder.BasicParameter{
 				Flag:        3,
 				CharsetID:   bulk.conn.tcpNego.ServerCharset,
 				CharsetForm: 1,

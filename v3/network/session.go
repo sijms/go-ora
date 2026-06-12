@@ -707,12 +707,12 @@ func (session *Session) processMarker() error {
 	// }
 
 	// receive all marker packet
-	// for pck != nil && pck.getPacketType() == MARKER && !session.isFinalPacketRead {
-	// 	pck, err = session.readPacket()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
+	//for pck != nil && pck.getPacketType() == MARKER /*&& !session.isFinalPacketRead*/ {
+	//	pck, err = session.readPacket()
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 
 	return nil
 	// breakConn, resetConn := false, false

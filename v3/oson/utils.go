@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+
+	"github.com/sijms/go-ora/v3/types"
 )
 
 /*
@@ -365,7 +367,10 @@ func decodeNode(buffer *bytes.Reader, header *Header) (Field, error) {
 			value := make([]interface{}, childCount)
 			if childCount > 0 {
 				for index = 0; index < childCount; index++ {
-					value[index] = children[index].Value()
+					value[index], err = children[index].Value()
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 			return &ArrayField{
@@ -386,7 +391,10 @@ func decodeNode(buffer *bytes.Reader, header *Header) (Field, error) {
 			if childCount > 0 {
 				for index = 0; index < childCount; index++ {
 					key := header.keys[children[index].KeyIndex()-1]
-					value[key.name] = children[index].Value()
+					value[key.name], err = children[index].Value()
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 			return &ObjectField{
@@ -448,12 +456,14 @@ func decodeNode(buffer *bytes.Reader, header *Header) (Field, error) {
 	case 0x36:
 		var temp = make([]byte, 8)
 		_, err = buffer.Read(temp)
-		return &BinaryDoubleField{
-			data: temp,
+		field := &BinaryDoubleField{
+			value: types.Number{},
 			basicField: basicField{
 				opCode: opCode,
 			},
-		}, nil
+		}
+		field.value.SetBytes(temp)
+		return field, nil
 	case 0x37:
 		var stringLen uint16
 		err = binary.Read(buffer, binary.BigEndian, &stringLen)
@@ -494,19 +504,23 @@ func decodeNode(buffer *bytes.Reader, header *Header) (Field, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &NumberField{
-			data:      numberBytes,
+		field := &NumberField{
+			value:      types.Number{},
 			basicField: basicField{opCode: opCode},
-		}, nil
+		}
+		field.value.SetBytes(numberBytes)
+		return field, nil
 	case 0x7F:
 		var temp = make([]byte, 4)
 		_, err = buffer.Read(temp)
-		return &BinaryFloatField{
-			data: temp,
+		field := &BinaryFloatField{
+			value: types.Number{},
 			basicField: basicField{
 				opCode: opCode,
 			},
-		}, nil
+		}
+		field.value.SetBytes(temp)
+		return field, nil
 	}
 	if opCode&0x60 == 0x60 {
 		dataLen := (int(opCode) & ^0x60) + 1
@@ -515,10 +529,12 @@ func decodeNode(buffer *bytes.Reader, header *Header) (Field, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &NumberField{
-			data:      numberBytes,
+		field := &NumberField{
+			value:      types.Number{},
 			basicField: basicField{opCode: opCode},
-		}, nil
+		}
+		field.value.SetBytes(numberBytes)
+		return field, nil
 	}
 	return nil, fmt.Errorf("unsupported type code: %d", opCode)
 }
@@ -534,7 +550,7 @@ func Decode(data []byte) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return obj.Value(), nil
+	return obj.Value()
 	//if value, ok := obj.Value().(map[string]interface{}); ok {
 	//	return value, nil
 	//}

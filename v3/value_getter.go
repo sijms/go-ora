@@ -52,9 +52,18 @@ func getString(col interface{}) string {
 	// common types
 	switch val := col.(type) {
 	case oraTypes.Clob:
-		return val.Data().String
+		temp, _ := val.Value(0)
+		if temp == nil {
+			return ""
+		}
+		return temp.(string)
 	case *oraTypes.Clob:
-		return (*val).Data().String
+		temp, _ := val.Value(0)
+		if temp == nil {
+			return ""
+		}
+		return temp.(string)
+		//return (*val).Data().String
 	}
 	col, _ = getValue(col)
 	if col == nil {
@@ -145,9 +154,27 @@ func getBytes(col interface{}) ([]byte, error) {
 	var err error
 	switch val := col.(type) {
 	case oraTypes.Blob:
-		return val.Data(), nil
+		var temp interface{}
+		temp, err = val.Value(0)
+		if err != nil {
+			return nil, err
+		}
+		if temp == nil {
+			return nil, nil
+		}
+		return temp.([]byte), nil
+		//return val.Data(), nil
 	case *oraTypes.Blob:
-		return (*val).Data(), nil
+		//return (*val).Data(), nil
+		var temp interface{}
+		temp, err = val.Value(0)
+		if err != nil {
+			return nil, err
+		}
+		if temp == nil {
+			return nil, nil
+		}
+		return temp.([]byte), nil
 	}
 	col, err = getValue(col)
 	if err != nil {
@@ -164,7 +191,16 @@ func getBytes(col interface{}) ([]byte, error) {
 	//case Blob:
 	//	return val.Data, nil
 	case oraTypes.Blob:
-		return val.Data(), nil
+		var temp interface{}
+		temp, err = val.Value(0)
+		if err != nil {
+			return nil, err
+		}
+		if temp == nil {
+			return nil, nil
+		}
+		return temp.([]byte), nil
+		//return val.Data(), nil
 	default:
 		return nil, errors.New("conversion of unsupported type to []byte")
 	}

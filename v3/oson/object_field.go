@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"github.com/sijms/go-ora/v3/types"
+	"github.com/sijms/go-ora/v3/utils"
 )
 
 type ObjectField struct {
@@ -14,9 +15,9 @@ type ObjectField struct {
 	structField
 }
 
-func (obj *ObjectField) Value() interface{} {
+func (obj *ObjectField) Value() (interface{}, error) {
 	//TODO implement me
-	return obj.value
+	return obj.value, nil
 }
 
 func NewObjectField(value map[string]interface{}, header *Header) (*ObjectField, error) {
@@ -40,7 +41,7 @@ func NewObjectField(value map[string]interface{}, header *Header) (*ObjectField,
 				if err != nil {
 					return nil, err
 				}
-				field = &NumberField{data: temp.Data}
+				field = &NumberField{value: *temp}
 			case reflect.String:
 				field = NewStringField(rValue.String())
 			case reflect.Bool:
@@ -60,7 +61,24 @@ func NewObjectField(value map[string]interface{}, header *Header) (*ObjectField,
 					return nil, fmt.Errorf("invalid JSON object at key: %s not decoded as Map[string]Any", keyName)
 				}
 			default:
-				return nil, fmt.Errorf("unsupported type: %s at key: %s", rValue.Type(), keyName)
+				switch rValue.Type() {
+				case utils.TyTime:
+					data := types.Date{}
+					err = data.SetValue(value, types.TIMESTAMPTZ)
+					if err != nil {
+						return nil, err
+					}
+					field = &DateField{value: data}
+				case utils.TyNullTime:
+					data := types.Date{}
+					err = data.SetValue(value, types.TIMESTAMPTZ)
+					if err != nil {
+						return nil, err
+					}
+					field = &DateField{value: data}
+				default:
+					return nil, fmt.Errorf("unsupported type: %s at key: %s", rValue.Type(), keyName)
+				}
 			}
 		}
 		if field == nil {

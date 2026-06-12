@@ -17,8 +17,6 @@ type RowIDCoder struct {
 	data        []byte
 	TypeInfo
 }
-type RowID struct {
-}
 
 func (coder *RowIDCoder) decode() []byte {
 	output := make([]byte, 0, 18)

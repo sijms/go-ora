@@ -26,7 +26,16 @@ import (
 var (
 	tyFloat64  = reflect.TypeOf((*float64)(nil)).Elem()
 	tyFloat32  = reflect.TypeOf((*float32)(nil)).Elem()
+	tyInt      = reflect.TypeOf((*int)(nil)).Elem()
+	tyInt8     = reflect.TypeOf((*int8)(nil)).Elem()
+	tyInt16    = reflect.TypeOf((*int16)(nil)).Elem()
+	tyInt32    = reflect.TypeOf((*int32)(nil)).Elem()
 	tyInt64    = reflect.TypeOf((*int64)(nil)).Elem()
+	tyUint     = reflect.TypeOf((*uint)(nil)).Elem()
+	tyUint8    = reflect.TypeOf((*uint8)(nil)).Elem()
+	tyUint16   = reflect.TypeOf((*uint16)(nil)).Elem()
+	tyUint32   = reflect.TypeOf((*uint32)(nil)).Elem()
+	tyUint64   = reflect.TypeOf((*uint64)(nil)).Elem()
 	tyBool     = reflect.TypeOf((*bool)(nil)).Elem()
 	tyBytes    = reflect.TypeOf((*[]byte)(nil)).Elem()
 	tyString   = reflect.TypeOf((*string)(nil)).Elem()
@@ -478,7 +487,7 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 					}
 					err = decodeObject(conn, &tempPar, temporaryLobs)
 				} else {
-					err = tempPar.decodePrimValue(conn, temporaryLobs, true)
+					err = tempPar.decodePrimValue(conn, true)
 				}
 				if err != nil {
 					return err
@@ -549,7 +558,7 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 						}
 					}
 				} else {
-					err := attrib.decodePrimValue(conn, temporaryLobs, true)
+					err := attrib.decodePrimValue(conn, true)
 					if err != nil {
 						return err
 					}
@@ -621,7 +630,7 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 					}
 				}
 			} else {
-				err := attrib.decodePrimValue(conn, temporaryLobs, true)
+				err := attrib.decodePrimValue(conn, true)
 				if err != nil {
 					return err
 				}
@@ -659,16 +668,23 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 	typeErr := fmt.Errorf("error passing field %s as type %s", fieldValue.Type().Name(), _type)
 	switch _type {
 	case "number":
+		tempPar.Value = getString(fieldValue.Interface())
 		// var fieldVal float64
-		tempPar.Value, err = NewNumber(fieldValue.Interface()) // getFloat(fieldValue.Interface())
-		if err != nil {
-			err = typeErr
-			return
-		}
+		//tempPar.Value, err = NewNumber(fieldValue.Interface()) // getFloat(fieldValue.Interface())
+		//if err != nil {
+		//	err = typeErr
+		//	return
+		//}
 	case "varchar":
 		tempPar.Value = getString(fieldValue.Interface())
 	case "nvarchar":
-		tempPar.Value = NVarChar(getString(fieldValue.Interface()))
+		temp := &oraTypes.String{}
+		temp.UseNCharset = true
+		err = temp.SetValue(getString(fieldValue.Interface()), 0)
+		if err != nil {
+			return nil, err
+		}
+		tempPar.Value = temp
 	case "date":
 		tempPar.Value, err = getDate(fieldValue.Interface())
 		if err != nil {
@@ -684,13 +700,15 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 	//	}
 	//	tempPar.Value = TimeStamp(fieldVal)
 	case "timestamptz":
-		var fieldVal time.Time
-		fieldVal, err = getDate(fieldValue.Interface())
+		var fieldVal = &oraTypes.Date{}
+		var temp time.Time
+		temp, err = getDate(fieldValue.Interface())
 		if err != nil {
 			err = typeErr
 			return
 		}
-		tempPar.Value = TimeStampTZ(fieldVal)
+		err = fieldVal.SetValue(temp, oraTypes.TIMESTAMPTZ)
+		tempPar.Value = fieldVal
 	case "raw":
 		tempPar.Value, err = getBytes(fieldValue.Interface())
 		if err != nil {
@@ -699,18 +717,34 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 		}
 	case "clob":
 		fieldVal := getString(fieldValue.Interface())
+		clob := &oraTypes.Clob{}
 		if len(fieldVal) == 0 {
-			tempPar.Value = Clob{Valid: false}
+			err = clob.SetValue(nil, 0)
+			//tempPar.Value, err = oraTypes.CreateClob()
+			//tempPar.Value = Clob{Valid: false}
 		} else {
-			tempPar.Value = Clob{String: fieldVal, Valid: true}
+			err = clob.SetValue(fieldVal, 0)
+			//tempPar.Value = Clob{String: fieldVal, Valid: true}
 		}
+		if err != nil {
+			return nil, err
+		}
+		tempPar.Value = clob
 	case "nclob":
 		fieldVal := getString(fieldValue.Interface())
+		clob := &oraTypes.Clob{}
+		clob.UseNCharset = true
 		if len(fieldVal) == 0 {
-			tempPar.Value = NClob{Valid: false}
+			err = clob.SetValue(nil, 0)
+			//tempPar.Value = NClob{Valid: false}
 		} else {
-			tempPar.Value = NClob{String: fieldVal, Valid: true}
+			err = clob.SetValue(fieldVal, 0)
+			//tempPar.Value = NClob{String: fieldVal, Valid: true}
 		}
+		if err != nil {
+			return nil, err
+		}
+		tempPar.Value = clob
 	case "blob":
 		var fieldVal []byte
 		fieldVal, err = getBytes(fieldValue.Interface())

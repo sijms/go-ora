@@ -100,7 +100,6 @@ func NewTimestampTZ(data sql.NullTime, asUTC bool) *DateCoder {
 //func (coder *DateCoder) SendAsUTC(value bool) {
 //	coder.asUTC = value
 //}
-
 //func (date *Date) Encode() ([]byte, error) {
 //
 //	if !date.Data.Valid {

@@ -1,6 +1,7 @@
 package go_ora
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"database/sql"
@@ -18,7 +19,7 @@ import (
 
 	"github.com/sijms/go-ora/v3/aq"
 	"github.com/sijms/go-ora/v3/lazy_init"
-	"github.com/sijms/go-ora/v3/type_coder"
+	"github.com/sijms/go-ora/v3/parameter_coder"
 	"github.com/sijms/go-ora/v3/types"
 
 	"github.com/sijms/go-ora/v3/configurations"
@@ -110,9 +111,11 @@ type Connection struct {
 	nStrConv          converters.IStringConverter
 	cStrConv          converters.IStringConverter
 	NLSData           NLSData
-	typeDecoder       map[uint16]type_coder.OracleTypeDecoder
-	cusTyp            map[string]customType
-	maxLen            struct {
+	parameterEncoder  map[reflect.Type]parameter_coder.OracleParameterEncoder
+	parameterDecoder  map[uint16]parameter_coder.OracleParameterDecoder
+	//typeDecoder       map[uint16]type_coder.OracleTypeDecoder
+	cusTyp map[string]customType
+	maxLen struct {
 		varchar   int64
 		nvarchar  int64
 		raw       int64
@@ -124,6 +127,7 @@ type Connection struct {
 	dbTimeZone               *time.Location // equivalent to database timezone used for timestamp with local timezone
 	dbServerTimeZone         *time.Location // equivalent to timezone of the server carry the database
 	dbServerTimeZoneExplicit *time.Location
+	temporaryLocs            []types.Locator
 }
 
 type ConnectionProperties struct {
@@ -163,7 +167,7 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 	if err != nil {
 		return nil, err
 	}
-	conn.buildTypeDecodersMap(connector.drv)
+	conn.buildParameterCoderMap(connector.drv)
 	conn.cusTyp = connector.drv.cusTyp
 	//"TCP negotiation for character set updates fails when multiple database connections
 	// with varying encodings coexist in the same process,
@@ -230,7 +234,7 @@ func (driver *OracleDriver) Open(name string) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn.buildTypeDecodersMap(driver)
+	conn.buildParameterCoderMap(driver)
 	conn.cusTyp = driver.cusTyp
 	err = conn.Open()
 	if err != nil {
@@ -243,15 +247,31 @@ func (driver *OracleDriver) Open(name string) (driver.Conn, error) {
 	return conn, nil
 }
 
-func (conn *Connection) buildTypeDecodersMap(drv *OracleDriver) {
-	conn.typeDecoder = make(map[uint16]type_coder.OracleTypeDecoder)
-	for name, value := range drv.typeDecoder {
+func (conn *Connection) buildParameterCoderMap(drv *OracleDriver) {
+	conn.parameterDecoder = make(map[uint16]parameter_coder.OracleParameterDecoder)
+	for name, value := range drv.parameterDecoder {
 		rValue := reflect.ValueOf(value)
 		newValue := reflect.New(rValue.Elem().Type()).Interface()
-		if temp, ok := newValue.(type_coder.OracleTypeDecoder); ok {
-			conn.typeDecoder[name] = temp
+		if temp, ok := newValue.(parameter_coder.OracleParameterDecoder); ok {
+			conn.parameterDecoder[name] = temp
 		}
 	}
+	conn.parameterEncoder = make(map[reflect.Type]parameter_coder.OracleParameterEncoder)
+	for key, value := range drv.parameterEncoder {
+		rValue := reflect.ValueOf(value)
+		newValue := reflect.New(rValue.Elem().Type()).Interface()
+		if temp, ok := newValue.(parameter_coder.OracleParameterEncoder); ok {
+			conn.parameterEncoder[key] = temp
+		}
+	}
+	//conn.typeDecoder = make(map[uint16]type_coder.OracleTypeDecoder)
+	//for name, value := range drv.typeDecoder {
+	//	rValue := reflect.ValueOf(value)
+	//	newValue := reflect.New(rValue.Elem().Type()).Interface()
+	//	if temp, ok := newValue.(type_coder.OracleTypeDecoder); ok {
+	//		conn.typeDecoder[name] = temp
+	//	}
+	//}
 }
 
 // GetNLS return NLS properties of the connection.
@@ -702,12 +722,12 @@ func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) 
 	temp := new(configurations.ConnectionConfig)
 	*temp = *config
 	return &Connection{
-		State:       Closed,
-		connOption:  temp,
-		cStrConv:    converters.NewStringConverter(config.CharsetID),
-		autoCommit:  true,
-		typeDecoder: map[uint16]type_coder.OracleTypeDecoder{},
-		cusTyp:      map[string]customType{},
+		State:            Closed,
+		connOption:       temp,
+		cStrConv:         converters.NewStringConverter(config.CharsetID),
+		autoCommit:       true,
+		parameterDecoder: nil,
+		cusTyp:           map[string]customType{},
 		maxLen: struct {
 			varchar   int64
 			nvarchar  int64
@@ -719,8 +739,56 @@ func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) 
 	}, nil
 }
 
+func (conn *Connection) freeTemporaryLobs() error {
+	if len(conn.temporaryLocs) == 0 {
+		return nil
+	}
+	conn.tracer.Printf("Free %d Temporary Lobs", len(conn.temporaryLocs))
+	session := conn.session
+	freeTemp := func(locators []types.Locator) {
+		totalLen := 0
+		for _, locator := range locators {
+			totalLen += len(locator)
+		}
+		session.PutTTCFunc(0x11, 0x60)
+		session.PutBytes(1)
+		session.PutUint(totalLen, 4, true, true)
+		session.PutBytes(0, 0, 0, 0, 0, 0, 0)
+		session.PutUint(0x80111, 4, true, true)
+		session.PutBytes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+		for _, locator := range locators {
+			session.PutBytes(locator...)
+		}
+	}
+	start := 0
+	end := 0
+	session.ResetBuffer()
+	for start < len(conn.temporaryLocs) {
+		end = start + 25000
+		if end > len(conn.temporaryLocs) {
+			end = len(conn.temporaryLocs)
+		}
+		freeTemp(conn.temporaryLocs[start:end])
+		start += end
+	}
+	session.PutTTCFunc(0x3, 0x93)
+	err := session.Write()
+	if err != nil {
+		return err
+	}
+	err = conn.read()
+	if err == nil {
+		conn.temporaryLocs = nil
+	}
+	return err
+}
+
 // Close the connection by disconnect network session
 func (conn *Connection) Close() (err error) {
+	err = conn.freeTemporaryLobs()
+	if err != nil {
+		conn.tracer.Printf("Error free temporary lobs: %v", err)
+	}
 	tracer := conn.tracer
 	tracer.Print("Close")
 	// var err error = nil
@@ -1231,7 +1299,7 @@ func (conn *Connection) encodeData(data interface{}) ([]byte, error) {
 
 func (conn *Connection) decodeData(data []byte, messageType aq.MessageType, udtName string) (interface{}, error) {
 	par := ParameterInfo{
-		TypeInfo: type_coder.TypeInfo{
+		BasicParameter: parameter_coder.BasicParameter{
 			BValue: data,
 		},
 	}
@@ -1587,4 +1655,13 @@ func (conn *Connection) protocolNegotiation() error {
 	}
 	conn.tcpNego.ServerFlags |= 2
 	return nil
+}
+
+func (conn *Connection) appendTemporaryLoc(loc types.Locator) {
+	for _, locator := range conn.temporaryLocs {
+		if bytes.Equal(loc, locator) {
+			return
+		}
+	}
+	conn.temporaryLocs = append(conn.temporaryLocs, loc)
 }

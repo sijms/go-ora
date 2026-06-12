@@ -8,7 +8,6 @@ import (
 	"reflect"
 
 	"github.com/sijms/go-ora/v3/converters"
-	"github.com/sijms/go-ora/v3/type_coder"
 	oraTypes "github.com/sijms/go-ora/v3/types"
 )
 
@@ -635,15 +634,8 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 }
 
 func (par *ParameterInfo) init() {
-	par.DataType = 0
-	par.Flag = 3
-	par.ContFlag = 0
-	par.CharsetID = 0
-	par.CharsetForm = 0
-	par.MaxLen = 1
-	par.MaxCharLen = 0
+	par.SetDefault()
 	par.MaxNoOfArrayElements = 0
-	par.BValue = nil
 	par.iPrimValue = nil
 	par.oPrimValue = nil
 }
@@ -651,10 +643,14 @@ func (par *ParameterInfo) init() {
 func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error {
 	par.init()
 	var err error
-	par.encoder, err = type_coder.Encode(par.Value)
-	if err != nil {
-		return err
-	}
+	//for key, value := range connection.parameterEncoder {
+	//
+	//}
+	//par.encoder, err = type_coder.Encode(par.Value)
+	//if err != nil {
+	//	return err
+	//}
+
 	// first check if the value is nil and return nil
 	//if par.Value == nil {
 	//	par.DataType = oraTypes.NCHAR
@@ -690,19 +686,40 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	//}
 	// switch type of the value and according put each type in its build in encoder
 	// custom encoder should be passed in the value
-	if par.encoder != nil {
-		err = par.encoder.Encode(connection, nil)
+	valueType := reflect.TypeOf(par.Value)
+	for valueType.Kind() == reflect.Ptr {
+		valueType = valueType.Elem()
+	}
+	var ok bool
+	par.encoder, ok = connection.parameterEncoder[valueType]
+	if ok {
+		err = par.encoder.Encode(par.Value, connection, nil)
 		if err != nil {
 			return err
 		}
-		par.TypeInfo.SetTypeInfo(par.encoder.GetTypeInfo())
+		par.SetParameterInfo(par.encoder.GetParameterInfo())
 		if par.MaxLen < size {
 			par.MaxLen = size
 		}
-		if par.DataType == oraTypes.NCHAR {
-			par.MaxCharLen = par.MaxLen
-		}
+		//if par.DataType == oraTypes.NCHAR {
+		//	par.MaxCharLen = par.MaxLen
+		//}
+	} else {
+		return fmt.Errorf("no encoder register for data type: %T", par.Value)
 	}
+	//if par.encoder != nil {
+	//	err = par.encoder.Encode(connection, nil)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	//par.SetParameterInfo(par.encoder.GetTypeInfo())
+	//	if par.MaxLen < size {
+	//		par.MaxLen = size
+	//	}
+	//	if par.DataType == oraTypes.NCHAR {
+	//		par.MaxCharLen = par.MaxLen
+	//	}
+	//}
 	if par.Direction == Output {
 		par.BValue = nil
 	}

@@ -12,23 +12,25 @@ import (
 	"github.com/sijms/go-ora/v3/advanced_nego"
 	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/converters"
-	"github.com/sijms/go-ora/v3/type_coder"
-	"github.com/sijms/go-ora/v3/types"
 	"github.com/sijms/go-ora/v3/oson"
+	"github.com/sijms/go-ora/v3/parameter_coder"
+	"github.com/sijms/go-ora/v3/types"
 )
 
 type OracleDriver struct {
-	dataCollected bool
-	typeDecoder   map[uint16]type_coder.OracleTypeDecoder
-	jsonEncoder   map[reflect.Type]oson.FieldEncoder
-	jsonDecoder   map[int]oson.FieldDecoder
-	cusTyp        map[string]customType
-	sessionParam  map[string]string
-	mu            sync.Mutex
-	sStrConv      converters.IStringConverter
-	nStrConv      converters.IStringConverter
-	UserId        string
-	connOption    *configurations.ConnectionConfig
+	dataCollected    bool
+	parameterDecoder map[uint16]parameter_coder.OracleParameterDecoder
+	parameterEncoder map[reflect.Type]parameter_coder.OracleParameterEncoder
+	//typeDecoder      map[uint16]type_coder.OracleTypeDecoder
+	jsonEncoder  map[reflect.Type]oson.FieldEncoder
+	jsonDecoder  map[int]oson.FieldDecoder
+	cusTyp       map[string]customType
+	sessionParam map[string]string
+	mu           sync.Mutex
+	sStrConv     converters.IStringConverter
+	nStrConv     converters.IStringConverter
+	UserId       string
+	connOption   *configurations.ConnectionConfig
 	// Server    string
 	// Port      int
 	// Instance  string
@@ -41,7 +43,9 @@ type OracleDriver struct {
 
 func NewDriver() *OracleDriver {
 	drv := &OracleDriver{
-		typeDecoder:  make(map[uint16]type_coder.OracleTypeDecoder),
+		parameterEncoder: make(map[reflect.Type]parameter_coder.OracleParameterEncoder),
+		parameterDecoder: make(map[uint16]parameter_coder.OracleParameterDecoder),
+		//typeDecoder:  make(map[uint16]type_coder.OracleTypeDecoder),
 		cusTyp:       map[string]customType{},
 		sessionParam: map[string]string{},
 	}
@@ -65,43 +69,107 @@ func GetDefaultDriver() *OracleDriver {
 
 func (driver *OracleDriver) init() {
 	// add basic type decoders here
-	driver.typeDecoder[types.NUMBER] = &type_coder.NumberCoder{}
+	driver.parameterDecoder[types.NCHAR] = &parameter_coder.StringParameter{}
+	driver.parameterDecoder[types.CHAR] = &parameter_coder.StringParameter{}
+	driver.parameterDecoder[types.LONG] = &parameter_coder.StringParameter{}
+	driver.parameterDecoder[types.LongVarChar] = &parameter_coder.StringParameter{}
 
-	driver.typeDecoder[types.NCHAR] = &type_coder.StringCoder{}
-	driver.typeDecoder[types.CHAR] = &type_coder.StringCoder{}
-	driver.typeDecoder[types.LONG] = &type_coder.StringCoder{}
-	driver.typeDecoder[types.LongVarChar] = &type_coder.StringCoder{}
+	driver.parameterDecoder[types.RAW] = &parameter_coder.RawParameter{}
+	driver.parameterDecoder[types.LongRaw] = &parameter_coder.RawParameter{}
 
-	driver.typeDecoder[types.RAW] = &type_coder.RawCoder{}
-	driver.typeDecoder[types.LongRaw] = &type_coder.RawCoder{}
-	driver.typeDecoder[types.LongVarRaw] = &type_coder.RawCoder{}
+	driver.parameterDecoder[types.NUMBER] = &parameter_coder.NumberParameter{}
+	driver.parameterDecoder[types.IBFLOAT] = &parameter_coder.NumberParameter{}
+	driver.parameterDecoder[types.IBDOUBLE] = &parameter_coder.NumberParameter{}
 
-	driver.typeDecoder[types.IBFLOAT] = &type_coder.DoubleCoder{}
-	driver.typeDecoder[types.BFLOAT] = &type_coder.DoubleCoder{}
-	driver.typeDecoder[types.IBDOUBLE] = &type_coder.DoubleCoder{}
-	driver.typeDecoder[types.BDOUBLE] = &type_coder.DoubleCoder{}
+	driver.parameterDecoder[types.DATE] = &parameter_coder.DateParameter{}
+	driver.parameterDecoder[types.TIMESTAMP] = &parameter_coder.DateParameter{}
+	driver.parameterDecoder[types.TIMESTAMPTZ] = &parameter_coder.DateParameter{}
 
-	driver.typeDecoder[types.DATE] = &type_coder.DateCoder{}
-	driver.typeDecoder[types.TIMESTAMP] = &type_coder.DateCoder{}
-	driver.typeDecoder[types.TimeStampDTY] = &type_coder.DateCoder{}
-	driver.typeDecoder[types.TIMESTAMPTZ] = &type_coder.DateCoder{}
-	driver.typeDecoder[types.TimeStampeLTZ] = &type_coder.DateCoder{}
-	driver.typeDecoder[types.TimeStampTZ_DTY] = &type_coder.DateCoder{}
+	driver.parameterDecoder[types.VECTOR] = &parameter_coder.VectorParameter{}
+	driver.parameterDecoder[types.OCIBlobLocator] = &parameter_coder.BlobParameter{}
+	driver.parameterDecoder[types.OCIClobLocator] = &parameter_coder.ClobParameter{}
 
-	driver.typeDecoder[types.ROWID] = &type_coder.RowIDCoder{}
-	driver.typeDecoder[types.UROWID] = &type_coder.RowIDCoder{}
+	driver.parameterDecoder[types.ROWID] = &parameter_coder.RowIDParameter{}
+	driver.parameterDecoder[types.UROWID] = &parameter_coder.RowIDParameter{}
 
-	driver.typeDecoder[types.BOOLEAN] = &type_coder.BoolCoder{}
+	driver.parameterDecoder[types.BOOLEAN] = &parameter_coder.BoolParameter{}
 
-	driver.typeDecoder[types.VECTOR] = type_coder.NewVectorDecoder()
-	driver.typeDecoder[types.OCIBlobLocator] = type_coder.NewBlobDecoder()
-	driver.typeDecoder[types.OCIClobLocator] = type_coder.NewClobDecoder()
+	driver.parameterEncoder[tyString] = &parameter_coder.StringParameter{}
+	driver.parameterEncoder[tyNullString] = &parameter_coder.StringParameter{}
+	driver.parameterEncoder[types.TyVarchar] = &parameter_coder.StringParameter{}
+
+	driver.parameterEncoder[tyBytes] = &parameter_coder.RawParameter{}
+	driver.parameterEncoder[types.TyRaw] = &parameter_coder.RawParameter{}
+
+	driver.parameterEncoder[tyInt] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyInt8] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyInt16] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyInt32] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyInt64] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyUint] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyUint8] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyUint16] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyUint32] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyUint64] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyFloat32] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyFloat64] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyNullByte] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyNullInt16] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyNullInt32] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyNullInt64] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyNullFloat64] = &parameter_coder.NumberParameter{}
+	driver.parameterEncoder[tyNumber] = &parameter_coder.NumberParameter{}
+
+	driver.parameterEncoder[types.TyBoolean] = &parameter_coder.BoolParameter{}
+
+	driver.parameterEncoder[tyTime] = &parameter_coder.DateParameter{}
+	driver.parameterEncoder[tyNullTime] = &parameter_coder.DateParameter{}
+	driver.parameterEncoder[types.TyDate] = &parameter_coder.DateParameter{}
+
+	driver.parameterEncoder[types.TyInterval] = &parameter_coder.IntervalParamter{}
+
+	driver.parameterEncoder[types.TyVector] = &parameter_coder.VectorParameter{}
+	driver.parameterEncoder[types.TyClob] = &parameter_coder.ClobParameter{}
+	driver.parameterEncoder[types.TyBlob] = &parameter_coder.BlobParameter{}
+
+	// add basic type decoders here
+	//driver.typeDecoder[types.NUMBER] = &type_coder.NumberCoder{}
+	//
+	//driver.typeDecoder[types.NCHAR] = &type_coder.StringCoder{}
+	//driver.typeDecoder[types.CHAR] = &type_coder.StringCoder{}
+	//driver.typeDecoder[types.LONG] = &type_coder.StringCoder{}
+	//driver.typeDecoder[types.LongVarChar] = &type_coder.StringCoder{}
+	//
+	//driver.typeDecoder[types.RAW] = &type_coder.RawCoder{}
+	//driver.typeDecoder[types.LongRaw] = &type_coder.RawCoder{}
+	//driver.typeDecoder[types.LongVarRaw] = &type_coder.RawCoder{}
+	//
+	//driver.typeDecoder[types.IBFLOAT] = &type_coder.DoubleCoder{}
+	//driver.typeDecoder[types.BFLOAT] = &type_coder.DoubleCoder{}
+	//driver.typeDecoder[types.IBDOUBLE] = &type_coder.DoubleCoder{}
+	//driver.typeDecoder[types.BDOUBLE] = &type_coder.DoubleCoder{}
+	//
+	//driver.typeDecoder[types.DATE] = &type_coder.DateCoder{}
+	//driver.typeDecoder[types.TIMESTAMP] = &type_coder.DateCoder{}
+	//driver.typeDecoder[types.TimeStampDTY] = &type_coder.DateCoder{}
+	//driver.typeDecoder[types.TIMESTAMPTZ] = &type_coder.DateCoder{}
+	//driver.typeDecoder[types.TimeStampeLTZ] = &type_coder.DateCoder{}
+	//driver.typeDecoder[types.TimeStampTZ_DTY] = &type_coder.DateCoder{}
+	//
+	//driver.typeDecoder[types.ROWID] = &type_coder.RowIDCoder{}
+	//driver.typeDecoder[types.UROWID] = &type_coder.RowIDCoder{}
+	//
+	//driver.typeDecoder[types.BOOLEAN] = &type_coder.BoolCoder{}
+	//
+	//driver.typeDecoder[types.VECTOR] = type_coder.NewVectorDecoder()
+	//driver.typeDecoder[types.OCIBlobLocator] = type_coder.NewBlobDecoder()
+	//driver.typeDecoder[types.OCIClobLocator] = type_coder.NewClobDecoder()
 
 	// JsonFieldEncoder
-	driver.jsonEncoder[tyString] = &oson.StringField{}
-	driver.jsonEncoder[tyInt64] = &oson.NumberField{}
-	driver.jsonEncoder[tyFloat32] = &oson.NumberField{}
-	driver.jsonEncoder[tyFloat64] = &oson.NumberField{}
+	//driver.jsonEncoder[tyString] = &oson.StringField{}
+	//driver.jsonEncoder[tyInt64] = &oson.NumberField{}
+	//driver.jsonEncoder[tyFloat32] = &oson.NumberField{}
+	//driver.jsonEncoder[tyFloat64] = &oson.NumberField{}
 	// JsonFieldDecoder
 }
 func (driver *OracleDriver) initFromConn(conn *Connection) error {
@@ -183,10 +251,11 @@ func RegisterJsonFieldDecoder(db GetDriverInterface, opCode int, decoder oson.Fi
 	}
 	return errors.New("the driver used is not a go-ora driver type")
 }
-func RegisterTypeDecoder(db GetDriverInterface, oracleType uint16, decoder type_coder.OracleTypeDecoder) error {
+func RegisterTypeDecoder(db GetDriverInterface, oracleType uint16, decoder parameter_coder.OracleParameterDecoder) error {
 	if drv, ok := db.Driver().(*OracleDriver); ok {
 		drv.mu.Lock()
-		drv.typeDecoder[oracleType] = decoder
+		drv.parameterDecoder[oracleType] = decoder
+		//drv.typeDecoder[oracleType] = decoder
 		drv.mu.Unlock()
 		return nil
 	}
@@ -326,7 +395,7 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 	var err error
 	arrayParam := ParameterInfo{
 		Direction: Input,
-		TypeInfo: type_coder.TypeInfo{
+		BasicParameter: parameter_coder.BasicParameter{
 			Flag:       3,
 			MaxLen:     1,
 			MaxCharLen: 1,
@@ -400,7 +469,7 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 			if err != nil {
 				return err
 			}
-			param := ParameterInfo{Direction: Input, TypeInfo: type_coder.TypeInfo{Flag: 3}}
+			param := ParameterInfo{Direction: Input, BasicParameter: parameter_coder.BasicParameter{Flag: 3}}
 			param.Name = attName.String
 			param.TypeName = attTypeName.String
 			switch strings.ToUpper(attTypeName.String) {

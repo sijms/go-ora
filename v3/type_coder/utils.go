@@ -1,15 +1,8 @@
 package type_coder
 
 import (
-	"database/sql"
-	"database/sql/driver"
 	"encoding/binary"
-	"fmt"
-	"reflect"
 	"time"
-
-	"github.com/sijms/go-ora/v3/types"
-	"github.com/sijms/go-ora/v3/utils"
 )
 
 func xorBuffer(buffer []byte, length int) {
@@ -70,65 +63,65 @@ func createQuasiLocator(dataLen uint64) []byte {
 	return ret
 }
 
-func Encode(input any) (OracleTypeEncoder, error) {
-	// if nil use string converter
-	if input == nil {
-		return NewStringCoder(sql.NullString{}, false)
-	}
-	// check if the type is actually implements OracleTypeEncoder so return it
-	if temp, ok := input.(OracleTypeEncoder); ok {
-		return temp, nil
-	}
-	vInput := reflect.ValueOf(input)
-	for vInput.Kind() == reflect.Ptr {
-		vInput = vInput.Elem()
-	}
-	// switch special types
-	switch v := input.(type) {
-	case types.Blob:
-		return NewBlobEncoder(v), nil
-	case *types.Blob:
-		return NewBlobEncoder(*v), nil
-	case types.Clob:
-		return NewClobEncoder(v), nil
-	case *types.Clob:
-		return NewClobEncoder(*v), nil
-	case types.Vector:
-		return NewVectorEncoder(v)
-	case *types.Vector:
-		return NewVectorEncoder(*v)
-		// BFile
-		// Json
-	}
-	// switch main types
-	if utils.IsNumber(vInput.Type()) || utils.IsNumber(vInput.Type()) {
-		number, err := types.NewNumber(input)
-		if err != nil {
-			return nil, err
-		}
-		return NewNumberCoder(number)
-	}
-	switch vInput.Type() {
-	case utils.TyString, utils.TyNullString:
-		return NewStringCoder(input, false)
-	case utils.TyBool:
-		return NewBoolCoder(input)
-	case utils.TyTime, utils.TyNullTime:
-		return NewDate(input)
-	case utils.TyBytes:
-		return NewRawCoder(input)
-	}
-	// switch complex types types
-	// objects
-	// arrays
-
-	// last thing see if the input support valuer interface
-	if temp, ok := input.(driver.Valuer); ok {
-		v, err := temp.Value()
-		if err != nil {
-			return nil, err
-		}
-		return Encode(v)
-	}
-	return nil, fmt.Errorf("unsupported type: %v", vInput.Type())
-}
+//func Encode(input any) (OracleTypeEncoder, error) {
+//	// if nil use string converter
+//	if input == nil {
+//		return NewStringCoder(sql.NullString{}, false)
+//	}
+//	// check if the type is actually implements OracleTypeEncoder so return it
+//	if temp, ok := input.(OracleTypeEncoder); ok {
+//		return temp, nil
+//	}
+//	vInput := reflect.ValueOf(input)
+//	for vInput.Kind() == reflect.Ptr {
+//		vInput = vInput.Elem()
+//	}
+//	// switch special types
+//	switch v := input.(type) {
+//	case types.Blob:
+//		return NewBlobEncoder(v), nil
+//	case *types.Blob:
+//		return NewBlobEncoder(*v), nil
+//	case types.Clob:
+//		return NewClobEncoder(v), nil
+//	case *types.Clob:
+//		return NewClobEncoder(*v), nil
+//	case types.Vector:
+//		return NewVectorEncoder(v)
+//	case *types.Vector:
+//		return NewVectorEncoder(*v)
+//		// BFile
+//		// Json
+//	}
+//	// switch main types
+//	if utils.IsNumber(vInput.Type()) || utils.IsNumber(vInput.Type()) {
+//		number, err := types.NewNumber(input)
+//		if err != nil {
+//			return nil, err
+//		}
+//		return NewNumberCoder(number)
+//	}
+//	switch vInput.Type() {
+//	case utils.TyString, utils.TyNullString:
+//		return NewStringCoder(input, false)
+//	case utils.TyBool:
+//		return NewBoolCoder(input)
+//	case utils.TyTime, utils.TyNullTime:
+//		return NewDate(input)
+//	case utils.TyBytes:
+//		return NewRawCoder(input)
+//	}
+//	// switch complex types types
+//	// objects
+//	// arrays
+//
+//	// last thing see if the input support valuer interface
+//	if temp, ok := input.(driver.Valuer); ok {
+//		v, err := temp.Value()
+//		if err != nil {
+//			return nil, err
+//		}
+//		return Encode(v)
+//	}
+//	return nil, fmt.Errorf("unsupported type: %v", vInput.Type())
+//}

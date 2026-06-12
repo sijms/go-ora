@@ -7,132 +7,128 @@ import (
 	"fmt"
 )
 
-type Blob interface {
-	Data() []byte
-	//CopyFrom(blob Blob) error
-	ReadFromPos(ctx context.Context, pos int64) ([]byte, error)
-	ReadBytesFromPos(ctx context.Context, pos, count int64) ([]byte, error)
-	Lob
-}
-type blob struct {
-	data []byte
+type Blob struct {
+	Raw
 	lobBase
+	UploadCtx context.Context
 }
 
-func CreateBlob(db *sql.DB, ctx context.Context, data []byte) (Blob, error) {
-	ret := &blob{data: data}
-	if data == nil {
-		return ret, nil
-	}
-	_, err := db.ExecContext(context.Background(), "--CREATE-LOB-STREAM--", &ret.stream)
-	if err != nil {
-		return nil, err
-	}
-	err = ret.createLocatorAndUploadData(ctx)
-	return ret, nil
+func (blob *Blob) Upload() error {
+	return blob.uploadData(blob.bValue, 0, 0)
 }
 
-func NewBlob(streamer LobStreamer, data []byte) (Blob, error) {
-	ret := &blob{
-		data: data,
-		lobBase: lobBase{
-			stream: streamer,
-		},
-	}
-	err := ret.createLocatorAndUploadData(context.Background())
-	return ret, err
-}
-
-func (l *blob) createLocatorAndUploadData(ctx context.Context) error {
-	if l.stream == nil {
-		return errNilStreamer
-	}
+func (blob *Blob) SetValue(input interface{}, typeId uint16) error {
 	var err error
-	if l.stream.GetLocator() == nil {
-		if len(l.data) == 0 {
-			return nil
-		}
-		done := l.stream.StartContext(ctx)
-		defer l.stream.EndContext(done)
-		_, err = l.stream.CreateTemporaryLocator(0, 0)
+	switch input := input.(type) {
+	case Blob:
+		*blob = input
+		return nil
+	case *Blob:
+		*blob = *input
+		return nil
+	default:
+		err = blob.Raw.SetValue(input, typeId)
 		if err != nil {
 			return err
 		}
-		err = l.stream.Write(l.data)
 	}
-	return err
+	return blob.Upload()
 }
-func (l *blob) Read(ctx context.Context) error {
-	if len(l.data) > 0 {
-		return nil
-	}
+
+//	type Blob interface {
+//		Data() []byte
+//		//CopyFrom(blob Blob) error
+//		ReadFromPos(ctx context.Context, pos int64) ([]byte, error)
+//		ReadBytesFromPos(ctx context.Context, pos, count int64) ([]byte, error)
+//		Lob
+//	}
+//type blob struct {
+//	data []byte
+//	lobBase
+//	UploadCtx context.Context
+//}
+
+func CreateBlob(db *sql.DB, uploadCtx context.Context, input interface{}) (*Blob, error) {
 	var err error
-	l.data, err = l.ReadFromPos(ctx, 0)
+	ret := &Blob{}
+	ret.UploadCtx = uploadCtx
+	err = ret.createStreamer(db)
+	if err != nil {
+		return nil, err
+	}
+	return ret, ret.SetValue(input, 0)
+}
+
+func NewBlob(stream LobStreamer, uploadCtx context.Context, input interface{}) (*Blob, error) {
+	ret := &Blob{}
+	ret.UploadCtx = uploadCtx
+	ret.stream = stream
+	return ret, ret.SetValue(input, 0)
+}
+
+//	func (blob *Blob) createLocatorAndUploadData(ctx context.Context) error {
+//		if l.stream == nil {
+//			return errNilStreamer
+//		}
+//		var err error
+//		if len(blob.bValue) == 0 {
+//			return nil
+//		}
+//		done := blob.stream.StartContext(ctx)
+//		defer blob.stream.EndContext(done)
+//		_, err = blob.stream.CreateTemporaryLocator(0, 0)
+//		if err != nil {
+//			return err
+//		}
+//		err = blob.stream.Write(blob.bValue)
+//		return err
+//	}
+func (blob *Blob) Read(ctx context.Context) error {
+	var err error
+	blob.bValue, err = blob.ReadFromPos(ctx, 0)
 	return err
 }
-func (l *blob) CopyTo(dest driver.Value) error {
+func (blob *Blob) CopyTo(dest driver.Value) error {
 	switch dst := dest.(type) {
 	case *[]byte:
-		*dst = l.data
+		*dst = blob.bValue
 	case *string:
-		*dst = string(l.data)
+		*dst = string(blob.bValue)
 	case *sql.NullString:
-		if l.data == nil {
+		if blob.bValue == nil {
 			*dst = sql.NullString{Valid: false}
 		} else {
-			*dst = sql.NullString{String: string(l.data), Valid: true}
+			*dst = sql.NullString{String: string(blob.bValue), Valid: true}
 		}
 	default:
 		return fmt.Errorf("cannot copy blob to variable of type %T ", dest)
 	}
 	return nil
 }
-func (l *blob) Scan(src interface{}) error {
-	var err error
-	if src == nil {
-		if l.stream != nil {
-			l.stream.SetLocator(nil)
-		}
-		l.data = nil
-		return nil
-	}
-	switch v := src.(type) {
-	case *blob:
-		err = l.lobBase.copyFrom(&v.lobBase)
-		if err != nil {
-			return err
-		}
-		l.data = v.data
-	case []byte:
-		l.data = v
-	default:
-		return fmt.Errorf("value of type %T cannot scanned into Blob", src)
-	}
-	return nil
+func (blob *Blob) Scan(src interface{}) error {
+	return blob.SetValue(src, 0)
 }
 
-func (l *blob) Data() []byte {
-	//if l.IsNil() || l.data != nil {
-	//	return l.data, nil
-	//}
-	//var err error
-	//err = l.Read(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if free {
-	//	err = l.Free()
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//}
-	return l.data
-}
-
+//func (l *blob) Data() []byte {
+//	//if l.IsNil() || l.data != nil {
+//	//	return l.data, nil
+//	//}
+//	//var err error
+//	//err = l.Read(ctx)
+//	//if err != nil {
+//	//	return nil, err
+//	//}
+//	//if free {
+//	//	err = l.Free()
+//	//	if err != nil {
+//	//		return nil, err
+//	//	}
+//	//}
+//	return l.data
+//}
 //func (lob *blob) Value() (driver.Value, error) {
 //	return lob.Data(context.Background(), false)
 //}
-
 //func (blob *Blob) Encode() ([]byte, error) {
 //	return blob.Data, nil
 //}

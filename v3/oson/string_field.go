@@ -13,8 +13,8 @@ type StringField struct {
 	basicField
 }
 
-func (field *StringField) Value() interface{} {
-	return field.value
+func (field *StringField) Value() (interface{}, error) {
+	return field.value, nil
 }
 
 func NewStringField(value string) *StringField {

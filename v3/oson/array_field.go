@@ -14,8 +14,8 @@ type ArrayField struct {
 	structField
 }
 
-func (array *ArrayField) Value() interface{} {
-	return array.value
+func (array *ArrayField) Value() (interface{}, error) {
+	return array.value, nil
 }
 
 func NewArrayField(value interface{}, header *Header) (*ArrayField, error) {
@@ -41,7 +41,7 @@ func NewArrayField(value interface{}, header *Header) (*ArrayField, error) {
 				if err != nil {
 					return nil, err
 				}
-				field = &NumberField{data: temp.Data}
+				field = &NumberField{value: *temp}
 			case reflect.String:
 				field = NewStringField(item.String())
 			case reflect.Bool:

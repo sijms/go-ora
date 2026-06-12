@@ -9,6 +9,7 @@ import (
 	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/trace"
+	ora_types "github.com/sijms/go-ora/v3/types"
 )
 
 type Clob struct {
@@ -34,8 +35,8 @@ var errEmptyLocator = errors.New("call lob operation on an empty locator")
 
 type LobStream struct {
 	conn          *Connection
-	sourceLocator []byte
-	destLocator   []byte
+	sourceLocator ora_types.Locator
+	destLocator   ora_types.Locator
 	scn           []byte
 	sourceOffset  int64
 	destOffset    int64
@@ -63,20 +64,23 @@ func (lob *LobStream) initialize() {
 }
 
 // variableWidthChar if lob has variable width char or not
-func (lob *LobStream) IsVarWidthChar() bool {
-	return len(lob.sourceLocator) > 6 && lob.sourceLocator[6]&0x80 == 0x80
-}
-
+//func (lob *LobStream) IsVarWidthChar() bool {
+//	return len(lob.sourceLocator) > 6 && lob.sourceLocator[6]&0x80 == 0x80
+//}
 // IsLittleEndian if Lob is littleEndian or not
-func (lob *LobStream) IsLittleEndian() bool {
-	return len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&0x40 == 0x40
-}
+//func (lob *LobStream) IsLittleEndian() bool {
+//	return len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&0x40 == 0x40
+//}
 
-func (lob *LobStream) GetLocator() []byte {
+func (lob *LobStream) GetLocator() ora_types.Locator {
 	return lob.sourceLocator
 }
-func (lob *LobStream) SetLocator(locator []byte) {
+func (lob *LobStream) SetLocator(locator ora_types.Locator) {
 	lob.sourceLocator = locator
+	if !locator.IsQuasi() {
+		lob.conn.appendTemporaryLoc(locator)
+	}
+
 }
 func (lob *LobStream) GetTracer() trace.Tracer {
 	return lob.conn.tracer
@@ -106,6 +110,7 @@ func (lob *LobStream) GetSize() (size int64, err error) {
 		return
 	}
 	err = lob.read()
+	err = processReset(err, lob.conn)
 	if err != nil {
 		return
 	}
@@ -138,6 +143,7 @@ func (lob *LobStream) Read(offset, count int64) (data []byte, err error) {
 		return
 	}
 	err = lob.read()
+	err = processReset(err, lob.conn)
 	if err != nil {
 		return
 	}
@@ -161,7 +167,8 @@ func (lob *LobStream) Write(data []byte) error {
 	if err != nil {
 		return err
 	}
-	return lob.read()
+	err = lob.read()
+	return processReset(err, lob.conn)
 }
 
 // getData return lob data
@@ -181,8 +188,8 @@ func (lob *LobStream) putString(data string) error {
 	conn.tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
 	lob.initialize()
 	var strConv converters.IStringConverter
-	if lob.IsVarWidthChar() {
-		if conn.dBVersion.Number < 10200 && lob.IsLittleEndian() {
+	if lob.sourceLocator.IsVarWidthChar() {
+		if conn.dBVersion.Number < 10200 && lob.sourceLocator.IsLittleEndian() {
 			strConv, _ = conn.GetStringCoder(2002, 0)
 		} else {
 			strConv, _ = conn.GetStringCoder(2000, 0)
@@ -206,7 +213,8 @@ func (lob *LobStream) putString(data string) error {
 	if err != nil {
 		return err
 	}
-	return lob.read()
+	err = lob.read()
+	return processReset(err, lob.conn)
 }
 
 func (lob *LobStream) Exists() (bool, error) {
@@ -223,6 +231,7 @@ func (lob *LobStream) Exists() (bool, error) {
 		return false, err
 	}
 	err = lob.read()
+	err = processReset(err, lob.conn)
 	if err != nil {
 		return false, err
 	}
@@ -237,22 +246,23 @@ func (lob *LobStream) GetLobReadMode() configurations.LobReadMode {
 }
 
 // isTemporary: return true if the lob is temporary
-func (lob *LobStream) isTemporary() bool {
-	if len(lob.sourceLocator) > 7 {
-		if lob.sourceLocator[7]&1 == 1 || lob.sourceLocator[4]&0x40 == 0x40 || lob.isValueBasedLocator() {
-			return true
-		}
-	}
-	return false
-}
-
-func (lob *LobStream) isQuasiLocator() bool {
-	return lob.sourceLocator[3] == 4
-}
-
-func (lob *LobStream) isValueBasedLocator() bool {
-	return lob.sourceLocator[4]&0x20 > 0
-}
+//
+//	func (lob *LobStream) isTemporary() bool {
+//		if len(lob.sourceLocator) > 7 {
+//			if lob.sourceLocator[7]&1 == 1 || lob.sourceLocator[4]&0x40 == 0x40 || lob.isValueBasedLocator() {
+//				return true
+//			}
+//		}
+//		return false
+//	}
+//
+//	func (lob *LobStream) isQuasiLocator() bool {
+//		return lob.sourceLocator.IsQuasi()
+//	}
+//
+//	func (lob *LobStream) isValueBasedLocator() bool {
+//		return lob.sourceLocator[4]&0x20 > 0
+//	}
 func (lob *LobStream) StartContext(ctx context.Context) chan struct{} {
 	return lob.conn.session.StartContext(ctx)
 }
@@ -271,13 +281,14 @@ func (lob *LobStream) FreeTemporaryLocator() error {
 		return err
 	}
 	err = lob.read()
+	err = processReset(err, lob.conn)
 	if err != nil {
 		return err
 	}
 	lob.sourceLocator = nil
 	return nil
 }
-func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) ([]byte, error) {
+func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) (ora_types.Locator, error) {
 	lob.initialize()
 	lob.conn.tracer.Print("Create Temporary Lob:")
 	lob.sourceLocator = make([]byte, 0x28)
@@ -306,9 +317,11 @@ func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) ([]byte
 		return nil, err
 	}
 	err = lob.read()
+	err = processReset(err, lob.conn)
 	if err != nil {
 		return nil, err
 	}
+	lob.conn.appendTemporaryLoc(lob.sourceLocator)
 	return lob.sourceLocator, nil
 }
 
@@ -339,7 +352,7 @@ func (lob *LobStream) Open(mode, opID int) error {
 		return errEmptyLocator
 	}
 	lob.conn.tracer.Printf("Open Lob: Mode= %d   Operation ID= %d", mode, opID)
-	if lob.isTemporary() {
+	if lob.sourceLocator.IsTemporary() {
 		if lob.sourceLocator[7]&8 == 8 {
 			return errors.New("TTC Error")
 		}

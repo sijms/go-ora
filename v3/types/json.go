@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	//"github.com/sijms/go-ora/v3/oson"
 )
 
 //type Json interface {
@@ -13,7 +14,8 @@ type JsonDecoder interface {
 	DecodeJson(data []byte) (*Json, error)
 }
 type Json struct {
-	Data    interface{}
+	Value   interface{}
+	bValue  []byte
 	decoder JsonDecoder
 	lobBase
 }
@@ -35,19 +37,19 @@ func CreateJson(input interface{}) (*Json, error) {
 		if strings.HasPrefix(value, "[") {
 			var temp []interface{}
 			err = json.Unmarshal([]byte(value), &temp)
-			j.Data = temp
+			j.Value = temp
 		} else {
 			var temp = make(map[string]interface{})
 			err = json.Unmarshal([]byte(value), &temp)
-			j.Data = temp
+			j.Value = temp
 		}
 		if err != nil {
 			return nil, err
 		}
 	case map[string]interface{}:
-		j.Data = value
+		j.Value = value
 	case []map[string]interface{}:
-		j.Data = value
+		j.Value = value
 	default:
 		return nil, jsonTypeError
 	}
@@ -64,21 +66,22 @@ func NewJson(input interface{}, stream LobStreamer, decoder JsonDecoder) (*Json,
 	return j, nil
 }
 func (j *Json) Scan(input interface{}) error {
-	var err error
+	//var err error
 	if input == nil {
 		if j.stream != nil {
 			j.stream.SetLocator(nil)
 		}
-		j.Data = nil
+		j.Value = nil
 		return nil
 	}
 	switch value := input.(type) {
 	case *Json:
-		err = j.lobBase.copyFrom(&value.lobBase)
-		if err != nil {
-			return nil
-		}
-		j.Data = value.Data
+		*j = *value
+		//err = j.lobBase.copyFrom(&value.lobBase)
+		//if err != nil {
+		//	return nil
+		//}
+		//j.Value = value.Value
 	default:
 		temp, err := CreateJson(value)
 		if err != nil {
@@ -90,4 +93,21 @@ func (j *Json) Scan(input interface{}) error {
 		}
 	}
 	return nil
+}
+
+func (j *Json) decode() error {
+	var err error
+	//j.Value, err = oson.Decode(j.bValue)
+	return err
+}
+
+func (j *Json) encode() error {
+	var err error
+	//j.bValue, err = oson.Encode(j.Value)
+	return err
+}
+
+func (j *Json) setNil() {
+	j.Value = nil
+	j.bValue = nil
 }

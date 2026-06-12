@@ -20,8 +20,13 @@ type (
 		DecodeBinaryFloat(input []byte) (float32, error)
 	}
 	OracleType interface {
-		Encode(input interface{}) ([]byte, error)
-		Decode(input []byte) (interface{}, error)
+		SetValue(v interface{}, typeId uint16) error
+		SetBytes(b []byte)
+		Value(typeId uint16) (interface{}, error)
+		Bytes() []byte
+
+		//Encode(typeId uint16) error
+		//Decode(typeId uint16) error
 		//Value() interface{}
 		//Bytes() []byte
 	}

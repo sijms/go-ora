@@ -57,7 +57,6 @@ type defaultStmt struct {
 	arrayBindCount    int
 	containOutputPars bool
 	autoClose         bool
-	temporaryLobs     [][]byte
 	multiSet          []RefCursor
 }
 
@@ -367,7 +366,8 @@ func (stmt *Stmt) writePars() error {
 		}
 		if !par.isLongType() {
 			if par.encoder != nil {
-				par.encoder.SetTypeInfo(par.TypeInfo)
+				//par.encoder.SetTypeInfo(par.TypeInfo)
+				par.encoder.SetParameterInfo(par.GetParameterInfo())
 				err := par.encoder.Write(ms)
 				if err != nil {
 					return err
@@ -432,10 +432,6 @@ func (stmt *Stmt) writePars() error {
 
 // write stmt data to network stream
 func (stmt *Stmt) write() error {
-	// add temporay lobs first
-	for _, par := range stmt.Pars {
-		stmt.temporaryLobs = append(stmt.temporaryLobs, par.collectLocators()...)
-	}
 	session := stmt.connection.session
 	if !stmt.parse && !stmt.reSendParDef {
 		exeOf := 0
@@ -477,7 +473,7 @@ func (stmt *Stmt) write() error {
 				if tempVal, ok := stmt.Pars[x].iPrimValue.([][]byte); ok {
 					arrayValues[x] = tempVal
 				} else {
-					return errors.New("")
+					return errors.New("error in encoding bulk exec array parameter")
 				}
 			}
 			for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
@@ -683,12 +679,6 @@ func (stmt *defaultStmt) fetch(resultSet *ResultSet) error {
 
 func (stmt *defaultStmt) _fetch(resultSet *ResultSet) error {
 	session := stmt.connection.session
-	// defer func() {
-	// 	err := stmt.freeTemporaryLobs()
-	// 	if err != nil {
-	// 		stmt.connection.tracer.Printf("Error free temporary lobs: %v", err)
-	// 	}
-	// }()
 	session.ResetBuffer()
 	session.PutTTCFunc(3, 5)
 	session.PutInt(stmt.cursorID, 2, true, true)
@@ -1062,50 +1052,6 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 	return nil
 }
 
-func (stmt *defaultStmt) freeTemporaryLobs() error {
-	// var locators = collectLocators(stmt.Pars)
-	if len(stmt.temporaryLobs) == 0 {
-		return nil
-	}
-	stmt.connection.tracer.Printf("Free %d Temporary Lobs", len(stmt.temporaryLobs))
-	session := stmt.connection.session
-	freeTemp := func(locators [][]byte) {
-		totalLen := 0
-		for _, locator := range locators {
-			totalLen += len(locator)
-		}
-		session.PutTTCFunc(0x11, 0x60)
-		session.PutBytes(1)
-		//session.PutBytes(0x11, 0x60, 0, 1)
-		session.PutUint(totalLen, 4, true, true)
-		session.PutBytes(0, 0, 0, 0, 0, 0, 0)
-		session.PutUint(0x80111, 4, true, true)
-		session.PutBytes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-		for _, locator := range locators {
-			session.PutBytes(locator...)
-		}
-	}
-	start := 0
-	end := 0
-	session.ResetBuffer()
-	for start < len(stmt.temporaryLobs) {
-		end = start + 25000
-		// end = start + 25
-		if end > len(stmt.temporaryLobs) {
-			end = len(stmt.temporaryLobs)
-		}
-		freeTemp(stmt.temporaryLobs[start:end])
-		start += end
-	}
-	session.PutTTCFunc(0x3, 0x93)
-	//session.PutBytes(0x3, 0x93, 0x0)
-	err := session.Write()
-	if err != nil {
-		return err
-	}
-	return stmt.connection.read()
-}
-
 // requestCustomTypeInfo an experimental function to ask for UDT information
 func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	session := stmt.connection.session
@@ -1192,7 +1138,7 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) erro
 		return nil
 	}
 
-	return col.decodeColumnValue(stmt.connection, &stmt.temporaryLobs, udt)
+	return col.decodeColumnValue(stmt.connection, udt)
 }
 
 // get values of rows and output parameter according to DataType and binary value (bValue)
@@ -1200,7 +1146,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	if param.isLobType() {
 		stmt._hasBLOB = true
 	}
-	err := param.decodeParameterValue(stmt.connection, &stmt.temporaryLobs)
+	err := param.decodeParameterValue(stmt.connection)
 	if err != nil {
 		return err
 	}
@@ -1223,10 +1169,11 @@ func (stmt *defaultStmt) Close() error {
 		stmt.connection.setBad()
 		return driver.ErrBadConn
 	}
-	err := stmt.freeTemporaryLobs()
-	if err != nil {
-		stmt.connection.tracer.Printf("Error free temporary lobs: %v", err)
-	}
+	var err error
+	//err := stmt.connection.freeTemporaryLobs()
+	//if err != nil {
+	//	stmt.connection.tracer.Printf("Error free temporary lobs: %v", err)
+	//}
 	if stmt.cursorID != 0 {
 		session := stmt.connection.session
 		session.ResetBuffer()
@@ -1486,10 +1433,16 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "nvarchar":
-			fieldVal := &NullNVarChar{}
-			if !hasNullValue {
-				fieldVal.NVarChar, fieldVal.Valid = NVarChar(getString(fieldValue)), true
+			fieldVal := &oraTypes.String{}
+			fieldVal.UseNCharset = true
+			err = fieldVal.SetValue(fieldValue, 0)
+			if err != nil {
+				return
 			}
+			//fieldVal := &NullNVarChar{}
+			//if !hasNullValue {
+			//	fieldVal.NVarChar, fieldVal.Valid = NVarChar(getString(fieldValue)), true
+			//}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "date":
 			fieldVal := &sql.NullTime{}
@@ -1539,47 +1492,59 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, &fieldVal, size, dir)
 		case "clob":
-			temp := sql.NullString{}
-			if !hasNullValue {
-				temp.Valid = true
-				temp.String = getString(fieldValue)
-			}
-			fieldVal, err := oraTypes.NewClob(&LobStream{conn: stmt.connection}, nil, temp, false)
+			fieldVal := &oraTypes.Clob{}
+			err = fieldVal.SetValue(fieldValue, 0)
 			if err != nil {
-				return nil, err
+				return
 			}
+			//fieldVal, err := oraTypes.NewClob(, nil, temp, false)
+			//if err != nil {
+			//	return nil, err
+			//}
 			//if !hasNullValue {
 			//	fieldVal.String, fieldVal.Valid = getString(fieldValue), true
 			//}
-			tempPar, err = stmt.NewParam(name, &fieldVal, size, dir)
+			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "nclob":
-			temp := sql.NullString{}
-			if !hasNullValue {
-				temp.Valid = true
-				temp.String = getString(fieldValue)
-			}
-			fieldVal, err := oraTypes.NewClob(&LobStream{conn: stmt.connection}, nil, temp, true)
+			fieldVal := &oraTypes.Clob{}
+			fieldVal.UseNCharset = true
+			err = fieldVal.SetValue(fieldValue, 0)
 			if err != nil {
-				return nil, err
+				return
 			}
+			//temp := sql.NullString{}
+			//if !hasNullValue {
+			//	temp.Valid = true
+			//	temp.String = getString(fieldValue)
+			//}
+			//fieldVal, err := oraTypes.NewClob(&LobStream{conn: stmt.connection}, context.Background(), temp, true)
+			//if err != nil {
+			//	return nil, err
+			//}
+			//fieldVal, err := oraTypes.NewClob(&LobStream{conn: stmt.connection}, nil, temp, true)
+			//if err != nil {
+			//	return nil, err
+			//}
 			//if !hasNullValue {
 			//	fieldVal.String, fieldVal.Valid = getString(fieldValue), true
 			//}
-			tempPar, err = stmt.NewParam(name, &fieldVal, size, dir)
+			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "blob":
-			var temp []byte = nil
-			if !hasNullValue {
-				temp, err = getBytes(fieldValue)
-				if err != nil {
-					err = typeErr
-					return
-				}
-			}
-			fieldVal, err := oraTypes.NewBlob(&LobStream{conn: stmt.connection}, temp)
-			if err != nil {
-				return nil, err
-			}
-			tempPar, err = stmt.NewParam(name, &fieldVal, size, dir)
+			fieldVal := &oraTypes.Blob{}
+			err = fieldVal.SetValue(fieldValue, 0)
+			//var temp []byte = nil
+			//if !hasNullValue {
+			//	temp, err = getBytes(fieldValue)
+			//	if err != nil {
+			//		err = typeErr
+			//		return
+			//	}
+			//}
+			//fieldVal, err := oraTypes.NewBlob(&LobStream{conn: stmt.connection}, context.Background(), temp)
+			//if err != nil {
+			//	return nil, err
+			//}
+			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "":
 			if field.Kind() == reflect.Ptr {
 				if field.IsNil() {
@@ -1769,7 +1734,6 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 					if err != nil {
 						return nil, err
 					}
-					stmt.temporaryLobs = append(stmt.temporaryLobs, par.collectLocators()...)
 					if maxLen < par.MaxLen {
 						maxLen = par.MaxLen
 					}
@@ -2227,41 +2191,51 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 			//	} else {
 			//		resultSet.rows[rowIndex][colIndex] = nil
 			//	}
-			case oraTypes.Vector:
+			case *oraTypes.Vector:
 				if stmt.connection.connOption.Lob == configurations.INLINE {
-					resultSet.rows[rowIndex][colIndex] = val.Data()
+					resultSet.rows[rowIndex][colIndex], err = val.Value(0)
+					if err != nil {
+						return err
+					}
 				} else {
 					if val.GetReadMode() == configurations.LobReadMode_AUTO {
 						err = val.Read(context.Background())
 						if err != nil {
 							return err
 						}
-						resultSet.rows[rowIndex][colIndex] = val.Data()
+						resultSet.rows[rowIndex][colIndex], err = val.Value(0)
+						if err != nil {
+							return err
+						}
 					}
 				}
-			case oraTypes.Clob:
+			case *oraTypes.Clob:
 				if val.GetReadMode() == configurations.LobReadMode_AUTO {
 					err = val.Read(context.Background())
 					if err != nil {
 						return err
 					}
-					data := val.Data()
-					if data.Valid {
-						resultSet.rows[rowIndex][colIndex] = data.String
-					} else {
-						resultSet.rows[rowIndex][colIndex] = nil
-					}
+					resultSet.rows[rowIndex][colIndex], err = val.Value(0)
 					if err != nil {
 						return err
 					}
+					//data := val.Data()
+					//if data.Valid {
+					//	resultSet.rows[rowIndex][colIndex] = data.String
+					//} else {
+					//	resultSet.rows[rowIndex][colIndex] = nil
+					//}
+					//if err != nil {
+					//	return err
+					//}
 				}
-			case oraTypes.Blob:
+			case *oraTypes.Blob:
 				if val.GetReadMode() == configurations.LobReadMode_AUTO {
 					err = val.Read(context.Background())
 					if err != nil {
 						return err
 					}
-					resultSet.rows[rowIndex][colIndex] = val.Data()
+					resultSet.rows[rowIndex][colIndex], err = val.Value(0)
 					if err != nil {
 						return err
 					}

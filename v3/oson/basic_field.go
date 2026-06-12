@@ -18,7 +18,7 @@ type Field interface {
 	Offset() int
 	SetOffset(int)
 	Children() []Field
-	Value() interface{}
+	Value() (interface{}, error)
 }
 
 type basicField struct {
@@ -74,8 +74,8 @@ type NullField struct {
 	basicField
 }
 
-func (field *NullField) Value() interface{} {
-	return nil
+func (field *NullField) Value() (interface{}, error) {
+	return nil, nil
 }
 
 func (field *NullField) Encode() ([]byte, error) {
@@ -96,8 +96,8 @@ type BooleanField struct {
 	basicField
 }
 
-func (field *BooleanField) Value() interface{} {
-	return field.value
+func (field *BooleanField) Value() (interface{}, error) {
+	return field.value, nil
 }
 
 func (field *BooleanField) Encode() ([]byte, error) {

@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/sijms/go-ora/v3/network"
-	"github.com/sijms/go-ora/v3/types"
 	"github.com/sijms/go-ora/v3/oson"
+	"github.com/sijms/go-ora/v3/types"
 )
 
 type JsonCoder struct {
@@ -25,11 +25,11 @@ func NewJsonEncoder(input *types.Json) (OracleTypeEncoder, error) {
 	if input == nil {
 		return ret, nil
 	}
-	if input.Data == nil {
+	if input.Value == nil {
 		return ret, nil
 	}
 	// convert json to bytes
-	ret.BValue, err = oson.Encode(input.Data)
+	ret.BValue, err = oson.Encode(input.Value)
 	if err != nil {
 		return nil, err
 	}

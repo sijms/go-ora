@@ -9,7 +9,7 @@ import (
 	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
-	"github.com/sijms/go-ora/v3/type_coder"
+	"github.com/sijms/go-ora/v3/parameter_coder"
 	oraTypes "github.com/sijms/go-ora/v3/types"
 )
 
@@ -76,7 +76,7 @@ type ParameterInfo struct {
 	//CharsetForm          int
 	//BValue            []byte
 	Value             driver.Value
-	encoder           type_coder.OracleTypeEncoder
+	encoder           parameter_coder.OracleParameterEncoder
 	iPrimValue        driver.Value
 	oPrimValue        driver.Value
 	OutputVarPtr      interface{}
@@ -85,7 +85,7 @@ type ParameterInfo struct {
 	cusType           *customType
 	parent            *ParameterInfo
 	Annotations       map[string]string
-	type_coder.TypeInfo
+	parameter_coder.BasicParameter
 }
 
 // load get parameter information form network session
@@ -380,39 +380,39 @@ func (par *ParameterInfo) clone() ParameterInfo {
 	return tempPar
 }
 
-func (par *ParameterInfo) collectLocators() [][]byte {
-	var ret [][]byte = nil
-	if temp, ok := par.Value.(oraTypes.Lob); ok {
-		locator := temp.GetLocator()
-		if locator != nil {
-			ret = append(ret, locator)
-		}
-	}
-	if temp, ok := par.oPrimValue.(oraTypes.Lob); ok {
-		locator := temp.GetLocator()
-		if locator != nil {
-			ret = append(ret, locator)
-		}
-	}
-	return ret
-	//switch value := par.iPrimValue.(type) {
-	//case *Lob:
-	//	if value != nil && value.sourceLocator != nil {
-	//		return [][]byte{value.sourceLocator}
-	//	}
-	//case *BFile:
-	//	if value != nil && value.lob.sourceLocator != nil {
-	//		return [][]byte{value.lob.sourceLocator}
-	//	}
-	//case []ParameterInfo:
-	//	output := make([][]byte, 0, 10)
-	//	for _, temp := range value {
-	//		output = append(output, temp.collectLocators()...)
-	//	}
-	//	return output
-	//}
-	//return [][]byte{}
-}
+//func (par *ParameterInfo) collectLocators() [][]byte {
+//	var ret [][]byte = nil
+//	if temp, ok := par.Value.(oraTypes.Lob); ok {
+//		locator := temp.GetLocator()
+//		if locator != nil {
+//			ret = append(ret, locator)
+//		}
+//	}
+//	if temp, ok := par.oPrimValue.(oraTypes.Lob); ok {
+//		locator := temp.GetLocator()
+//		if locator != nil {
+//			ret = append(ret, locator)
+//		}
+//	}
+//	return ret
+//	//switch value := par.iPrimValue.(type) {
+//	//case *Lob:
+//	//	if value != nil && value.sourceLocator != nil {
+//	//		return [][]byte{value.sourceLocator}
+//	//	}
+//	//case *BFile:
+//	//	if value != nil && value.lob.sourceLocator != nil {
+//	//		return [][]byte{value.lob.sourceLocator}
+//	//	}
+//	//case []ParameterInfo:
+//	//	output := make([][]byte, 0, 10)
+//	//	for _, temp := range value {
+//	//		output = append(output, temp.collectLocators()...)
+//	//	}
+//	//	return output
+//	//}
+//	//return [][]byte{}
+//}
 
 func (par *ParameterInfo) isLongType() bool {
 	return par.DataType == oraTypes.LONG ||
@@ -429,7 +429,7 @@ func (par *ParameterInfo) isLobType() bool {
 		par.DataType == oraTypes.JSON
 }
 
-func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]byte, udt bool) error {
+func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	session := conn.session
 	var err error
 	par.oPrimValue = nil
@@ -444,7 +444,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			pars := make([]ParameterInfo, 0, size)
 			for x := 0; x < size; x++ {
 				tempPar := par.clone()
-				err = tempPar.decodeParameterValue(conn, temporaryLobs)
+				err = tempPar.decodeParameterValue(conn)
 				if err != nil {
 					return err
 				}
@@ -497,21 +497,35 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 		}
 		par.IsNull = false
 	}
-	if decoder, ok := conn.typeDecoder[par.DataType]; ok {
-		par.IsUDTPar = udt
-		decoder.SetTypeInfo(par.TypeInfo)
-		decoder.SetCharsetCoder(conn)
+	if decoder, ok := conn.parameterDecoder[par.DataType]; ok {
+		decoder.SetParameterInfo(par.BasicParameter)
 		if par.isLobType() {
 			streamer := &LobStream{conn: conn}
 			decoder.SetLobStreamer(streamer)
 		}
-		par.oPrimValue, err = decoder.Read(session)
+		err = decoder.Read(session)
+		if err != nil {
+			return err
+		}
+		par.oPrimValue, err = decoder.Decode(conn)
 		if err != nil {
 			return err
 		}
 	} else {
-		return fmt.Errorf("unknown data type: %d", par.DataType)
+		return fmt.Errorf("no decoder register for data type: %d", par.DataType)
 	}
+	//if decoder, ok := conn.typeDecoder[par.DataType]; ok {
+	//	par.IsUDTPar = udt
+	//	decoder.SetTypeInfo(par.TypeInfo)
+	//	decoder.SetCharsetCoder(conn)
+
+	//	par.oPrimValue, err = decoder.Read(session)
+	//	if err != nil {
+	//		return err
+	//	}
+	//} else {
+	//	return fmt.Errorf("unknown data type: %d", par.DataType)
+	//}
 
 	//switch par.DataType {
 
@@ -608,13 +622,13 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 	return nil
 }
 
-func (par *ParameterInfo) decodeParameterValue(connection *Connection, temporaryLobs *[][]byte) error {
+func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
 	currentLobFetch := connection.connOption.Lob
 	connection.connOption.Lob = configurations.STREAM
 	defer func() {
 		connection.connOption.Lob = currentLobFetch
 	}()
-	err := par.decodePrimValue(connection, temporaryLobs, false)
+	err := par.decodePrimValue(connection, false)
 	if err != nil {
 		return err
 	}
@@ -629,7 +643,7 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection, temporary
 	//return fmt.Errorf("the input parameter does not support scanner interface")
 }
 
-func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLobs *[][]byte, udt bool) error {
+func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) error {
 	// var err error
 	//if !udt && connection.connOption.Lob == configurations.INLINE && (par.isLobType()) {
 	//	session := connection.session
@@ -703,5 +717,5 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLob
 	//	return nil
 	//}
 	// par.Value, err = par.decodeValue(connection, udt)
-	return par.decodePrimValue(connection, temporaryLobs, udt)
+	return par.decodePrimValue(connection, udt)
 }

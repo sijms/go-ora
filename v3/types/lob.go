@@ -1,17 +1,15 @@
 package types
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/sijms/go-ora/v3/configurations"
 )
 
 type Lob interface {
-	GetLocator() []byte
+	GetLocator() Locator
 	Free() error
 	GetLength() (int64, error)
 	Read(ctx context.Context) error
@@ -23,21 +21,24 @@ var errEmptyLocator = errors.New("calling Lob function: on nil or non allocated 
 var errNilStreamer = errors.New("calling Lob function: nil streamer")
 
 type lobBase struct {
-	//Locator []byte
-	stream LobStreamer
+	stream    LobStreamer
+	UploadCtx context.Context
 }
 
-//	func (l *lobBase) NewQuasiLocator(dataLen uint64) {
-//		l.Locator = make([]byte, 0x28)
-//		l.Locator[1] = 38
-//		l.Locator[3] = 4
-//		l.Locator[4] = 97
-//		l.Locator[5] = 8
-//		l.Locator[9] = 1
-//		binary.BigEndian.PutUint64(l.Locator[10:], dataLen)
-//	}
-
-func (l *lobBase) GetLocator() []byte {
+func (l *lobBase) createStreamer(db *sql.DB) error {
+	var err error
+	if l.stream == nil {
+		_, err = db.ExecContext(context.Background(), "--CREATE-LOB-STREAM--", &l.stream)
+	}
+	return err
+}
+func (l *lobBase) GetStreamer() LobStreamer {
+	return l.stream
+}
+func (l *lobBase) SetStreamer(input LobStreamer) {
+	l.stream = input
+}
+func (l *lobBase) GetLocator() Locator {
 	if l.IsNil() {
 		return nil
 	}
@@ -50,47 +51,40 @@ func (l *lobBase) IsQuasi() bool {
 	if l.IsNil() {
 		return true
 	}
-	locator := l.stream.GetLocator()
-	return len(locator) > 3 && locator[3] == 4
+	return l.stream.GetLocator().IsQuasi()
 }
-func (l *lobBase) IsValueBased() bool {
-	if !l.IsNil() {
-		locator := l.stream.GetLocator()
-		return len(locator) > 4 && locator[4]&0x20 == 0x20
-	}
-	return false
-}
-func (l *lobBase) IsTemporary() bool {
-	if !l.IsNil() {
-		locator := l.stream.GetLocator()
-		return len(locator) > 7 && locator[7]&1 == 1 || locator[4]&0x40 == 0x40 || l.IsValueBased()
-	}
-	return false
+func (l *lobBase) IsDataUploaded() bool {
+	return l.stream != nil && l.stream.GetLocator() != nil
 }
 
-func (l *lobBase) IsVarWidthChar() bool {
-	if !l.IsNil() {
-		locator := l.stream.GetLocator()
-		return len(locator) > 6 && locator[6]&0x80 == 0x80
+func (lob *lobBase) uploadData(data []byte, charsetID, charsetForm int) error {
+	if len(data) == 0 {
+		return nil
 	}
-	return false
+	var err error
+	if !lob.IsDataUploaded() && lob.stream != nil {
+		if lob.UploadCtx == nil {
+			lob.UploadCtx = context.Background()
+		}
+		done := lob.stream.StartContext(lob.UploadCtx)
+		defer lob.stream.EndContext(done)
+
+		_, err = lob.stream.CreateTemporaryLocator(charsetID, charsetForm)
+		if err != nil {
+			return err
+		}
+		err = lob.stream.Write(data)
+	}
+	return err
 }
 
-func (l *lobBase) IsLittleEndian() bool {
-	if !l.IsNil() {
-		locator := l.stream.GetLocator()
-		return len(locator) > 7 && locator[7]&0x40 == 0x40
-	}
-	return false
-}
-
-func (l *lobBase) IsReadOnly() bool {
-	if !l.IsNil() {
-		locator := l.stream.GetLocator()
-		return len(locator) > 6 && locator[6]&1 == 1
-	}
-	return false
-}
+//func (l *lobBase) IsTemporary() bool {
+//	if !l.IsNil() {
+//		locator := l.stream.GetLocator()
+//		return len(locator) > 7 && locator[7]&1 == 1 || locator[4]&0x40 == 0x40 || l.IsValueBased()
+//	}
+//	return false
+//}
 
 func (l *lobBase) Free() error {
 	if !l.IsQuasi() {
@@ -129,19 +123,22 @@ func (l *lobBase) ReadBytesFromPos(ctx context.Context, pos, count int64) ([]byt
 		defer l.stream.EndContext(done)
 		return l.stream.Read(pos, count)
 	}
-	return nil, errEmptyLocator
+	if l.stream == nil {
+		return nil, errEmptyLocator
+	}
+	return nil, nil
 }
 
-func (l *lobBase) copyFrom(input *lobBase) error {
-	if input.stream != nil && input.stream.GetLocator() != nil {
-		if l.IsQuasi() {
-			l.stream = input.stream
-			return nil
-		}
-		if bytes.Compare(l.GetLocator(), input.GetLocator()) == 0 {
-			return nil
-		}
-		return fmt.Errorf("the source lob locator is not empty so copy is not permitted, please free the current lob first")
-	}
-	return nil
-}
+//func (l *lobBase) copyFrom(input *lobBase) error {
+//	if input.stream != nil && input.stream.GetLocator() != nil {
+//		if l.IsQuasi() {
+//			l.stream = input.stream
+//			return nil
+//		}
+//		if bytes.Compare(l.GetLocator(), input.GetLocator()) == 0 {
+//			return nil
+//		}
+//		return fmt.Errorf("the source lob locator is not empty so copy is not permitted, please free the current lob first")
+//	}
+//	return nil
+//}

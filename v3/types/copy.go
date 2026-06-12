@@ -8,25 +8,6 @@ import (
 	"time"
 )
 
-var (
-	tyFloat64     = reflect.TypeOf((*float64)(nil)).Elem()
-	tyFloat32     = reflect.TypeOf((*float32)(nil)).Elem()
-	tyInt64       = reflect.TypeOf((*int64)(nil)).Elem()
-	tyBool        = reflect.TypeOf((*bool)(nil)).Elem()
-	tyBytes       = reflect.TypeOf((*[]byte)(nil)).Elem()
-	tyString      = reflect.TypeOf((*string)(nil)).Elem()
-	tyTime        = reflect.TypeOf((*time.Time)(nil)).Elem()
-	tyNullByte    = reflect.TypeOf((*sql.NullByte)(nil)).Elem()
-	tyNullInt16   = reflect.TypeOf((*sql.NullInt16)(nil)).Elem()
-	tyNullInt32   = reflect.TypeOf((*sql.NullInt32)(nil)).Elem()
-	tyNullInt64   = reflect.TypeOf((*sql.NullInt64)(nil)).Elem()
-	tyNullFloat64 = reflect.TypeOf((*sql.NullFloat64)(nil)).Elem()
-	tyNullBool    = reflect.TypeOf((*sql.NullBool)(nil)).Elem()
-	tyNullString  = reflect.TypeOf((*sql.NullString)(nil)).Elem()
-	tyNullTime    = reflect.TypeOf((*sql.NullTime)(nil)).Elem()
-	tyScanner     = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
-)
-
 func tSigned(input reflect.Type) bool {
 	switch input.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -50,16 +31,19 @@ func tFloat(input reflect.Type) bool {
 	return input.Kind() == reflect.Float32 || input.Kind() == reflect.Float64
 }
 func tNumber(input reflect.Type) bool {
-	return tInteger(input) || tFloat(input) || input == tyBool
+	return tInteger(input) || tFloat(input) || input == TyBool
 }
 
 func defaultCopy(dst, src any) error {
 	dstValue := reflect.ValueOf(dst)
-	dstType := reflect.TypeOf(dst)
+	//dstType := reflect.TypeOf(dst)
 	// if the destination implements the scanner interface, use it
-	if dstType.Elem().Implements(tyScanner) {
-		return dstValue.Elem().Interface().(sql.Scanner).Scan(src)
+	if temp, ok := dst.(sql.Scanner); ok {
+		return temp.Scan(src)
 	}
+	//if dstType.Implements(TyScanner) {
+	//	return dstValue.Elem().Interface().(sql.Scanner).Scan(src)
+	//}
 	if src == nil {
 		setNil(dst)
 		//dstValue.Elem().Set(reflect.Zero(dstType.Elem()))
@@ -100,7 +84,7 @@ func Copy(dst, src any) error {
 		}
 	}
 	//// if the destination implements the scanner interface, use it
-	//if dstType.Elem().Implements(tyScanner) {
+	//if dstType.Elem().Implements(TyScanner) {
 	//	return dstValue.Elem().Interface().(sql.Scanner).Scan(src)
 	//}
 	//// if the source implements the oracle type interface, use it
@@ -154,7 +138,7 @@ func Copy(dst, src any) error {
 	//		dstValue.Elem().Set(reflect.ValueOf(src).Convert(dstType.Elem()))
 	//	}
 	case bool:
-		if dstType.Elem() == tyString || dstType.Elem().Kind() == reflect.String {
+		if dstType.Elem() == TyString || dstType.Elem().Kind() == reflect.String {
 			dstValue.Elem().SetString(fmt.Sprintf("%t", src))
 		} else if reflect.TypeOf(src).ConvertibleTo(dstType.Elem()) {
 			dstValue.Elem().Set(reflect.ValueOf(src).Convert(dstType.Elem()))
@@ -186,15 +170,15 @@ func Copy(dst, src any) error {
 func createNewType(dstValue reflect.Value, dstType reflect.Type) error {
 	// special types
 	if dstType == reflect.TypeOf((*Blob)(nil)).Elem() {
-		dstValue.Set(reflect.ValueOf(&blob{}))
+		dstValue.Set(reflect.ValueOf(&Blob{}))
 		return nil
 	}
 	if dstType == reflect.TypeOf((*Clob)(nil)).Elem() {
-		dstValue.Set(reflect.ValueOf(&clob{}))
+		dstValue.Set(reflect.ValueOf(&Clob{}))
 		return nil
 	}
 	if dstType == reflect.TypeOf((*Vector)(nil)).Elem() {
-		dstValue.Set(reflect.ValueOf(&vector{}))
+		dstValue.Set(reflect.ValueOf(&Vector{}))
 		return nil
 	}
 	if dstType.Kind() != reflect.Ptr {

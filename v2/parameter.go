@@ -709,8 +709,7 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection, temporary
 
 func (par *ParameterInfo) decodeColumnValue(connection *Connection, temporaryLobs *[][]byte, udt bool) error {
 	// var err error
-	if !udt && connection.connOption.Lob == configurations.INLINE && (par.DataType == OCIBlobLocator ||
-		par.DataType == OCIClobLocator || par.DataType == VECTOR) {
+	if !udt && connection.connOption.Lob == configurations.INLINE && par.isLobType() {
 		session := connection.session
 		maxSize, err := session.GetInt(4, true, true)
 		if err != nil {

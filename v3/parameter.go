@@ -51,40 +51,30 @@ type Out struct {
 //)
 
 type ParameterInfo struct {
-	Name         string
-	TypeName     string
-	SchemaName   string
-	DomainSchema string
-	DomainName   string
-	Direction    ParameterDirection
-	IsNull       bool
-	AllowNull    bool
-	IsJson       bool
-	ColAlias     string
-	//DataType             uint16
-	IsXmlType bool
-	//Flag                 uint8
-	Precision uint8
-	Scale     uint8
-	//MaxLen               int
-	//MaxCharLen           int
+	Name                 string
+	TypeName             string
+	SchemaName           string
+	DomainSchema         string
+	DomainName           string
+	Direction            ParameterDirection
+	IsNull               bool
+	AllowNull            bool
+	IsJson               bool
+	ColAlias             string
+	IsXmlType            bool
+	Precision            uint8
+	Scale                uint8
 	MaxNoOfArrayElements int
-	//ContFlag             int
-	//ToID                 []byte
-	Version int
-	//CharsetID            int
-	//CharsetForm          int
-	//BValue            []byte
-	Value             driver.Value
-	encoder           parameter_coder.OracleParameterEncoder
-	iPrimValue        driver.Value
-	oPrimValue        driver.Value
-	OutputVarPtr      interface{}
-	getDataFromServer bool
-	oaccollid         int
-	cusType           *customType
-	parent            *ParameterInfo
-	Annotations       map[string]string
+	Version              int
+	Value                driver.Value
+	encoder              parameter_coder.OracleParameterEncoder
+	iPrimValue           driver.Value
+	oPrimValue           driver.Value
+	getDataFromServer    bool
+	oaccollid            int
+	cusType              *Object
+	parent               *ParameterInfo
+	Annotations          map[string]string
 	parameter_coder.BasicParameter
 }
 
@@ -230,7 +220,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if par.DataType == oraTypes.XMLType && par.TypeName != "XMLTYPE" {
 		for typName, cusTyp := range conn.cusTyp {
 			if typName == par.TypeName {
-				par.cusType = new(customType)
+				par.cusType = new(Object)
 				*par.cusType = cusTyp
 			}
 		}
@@ -461,42 +451,36 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 		}
 		return nil
 	}
-	if par.DataType == oraTypes.XMLType && par.parent == nil {
-		//if par.TypeName == "XMLTYPE" {
-		//	return errors.New("unsupported data type: XMLTYPE")
-		//}
-		//if par.cusType == nil {
-		//	return fmt.Errorf("unregister custom type: %s. call RegisterType first", par.TypeName)
-		//}
-		_, err = session.GetDlc() // contain toid and some 0s
-		if err != nil {
-			return err
-		}
-		_, err = session.GetBytes(3) // 3 0s
-		if err != nil {
-			return err
-		}
-		var size int
-		size, err = session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		_, err = session.GetBytes(2) // 0x1 0x1
-		if err != nil {
-			return err
-		}
-		if size == 0 {
-			// the object is null
-			_, err = session.GetBytes(2) // 0x81 0x01
-			if err != nil {
-				return err
-			}
-			par.oPrimValue = nil
-			par.IsNull = true
-			return nil
-		}
-		par.IsNull = false
-	}
+	//if par.DataType == oraTypes.XMLType && par.parent == nil {
+	//	_, err = session.GetDlc() // contain toid and some 0s
+	//	if err != nil {
+	//		return err
+	//	}
+	//	_, err = session.GetBytes(3) // 3 0s
+	//	if err != nil {
+	//		return err
+	//	}
+	//	var size int
+	//	size, err = session.GetInt(4, true, true)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	_, err = session.GetBytes(2) // 0x1 0x1
+	//	if err != nil {
+	//		return err
+	//	}
+	//	if size == 0 {
+	//		// the object is null
+	//		_, err = session.GetBytes(2) // 0x81 0x01
+	//		if err != nil {
+	//			return err
+	//		}
+	//		par.oPrimValue = nil
+	//		par.IsNull = true
+	//		return nil
+	//	}
+	//	par.IsNull = false
+	//}
 	if decoder, ok := conn.parameterDecoder[par.DataType]; ok {
 		decoder.SetParameterInfo(par.BasicParameter)
 		if par.isLobType() {
@@ -514,18 +498,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	} else {
 		return fmt.Errorf("no decoder register for data type: %d", par.DataType)
 	}
-	//if decoder, ok := conn.typeDecoder[par.DataType]; ok {
-	//	par.IsUDTPar = udt
-	//	decoder.SetTypeInfo(par.TypeInfo)
-	//	decoder.SetCharsetCoder(conn)
-
-	//	par.oPrimValue, err = decoder.Read(session)
-	//	if err != nil {
-	//		return err
-	//	}
-	//} else {
-	//	return fmt.Errorf("unknown data type: %d", par.DataType)
-	//}
 
 	//switch par.DataType {
 

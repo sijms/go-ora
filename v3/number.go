@@ -330,7 +330,7 @@ func NewNumber(n interface{}) (*Number, error) {
 	if tFloat(rType) {
 		return NewNumberFromFloat(rValue.Float())
 	}
-	if rType == tyNumber {
+	if rType == oraTypes.TyNumber {
 		if num, ok := n.(Number); ok {
 			return &num, nil
 		}

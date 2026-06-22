@@ -8,10 +8,10 @@ import (
 )
 
 type Bool struct {
-	bValue []byte
+	Basic
 }
 
-func (bl *Bool) SetValue(input interface{}, _ uint16) error {
+func (bl *Bool) SetValue(input interface{}) error {
 	if input == nil {
 		bl.bValue = nil
 		return nil
@@ -39,7 +39,7 @@ func (bl *Bool) SetValue(input interface{}, _ uint16) error {
 	return nil
 }
 
-func (bl *Bool) Value(_ uint16) (interface{}, error) {
+func (bl *Bool) Value() (interface{}, error) {
 	if bl.bValue == nil {
 		return nil, nil
 	}
@@ -49,20 +49,12 @@ func (bl *Bool) Value(_ uint16) (interface{}, error) {
 	return false, nil
 }
 
-func (bl *Bool) Bytes() []byte {
-	return bl.bValue
-}
-
-func (bl *Bool) SetBytes(input []byte) {
-	bl.bValue = input
-}
-
 func (bl *Bool) Scan(input interface{}) error {
-	return bl.SetValue(input, 0)
+	return bl.SetValue(input)
 }
 
 func (bl *Bool) CopyTo(dest driver.Value) error {
-	val, err := bl.Value(0)
+	val, err := bl.Value()
 	if err != nil {
 		return err
 	}

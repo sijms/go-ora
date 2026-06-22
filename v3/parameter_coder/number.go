@@ -15,9 +15,13 @@ func (param *NumberParameter) Encode(input interface{}, _ converters.StringCoder
 	param.DataType = types.NUMBER
 	param.MaxLen = 0x16
 	encoder := types.Number{}
-	err := encoder.SetValue(input, param.DataType)
+	encoder.SetDataType(param.DataType)
+	err := encoder.SetValue(input)
 	if err != nil {
 		return err
+	}
+	if dt := encoder.GetDataType(); dt != 0 {
+		param.DataType = dt
 	}
 	param.BValue = encoder.Bytes()
 	return nil
@@ -26,7 +30,8 @@ func (param *NumberParameter) Encode(input interface{}, _ converters.StringCoder
 func (param *NumberParameter) Decode(_ converters.StringCoder) (interface{}, error) {
 	decoder := types.Number{}
 	decoder.SetBytes(param.BValue)
-	return decoder.Value(param.DataType)
+	decoder.SetDataType(param.DataType)
+	return decoder.Value()
 }
 
 func (param *NumberParameter) Write(session network.SessionWriter) error {

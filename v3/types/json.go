@@ -1,113 +1,141 @@
 package types
 
 import (
+	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	//"github.com/sijms/go-ora/v3/oson"
 )
 
-//type Json interface {
-//}
+// type Json interface {
+// }
+type JsonCoder interface {
+	JsonEncoder
+	JsonDecoder
+}
 
 type JsonDecoder interface {
-	DecodeJson(data []byte) (*Json, error)
+	DecodeJson(data []byte) (interface{}, error)
+}
+type JsonEncoder interface {
+	EncodeJson(input interface{}) ([]byte, error)
 }
 type Json struct {
-	Value   interface{}
-	bValue  []byte
-	decoder JsonDecoder
+	Basic
+	Coder JsonCoder
+	loc   Locator
 	lobBase
 }
 
 var jsonTypeError = errors.New("unexpected data for json type")
 
-func CreateJson(input interface{}) (*Json, error) {
-	j := new(Json)
-	var err error
-	if input == nil {
-		return j, nil
+func (js *Json) GetLocator() Locator {
+	if js.lobBase.GetLocator() != nil {
+		return js.lobBase.GetLocator()
 	}
+	return js.loc
+}
+func (js *Json) Upload() error {
+	return js.uploadData(js.bValue, 0, 0)
+}
+
+func (js *Json) SetValue(input interface{}) error {
+	if input == nil {
+		js.bValue = nil
+		return nil
+	}
+	var err error
 	switch value := input.(type) {
+	case Json:
+		*js = value
+	case *Json:
+		*js = *value
 	case string:
 		value = strings.TrimSpace(value)
 		if len(value) == 0 {
-			return j, nil
+			js.bValue = nil
+			return nil
 		}
 		if strings.HasPrefix(value, "[") {
 			var temp []interface{}
 			err = json.Unmarshal([]byte(value), &temp)
-			j.Value = temp
-		} else {
-			var temp = make(map[string]interface{})
-			err = json.Unmarshal([]byte(value), &temp)
-			j.Value = temp
+			if err != nil {
+				return err
+			}
+			return js.SetValue(temp)
 		}
+
+		var temp = make(map[string]interface{})
+		err = json.Unmarshal([]byte(value), &temp)
 		if err != nil {
-			return nil, err
+			return err
 		}
-	case map[string]interface{}:
-		j.Value = value
-	case []map[string]interface{}:
-		j.Value = value
+		return js.SetValue(temp)
 	default:
-		return nil, jsonTypeError
+		js.bValue, err = js.Coder.EncodeJson(input)
+		//return fmt.Errorf("cannot set value of type %T into Json", input)
 	}
-	return j, nil
+	if err == nil {
+		dataLen := uint64(len(js.bValue))
+		if dataLen > 0 {
+			js.loc = NewQuasiLocator(dataLen)
+		} else {
+			js.loc = nil
+		}
+	}
+	return err
 }
 
-func NewJson(input interface{}, stream LobStreamer, decoder JsonDecoder) (*Json, error) {
-	j, err := CreateJson(input)
-	if err != nil {
-		return nil, err
-	}
-	j.stream = stream
-	j.decoder = decoder
-	return j, nil
+func (js *Json) Value() (interface{}, error) {
+	return js.Coder.DecodeJson(js.bValue)
 }
-func (j *Json) Scan(input interface{}) error {
-	//var err error
-	if input == nil {
-		if j.stream != nil {
-			j.stream.SetLocator(nil)
-		}
-		j.Value = nil
-		return nil
+
+func (js *Json) Scan(input interface{}) error {
+	return js.SetValue(input)
+}
+
+func (js *Json) CopyTo(dest driver.Value) error {
+	value, err := js.Value()
+	if err != nil {
+		return err
 	}
-	switch value := input.(type) {
+	switch dst := dest.(type) {
 	case *Json:
-		*j = *value
-		//err = j.lobBase.copyFrom(&value.lobBase)
-		//if err != nil {
-		//	return nil
-		//}
-		//j.Value = value.Value
+		*dst = *js
+	case *string:
+		if value == nil {
+			*dst = ""
+		} else {
+			temp, err := json.Marshal(value)
+			if err != nil {
+				return err
+			}
+			*dst = string(temp)
+		}
+	case *map[string]interface{}:
+		if value == nil {
+			*dst = nil
+		} else {
+			*dst = value.(map[string]interface{})
+		}
+
+	case *[]interface{}:
+		if value == nil {
+			*dst = nil
+		} else {
+			*dst = value.([]interface{})
+		}
 	default:
-		temp, err := CreateJson(value)
-		if err != nil {
-			return err
-		}
-		err = j.Scan(temp)
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf("cannot copy Json to variable of type %T", dest)
 	}
 	return nil
 }
 
-func (j *Json) decode() error {
+func (js *Json) Read(ctx context.Context) error {
 	var err error
-	//j.Value, err = oson.Decode(j.bValue)
+	js.bValue, err = js.ReadFromPos(ctx, 0)
 	return err
-}
-
-func (j *Json) encode() error {
-	var err error
-	//j.bValue, err = oson.Encode(j.Value)
-	return err
-}
-
-func (j *Json) setNil() {
-	j.Value = nil
-	j.bValue = nil
 }

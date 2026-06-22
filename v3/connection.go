@@ -114,7 +114,7 @@ type Connection struct {
 	parameterEncoder  map[reflect.Type]parameter_coder.OracleParameterEncoder
 	parameterDecoder  map[uint16]parameter_coder.OracleParameterDecoder
 	//typeDecoder       map[uint16]type_coder.OracleTypeDecoder
-	cusTyp map[string]customType
+	cusTyp map[string]Object
 	maxLen struct {
 		varchar   int64
 		nvarchar  int64
@@ -131,7 +131,7 @@ type Connection struct {
 }
 
 type ConnectionProperties struct {
-	cusTyp map[string]customType
+	cusTyp map[string]Object
 	maxLen struct {
 		varchar   int
 		nvarchar  int
@@ -249,7 +249,7 @@ func (driver *OracleDriver) Open(name string) (driver.Conn, error) {
 
 func (conn *Connection) buildParameterCoderMap(drv *OracleDriver) {
 	conn.parameterDecoder = make(map[uint16]parameter_coder.OracleParameterDecoder)
-	for name, value := range drv.parameterDecoder {
+	for name, value := range drv.oracleTypeCoder {
 		rValue := reflect.ValueOf(value)
 		newValue := reflect.New(rValue.Elem().Type()).Interface()
 		if temp, ok := newValue.(parameter_coder.OracleParameterDecoder); ok {
@@ -257,7 +257,7 @@ func (conn *Connection) buildParameterCoderMap(drv *OracleDriver) {
 		}
 	}
 	conn.parameterEncoder = make(map[reflect.Type]parameter_coder.OracleParameterEncoder)
-	for key, value := range drv.parameterEncoder {
+	for key, value := range drv.goTypeCoder {
 		rValue := reflect.ValueOf(value)
 		newValue := reflect.New(rValue.Elem().Type()).Interface()
 		if temp, ok := newValue.(parameter_coder.OracleParameterEncoder); ok {
@@ -727,7 +727,7 @@ func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) 
 		cStrConv:         converters.NewStringConverter(config.CharsetID),
 		autoCommit:       true,
 		parameterDecoder: nil,
-		cusTyp:           map[string]customType{},
+		cusTyp:           map[string]Object{},
 		maxLen: struct {
 			varchar   int64
 			nvarchar  int64
@@ -1311,7 +1311,7 @@ func (conn *Connection) decodeData(data []byte, messageType aq.MessageType, udtN
 		par.DataType = types.XMLType
 		for name, cust := range conn.cusTyp {
 			if name == strings.ToUpper(udtName) {
-				par.cusType = new(customType)
+				par.cusType = new(Object)
 				*par.cusType = cust
 				par.ToID = cust.toid
 			}

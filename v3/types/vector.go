@@ -3,7 +3,6 @@ package types
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
 	"errors"
@@ -27,8 +26,8 @@ const (
 )
 
 type Vector struct {
-	bValue []byte
-	loc    Locator
+	Basic
+	loc Locator
 	lobBase
 }
 
@@ -38,24 +37,11 @@ func (vector *Vector) GetLocator() Locator {
 	}
 	return vector.loc
 }
-func (vector *Vector) Upload(db *sql.DB, ctx context.Context) error {
-	if len(vector.bValue) == 0 {
-		return nil
-	}
-	err := vector.createStreamer(db)
-	if err != nil {
-		return err
-	}
-	done := vector.stream.StartContext(ctx)
-	defer vector.stream.EndContext(done)
-	_, err = vector.stream.CreateTemporaryLocator(0, 0)
-	if err != nil {
-		return err
-	}
-	err = vector.stream.Write(vector.bValue)
-	return err
+func (vector *Vector) Upload() error {
+	return vector.uploadData(vector.bValue, 0, 0)
 }
-func (vector *Vector) SetValue(input interface{}, _ uint16) error {
+
+func (vector *Vector) SetValue(input interface{}) error {
 	if input == nil {
 		vector.bValue = nil
 		return nil
@@ -175,7 +161,8 @@ func (vector *Vector) SetValue(input interface{}, _ uint16) error {
 	case []float32:
 		for _, val := range value {
 			n := Number{}
-			err = n.SetValue(val, IBFLOAT)
+			n.SetDataType(IBFLOAT)
+			err = n.SetValue(val)
 			if err != nil {
 				return err
 			}
@@ -188,7 +175,8 @@ func (vector *Vector) SetValue(input interface{}, _ uint16) error {
 	case []float64:
 		for _, val := range value {
 			n := Number{}
-			err = n.SetValue(val, IBDOUBLE)
+			n.SetDataType(IBDOUBLE)
+			err = n.SetValue(val)
 			if err != nil {
 				return err
 			}
@@ -209,7 +197,8 @@ func (vector *Vector) SetValue(input interface{}, _ uint16) error {
 	}
 	return nil
 }
-func (vector *Vector) Value(_ uint16) (interface{}, error) {
+
+func (vector *Vector) Value() (interface{}, error) {
 	if len(vector.bValue) == 0 {
 		return nil, nil
 	}
@@ -285,7 +274,8 @@ func (vector *Vector) Value(_ uint16) (interface{}, error) {
 		for i := 0; i < count; i++ {
 			n := Number{}
 			n.SetBytes(buffer.Next(4))
-			output, err := n.Value(IBFLOAT)
+			n.SetDataType(IBFLOAT)
+			output, err := n.Value()
 			if err != nil {
 				return nil, err
 			}
@@ -306,7 +296,8 @@ func (vector *Vector) Value(_ uint16) (interface{}, error) {
 		for i := 0; i < count; i++ {
 			n := Number{}
 			n.SetBytes(buffer.Next(8))
-			output, err := n.Value(IBDOUBLE)
+			n.SetDataType(IBDOUBLE)
+			output, err := n.Value()
 			if err != nil {
 				return nil, err
 			}
@@ -332,12 +323,6 @@ func (vector *Vector) Value(_ uint16) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("unsupported format (%d) for vector type", format)
 	}
-}
-func (vector *Vector) SetBytes(input []byte) {
-	vector.bValue = input
-}
-func (vector *Vector) Bytes() []byte {
-	return vector.bValue
 }
 
 //	type Vector interface {
@@ -365,12 +350,7 @@ var vectorTypeError = errors.New("unexpected data for vector type")
 // CreateVector : create vector from supported array type: uint8, float32 and float64
 func CreateVector(array interface{}) (*Vector, error) {
 	v := new(Vector)
-	//if array == nil {
-	//	v.Type = VECTOR_NIL
-	//	v.data = nil
-	//	return v, nil
-	//}
-	return v, v.SetValue(array, 0)
+	return v, v.SetValue(array)
 }
 
 //	func NewVectorFromBytes(data []byte) (Vector, error) {
@@ -457,21 +437,6 @@ func CreateVector(array interface{}) (*Vector, error) {
 //		}
 //	}
 
-func NewVector(array interface{}, stream LobStreamer) (*Vector, error) {
-	ret, err := CreateVector(array)
-	if err != nil {
-		return nil, err
-	}
-	ret.stream = stream
-	return ret, nil
-	//if err != nil {
-	//	return nil, err
-	//}
-	//v.(*vector).stream = stream
-	//v.(*vector).decoder = decoder
-	//return v
-}
-
 //func (v *vector) Length() int {
 //	switch v.Type {
 //	case VECTOR_NIL:
@@ -555,7 +520,7 @@ func (vector *Vector) Read(ctx context.Context) error {
 //}
 
 func (vector *Vector) Scan(input interface{}) error {
-	return vector.SetValue(input, 0)
+	return vector.SetValue(input)
 	//var err error
 	//if input == nil {
 	//	if v.stream != nil {
@@ -587,7 +552,7 @@ func (vector *Vector) Scan(input interface{}) error {
 	//return nil
 }
 func (vector *Vector) CopyTo(dest driver.Value) error {
-	val, err := vector.Value(0)
+	val, err := vector.Value()
 	if err != nil {
 		return err
 	}
@@ -632,7 +597,3 @@ func (vector *Vector) CopyTo(dest driver.Value) error {
 	}
 	return fmt.Errorf("cannot copy Vector to variable of type %T", dest)
 }
-
-//func (vector *Vector) Value() (driver.Value, error) {
-//	return vector.Data, nil
-//}

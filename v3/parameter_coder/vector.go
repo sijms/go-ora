@@ -15,9 +15,13 @@ func (param *VectorParameter) Encode(input interface{}, _ converters.StringCoder
 	param.SetDefault()
 	param.DataType = types.VECTOR
 	encoder := &types.Vector{}
-	err := encoder.SetValue(input, param.DataType)
+	encoder.SetDataType(param.DataType)
+	err := encoder.SetValue(input)
 	if err != nil {
 		return err
+	}
+	if dt := encoder.GetDataType(); dt != 0 {
+		param.DataType = dt
 	}
 	param.BValue = encoder.Bytes()
 	param.locator = encoder.GetLocator()
@@ -26,11 +30,8 @@ func (param *VectorParameter) Encode(input interface{}, _ converters.StringCoder
 }
 
 func (param *VectorParameter) Decode(_ converters.StringCoder) (interface{}, error) {
-	decoder, err := types.NewVector(nil, param.streamer)
-	if err != nil {
-		return nil, err
-	}
-	//decoder := &types.Vector{}
+	decoder := &types.Vector{}
+	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)
 	return decoder, nil
 }

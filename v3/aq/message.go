@@ -4,7 +4,8 @@ import (
 	"time"
 
 	"github.com/sijms/go-ora/v3/network"
-	"github.com/sijms/go-ora/v3/type_coder"
+	"github.com/sijms/go-ora/v3/types"
+	//"github.com/sijms/go-ora/v3/type_coder"
 )
 
 var XMLTYPE_TOID = []byte{
@@ -139,12 +140,15 @@ func (message *Message) read(session *network.Session) error {
 		if err != nil {
 			return err
 		}
-		dateDecoder := &type_coder.DateCoder{}
-		tempTime, err := dateDecoder.DecodeDate(temp)
+		decoder := &types.Date{}
+		decoder.SetBytes(temp)
+		tempTime, err := decoder.Value()
 		if err != nil {
 			return err
 		}
-		message.EnqTime = tempTime.Time
+		if tempTime != nil {
+			message.EnqTime = tempTime.(time.Time)
+		}
 		//message.EnqTime, err = converters.DecodeDate(temp)
 		//if err != nil {
 		//	return err

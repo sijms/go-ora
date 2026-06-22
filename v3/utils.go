@@ -2,21 +2,17 @@ package go_ora
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/lazy_init"
 	oraTypes "github.com/sijms/go-ora/v3/types"
 
@@ -24,49 +20,49 @@ import (
 )
 
 var (
-	tyFloat64  = reflect.TypeOf((*float64)(nil)).Elem()
-	tyFloat32  = reflect.TypeOf((*float32)(nil)).Elem()
-	tyInt      = reflect.TypeOf((*int)(nil)).Elem()
-	tyInt8     = reflect.TypeOf((*int8)(nil)).Elem()
-	tyInt16    = reflect.TypeOf((*int16)(nil)).Elem()
-	tyInt32    = reflect.TypeOf((*int32)(nil)).Elem()
-	tyInt64    = reflect.TypeOf((*int64)(nil)).Elem()
-	tyUint     = reflect.TypeOf((*uint)(nil)).Elem()
-	tyUint8    = reflect.TypeOf((*uint8)(nil)).Elem()
-	tyUint16   = reflect.TypeOf((*uint16)(nil)).Elem()
-	tyUint32   = reflect.TypeOf((*uint32)(nil)).Elem()
-	tyUint64   = reflect.TypeOf((*uint64)(nil)).Elem()
-	tyBool     = reflect.TypeOf((*bool)(nil)).Elem()
-	tyBytes    = reflect.TypeOf((*[]byte)(nil)).Elem()
-	tyString   = reflect.TypeOf((*string)(nil)).Elem()
-	tyNVarChar = reflect.TypeOf((*NVarChar)(nil)).Elem()
-	tyTime     = reflect.TypeOf((*time.Time)(nil)).Elem()
+	//tyFloat64  = reflect.TypeOf((*float64)(nil)).Elem()
+	//tyFloat32  = reflect.TypeOf((*float32)(nil)).Elem()
+	//tyInt      = reflect.TypeOf((*int)(nil)).Elem()
+	//tyInt8     = reflect.TypeOf((*int8)(nil)).Elem()
+	//tyInt16    = reflect.TypeOf((*int16)(nil)).Elem()
+	//tyInt32    = reflect.TypeOf((*int32)(nil)).Elem()
+	//tyInt64    = reflect.TypeOf((*int64)(nil)).Elem()
+	//tyUint     = reflect.TypeOf((*uint)(nil)).Elem()
+	//tyUint8    = reflect.TypeOf((*uint8)(nil)).Elem()
+	//tyUint16   = reflect.TypeOf((*uint16)(nil)).Elem()
+	//tyUint32   = reflect.TypeOf((*uint32)(nil)).Elem()
+	//tyUint64   = reflect.TypeOf((*uint64)(nil)).Elem()
+	//tyBool     = reflect.TypeOf((*bool)(nil)).Elem()
+	//tyBytes    = oraTypes.TyBytes
+	//tyString   = oraTypes.TyString
+	//tyNVarChar = reflect.TypeOf((*NVarChar)(nil)).Elem()
+	//tyTime     = oraTypes.TyTime
 	//tyTimeStamp       = reflect.TypeOf((*TimeStamp)(nil)).Elem()
-	tyTimeStampTZ = reflect.TypeOf((*TimeStampTZ)(nil)).Elem()
-	tyClob        = reflect.TypeOf((*Clob)(nil)).Elem()
+	//tyTimeStampTZ = reflect.TypeOf((*TimeStampTZ)(nil)).Elem()
+	tyClob = reflect.TypeOf((*Clob)(nil)).Elem()
 	//tyNClob       = reflect.TypeOf((*NClob)(nil)).Elem()
-	tyBlob  = reflect.TypeOf((*Blob)(nil)).Elem()
-	tyBFile = reflect.TypeOf((*oraTypes.BFile)(nil)).Elem()
+	tyBlob = reflect.TypeOf((*Blob)(nil)).Elem()
+	//tyBFile = oraTypes.TyBFile
 	//tyVector       = reflect.TypeOf((*oraTypes.vector)(nil)).Elem()
-	tyNullByte     = reflect.TypeOf((*sql.NullByte)(nil)).Elem()
-	tyNullInt16    = reflect.TypeOf((*sql.NullInt16)(nil)).Elem()
-	tyNullInt32    = reflect.TypeOf((*sql.NullInt32)(nil)).Elem()
-	tyNullInt64    = reflect.TypeOf((*sql.NullInt64)(nil)).Elem()
-	tyNullFloat64  = reflect.TypeOf((*sql.NullFloat64)(nil)).Elem()
-	tyNullBool     = reflect.TypeOf((*sql.NullBool)(nil)).Elem()
-	tyNullString   = reflect.TypeOf((*sql.NullString)(nil)).Elem()
-	tyNullNVarChar = reflect.TypeOf((*NullNVarChar)(nil)).Elem()
-	tyNullTime     = reflect.TypeOf((*sql.NullTime)(nil)).Elem()
+	//tyNullByte     = oraTypes.TyNullByte
+	//tyNullInt16    = oraTypes.TyNullInt16
+	//tyNullInt32    = oraTypes.TyNullInt32
+	//tyNullInt64    = oraTypes.TyNullInt64
+	//tyNullFloat64  = oraTypes.TyNullFloat64
+	//tyNullBool     = oraTypes.TyNullBool
+	//tyNullString   = oraTypes.TyNullString
+	//tyNullNVarChar = reflect.TypeOf((*NullNVarChar)(nil)).Elem()
+	//tyNullTime     = oraTypes.TyNullTime
 	//tyNullTimeStamp   = reflect.TypeOf((*NullTimeStamp)(nil)).Elem()
-	tyNullTimeStampTZ = reflect.TypeOf((*NullTimeStampTZ)(nil)).Elem()
-	tyRefCursor       = reflect.TypeOf((*RefCursor)(nil)).Elem()
-	tyPLBool          = reflect.TypeOf((*PLBool)(nil)).Elem()
-	tyObject          = reflect.TypeOf((*Object)(nil)).Elem()
-	tyNumber          = reflect.TypeOf((*Number)(nil)).Elem()
-	tyFloat32Array    = reflect.TypeOf((*[]float32)(nil)).Elem()
-	tyUint8Array      = reflect.TypeOf((*[]uint8)(nil)).Elem()
-	tyFloat64Array    = reflect.TypeOf((*[]float64)(nil)).Elem()
-	tyDictionary      = reflect.TypeOf((*map[string]interface{})(nil)).Elem()
+	//tyNullTimeStampTZ = reflect.TypeOf((*NullTimeStampTZ)(nil)).Elem()
+	//tyRefCursor       = reflect.TypeOf((*RefCursor)(nil)).Elem()
+	//tyPLBool          = reflect.TypeOf((*PLBool)(nil)).Elem()
+	//tyObject          = reflect.TypeOf((*Object)(nil)).Elem()
+	//tyNumber          = reflect.TypeOf((*Number)(nil)).Elem()
+	//tyFloat32Array    = reflect.TypeOf((*[]float32)(nil)).Elem()
+	//tyUint8Array      = reflect.TypeOf((*[]uint8)(nil)).Elem()
+	//tyFloat64Array    = reflect.TypeOf((*[]float64)(nil)).Elem()
+	//tyDictionary      = reflect.TypeOf((*map[string]interface{})(nil)).Elem()
 )
 
 func refineSqlText(text string) string {
@@ -154,92 +150,32 @@ func parseQueryParametersNames(text string) (names []string, err error) {
 	return names, nil
 }
 
-func extractTag(tag string) (name, _type string, size int, direction ParameterDirection) {
-	extractNameValue := func(input string, pos int) {
-		parts := strings.Split(input, "=")
-		var id, value string
-		if len(parts) < 2 {
-			switch pos {
-			case 0:
-				id = "name"
-			case 1:
-				id = "type"
-			case 2:
-				id = "size"
-			case 3:
-				id = "direction"
-			}
-			value = input
-		} else {
-			id = strings.TrimSpace(strings.ToLower(parts[0]))
-			value = strings.TrimSpace(parts[1])
-		}
-		switch id {
-		case "name":
-			name = value
-		case "type":
-			_type = value
-		case "size":
-			tempSize, _ := strconv.ParseInt(value, 10, 32)
-			size = int(tempSize)
-		case "dir":
-			fallthrough
-		case "direction":
-			switch value {
-			case "in", "input":
-				direction = Input
-			case "out", "output":
-				direction = Output
-			case "inout":
-				direction = InOut
-			}
-		}
-	}
-	tag = strings.TrimSpace(tag)
-	if len(tag) == 0 {
-		return
-	}
-	tagFields := strings.Split(tag, ",")
-	if len(tagFields) > 0 {
-		extractNameValue(tagFields[0], 0)
-	}
-	if len(tagFields) > 1 {
-		extractNameValue(tagFields[1], 1)
-	}
-	if len(tagFields) > 2 {
-		extractNameValue(tagFields[2], 2)
-	}
-	if len(tagFields) > 3 {
-		extractNameValue(tagFields[3], 3)
-	}
-	return
-}
+//func copy_(dest, source any) error {
+//	var err error
+//	dst := reflect.ValueOf(dest)
+//	if dst.Kind() != reflect.Ptr {
+//		return fmt.Errorf("source is not a pointer")
+//	}
+//	// do pre-copy operation
+//	if temp, ok := source.(oraTypes.Lob); ok {
+//		if temp.GetReadMode() == configurations.LobReadMode_AUTO {
+//			err = temp.Read(context.Background())
+//			if err != nil {
+//				return err
+//			}
+//		}
+//	}
+//
+//	// actual copy will be done through scanner interface
+//	if temp, ok := dest.(sql.Scanner); ok {
+//		err = temp.Scan(source)
+//		if err != nil {
+//			return err
+//		}
+//	}
+//	return nil
+//}
 
-func copy_(dest, source any) error {
-	var err error
-	dst := reflect.ValueOf(dest)
-	if dst.Kind() != reflect.Ptr {
-		return fmt.Errorf("source is not a pointer")
-	}
-	// do pre-copy operation
-	if temp, ok := source.(oraTypes.Lob); ok {
-		if temp.GetReadMode() == configurations.LobReadMode_AUTO {
-			err = temp.Read(context.Background())
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// actual copy will be done through scanner interface
-	if temp, ok := dest.(sql.Scanner); ok {
-		err = temp.Scan(source)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 func tSigned(input reflect.Type) bool {
 	switch input.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -266,19 +202,19 @@ func tFloat(input reflect.Type) bool {
 	return input.Kind() == reflect.Float32 || input.Kind() == reflect.Float64
 }
 
-func tNumber(input reflect.Type) bool {
-	return tInteger(input) || tFloat(input) || input == tyBool
-}
+//func tNumber(input reflect.Type) bool {
+//	return tInteger(input) || tFloat(input) || input == tyBool
+//}
 
-func tNullNumber(input reflect.Type) bool {
-	switch input {
-	case tyNullBool, tyNullByte, tyNullInt16, tyNullInt32, tyNullInt64:
-		fallthrough
-	case tyNullFloat64:
-		return true
-	}
-	return false
-}
+//func tNullNumber(input reflect.Type) bool {
+//	switch input {
+//	case tyNullBool, tyNullByte, tyNullInt16, tyNullInt32, tyNullInt64:
+//		fallthrough
+//	case tyNullFloat64:
+//		return true
+//	}
+//	return false
+//}
 
 func processReset(err error, conn *Connection) error {
 	if errors.Is(err, network.ErrConnReset) {
@@ -318,31 +254,31 @@ func getTOID2(conn *sql.DB, owner, typeName string) ([]byte, error) {
 	return toid, err
 }
 
-func getTOID(conn *Connection, owner, typeName string) ([]byte, error) {
-	sqlText := `SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
-	stmt := NewStmt(sqlText, conn)
-	defer func(stmt *Stmt) {
-		_ = stmt.Close()
-	}(stmt)
-	var ret []byte
-	rows, err := stmt.Query_([]driver.NamedValue{
-		{Value: strings.ToUpper(owner)},
-		{Value: strings.ToUpper(typeName)},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if rows.Next_() {
-		err = rows.Scan(&ret)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if len(ret) == 0 {
-		return nil, fmt.Errorf("unknown type: %s", typeName)
-	}
-	return ret, rows.Err()
-}
+//func getTOID(conn *Connection, owner, typeName string) ([]byte, error) {
+//	sqlText := `SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`
+//	stmt := NewStmt(sqlText, conn)
+//	defer func(stmt *Stmt) {
+//		_ = stmt.Close()
+//	}(stmt)
+//	var ret []byte
+//	rows, err := stmt.Query_([]driver.NamedValue{
+//		{Value: strings.ToUpper(owner)},
+//		{Value: strings.ToUpper(typeName)},
+//	})
+//	if err != nil {
+//		return nil, err
+//	}
+//	if rows.Next_() {
+//		err = rows.Scan(&ret)
+//		if err != nil {
+//			return nil, err
+//		}
+//	}
+//	if len(ret) == 0 {
+//		return nil, fmt.Errorf("unknown type: %s", typeName)
+//	}
+//	return ret, rows.Err()
+//}
 
 func encodeObject(session *network.Session, objectData []byte, isArray bool) []byte {
 	size := len(objectData)
@@ -364,7 +300,7 @@ func encodeObject(session *network.Session, objectData []byte, isArray bool) []b
 	return fieldsData.Bytes()
 }
 
-func putUDTAttributes(input *customType, pars []ParameterInfo, index int) ([]ParameterInfo, int) {
+func putUDTAttributes(input *Object, pars []ParameterInfo, index int) ([]ParameterInfo, int) {
 	oPrimValue := make([]ParameterInfo, 0, len(input.attribs))
 	for _, attrib := range input.attribs {
 		if attrib.cusType != nil && !attrib.cusType.isArray {
@@ -380,7 +316,7 @@ func putUDTAttributes(input *customType, pars []ParameterInfo, index int) ([]Par
 	return oPrimValue, index
 }
 
-func getUDTAttributes(input *customType, value reflect.Value) []ParameterInfo {
+func getUDTAttributes(input *Object, value reflect.Value) []ParameterInfo {
 	output := make([]ParameterInfo, 0, 10)
 	for _, attrib := range input.attribs {
 		fieldValue := reflect.Value{}
@@ -414,7 +350,7 @@ func isArrayValue(val interface{}) bool {
 	for tyVal.Kind() == reflect.Ptr {
 		tyVal = tyVal.Elem()
 	}
-	if tyVal != tyBytes && (tyVal.Kind() == reflect.Array || tyVal.Kind() == reflect.Slice) {
+	if tyVal != oraTypes.TyBytes && (tyVal.Kind() == reflect.Array || tyVal.Kind() == reflect.Slice) {
 		return true
 	}
 	return false
@@ -680,7 +616,7 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 	case "nvarchar":
 		temp := &oraTypes.String{}
 		temp.UseNCharset = true
-		err = temp.SetValue(getString(fieldValue.Interface()), 0)
+		err = temp.SetValue(getString(fieldValue.Interface()))
 		if err != nil {
 			return nil, err
 		}
@@ -707,7 +643,8 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 			err = typeErr
 			return
 		}
-		err = fieldVal.SetValue(temp, oraTypes.TIMESTAMPTZ)
+		fieldVal.SetDataType(oraTypes.TIMESTAMPTZ)
+		err = fieldVal.SetValue(temp)
 		tempPar.Value = fieldVal
 	case "raw":
 		tempPar.Value, err = getBytes(fieldValue.Interface())
@@ -719,11 +656,11 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 		fieldVal := getString(fieldValue.Interface())
 		clob := &oraTypes.Clob{}
 		if len(fieldVal) == 0 {
-			err = clob.SetValue(nil, 0)
+			err = clob.SetValue(nil)
 			//tempPar.Value, err = oraTypes.CreateClob()
 			//tempPar.Value = Clob{Valid: false}
 		} else {
-			err = clob.SetValue(fieldVal, 0)
+			err = clob.SetValue(fieldVal)
 			//tempPar.Value = Clob{String: fieldVal, Valid: true}
 		}
 		if err != nil {
@@ -735,10 +672,10 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 		clob := &oraTypes.Clob{}
 		clob.UseNCharset = true
 		if len(fieldVal) == 0 {
-			err = clob.SetValue(nil, 0)
+			err = clob.SetValue(nil)
 			//tempPar.Value = NClob{Valid: false}
 		} else {
-			err = clob.SetValue(fieldVal, 0)
+			err = clob.SetValue(fieldVal)
 			//tempPar.Value = NClob{String: fieldVal, Valid: true}
 		}
 		if err != nil {

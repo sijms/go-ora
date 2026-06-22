@@ -9,12 +9,12 @@ import (
 )
 
 type String struct {
-	bValue      []byte
+	Basic
 	Conv        converters.IStringConverter
 	UseNCharset bool
 }
 
-func (str *String) Value(_ uint16) (interface{}, error) {
+func (str *String) Value() (interface{}, error) {
 	if str.bValue == nil {
 		return nil, nil
 	}
@@ -24,7 +24,7 @@ func (str *String) Value(_ uint16) (interface{}, error) {
 	return str.Conv.Decode(str.bValue), nil
 }
 
-func (str *String) SetValue(input interface{}, _ uint16) error {
+func (str *String) SetValue(input interface{}) error {
 	if input == nil {
 		str.bValue = nil
 		return nil
@@ -37,22 +37,22 @@ func (str *String) SetValue(input interface{}, _ uint16) error {
 		if str.Conv.GetLangID() == data.Conv.GetLangID() {
 			*str = data
 		} else {
-			temp, err := data.Value(0)
+			temp, err := data.Value()
 			if err != nil {
 				return err
 			}
-			return str.SetValue(temp, 0)
+			return str.SetValue(temp)
 		}
 
 	case *String:
 		if str.Conv.GetLangID() == data.Conv.GetLangID() {
 			*str = *data
 		} else {
-			temp, err := data.Value(0)
+			temp, err := data.Value()
 			if err != nil {
 				return err
 			}
-			return str.SetValue(temp, 0)
+			return str.SetValue(temp)
 		}
 
 	case string:
@@ -76,15 +76,8 @@ func (str *String) SetValue(input interface{}, _ uint16) error {
 	}
 	return nil
 }
-func (str *String) Bytes() []byte {
-	return str.bValue
-}
-func (str *String) SetBytes(input []byte) {
-	str.bValue = input
-}
-
 func (str *String) Scan(input interface{}) error {
-	return str.SetValue(input, 0)
+	return str.SetValue(input)
 }
 
 //type String interface {
@@ -97,7 +90,7 @@ func (str *String) Scan(input interface{}) error {
 //}
 
 func (str *String) CopyTo(dest driver.Value) (err error) {
-	value, err := str.Value(0)
+	value, err := str.Value()
 	if err != nil {
 		return err
 	}

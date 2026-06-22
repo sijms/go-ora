@@ -77,7 +77,7 @@ func (lob *LobStream) GetLocator() ora_types.Locator {
 }
 func (lob *LobStream) SetLocator(locator ora_types.Locator) {
 	lob.sourceLocator = locator
-	if !locator.IsQuasi() {
+	if !locator.IsQuasi() && locator.IsTemporary() {
 		lob.conn.appendTemporaryLoc(locator)
 	}
 

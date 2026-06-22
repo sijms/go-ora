@@ -14,7 +14,11 @@ func (param *BlobParameter) Encode(input interface{}, _ converters.StringCoder, 
 	param.SetDefault()
 	param.DataType = types.OCIBlobLocator
 	encoder := &types.Blob{}
-	err = encoder.SetValue(input, 0)
+	encoder.SetDataType(param.DataType)
+	err = 	encoder.SetValue(input)
+	if dt := encoder.GetDataType(); dt != 0 {
+		param.DataType = dt
+	}
 	if err != nil {
 		return
 	}

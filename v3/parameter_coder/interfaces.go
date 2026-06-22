@@ -10,6 +10,7 @@ type (
 	OracleParameterCoder interface {
 		OracleParameterEncoder
 		OracleParameterDecoder
+		Bytes() []byte
 	}
 	OracleParameterEncoder interface {
 		Encode(input interface{}, strConv converters.StringCoder, _ types.LobStreamer) error

@@ -11,18 +11,15 @@ import (
 )
 
 type Date struct {
-	bValue []byte
-	asUTC  bool
+	Basic
+	asUTC bool
 }
 
-func (date *Date) Value(typeId uint16) (interface{}, error) {
+func (date *Date) Value() (interface{}, error) {
 	if len(date.bValue) == 0 {
 		return nil, nil
 	}
 	return date.decode()
-}
-func (date *Date) Bytes() []byte {
-	return date.bValue
 }
 func (date *Date) encode(input time.Time, typeId uint16) (bytes []byte, err error) {
 	switch typeId {
@@ -68,7 +65,7 @@ func (date *Date) encode(input time.Time, typeId uint16) (bytes []byte, err erro
 	return
 
 }
-func (date *Date) SetValue(input interface{}, typeId uint16) (err error) {
+func (date *Date) SetValue(input interface{}) (err error) {
 	if input == nil {
 		date.bValue = nil
 		return
@@ -79,18 +76,18 @@ func (date *Date) SetValue(input interface{}, typeId uint16) (err error) {
 	case *Date:
 		*date = *data
 	case time.Time:
-		date.bValue, err = date.encode(data, typeId)
+		date.bValue, err = date.encode(data, date.dataType)
 	case *time.Time:
-		date.bValue, err = date.encode(*data, typeId)
+		date.bValue, err = date.encode(*data, date.dataType)
 	case sql.NullTime:
 		if data.Valid {
-			date.bValue, err = date.encode(data.Time, typeId)
+			date.bValue, err = date.encode(data.Time, date.dataType)
 		} else {
 			date.bValue = nil
 		}
 	case *sql.NullTime:
 		if data.Valid {
-			date.bValue, err = date.encode(data.Time, typeId)
+			date.bValue, err = date.encode(data.Time, date.dataType)
 		} else {
 			date.bValue = nil
 		}
@@ -147,16 +144,12 @@ func (date *Date) decode() (output time.Time, err error) {
 	}
 	return
 }
-func (date *Date) SetBytes(input []byte) {
-	date.bValue = input
-}
-
 func (date *Date) Scan(value interface{}) (err error) {
-	return date.SetValue(value, 0)
+	return date.SetValue(value)
 }
 
 func (date *Date) CopyTo(dest driver.Value) (err error) {
-	value, err := date.Value(0)
+	value, err := date.Value()
 	if err != nil {
 		return err
 	}

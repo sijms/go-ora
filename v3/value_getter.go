@@ -52,13 +52,13 @@ func getString(col interface{}) string {
 	// common types
 	switch val := col.(type) {
 	case oraTypes.Clob:
-		temp, _ := val.Value(0)
+		temp, _ := val.Value()
 		if temp == nil {
 			return ""
 		}
 		return temp.(string)
 	case *oraTypes.Clob:
-		temp, _ := val.Value(0)
+		temp, _ := val.Value()
 		if temp == nil {
 			return ""
 		}
@@ -155,7 +155,7 @@ func getBytes(col interface{}) ([]byte, error) {
 	switch val := col.(type) {
 	case oraTypes.Blob:
 		var temp interface{}
-		temp, err = val.Value(0)
+		temp, err = val.Value()
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +167,7 @@ func getBytes(col interface{}) ([]byte, error) {
 	case *oraTypes.Blob:
 		//return (*val).Data(), nil
 		var temp interface{}
-		temp, err = val.Value(0)
+		temp, err = val.Value()
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +192,7 @@ func getBytes(col interface{}) ([]byte, error) {
 	//	return val.Data, nil
 	case oraTypes.Blob:
 		var temp interface{}
-		temp, err = val.Value(0)
+		temp, err = val.Value()
 		if err != nil {
 			return nil, err
 		}

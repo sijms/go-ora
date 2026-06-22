@@ -1,24 +1,14 @@
 package go_ora
 
-import (
-	"fmt"
-	"reflect"
-	"strings"
-
-	oraTypes "github.com/sijms/go-ora/v3/types"
-)
-
-type customType struct {
-	owner string
-	name  string
-	// arrayTypeName string
-	attribs []ParameterInfo
-	typ     reflect.Type
-	toid    []byte // type oid
-	// arrayTOID     []byte
-	isArray  bool
-	fieldMap map[string]int
-}
+//type Object struct {
+//	Owner string
+//	Name  string
+//	attribs []ParameterInfo
+//	typ     reflect.Type
+//	toid    []byte // type oid
+//	isArray  bool
+//	fieldMap map[string]int
+//}
 
 // RegisterType register user defined type with owner equal to user id
 // func (conn *Connection) RegisterType(typeName, arrayTypeName string, typeObj interface{}) error {
@@ -213,61 +203,61 @@ type customType struct {
 
 // loadFieldMap read struct tag that supplied with golang type object passed in RegisterType
 // function
-func (cust *customType) loadFieldMap() {
-	typ := cust.typ
-	for x := 0; x < typ.NumField(); x++ {
-		f := typ.Field(x)
-		fieldID, _, _, _ := extractTag(f.Tag.Get("udt"))
-		if len(fieldID) == 0 {
-			continue
-		}
-		fieldID = strings.ToUpper(fieldID)
-		cust.fieldMap[fieldID] = x
-	}
-}
+//func (cust *customType) loadFieldMap() {
+//	typ := cust.typ
+//	for x := 0; x < typ.NumField(); x++ {
+//		f := typ.Field(x)
+//		fieldID, _, _, _ := extractTag(f.Tag.Get("udt"))
+//		if len(fieldID) == 0 {
+//			continue
+//		}
+//		fieldID = strings.ToUpper(fieldID)
+//		cust.fieldMap[fieldID] = x
+//	}
+//}
 
 // func (cust *customType) isRegularArray() bool {
 // 	return cust.isArray && len(cust.attribs) > 0 && cust.attribs[0].DataType != XMLType
 // }
 
-type Object struct {
-	Owner       string
-	Name        string
-	Value       interface{}
-	itemMaxSize int
-}
+//type Object struct {
+//	Owner       string
+//	Name        string
+//	Value       interface{}
+//	//itemMaxSize int
+//}
 
 // NewObject call this function to wrap oracle object types or arrayso
-func NewObject(owner, name string, value interface{}) *Object {
-	return &Object{
-		Owner:       owner,
-		Name:        name,
-		Value:       value,
-		itemMaxSize: 0,
-	}
-}
+//func NewObject(owner, name string, value interface{}) *Object {
+//	return &Object{
+//		Owner:       owner,
+//		Name:        name,
+//		Value:       value,
+//		//itemMaxSize: 0,
+//	}
+//}
 
-func (obj Object) SetDataType(conn *Connection, par *ParameterInfo) error {
-	par.DataType = oraTypes.XMLType
-	par.Value = obj.Value
-	for name, cusType := range conn.cusTyp {
-		if strings.EqualFold(name, obj.Name) {
-			par.cusType = new(customType)
-			*par.cusType = cusType
-			par.ToID = cusType.toid
-			if cusType.isArray {
-				par.MaxNoOfArrayElements = 1
-			} else {
-				par.Version = 1
-			}
-			break
-		}
-	}
-	if par.cusType == nil {
-		return fmt.Errorf("type %s is not created or not registered", obj.Name)
-	}
-	return nil
-}
+//func (obj Object) SetDataType(conn *Connection, par *ParameterInfo) error {
+//	par.DataType = oraTypes.XMLType
+//	par.Value = obj.Value
+//	for name, cusType := range conn.cusTyp {
+//		if strings.EqualFold(name, obj.Name) {
+//			par.cusType = new(Object)
+//			*par.cusType = cusType
+//			par.ToID = cusType.toid
+//			if cusType.isArray {
+//				par.MaxNoOfArrayElements = 1
+//			} else {
+//				par.Version = 1
+//			}
+//			break
+//		}
+//	}
+//	if par.cusType == nil {
+//		return fmt.Errorf("type %s is not created or not registered", obj.Name)
+//	}
+//	return nil
+//}
 
 // NewArrayObject call this function for creation of array of regular type
 // for example sql: create or replace TYPE SLICE AS TABLE OF varchar2(500)

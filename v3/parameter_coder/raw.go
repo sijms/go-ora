@@ -13,9 +13,13 @@ type RawParameter struct {
 func (param *RawParameter) Encode(input interface{}, strConv converters.StringCoder, _ types.LobStreamer) error {
 	param.SetDefault()
 	encoder := types.Raw{}
-	err := encoder.SetValue(input, param.DataType)
+	encoder.SetDataType(param.DataType)
+	err := encoder.SetValue(input)
 	if err != nil {
 		return err
+	}
+	if dt := encoder.GetDataType(); dt != 0 {
+		param.DataType = dt
 	}
 	param.BValue = encoder.Bytes()
 	if len(param.BValue) > 0 {
@@ -32,7 +36,8 @@ func (param *RawParameter) Encode(input interface{}, strConv converters.StringCo
 func (param *RawParameter) Decode(_ converters.StringCoder) (interface{}, error) {
 	decoder := types.Raw{}
 	decoder.SetBytes(param.BValue)
-	return decoder.Value(param.DataType)
+	decoder.SetDataType(param.DataType)
+	return decoder.Value()
 }
 
 func (param *RawParameter) Write(session network.SessionWriter) error {

@@ -7,7 +7,8 @@ import (
 
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/trace"
-	oraTypes "github.com/sijms/go-ora/v3/types"
+	types "github.com/sijms/go-ora/v3/types"
+	"github.com/sijms/go-ora/v3/utils"
 
 	"io"
 	"reflect"
@@ -131,7 +132,7 @@ func (resultSet *ResultSet) ColumnTypeDatabaseTypeName(index int) string {
 // ColumnTypeLength return length of column type
 func (resultSet *ResultSet) ColumnTypeLength(index int) (int64, bool) {
 	switch (*resultSet.cols)[index].DataType {
-	case oraTypes.NCHAR, oraTypes.CHAR:
+	case types.NCHAR, types.CHAR:
 		return int64((*resultSet.cols)[index].MaxCharLen), true
 	}
 	return int64(0), false
@@ -146,7 +147,7 @@ func (resultSet *ResultSet) ColumnTypeNullable(index int) (nullable, ok bool) {
 func (resultSet *ResultSet) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
 	col := (*resultSet.cols)[index]
 	switch col.DataType {
-	case oraTypes.NUMBER:
+	case types.NUMBER:
 		return int64(col.Precision), int64(col.Scale), true
 	}
 	return int64(0), int64(0), false
@@ -155,36 +156,36 @@ func (resultSet *ResultSet) ColumnTypePrecisionScale(index int) (int64, int64, b
 func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 	col := (*resultSet.cols)[index]
 	switch col.DataType {
-	case oraTypes.NUMBER:
+	case types.NUMBER:
 		if col.Precision > 0 {
-			return tyFloat64
+			return types.TyFloat64
 		} else {
-			return tyInt64
+			return types.TyInt64
 		}
-	case oraTypes.ROWID, oraTypes.UROWID:
+	case types.ROWID, types.UROWID:
 		fallthrough
-	case oraTypes.CHAR, oraTypes.NCHAR:
+	case types.CHAR, types.NCHAR:
 		fallthrough
-	case oraTypes.OCIClobLocator:
-		return tyString
-	case oraTypes.RAW:
+	case types.OCIClobLocator:
+		return types.TyString
+	case types.RAW:
 		fallthrough
-	case oraTypes.OCIBlobLocator, oraTypes.OCIFileLocator:
-		return tyBytes
-	case oraTypes.DATE, oraTypes.TIMESTAMP:
+	case types.OCIBlobLocator, types.OCIFileLocator:
+		return types.TyBytes
+	case types.DATE, types.TIMESTAMP:
 		fallthrough
-	case oraTypes.TimeStampDTY:
+	case types.TimeStampDTY:
 		fallthrough
-	case oraTypes.TimeStampeLTZ, oraTypes.TimeStampLTZ_DTY:
+	case types.TimeStampeLTZ, types.TimeStampLTZ_DTY:
 		fallthrough
-	case oraTypes.TIMESTAMPTZ, oraTypes.TimeStampTZ_DTY:
-		return tyTime
-	case oraTypes.IBFLOAT:
-		return tyFloat32
-	case oraTypes.IBDOUBLE:
-		return tyFloat64
-	case oraTypes.INTERVALDS_DTY, oraTypes.INTERVALYM_DTY:
-		return tyString
+	case types.TIMESTAMPTZ, types.TimeStampTZ_DTY:
+		return types.TyTime
+	case types.IBFLOAT:
+		return types.TyFloat32
+	case types.IBDOUBLE:
+		return types.TyFloat64
+	case types.INTERVALDS_DTY, types.INTERVALYM_DTY:
+		return types.TyString
 	default:
 		return nil
 	}
@@ -228,7 +229,7 @@ func (resultSet *ResultSet) Scan(dest ...interface{}) error {
 					continue
 				}
 				field := destTyp.Field(x)
-				name, _, _, _ := extractTag(field.Tag.Get("db"))
+				name, _, _, _ := utils.ExtractTag(field.Tag.Get("db"))
 				if len(name) == 0 {
 					continue
 				}

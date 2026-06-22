@@ -17,7 +17,7 @@ func (blob *Blob) Upload() error {
 	return blob.uploadData(blob.bValue, 0, 0)
 }
 
-func (blob *Blob) SetValue(input interface{}, typeId uint16) error {
+func (blob *Blob) SetValue(input interface{}) error {
 	var err error
 	switch input := input.(type) {
 	case Blob:
@@ -27,7 +27,7 @@ func (blob *Blob) SetValue(input interface{}, typeId uint16) error {
 		*blob = *input
 		return nil
 	default:
-		err = blob.Raw.SetValue(input, typeId)
+		err = blob.Raw.SetValue(input)
 		if err != nil {
 			return err
 		}
@@ -56,14 +56,14 @@ func CreateBlob(db *sql.DB, uploadCtx context.Context, input interface{}) (*Blob
 	if err != nil {
 		return nil, err
 	}
-	return ret, ret.SetValue(input, 0)
+	return ret, ret.SetValue(input)
 }
 
 func NewBlob(stream LobStreamer, uploadCtx context.Context, input interface{}) (*Blob, error) {
 	ret := &Blob{}
 	ret.UploadCtx = uploadCtx
 	ret.stream = stream
-	return ret, ret.SetValue(input, 0)
+	return ret, ret.SetValue(input)
 }
 
 //	func (blob *Blob) createLocatorAndUploadData(ctx context.Context) error {
@@ -106,7 +106,7 @@ func (blob *Blob) CopyTo(dest driver.Value) error {
 	return nil
 }
 func (blob *Blob) Scan(src interface{}) error {
-	return blob.SetValue(src, 0)
+	return blob.SetValue(src)
 }
 
 //func (l *blob) Data() []byte {

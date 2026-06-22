@@ -14,9 +14,13 @@ func (param *DateParameter) Encode(input interface{}, _ converters.StringCoder, 
 	param.SetDefault()
 	param.DataType = types.DATE
 	encoder := types.Date{}
-	err := encoder.SetValue(input, param.DataType)
+	encoder.SetDataType(param.DataType)
+	err := encoder.SetValue(input)
 	if err != nil {
 		return err
+	}
+	if dt := encoder.GetDataType(); dt != 0 {
+		param.DataType = dt
 	}
 	param.BValue = encoder.Bytes()
 	if len(param.BValue) > 0 {
@@ -28,7 +32,8 @@ func (param *DateParameter) Encode(input interface{}, _ converters.StringCoder, 
 func (param *DateParameter) Decode(_ converters.StringCoder) (interface{}, error) {
 	decoder := types.Date{}
 	decoder.SetBytes(param.BValue)
-	return decoder.Value(param.DataType)
+	decoder.SetDataType(param.DataType)
+	return decoder.Value()
 }
 
 func (param *DateParameter) Write(session network.SessionWriter) error {

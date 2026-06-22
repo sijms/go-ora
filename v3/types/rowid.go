@@ -6,24 +6,20 @@ import (
 )
 
 type RowID struct {
+	Basic
 	Rba         int64
 	PartitionID int64
 	filter      byte
 	BlockNumber int64
 	SlotNumber  int64
-	//data        []byte
-	bValue []byte
 }
 
-func (rowid RowID) SetValue(_ interface{}, _ uint16) error {
+func (rowid RowID) SetValue(_ interface{}) error {
 	return fmt.Errorf("row id is returned from server only")
 }
 
-func (rowid RowID) Value(typeId uint16) (interface{}, error) {
-	//if len(rowid.bValue) == 0 {
-	//	return nil, nil
-	//}
-	switch typeId {
+func (rowid RowID) Value() (interface{}, error) {
+	switch rowid.dataType {
 	case ROWID:
 		return string(rowid.decode()), nil
 	case UROWID:
@@ -34,9 +30,6 @@ func (rowid RowID) Value(typeId uint16) (interface{}, error) {
 	}
 	return nil, fmt.Errorf("row id is returned from server only")
 }
-
-func (rowid *RowID) Bytes() []byte         { return rowid.bValue }
-func (rowid *RowID) SetBytes(input []byte) { rowid.bValue = input }
 
 func (rowid *RowID) decode() []byte {
 	var convertRowIDToByte = func(number int64, size int) []byte {

@@ -41,8 +41,10 @@ var (
 	TyInterval = reflect.TypeOf((*Interval)(nil)).Elem()
 	TyRaw      = reflect.TypeOf((*Raw)(nil)).Elem()
 	TyVector   = reflect.TypeOf((*Vector)(nil)).Elem()
+	TyJson     = reflect.TypeOf((*Json)(nil)).Elem()
 	TyClob     = reflect.TypeOf((*Clob)(nil)).Elem()
 	TyBlob     = reflect.TypeOf((*Blob)(nil)).Elem()
+	TyBFile    = reflect.TypeOf((*BFile)(nil)).Elem()
 )
 
 func xorBuffer(buffer []byte, length int) {

@@ -34,9 +34,13 @@ func (param *StringParameter) Encode(input interface{}, strConv converters.Strin
 	encoder := &types.String{
 		Conv: conv,
 	}
-	err = encoder.SetValue(input, param.DataType)
+	encoder.SetDataType(param.DataType)
+	err = encoder.SetValue(input)
 	if err != nil {
 		return err
+	}
+	if dt := encoder.GetDataType(); dt != 0 {
+		param.DataType = dt
 	}
 	param.BValue = encoder.Bytes()
 	param.MaxLen = int64(len(param.BValue))
@@ -65,7 +69,8 @@ func (param *StringParameter) Decode(strConv converters.StringCoder) (interface{
 		Conv: conv,
 	}
 	decoder.SetBytes(param.BValue)
-	return decoder.Value(param.DataType)
+	decoder.SetDataType(param.DataType)
+	return decoder.Value()
 }
 
 func (param *StringParameter) Write(session network.SessionWriter) error {

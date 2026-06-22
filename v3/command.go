@@ -15,6 +15,7 @@ import (
 
 	"github.com/sijms/go-ora/v3/lazy_init"
 	oraTypes "github.com/sijms/go-ora/v3/types"
+	"github.com/sijms/go-ora/v3/utils"
 
 	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/network"
@@ -1291,9 +1292,9 @@ func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 		structVal = structVal.Elem()
 		structFieldCount := structType.NumField()
 		for i := 0; i < structFieldCount; i++ {
-			name, _, _, dir := extractTag(structType.Field(i).Tag.Get("db"))
+			name, _, _, dir := utils.ExtractTag(structType.Field(i).Tag.Get("db"))
 			var err error
-			if len(name) > 0 && dir != Input {
+			if len(name) > 0 && ParameterDirection(dir) != Input {
 				for _, par := range stmt.Pars {
 					if par.Name == name {
 						//fieldValue := structVal.Field(i).Addr().Interface()
@@ -1435,7 +1436,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		case "nvarchar":
 			fieldVal := &oraTypes.String{}
 			fieldVal.UseNCharset = true
-			err = fieldVal.SetValue(fieldValue, 0)
+			err = fieldVal.SetValue(fieldValue)
 			if err != nil {
 				return
 			}
@@ -1493,7 +1494,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			tempPar, err = stmt.NewParam(name, &fieldVal, size, dir)
 		case "clob":
 			fieldVal := &oraTypes.Clob{}
-			err = fieldVal.SetValue(fieldValue, 0)
+			err = fieldVal.SetValue(fieldValue)
 			if err != nil {
 				return
 			}
@@ -1508,7 +1509,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		case "nclob":
 			fieldVal := &oraTypes.Clob{}
 			fieldVal.UseNCharset = true
-			err = fieldVal.SetValue(fieldValue, 0)
+			err = fieldVal.SetValue(fieldValue)
 			if err != nil {
 				return
 			}
@@ -1531,7 +1532,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "blob":
 			fieldVal := &oraTypes.Blob{}
-			err = fieldVal.SetValue(fieldValue, 0)
+			err = fieldVal.SetValue(fieldValue)
 			//var temp []byte = nil
 			//if !hasNullValue {
 			//	temp, err = getBytes(fieldValue)
@@ -1567,7 +1568,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		structFieldCount := tempType.NumField()
 
 		for i := 0; i < structFieldCount; i++ {
-			name, _type, _, _ := extractTag(tempType.Field(i).Tag.Get("db"))
+			name, _type, _, _ := utils.ExtractTag(tempType.Field(i).Tag.Get("db"))
 			if name != "" {
 				var tempPar *ParameterInfo
 				tempPar, err = parseInputField(structValue, name, _type, i)
@@ -1591,20 +1592,20 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		structValue = structValue.Elem()
 		structFieldCount := tempType.NumField()
 		for i := 0; i < structFieldCount; i++ {
-			name, _type, size, dir := extractTag(tempType.Field(i).Tag.Get("db"))
+			name, _type, size, dir := utils.ExtractTag(tempType.Field(i).Tag.Get("db"))
 			if dir == 0 {
-				dir = Input
+				dir = 1
 			}
 			if name != "" {
 				var tempPar *ParameterInfo
-				if dir == Input {
+				if ParameterDirection(dir) == Input {
 					tempPar, err = parseInputField(structValue, name, _type, i)
 					if err != nil {
 						return
 					}
 					err = tempPar.encodeValue(0, stmt.connection)
 				} else {
-					tempPar, err = addOutputField(name, _type, size, dir, i)
+					tempPar, err = addOutputField(name, _type, size, ParameterDirection(dir), i)
 				}
 				if err != nil {
 					return
@@ -1702,7 +1703,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 					fieldCount := firstItem.NumField()
 					structArrayAsNamedPars := make([]driver.NamedValue, 0, fieldCount)
 					for fieldIndex := 0; fieldIndex < fieldCount; fieldIndex++ {
-						name, _type, _, _ := extractTag(firstItem.Type().Field(fieldIndex).Tag.Get("db"))
+						name, _type, _, _ := utils.ExtractTag(firstItem.Type().Field(fieldIndex).Tag.Get("db"))
 						if name != "" {
 							arrayValues := make([]driver.Value, stmt.arrayBindCount)
 							for arrayIndex := 0; arrayIndex < stmt.arrayBindCount; arrayIndex++ {
@@ -2193,7 +2194,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 			//	}
 			case *oraTypes.Vector:
 				if stmt.connection.connOption.Lob == configurations.INLINE {
-					resultSet.rows[rowIndex][colIndex], err = val.Value(0)
+					resultSet.rows[rowIndex][colIndex], err = val.Value()
 					if err != nil {
 						return err
 					}
@@ -2203,7 +2204,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 						if err != nil {
 							return err
 						}
-						resultSet.rows[rowIndex][colIndex], err = val.Value(0)
+						resultSet.rows[rowIndex][colIndex], err = val.Value()
 						if err != nil {
 							return err
 						}
@@ -2215,7 +2216,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 					if err != nil {
 						return err
 					}
-					resultSet.rows[rowIndex][colIndex], err = val.Value(0)
+					resultSet.rows[rowIndex][colIndex], err = val.Value()
 					if err != nil {
 						return err
 					}
@@ -2235,31 +2236,31 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 					if err != nil {
 						return err
 					}
-					resultSet.rows[rowIndex][colIndex], err = val.Value(0)
+					resultSet.rows[rowIndex][colIndex], err = val.Value()
 					if err != nil {
 						return err
 					}
 				}
-			case LobStream:
-				if col.DataType == oraTypes.OCIClobLocator {
-					tempString := sql.NullString{String: "", Valid: false}
-					err = setLob(reflect.ValueOf(&tempString).Elem(), val)
-					if err != nil {
-						return err
-					}
-					if tempString.Valid {
-						resultSet.rows[rowIndex][colIndex] = tempString.String
-					} else {
-						resultSet.rows[rowIndex][colIndex] = nil
-					}
-				} else {
-					var tempByte []byte
-					err = setLob(reflect.ValueOf(&tempByte).Elem(), val)
-					if err != nil {
-						return err
-					}
-					resultSet.rows[rowIndex][colIndex] = tempByte
-				}
+			//case LobStream:
+			//	if col.DataType == oraTypes.OCIClobLocator {
+			//		tempString := sql.NullString{String: "", Valid: false}
+			//		err = setLob(reflect.ValueOf(&tempString).Elem(), val)
+			//		if err != nil {
+			//			return err
+			//		}
+			//		if tempString.Valid {
+			//			resultSet.rows[rowIndex][colIndex] = tempString.String
+			//		} else {
+			//			resultSet.rows[rowIndex][colIndex] = nil
+			//		}
+			//	} else {
+			//		var tempByte []byte
+			//		err = setLob(reflect.ValueOf(&tempByte).Elem(), val)
+			//		if err != nil {
+			//			return err
+			//		}
+			//		resultSet.rows[rowIndex][colIndex] = tempByte
+			//	}
 			case []ParameterInfo:
 				if col.cusType != nil {
 					tempObject := reflect.New(col.cusType.typ)

@@ -14,9 +14,13 @@ func (param *BoolParameter) Encode(input interface{}, _ converters.StringCoder, 
 	param.SetDefault()
 	param.DataType = types.BOOLEAN
 	encoder := &types.Bool{}
-	err := encoder.SetValue(input, param.DataType)
+	encoder.SetDataType(param.DataType)
+	err := encoder.SetValue(input)
 	if err != nil {
 		return err
+	}
+	if dt := encoder.GetDataType(); dt != 0 {
+		param.DataType = dt
 	}
 	param.BValue = encoder.Bytes()
 	return nil
@@ -25,7 +29,8 @@ func (param *BoolParameter) Encode(input interface{}, _ converters.StringCoder, 
 func (param *BoolParameter) Decode(_ converters.StringCoder) (interface{}, error) {
 	decoder := &types.Bool{}
 	decoder.SetBytes(param.BValue)
-	return decoder.Value(param.DataType)
+	decoder.SetDataType(param.DataType)
+	return decoder.Value()
 }
 
 func (param *BoolParameter) Write(session network.SessionWriter) error {

@@ -39,7 +39,11 @@ func (param *ClobParameter) Encode(input interface{}, strConv converters.StringC
 		return
 	}
 	param.CharsetID = encoder.Conv.GetLangID()
-	err = encoder.SetValue(input, 0)
+	encoder.SetDataType(param.DataType)
+	err = 	encoder.SetValue(input)
+	if dt := encoder.GetDataType(); dt != 0 {
+		param.DataType = dt
+	}
 	if err != nil {
 		return
 	}

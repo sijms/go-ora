@@ -14,13 +14,6 @@ type (
 	ParameterDirection int
 )
 
-const (
-	Input  ParameterDirection = 1
-	Output ParameterDirection = 2
-	InOut  ParameterDirection = 3
-	// RetVal ParameterDirection = 9
-)
-
 func CreateQuasiLocator(dataLength uint64) []byte {
 	ret := make([]byte, 40)
 	ret[1] = 38
@@ -122,7 +115,7 @@ func GetValue(origVal driver.Value) (driver.Value, error) {
 	return proVal.Interface(), nil
 }
 
-func ExtractTag(tag string) (name, _type string, size int, direction ParameterDirection) {
+func ExtractTag(tag string) (name, _type string, size int, direction int) {
 	extractNameValue := func(input string, pos int) {
 		parts := strings.Split(input, "=")
 		var id, value string
@@ -155,11 +148,11 @@ func ExtractTag(tag string) (name, _type string, size int, direction ParameterDi
 		case "direction":
 			switch value {
 			case "in", "input":
-				direction = Input
+				direction = 1
 			case "out", "output":
-				direction = Output
+				direction = 2
 			case "inout":
-				direction = InOut
+				direction = 3
 			}
 		}
 	}

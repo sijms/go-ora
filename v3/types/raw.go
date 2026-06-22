@@ -2,17 +2,18 @@ package types
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 )
 
 type Raw struct {
-	bValue []byte
+	Basic
 }
 
-func (raw *Raw) Value(_ uint16) (interface{}, error) {
+func (raw *Raw) Value() (interface{}, error) {
 	return raw.bValue, nil
 }
-func (raw *Raw) SetValue(input interface{}, _ uint16) error {
+func (raw *Raw) SetValue(input interface{}) error {
 	if input == nil {
 		raw.bValue = nil
 		return nil
@@ -32,18 +33,11 @@ func (raw *Raw) SetValue(input interface{}, _ uint16) error {
 	return nil
 }
 
-func (raw *Raw) Bytes() []byte {
-	return raw.bValue
-}
-func (raw *Raw) SetBytes(input []byte) {
-	raw.bValue = input
-}
-
 func (raw *Raw) Scan(input interface{}) error {
-	return raw.SetValue(input, 0)
+	return raw.SetValue(input)
 }
 
-func (raw *Raw) CopyTo(dest interface{}) error {
+func (raw *Raw) CopyTo(dest driver.Value) error {
 	switch dst := dest.(type) {
 	case *[]byte:
 		*dst = raw.bValue

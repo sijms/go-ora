@@ -10,39 +10,32 @@ import (
 )
 
 type Interval struct {
-	//Year        int
-	//Month       int
-	//Day         int
-	//Hour        int
-	//Minute      int
-	//Second      int
-	//Microsecond int
-	bValue []byte
+	Basic
 }
 
-//func NewYearMonthInterval(year, month int) *Interval {
-//	return &Interval{
-//		Year:  year,
-//		Month: month,
-//	}
-//}
+func NewYearMonthInterval(year, month int) (*Interval, error) {
+	ret := &Interval{}
+	ret.dataType = INTERVALYM_DTY
+	input := time.Date(year, time.Month(month), 0, 0, 0, 0, 0, time.UTC)
+	err := ret.SetValue(input)
+	return ret, err
+}
 
-//func NewDaySecondInterval(day, hour, minute, second, nanosecond int) *Interval {
-//	return &Interval{
-//		Day:         day,
-//		Hour:        hour,
-//		Minute:      minute,
-//		Second:      second,
-//		Microsecond: nanosecond,
-//	}
-//}
+func NewDaySecondInterval(day, hour, minute, second, nanosecond int) (*Interval, error) {
+	ret := &Interval{}
+	ret.dataType = INTERVALDS_DTY
+	input := time.Date(0, 0, day, hour, minute, second, nanosecond, time.UTC)
+	err := ret.SetValue(input)
+	return ret, err
+}
 
-func (interval *Interval) Value(typeId uint16) (interface{}, error) {
+func (interval *Interval) Value() (interface{}, error) {
 	if len(interval.bValue) == 0 {
 		return nil, nil
 	}
 	var (
 		year, month, day, hour, minute, second, mSec int
+		typeId                                       = interval.dataType
 	)
 	if typeId == 0 {
 		if len(interval.bValue) >= 0xB {
@@ -75,9 +68,9 @@ func (interval *Interval) Value(typeId uint16) (interface{}, error) {
 	}
 }
 
-func (interval *Interval) encode(input time.Time, typeId uint16) error {
+func (interval *Interval) encode(input time.Time) error {
 	buffer := new(bytes.Buffer)
-	switch typeId {
+	switch interval.dataType {
 	case INTERVALYM_DTY:
 		err := binary.Write(buffer, binary.BigEndian, uint32(input.Year()+0x80000000))
 		if err != nil {
@@ -110,14 +103,16 @@ func (interval *Interval) encode(input time.Time, typeId uint16) error {
 		}
 	default:
 		if input.Year() != 0 || input.Month() != 0 {
-			return interval.SetValue(interval, INTERVALYM_DTY)
+			interval.SetDataType(INTERVALYM_DTY)
+			return interval.encode(input)
 		}
-		return interval.SetValue(interval, INTERVALDS_DTY)
+		interval.SetDataType(INTERVALDS_DTY)
+		return interval.encode(input)
 	}
 	interval.bValue = buffer.Bytes()
 	return nil
 }
-func (interval *Interval) SetValue(input interface{}, typeId uint16) error {
+func (interval *Interval) SetValue(input interface{}) error {
 	if input == nil {
 		interval.bValue = nil
 		return nil
@@ -128,29 +123,21 @@ func (interval *Interval) SetValue(input interface{}, typeId uint16) error {
 	case *Interval:
 		*interval = *data
 	case time.Time:
-		return interval.encode(data, typeId)
+		return interval.encode(data)
 	case *time.Time:
-		return interval.encode(*data, typeId)
+		return interval.encode(*data)
 	default:
 		return fmt.Errorf("cannot set value of type %T into interval", input)
 	}
 	return nil
 }
 
-func (interval *Interval) Bytes() []byte {
-	return interval.bValue
-}
-
-func (interval *Interval) SetBytes(input []byte) {
-	interval.bValue = input
-}
-
 func (interval *Interval) Scan(value interface{}) error {
-	return interval.SetValue(value, 0)
+	return interval.SetValue(value)
 }
 
 func (interval *Interval) CopyTo(dest driver.Value) error {
-	value, err := interval.Value(0)
+	value, err := interval.Value()
 	if err != nil {
 		return err
 	}

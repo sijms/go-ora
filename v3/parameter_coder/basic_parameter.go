@@ -1,22 +1,21 @@
 package parameter_coder
 
 import (
-	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
 
 type BasicParameter struct {
-	Flag         uint8
-	ContFlag     int
-	DataType     uint16
-	CharsetID    int
-	CharsetForm  int
-	MaxLen       int64
-	MaxCharLen   int64
-	ToID         []byte
-	ArraySize    int
-	Coder        converters.StringCoder
+	Flag        uint8
+	ContFlag    int
+	DataType    uint16
+	CharsetID   int
+	CharsetForm int
+	MaxLen      int64
+	MaxCharLen  int64
+	ToID        []byte
+	ArraySize   int
+	//Coder        converters.StringCoder
 	IsUDTPar     bool
 	BValue       []byte
 	VectorDim    int
@@ -58,6 +57,9 @@ func (basic *BasicParameter) SetDefault() {
 	basic.VectorType = 0
 }
 
+func (basic *BasicParameter) Bytes() []byte {
+	return basic.BValue
+}
 func (basic *BasicParameter) GetParameterInfo() BasicParameter {
 	return *basic
 }

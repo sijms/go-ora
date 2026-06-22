@@ -54,7 +54,7 @@ func (clob *Clob) Upload() error {
 // SetValue use stream to get charset converter
 // call basic SetValue
 // upload value to server
-func (clob *Clob) SetValue(input interface{}, typeId uint16) error {
+func (clob *Clob) SetValue(input interface{}) error {
 	var err error
 	charsetForm := 1
 	if clob.UseNCharset {
@@ -78,11 +78,11 @@ func (clob *Clob) SetValue(input interface{}, typeId uint16) error {
 			if clob.Conv != nil && input.Conv != nil && clob.Conv.GetLangID() == input.Conv.GetLangID() {
 				*clob = input
 			} else {
-				temp, err := input.Value(0)
+				temp, err := input.Value()
 				if err != nil {
 					return err
 				}
-				return clob.SetValue(temp, typeId)
+				return clob.SetValue(temp)
 			}
 		}
 		return nil
@@ -93,17 +93,17 @@ func (clob *Clob) SetValue(input interface{}, typeId uint16) error {
 			if clob.Conv != nil && input.Conv != nil && clob.Conv.GetLangID() == input.Conv.GetLangID() {
 				*clob = *input
 			} else {
-				temp, err := input.Value(0)
+				temp, err := input.Value()
 				if err != nil {
 					return err
 				}
-				return clob.SetValue(temp, typeId)
+				return clob.SetValue(temp)
 			}
 		}
 		//*clob = *input
 		return nil
 	default:
-		err = clob.String.SetValue(input, typeId)
+		err = clob.String.SetValue(input)
 		if err != nil {
 			return err
 		}
@@ -192,7 +192,7 @@ func CreateClob(db *sql.DB, uploadCtx context.Context, input interface{}, useNCl
 	if err != nil {
 		return nil, err
 	}
-	return ret, ret.SetValue(input, 0)
+	return ret, ret.SetValue(input)
 }
 
 func NewClob(stream LobStreamer, uploadCtx context.Context, input interface{}, useNClob bool) (*Clob, error) {
@@ -200,7 +200,7 @@ func NewClob(stream LobStreamer, uploadCtx context.Context, input interface{}, u
 	ret.UseNCharset = useNClob
 	ret.UploadCtx = uploadCtx
 	ret.stream = stream
-	return ret, ret.SetValue(input, 0)
+	return ret, ret.SetValue(input)
 }
 
 //	func NewClob(streamer LobStreamer) *Clob {
@@ -238,7 +238,7 @@ func NewClob(stream LobStreamer, uploadCtx context.Context, input interface{}, u
 //		return l.charsetID, l.charsetForm
 //	}
 func (clob *Clob) CopyTo(dest driver.Value) error {
-	temp, err := clob.Value(0)
+	temp, err := clob.Value()
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func (clob *Clob) CopyTo(dest driver.Value) error {
 	return nil
 }
 func (clob *Clob) Scan(value interface{}) error {
-	return clob.SetValue(value, 0)
+	return clob.SetValue(value)
 }
 
 //func (l *clob) Data() sql.NullString {

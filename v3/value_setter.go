@@ -64,58 +64,58 @@ func setNumber(value reflect.Value, input *Number) error {
 		return nil
 	}
 	switch value.Type() {
-	case tyBool:
+	case oraTypes.TyBool:
 		value.SetBool(!input.isZero())
-	case tyString:
+	case oraTypes.TyString:
 		temp, err := input.String()
 		if err != nil {
 			return err
 		}
 		value.SetString(temp)
-	case tyNullString:
+	case oraTypes.TyNullString:
 		temp, err := input.String()
 		if err != nil {
 			return err
 		}
 		value.Set(reflect.ValueOf(sql.NullString{temp, true}))
-	case tyNullByte:
+	case oraTypes.TyNullByte:
 		temp, err := input.Int64()
 		if err != nil {
 			return err
 		}
 		value.Set(reflect.ValueOf(sql.NullByte{uint8(temp), true}))
-	case tyNullInt16:
+	case oraTypes.TyNullInt16:
 		temp, err := input.Int64()
 		if err != nil {
 			return err
 		}
 		value.Set(reflect.ValueOf(sql.NullInt16{int16(temp), true}))
-	case tyNullInt32:
+	case oraTypes.TyNullInt32:
 		temp, err := input.Int64()
 		if err != nil {
 			return err
 		}
 		value.Set(reflect.ValueOf(sql.NullInt32{int32(temp), true}))
-	case tyNullInt64:
+	case oraTypes.TyNullInt64:
 		temp, err := input.Int64()
 		if err != nil {
 			return err
 		}
 		value.Set(reflect.ValueOf(sql.NullInt64{temp, true}))
-	case tyNullFloat64:
+	case oraTypes.TyNullFloat64:
 		temp, err := input.Float64()
 		if err != nil {
 			return err
 		}
 		value.Set(reflect.ValueOf(sql.NullFloat64{temp, true}))
-	case tyNullBool:
+	case oraTypes.TyNullBool:
 		value.Set(reflect.ValueOf(sql.NullBool{!input.isZero(), true}))
-	case tyNullNVarChar:
-		temp, err := input.String()
-		if err != nil {
-			return err
-		}
-		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(temp), true}))
+	//case oraTypes.TyNullNVarChar:
+	//	temp, err := input.String()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	value.Set(reflect.ValueOf(NullNVarChar{NVarChar(temp), true}))
 	default:
 		if temp, ok := value.Interface().(sql.Scanner); ok {
 			if temp != nil && !reflect.ValueOf(temp).IsNil() {
@@ -173,60 +173,60 @@ func setString(value reflect.Value, input string) error {
 		return floatErr
 	}
 	switch value.Type() {
-	case tyNumber:
+	case oraTypes.TyNumber:
 		tempNum, err := NewNumberFromString(input)
 		if err != nil {
 			return err
 		}
 		value.Set(reflect.ValueOf(*tempNum))
-	case tyBool:
+	case oraTypes.TyBool:
 		if slices.Contains(truthy, strings.ToLower(input)) {
 			value.SetBool(true)
 		} else {
 			value.SetBool(false)
 		}
-	case tyString:
+	case oraTypes.TyString:
 		value.SetString(input)
-	case tyNullString:
+	case oraTypes.TyNullString:
 		value.Set(reflect.ValueOf(sql.NullString{String: input, Valid: true}))
-	case tyNullByte:
+	case oraTypes.TyNullByte:
 		if intErr == nil {
 			value.Set(reflect.ValueOf(sql.NullByte{Byte: uint8(tempInt), Valid: true}))
 		}
 		return intErr
-	case tyNullInt16:
+	case oraTypes.TyNullInt16:
 		if intErr == nil {
 			value.Set(reflect.ValueOf(sql.NullInt16{Int16: int16(tempInt), Valid: true}))
 		}
 		return intErr
-	case tyNullInt32:
+	case oraTypes.TyNullInt32:
 		if intErr == nil {
 			value.Set(reflect.ValueOf(sql.NullInt32{Int32: int32(tempInt), Valid: true}))
 		}
 		return intErr
-	case tyNullInt64:
+	case oraTypes.TyNullInt64:
 		if intErr == nil {
 			value.Set(reflect.ValueOf(sql.NullInt64{Int64: tempInt, Valid: true}))
 		}
 		return intErr
-	case tyNullFloat64:
+	case oraTypes.TyNullFloat64:
 		if floatErr == nil {
 			value.Set(reflect.ValueOf(sql.NullFloat64{Float64: tempFloat, Valid: true}))
 		}
 		return floatErr
-	case tyNullBool:
+	case oraTypes.TyNullBool:
 		temp := slices.Contains(truthy, strings.ToLower(input))
 		value.Set(reflect.ValueOf(sql.NullBool{Bool: temp, Valid: true}))
 	//case tyNVarChar:
 	//	value.Set(reflect.ValueOf(NVarChar(input)))
 	//case tyNullNVarChar:
 	//	value.Set(reflect.ValueOf(NullNVarChar{NVarChar: NVarChar(input), Valid: true}))
-	case tyTime:
+	case oraTypes.TyTime:
 		if timeErr == nil {
 			value.Set(reflect.ValueOf(tempTime))
 		}
 		return timeErr
-	case tyNullTime:
+	case oraTypes.TyNullTime:
 		if timeErr == nil {
 			value.Set(reflect.ValueOf(sql.NullTime{Time: tempTime, Valid: true}))
 		}
@@ -241,16 +241,16 @@ func setString(value reflect.Value, input string) error {
 	//		value.Set(reflect.ValueOf(NullTimeStamp{TimeStamp: TimeStamp(tempTime), Valid: true}))
 	//	}
 	//	return timeErr
-	case tyTimeStampTZ:
-		if timeErr == nil {
-			value.Set(reflect.ValueOf(TimeStampTZ(tempTime)))
-		}
-		return timeErr
-	case tyNullTimeStampTZ:
-		if timeErr == nil {
-			value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ: TimeStampTZ(tempTime), Valid: true}))
-		}
-		return timeErr
+	//case tyTimeStampTZ:
+	//	if timeErr == nil {
+	//		value.Set(reflect.ValueOf(TimeStampTZ(tempTime)))
+	//	}
+	//	return timeErr
+	//case tyNullTimeStampTZ:
+	//	if timeErr == nil {
+	//		value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ: TimeStampTZ(tempTime), Valid: true}))
+	//	}
+	//	return timeErr
 	//case tyClob:
 	//	value.Set(reflect.ValueOf(Clob{String: input, Valid: true}))
 	//case tyNClob:
@@ -270,22 +270,22 @@ func setBytes(value reflect.Value, input []byte) error {
 		return setBytes(value.Elem(), input)
 	}
 	switch value.Type() {
-	case tyString:
+	case oraTypes.TyString:
 		value.SetString(string(input))
-	case tyBytes:
+	case oraTypes.TyBytes:
 		value.SetBytes(input)
-	case tyNVarChar:
-		value.Set(reflect.ValueOf(NVarChar(input)))
+	//case tyNVarChar:
+	//	value.Set(reflect.ValueOf(NVarChar(input)))
 	//case tyBlob:
 	//	value.Set(reflect.ValueOf(Blob{Data: input}))
 	//case tyClob:
 	//	value.Set(reflect.ValueOf(Clob{String: string(input), Valid: true}))
 	//case tyNClob:
 	//	value.Set(reflect.ValueOf(NClob{String: string(input), Valid: true}))
-	case tyNullString:
+	case oraTypes.TyNullString:
 		value.Set(reflect.ValueOf(sql.NullString{string(input), true}))
-	case tyNullNVarChar:
-		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(input), true}))
+	//case tyNullNVarChar:
+	//	value.Set(reflect.ValueOf(NullNVarChar{NVarChar(input), true}))
 	default:
 		return setWithScanner(value, input)
 		//if temp, ok := value.Interface().(sql.Scanner); ok {
@@ -313,22 +313,22 @@ func setTime(value reflect.Value, input time.Time) error {
 		return setTime(value.Elem(), input)
 	}
 	switch value.Type() {
-	case tyString:
+	case oraTypes.TyString:
 		value.SetString(input.Format(time.RFC3339))
-	case tyTime:
+	case oraTypes.TyTime:
 		value.Set(reflect.ValueOf(input))
 	//case tyTimeStamp:
 	//	value.Set(reflect.ValueOf(TimeStamp(input)))
-	case tyTimeStampTZ:
-		value.Set(reflect.ValueOf(TimeStampTZ(input)))
-	case tyNullString:
+	//case oraTypes.TyTimeStampTZ:
+	//	value.Set(reflect.ValueOf(TimeStampTZ(input)))
+	case oraTypes.TyNullString:
 		value.Set(reflect.ValueOf(sql.NullString{input.Format(time.RFC3339), true}))
-	case tyNullTime:
+	case oraTypes.TyNullTime:
 		value.Set(reflect.ValueOf(sql.NullTime{input, true}))
 	//case tyNullTimeStamp:
 	//	value.Set(reflect.ValueOf(NullTimeStamp{TimeStamp(input), true}))
-	case tyNullTimeStampTZ:
-		value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ(input), true}))
+	//case tyNullTimeStampTZ:
+	//	value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ(input), true}))
 	default:
 		if temp, ok := value.Interface().(sql.Scanner); ok {
 			if temp != nil && !reflect.ValueOf(temp).IsNil() {
@@ -347,7 +347,7 @@ func setTime(value reflect.Value, input time.Time) error {
 }
 
 // set field value
-func setFieldValue(fieldValue reflect.Value, cust *customType, input interface{}) error {
+func setFieldValue(fieldValue reflect.Value, cust *Object, input interface{}) error {
 	// input should be one of primitive values
 	if input == nil {
 		return setNull(fieldValue)
@@ -428,7 +428,7 @@ func setClob(dest reflect.Value, input oraTypes.Clob) error {
 			return err
 		}
 	}
-	temp, err := input.Value(0)
+	temp, err := input.Value()
 	if err != nil {
 		return err
 	}
@@ -436,9 +436,9 @@ func setClob(dest reflect.Value, input oraTypes.Clob) error {
 		dest.Set(reflect.Zero(dest.Type()))
 	} else {
 		switch dest.Type() {
-		case tyString:
+		case oraTypes.TyString:
 			dest.SetString(temp.(string))
-		case tyNullString:
+		case oraTypes.TyNullString:
 			dest.Set(reflect.ValueOf(sql.NullString{String: temp.(string), Valid: true}))
 		default:
 			return setWithScanner(dest, input)
@@ -476,7 +476,7 @@ func setBlob(dest reflect.Value, input oraTypes.Blob) error {
 			return err
 		}
 	}
-	temp, err := input.Value(0)
+	temp, err := input.Value()
 	if err != nil {
 		return err
 	}
@@ -484,7 +484,7 @@ func setBlob(dest reflect.Value, input oraTypes.Blob) error {
 		dest.Set(reflect.Zero(dest.Type()))
 	} else {
 		switch dest.Type() {
-		case tyBytes:
+		case oraTypes.TyBytes:
 			dest.SetBytes(temp.([]byte))
 		default:
 			return setWithScanner(dest, input)
@@ -532,13 +532,13 @@ func setLob(value reflect.Value, input LobStream) error {
 	}
 	var strConv converters.IStringConverter
 	switch value.Type() {
-	case tyString:
+	case oraTypes.TyString:
 		strConv, err = getStrConv()
 		if err != nil {
 			return err
 		}
 		value.SetString(strConv.Decode(lobData))
-	case tyNullString:
+	case oraTypes.TyNullString:
 		strConv, err = getStrConv()
 		if err != nil {
 			return err
@@ -581,7 +581,7 @@ func setLob(value reflect.Value, input LobStream) error {
 			Data:    lobData,
 			locator: input.sourceLocator,
 		}))
-	case tyBytes:
+	case oraTypes.TyBytes:
 		value.Set(reflect.ValueOf(lobData))
 	default:
 		return setWithScanner(value, input)
@@ -669,7 +669,7 @@ func setArray(value reflect.Value, input []ParameterInfo) error {
 	return nil
 }
 
-func setUDTObject(value reflect.Value, cust *customType, input []ParameterInfo) error {
+func setUDTObject(value reflect.Value, cust *Object, input []ParameterInfo) error {
 	if value.Kind() == reflect.Ptr {
 		if value.IsNil() {
 			value.Set(reflect.New(value.Type().Elem()))

@@ -15,7 +15,7 @@ import (
 )
 
 type Number struct {
-	bValue []byte
+	Basic
 }
 
 func (number *Number) isZero() bool {
@@ -312,7 +312,8 @@ func NewBinaryFloat(number float32) *Number {
 func NewNumber(n interface{}) (*Number, error) {
 	var err error
 	ret := new(Number)
-	err = ret.SetValue(n, NUMBER)
+	ret.SetDataType(NUMBER)
+	err = ret.SetValue(n)
 	return ret, err
 	//n, err = utils.GetValue(n)
 	//if err != nil {
@@ -450,11 +451,11 @@ func (number *Number) decodeFloat() (float32, error) {
 	return math.Float32frombits(binary.BigEndian.Uint32(number.bValue)), nil
 }
 
-func (number *Number) Value(typeId uint16) (interface{}, error) {
+func (number *Number) Value() (interface{}, error) {
 	if len(number.bValue) == 0 {
 		return nil, nil
 	}
-	switch typeId {
+	switch number.dataType {
 	case IBDOUBLE:
 		return number.decodeDouble()
 	case IBFLOAT:
@@ -462,10 +463,6 @@ func (number *Number) Value(typeId uint16) (interface{}, error) {
 	default:
 		return number.String()
 	}
-}
-
-func (number *Number) Bytes() []byte {
-	return number.bValue
 }
 
 func (number *Number) encodeInt(input int64) error {
@@ -572,7 +569,7 @@ func (number *Number) encodeString(input string) error {
 	number.bValue, err = number.encode(mantissa, exp, negative)
 	return err
 }
-func (number *Number) SetValue(input interface{}, typeId uint16) error {
+func (number *Number) SetValue(input interface{}) error {
 	var err error
 	input, err = utils.GetValue(input)
 	if err != nil {
@@ -655,7 +652,7 @@ func (number *Number) SetValue(input interface{}, typeId uint16) error {
 	}
 	switch temp := tempValue.(type) {
 	case int64:
-		switch typeId {
+		switch number.dataType {
 		case IBFLOAT:
 			err = number.encodeFloat32(float32(temp))
 		case IBDOUBLE:
@@ -664,7 +661,7 @@ func (number *Number) SetValue(input interface{}, typeId uint16) error {
 			err = number.encodeInt(temp)
 		}
 	case uint64:
-		switch typeId {
+		switch number.dataType {
 		case IBFLOAT:
 			err = number.encodeFloat32(float32(temp))
 		case IBDOUBLE:
@@ -673,7 +670,7 @@ func (number *Number) SetValue(input interface{}, typeId uint16) error {
 			err = number.encodeUint(temp)
 		}
 	case float64:
-		switch typeId {
+		switch number.dataType {
 		case IBFLOAT:
 			err = number.encodeFloat32(float32(temp))
 		case IBDOUBLE:
@@ -682,7 +679,7 @@ func (number *Number) SetValue(input interface{}, typeId uint16) error {
 			err = number.encodeFloat(temp)
 		}
 	case string:
-		switch typeId {
+		switch number.dataType {
 		case IBFLOAT:
 			value, err := strconv.ParseFloat(rValue.String(), 64)
 			if err != nil {
@@ -791,12 +788,9 @@ func (number *Number) SetValue(input interface{}, typeId uint16) error {
 	//return nil
 }
 
-func (number *Number) SetBytes(input []byte) {
-	number.bValue = input
-}
-
 func (number *Number) Scan(value interface{}) error {
-	return number.SetValue(value, NUMBER)
+	number.SetDataType(NUMBER)
+	return number.SetValue(value)
 	//temp, err := NewNumber(value)
 	//if err != nil {
 	//	return err

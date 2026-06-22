@@ -7,16 +7,16 @@ import (
 	"github.com/sijms/go-ora/v3/types"
 )
 
-type DateField struct {
+type dateField struct {
 	value types.Date
 	basicField
 }
 
-func (field *DateField) Value() (interface{}, error) {
-	return field.value.Value(0)
+func (field *dateField) Value() (interface{}, error) {
+	return field.value.Value()
 }
 
-func (field *DateField) Encode() ([]byte, error) {
+func (field *dateField) Encode() ([]byte, error) {
 	var err error
 	data := field.value.Bytes()
 	length := len(data)
@@ -30,7 +30,7 @@ func (field *DateField) Encode() ([]byte, error) {
 	return buffer.Bytes(), err
 }
 
-func (field *DateField) Decode(input []byte) error {
+func (field *dateField) Decode(input []byte) error {
 	buffer := bytes.NewBuffer(input)
 	var err error
 	field.opCode, err = buffer.ReadByte()
@@ -47,7 +47,7 @@ func (field *DateField) Decode(input []byte) error {
 	case 0x7C:
 		length = 13
 	default:
-		return fmt.Errorf("invalid opCode (%d) for DateField", field.opCode)
+		return fmt.Errorf("invalid opCode (%d) for dateField", field.opCode)
 	}
 	data := make([]byte, length)
 	var read int

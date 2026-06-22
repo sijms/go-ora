@@ -13,7 +13,7 @@ type ValueEncoder interface {
 }
 
 type (
-	PLBool   bool
+	//PLBool   bool
 	NVarChar string
 	batch    struct {
 		array driver.Value
@@ -23,11 +23,12 @@ type (
 func NewBatch(array driver.Value) driver.Value {
 	return &batch{array: array}
 }
-func (val PLBool) SetDataType(_ *Connection, par *ParameterInfo) error {
-	par.DataType = oraTypes.BOOLEAN
-	par.MaxLen = int64(converters.MAX_LEN_BOOL)
-	return nil
-}
+
+//func (val PLBool) SetDataType(_ *Connection, par *ParameterInfo) error {
+//	par.DataType = oraTypes.BOOLEAN
+//	par.MaxLen = int64(converters.MAX_LEN_BOOL)
+//	return nil
+//}
 
 func (val NVarChar) SetDataType(conn *Connection, par *ParameterInfo) error {
 	par.DataType = oraTypes.NCHAR

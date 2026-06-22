@@ -16,14 +16,20 @@ type RowIDParameter struct {
 func (param *RowIDParameter) Encode(input interface{}, _ converters.StringCoder, _ types.LobStreamer) error {
 	param.SetDefault()
 	coder := &types.RowID{}
-	return coder.SetValue(input, 0)
+	coder.SetDataType(param.DataType)
+	err := coder.SetValue(input)
+	if dt := coder.GetDataType(); dt != 0 {
+		param.DataType = dt
+	}
+	return err
 }
 
 func (param *RowIDParameter) Decode(_ converters.StringCoder) (interface{}, error) {
 	decoder := &types.RowID{}
 	*decoder = param.rowid
 	decoder.SetBytes(param.BValue)
-	return decoder.Value(param.DataType)
+	decoder.SetDataType(param.DataType)
+	return decoder.Value()
 }
 
 func (param *RowIDParameter) Write(session network.SessionWriter) error {

@@ -4,6 +4,7 @@ type TerminalReader interface {
 	read(num int) ([]byte, error)
 }
 type SessionReader interface {
+	Peek() (byte, error)
 	GetByte() (uint8, error)
 	GetBytes(length int) ([]byte, error)
 	GetInt64(size int, compress, bigEndian bool) (int64, error)
@@ -27,6 +28,7 @@ type SessionWriter interface {
 }
 type SessionReadWriter interface {
 	ResetBuffer()
+	GetProperties() SessionProperties
 	SessionReader
 	SessionWriter
 }
@@ -44,44 +46,44 @@ type ValueStreamer interface {
 	ValueStreamWriter
 }
 
-type Lob struct{}
-
-func (lob *Lob) Read(reader SessionReader) ([]byte, error) {
-	// extract []byte data from network by reading flags
-	var value []byte
-	maxSize, err := reader.GetInt(4, true, true)
-	if err != nil {
-		return nil, err
-	}
-	if maxSize > 0 {
-
-		value, err = reader.GetClr()
-		if err != nil {
-			return nil, err
-		}
-		/*locator*/ _, err = reader.GetClr()
-		if err != nil {
-			return nil, err
-		}
-
-	}
-
-	// at this point we have []byte data as value we should convert it to original value
-
-	//	v := Vector{}
-	//	err = v.decode(par.BValue)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	par.oPrimValue = v.Data
-	//	_ /*locator*/, err = session.GetClr()
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
-	return value, nil
-}
-
-func (lob *Lob) Write(writer SessionWriter, data []byte) error {
-	return nil
-}
+//type Lob struct{}
+//
+//func (lob *Lob) Read(reader SessionReader) ([]byte, error) {
+//	// extract []byte data from network by reading flags
+//	var value []byte
+//	maxSize, err := reader.GetInt(4, true, true)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if maxSize > 0 {
+//
+//		value, err = reader.GetClr()
+//		if err != nil {
+//			return nil, err
+//		}
+//		/*locator*/ _, err = reader.GetClr()
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//	}
+//
+//	// at this point we have []byte data as value we should convert it to original value
+//
+//	//	v := Vector{}
+//	//	err = v.decode(par.BValue)
+//	//	if err != nil {
+//	//		return err
+//	//	}
+//	//	par.oPrimValue = v.Data
+//	//	_ /*locator*/, err = session.GetClr()
+//	//	if err != nil {
+//	//		return err
+//	//	}
+//	//}
+//	return value, nil
+//}
+//
+//func (lob *Lob) Write(writer SessionWriter, data []byte) error {
+//	return nil
+//}

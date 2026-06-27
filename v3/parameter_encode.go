@@ -1,6 +1,8 @@
 package go_ora
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"reflect"
 
@@ -300,7 +302,6 @@ import (
 //
 //	return nil
 //}
-
 //func (par *ParameterInfo) encodeWithType(connection *Connection) error {
 //	var err error
 //	var val driver.Value
@@ -473,7 +474,6 @@ import (
 //	}
 //	return nil
 //}
-
 //func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 //	var err error
 //	switch value := par.iPrimValue.(type) {
@@ -639,57 +639,18 @@ func (par *ParameterInfo) init() {
 func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error {
 	par.init()
 	var err error
-	//for key, value := range connection.parameterEncoder {
-	//
-	//}
-	//par.encoder, err = type_coder.Encode(par.Value)
-	//if err != nil {
-	//	return err
-	//}
-
-	// first check if the value is nil and return nil
-	//if par.Value == nil {
-	//	par.DataType = oraTypes.NCHAR
-	//	par.MaxLen = 1
-	//	return nil
-	//}
-	//switch value := par.Value.(type) {
-	//case oraTypes.Blob:
-	//	par.encoder = type_coder.NewBlobEncoder(value)
-	//case *oraTypes.Blob:
-	//	par.encoder = type_coder.NewBlobEncoder(*value)
-	//case oraTypes.Clob:
-	//	par.encoder = type_coder.NewClobEncoder(value)
-	//case *oraTypes.Clob:
-	//	par.encoder = type_coder.NewClobEncoder(*value)
-	//case oraTypes.Vector:
-	//	par.encoder, err = type_coder.NewVectorEncoder(value)
-	//	if err != nil {
-	//		return err
-	//	}
-	//case *oraTypes.Vector:
-	//	par.encoder, err = type_coder.NewVectorEncoder(*value)
-	//
-	//}
-	// check if the value is of type string
-
-	// check if the value is of type lob
-	//if temp, ok := par.Value.(oraTypes.LobTyper); ok {
-	//	stream := &LobStream{
-	//		conn: connection,
-	//	}
-	//	temp.SetLobStream(stream)
-	//}
-	// switch type of the value and according put each type in its build in encoder
-	// custom encoder should be passed in the value
-	valueType := reflect.TypeOf(par.Value)
-	for valueType.Kind() == reflect.Ptr {
-		valueType = valueType.Elem()
+	if par.Value == nil {
+		par.Value = sql.NullString{}
 	}
-	var ok bool
-	par.encoder, ok = connection.parameterEncoder[valueType]
-	if ok {
-		err = par.encoder.Encode(par.Value, connection, nil)
+	tempType := getType(par.Value)
+	tempValue, err := getValue(par.Value)
+	if err != nil {
+		return err
+	}
+
+	if coder, ok := connection.goTypeCoder[tempType]; ok {
+		par.encoder = coder.Copy()
+		err = par.encoder.Encode(tempValue, connection)
 		if err != nil {
 			return err
 		}
@@ -697,12 +658,48 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 		if par.MaxLen < size {
 			par.MaxLen = size
 		}
-		//if par.DataType == oraTypes.NCHAR {
-		//	par.MaxCharLen = par.MaxLen
-		//}
 	} else {
-		return fmt.Errorf("no encoder register for data type: %T", par.Value)
+		// here code for object should be added
+		switch tempType.Kind() {
+		case reflect.Array, reflect.Slice:
+			var inVal driver.Value = nil
+			rValue := reflect.ValueOf(tempValue)
+			size := rValue.Len()
+			if size > 0 && rValue.Index(0).CanInterface() {
+				inVal, err = getValue(rValue.Index(0).Interface())
+				if err != nil {
+					return err
+				}
+			}
+			tempType = getType(inVal)
+			tempValue, err = getValue(inVal)
+			if err != nil {
+				return err
+			}
+			if coder, ok = connection.goTypeCoder[tempType]; ok {
+				par.encoder = coder.Copy()
+				err = par.encoder.Encode(tempValue, connection)
+				if err != nil {
+					return err
+				}
+				par.SetParameterInfo(par.encoder.GetParameterInfo())
+				if par.MaxLen < int64(size) {
+					par.MaxLen = int64(size)
+				}
+				if par.DataType != oraTypes.XMLType {
+					par.Flag = 0x43
+				}
+				par.ArraySize = 1
+			} else {
+				// return err
+			}
+
+			return nil
+		default:
+			return fmt.Errorf("no encoder register for data type: %T", par.Value)
+		}
 	}
+
 	//if par.encoder != nil {
 	//	err = par.encoder.Encode(connection, nil)
 	//	if err != nil {
@@ -716,25 +713,17 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	//		par.MaxCharLen = par.MaxLen
 	//	}
 	//}
-	if par.Direction == Output {
+	if par.DataType == oraTypes.OCIFileLocator {
+		par.MaxLen = int64(size)
+		if par.MaxLen == 0 {
+			par.MaxLen = 4000
+		}
+	}
+	if par.Direction == Output && !(par.DataType == oraTypes.XMLType) {
 		par.BValue = nil
 	}
 	return nil
 
-	//if temp, ok := par.Value.(type_coder.OracleTypeEncoder); ok {
-	//	lobStream := &LobStream{conn: connection}
-	//	err := temp.Encode(connection, lobStream)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	par.TypeInfo.SetTypeInfo(temp.GetTypeInfo())
-	//	par.encoder = temp
-	//	return nil
-	//}
-	//err = par.setDataType(connection, reflect.TypeOf(par.Value), par.Value)
-	//if err != nil {
-	//	return err
-	//}
 	//if par.MaxNoOfArrayElements > 0 && par.MaxNoOfArrayElements < int(size) {
 	//	par.MaxNoOfArrayElements = int(size)
 	//}
@@ -758,12 +747,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	//		return fmt.Errorf("passing raw value with size: %d bigger than max size: %d", len(par.BValue), connection.maxLen.raw)
 	//	}
 	//}
-	if par.DataType == oraTypes.OCIFileLocator {
-		par.MaxLen = int64(size)
-		if par.MaxLen == 0 {
-			par.MaxLen = 4000
-		}
-	}
+
 	if par.Direction != Input {
 		if par.DataType == oraTypes.NCHAR {
 			if par.MaxCharLen < int64(size) {

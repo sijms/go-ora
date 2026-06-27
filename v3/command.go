@@ -375,10 +375,11 @@ func (stmt *Stmt) writePars() error {
 				}
 				continue
 			}
-			if par.DataType == oraTypes.REFCURSOR {
-				ms.PutBytes(1, 0)
-				//session.WriteBytes(&buffer, 1, 0)
-			} else if (par.Direction == Input || par.Direction == InOut) && par.isLobType() {
+			//if par.DataType == oraTypes.REFCURSOR {
+			//	ms.PutBytes(1, 0)
+			//	//session.WriteBytes(&buffer, 1, 0)
+			//} else
+			if (par.Direction == Input || par.Direction == InOut) && par.isLobType() {
 				if par.DataType == oraTypes.VECTOR {
 					//session.WriteBytes(&buffer, par.BValue...)
 				} else {

@@ -28,6 +28,13 @@ func getValue(origVal driver.Value) (driver.Value, error) {
 	}
 	return proVal.Interface(), nil
 }
+func getType(value driver.Value) reflect.Type {
+	valueType := reflect.TypeOf(value)
+	for valueType.Kind() == reflect.Ptr {
+		valueType = valueType.Elem()
+	}
+	return valueType
+}
 
 //	func setWithScanner(dest reflect.Value, input interface{}) error {
 //		if temp, ok := dest.Interface().(sql.Scanner); ok {

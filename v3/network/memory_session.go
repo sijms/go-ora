@@ -23,7 +23,7 @@ func NewMemorySession(inputBuffer, outputBuffer []byte, sessionProp SessionPrope
 
 func (ms *MemorySession) read(length int) ([]byte, error) {
 	output := make([]byte, length)
-	n, err := ms.outBuffer.Read(output)
+	n, err := ms.inBuffer.Read(output)
 	if err != nil {
 		return nil, err
 	}
@@ -42,4 +42,8 @@ func (ms *MemorySession) Write(reset bool) []byte {
 func (ms *MemorySession) ResetBuffer() {
 	ms.inBuffer.Reset()
 	ms.outBuffer.Reset()
+}
+
+func (ms *MemorySession) GetProperties() SessionProperties {
+	return ms.SessionProperties
 }

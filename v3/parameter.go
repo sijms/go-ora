@@ -52,7 +52,6 @@ type Out struct {
 
 type ParameterInfo struct {
 	Name                 string
-	TypeName             string
 	SchemaName           string
 	DomainSchema         string
 	DomainName           string
@@ -481,7 +480,26 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	//	}
 	//	par.IsNull = false
 	//}
-	if decoder, ok := conn.parameterDecoder[par.DataType]; ok {
+	if par.DataType == oraTypes.XMLType {
+		if decoder, ok := conn.nameTypeCoder[par.TypeName]; ok {
+			if par.isLobType() {
+				streamer := &LobStream{conn: conn}
+				decoder.SetLobStreamer(streamer)
+			}
+			err = decoder.Read(session)
+			if err != nil {
+				return err
+			}
+			par.oPrimValue, err = decoder.Decode(conn)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("no decoder register for data type: %s", par.TypeName)
+		}
+		return nil
+	}
+	if decoder, ok := conn.oracleTypeCoder[par.DataType]; ok {
 		decoder.SetParameterInfo(par.BasicParameter)
 		if par.isLobType() {
 			streamer := &LobStream{conn: conn}

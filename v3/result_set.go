@@ -199,8 +199,8 @@ func (resultSet *ResultSet) Err() error {
 // for non-supported type
 // error means error occur during operation
 func (resultSet *ResultSet) setObjectValue(obj reflect.Value, colIndex int) error {
-	col := (*resultSet.cols)[colIndex]
-	return setFieldValue(obj, col.cusType, resultSet.currentRow[colIndex])
+	//col := (*resultSet.cols)[colIndex]
+	return types.RCopy(obj, resultSet.currentRow[colIndex])
 }
 
 // Scan act like scan in sql package return row values to dest variable pointers

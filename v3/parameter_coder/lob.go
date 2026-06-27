@@ -56,7 +56,7 @@ func (param *lobParameter) read(session network.SessionReader) error {
 		}
 	} else {
 		// the following code is working when the lob is not inline or part of UDT
-		locator, err = param.basicRead(session)
+		locator, err = param.BasicRead(session)
 		if err != nil {
 			return err
 		}

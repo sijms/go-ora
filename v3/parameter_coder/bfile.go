@@ -1,7 +1,6 @@
 package parameter_coder
 
 import (
-	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
@@ -10,16 +9,21 @@ type BFileParameter struct {
 	lobParameter
 }
 
-func (param *BFileParameter) Encode(input interface{}, strConv converters.StringCoder, stream types.LobStreamer) (err error) {
+func (param *BFileParameter) Copy() OracleParameterCoder {
+	ret := new(BFileParameter)
+	*ret = *param
+	return ret
+}
+func (param *BFileParameter) Encode(input interface{}, conn IConnection) (err error) {
 	param.SetDefault()
 	param.DataType = types.OCIFileLocator
 	encoder := &types.BFile{}
-	encoder.Conv, err = strConv.GetDefaultStringCoder()
+	encoder.Conv, err = conn.GetDefaultStringCoder()
 	if err != nil {
 		return
 	}
 	encoder.SetDataType(param.DataType)
-	encoder.SetStreamer(stream)
+	encoder.SetStreamer(conn.NewLobStreamer())
 	err = encoder.SetValue(input)
 	if dt := encoder.GetDataType(); dt != 0 {
 		param.DataType = dt
@@ -31,9 +35,9 @@ func (param *BFileParameter) Encode(input interface{}, strConv converters.String
 	return
 }
 
-func (param *BFileParameter) Decode(strConv converters.StringCoder) (output interface{}, err error) {
+func (param *BFileParameter) Decode(conn IConnection) (output interface{}, err error) {
 	decoder := &types.BFile{}
-	decoder.Conv, err = strConv.GetDefaultStringCoder()
+	decoder.Conv, err = conn.GetDefaultStringCoder()
 	if err != nil {
 		return
 	}

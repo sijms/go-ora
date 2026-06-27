@@ -1,7 +1,6 @@
 package parameter_coder
 
 import (
-	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
@@ -11,7 +10,13 @@ type ClobParameter struct {
 	lobParameter
 }
 
-func (param *ClobParameter) Encode(input interface{}, strConv converters.StringCoder, stream types.LobStreamer) (err error) {
+func (param *ClobParameter) Copy() OracleParameterCoder {
+	ret := new(ClobParameter)
+	*ret = *param
+	return ret
+}
+
+func (param *ClobParameter) Encode(input interface{}, conn IConnection) (err error) {
 	param.SetDefault()
 	param.DataType = types.OCIClobLocator
 	param.CharsetForm = 1
@@ -34,7 +39,7 @@ func (param *ClobParameter) Encode(input interface{}, strConv converters.StringC
 		}
 	}
 	encoder := &types.Clob{}
-	encoder.Conv, err = strConv.GetStringCoder(param.CharsetID, param.CharsetForm)
+	encoder.Conv, err = conn.GetStringCoder(param.CharsetID, param.CharsetForm)
 	if err != nil {
 		return
 	}
@@ -48,7 +53,7 @@ func (param *ClobParameter) Encode(input interface{}, strConv converters.StringC
 		return
 	}
 	if !encoder.IsDataUploaded() && len(encoder.Bytes()) > 0 {
-		encoder.SetStreamer(stream)
+		encoder.SetStreamer(conn.NewLobStreamer())
 		err = encoder.Upload()
 		if err != nil {
 			return
@@ -88,7 +93,7 @@ func (param *ClobParameter) Encode(input interface{}, strConv converters.StringC
 	//param.streamer = encoder.GetStreamer()
 }
 
-func (param *ClobParameter) Decode(strConv converters.StringCoder) (interface{}, error) {
+func (param *ClobParameter) Decode(conn IConnection) (interface{}, error) {
 	decoder := &types.Clob{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)
@@ -96,12 +101,12 @@ func (param *ClobParameter) Decode(strConv converters.StringCoder) (interface{},
 	var err error
 	if locator.IsVarWidthChar() {
 		if param.streamer.DatabaseVersionNumber() < 10200 && locator.IsLittleEndian() {
-			decoder.Conv, err = strConv.GetStringCoder(2002, 0)
+			decoder.Conv, err = conn.GetStringCoder(2002, 0)
 		} else {
-			decoder.Conv, err = strConv.GetStringCoder(2000, 0)
+			decoder.Conv, err = conn.GetStringCoder(2000, 0)
 		}
 	} else {
-		decoder.Conv, err = strConv.GetStringCoder(param.CharsetID, param.CharsetForm)
+		decoder.Conv, err = conn.GetStringCoder(param.CharsetID, param.CharsetForm)
 	}
 	return decoder, err
 }

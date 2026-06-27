@@ -111,8 +111,9 @@ type Connection struct {
 	nStrConv          converters.IStringConverter
 	cStrConv          converters.IStringConverter
 	NLSData           NLSData
-	parameterEncoder  map[reflect.Type]parameter_coder.OracleParameterEncoder
-	parameterDecoder  map[uint16]parameter_coder.OracleParameterDecoder
+	goTypeCoder       map[reflect.Type]parameter_coder.OracleParameterCoder
+	oracleTypeCoder   map[uint16]parameter_coder.OracleParameterCoder
+	nameTypeCoder     map[string]parameter_coder.OracleParameterCoder
 	//typeDecoder       map[uint16]type_coder.OracleTypeDecoder
 	cusTyp map[string]Object
 	maxLen struct {
@@ -168,7 +169,7 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 		return nil, err
 	}
 	conn.buildParameterCoderMap(connector.drv)
-	conn.cusTyp = connector.drv.cusTyp
+	//conn.cusTyp = connector.drv.cusTyp
 	//"TCP negotiation for character set updates fails when multiple database connections
 	// with varying encodings coexist in the same process,
 	// due to the cloning of the character converter."
@@ -248,22 +249,34 @@ func (driver *OracleDriver) Open(name string) (driver.Conn, error) {
 }
 
 func (conn *Connection) buildParameterCoderMap(drv *OracleDriver) {
-	conn.parameterDecoder = make(map[uint16]parameter_coder.OracleParameterDecoder)
-	for name, value := range drv.oracleTypeCoder {
-		rValue := reflect.ValueOf(value)
-		newValue := reflect.New(rValue.Elem().Type()).Interface()
-		if temp, ok := newValue.(parameter_coder.OracleParameterDecoder); ok {
-			conn.parameterDecoder[name] = temp
-		}
-	}
-	conn.parameterEncoder = make(map[reflect.Type]parameter_coder.OracleParameterEncoder)
-	for key, value := range drv.goTypeCoder {
-		rValue := reflect.ValueOf(value)
-		newValue := reflect.New(rValue.Elem().Type()).Interface()
-		if temp, ok := newValue.(parameter_coder.OracleParameterEncoder); ok {
-			conn.parameterEncoder[key] = temp
-		}
-	}
+	conn.goTypeCoder = drv.goTypeCoder
+	conn.nameTypeCoder = drv.nameTypeCoder
+	conn.oracleTypeCoder = drv.oracleTypeCoder
+	//conn.oracleTypeCoder = make(map[uint16]parameter_coder.OracleParameterCoder)
+	//for name, value := range drv.oracleTypeCoder {
+	//	rValue := reflect.ValueOf(value)
+	//	newValue := reflect.New(rValue.Elem().Type()).Interface()
+	//	if temp, ok := newValue.(parameter_coder.OracleParameterCoder); ok {
+	//		conn.oracleTypeCoder[name] = temp
+	//	}
+	//}
+	//conn.goTypeCoder = make(map[reflect.Type]parameter_coder.OracleParameterCoder)
+	//for key, value := range drv.goTypeCoder {
+	//	rValue := reflect.ValueOf(value)
+	//	newValue := reflect.New(rValue.Elem().Type()).Interface()
+	//	if temp, ok := newValue.(parameter_coder.OracleParameterCoder); ok {
+	//		conn.goTypeCoder[key] = temp
+	//	}
+	//}
+	//conn.nameTypeCoder = make(map[string]parameter_coder.OracleParameterCoder)
+	//for key, value := range drv.nameTypeCoder {
+	//	rValue := reflect.ValueOf(value)
+	//	newValue := reflect.New(rValue.Elem().Type()).Interface()
+	//	if temp, ok := newValue.(parameter_coder.OracleParameterCoder); ok {
+	//		conn.nameTypeCoder[key] = temp
+	//	}
+	//}
+
 	//conn.typeDecoder = make(map[uint16]type_coder.OracleTypeDecoder)
 	//for name, value := range drv.typeDecoder {
 	//	rValue := reflect.ValueOf(value)
@@ -722,12 +735,12 @@ func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) 
 	temp := new(configurations.ConnectionConfig)
 	*temp = *config
 	return &Connection{
-		State:            Closed,
-		connOption:       temp,
-		cStrConv:         converters.NewStringConverter(config.CharsetID),
-		autoCommit:       true,
-		parameterDecoder: nil,
-		cusTyp:           map[string]Object{},
+		State:           Closed,
+		connOption:      temp,
+		cStrConv:        converters.NewStringConverter(config.CharsetID),
+		autoCommit:      true,
+		oracleTypeCoder: nil,
+		cusTyp:          map[string]Object{},
 		maxLen: struct {
 			varchar   int64
 			nvarchar  int64
@@ -1137,109 +1150,109 @@ var insertQueryBracketsRegexp = lazy_init.NewLazyInit(func() (interface{}, error
 
 // BulkInsert mass insert column values into a table
 // all columns should pass as an array of values
-func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driver.Value) (driver.Result, error) {
-	stmt := NewStmt(sqlText, conn)
-	stmt.autoClose = true
-	input := make([]driver.Value, 100)
-	for x := 0; x < rowNum; x++ {
-		input[x] = NewBatch(columns[x])
-	}
-	result, err := stmt.Exec(input)
-	if err != nil {
-		_ = stmt.Close()
-		return nil, err
-	}
-	err = stmt.Close()
-	return result, err
-	//if conn.State != Opened {
-	//	return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
-	//}
-	//if rowNum == 0 {
-	//	return nil, nil
-	//}
-	//stmt := NewStmt(sqlText, conn)
-	//stmt.arrayBindCount = rowNum
-	//defer func() {
-	//	_ = stmt.Close()
-	//}()
-	//tracer := conn.tracer
-	//tracer.Printf("BulkInsert:\n%s", stmt.text)
-	//tracer.Printf("Row Num: %d", rowNum)
-	//tracer.Printf("Column Num: %d", len(columns))
-	//for idx, col := range columns {
-	//	if len(col) < rowNum {
-	//		return nil, fmt.Errorf("size of column no. %d is less than rowNum", idx)
-	//	}
-	//
-	//	par, err := stmt.NewParam("", col[0], 0, Input)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	maxLen := par.MaxLen
-	//	maxCharLen := par.MaxCharLen
-	//	dataType := par.DataType
-	//
-	//	for index, val := range col {
-	//		if index == 0 {
-	//			continue
-	//		}
-	//		par.Value = val
-	//		err = par.encodeValue(0, conn)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//
-	//		if maxLen < par.MaxLen {
-	//			maxLen = par.MaxLen
-	//		}
-	//
-	//		if maxCharLen < par.MaxCharLen {
-	//			maxCharLen = par.MaxCharLen
-	//		}
-	//
-	//		if par.DataType != dataType && par.DataType != NCHAR {
-	//			dataType = par.DataType
-	//		}
-	//	}
-	//	par.Value = col[0]
-	//	_ = par.encodeValue(0, conn)
-	//	par.MaxLen = maxLen
-	//	par.MaxCharLen = maxCharLen
-	//	par.DataType = dataType
-	//	stmt.Pars = append(stmt.Pars, *par)
-	//}
-	//session := conn.session
-	//session.ResetBuffer()
-	//err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
-	//for x := 0; x < rowNum; x++ {
-	//	for idx, col := range columns {
-	//		stmt.Pars[idx].Value = col[x]
-	//		err = stmt.Pars[idx].encodeValue(0, conn)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//	}
-	//	err = stmt.writePars()
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//}
-	//err = session.Write()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//dataSet := new(DataSet)
-	//err = stmt.read(dataSet)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//result := new(QueryResult)
-	//if session.Summary != nil {
-	//	result.rowsAffected = int64(session.Summary.CurRowNumber)
-	//}
-	//return result, nil
-}
+//func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driver.Value) (driver.Result, error) {
+//	stmt := NewStmt(sqlText, conn)
+//	stmt.autoClose = true
+//	input := make([]driver.Value, 100)
+//	for x := 0; x < rowNum; x++ {
+//		input[x] = NewBatch(columns[x])
+//	}
+//	result, err := stmt.Exec(input)
+//	if err != nil {
+//		_ = stmt.Close()
+//		return nil, err
+//	}
+//	err = stmt.Close()
+//	return result, err
+//	//if conn.State != Opened {
+//	//	return nil, &network.OracleError{ErrCode: 6413, ErrMsg: "ORA-06413: Connection not open"}
+//	//}
+//	//if rowNum == 0 {
+//	//	return nil, nil
+//	//}
+//	//stmt := NewStmt(sqlText, conn)
+//	//stmt.arrayBindCount = rowNum
+//	//defer func() {
+//	//	_ = stmt.Close()
+//	//}()
+//	//tracer := conn.tracer
+//	//tracer.Printf("BulkInsert:\n%s", stmt.text)
+//	//tracer.Printf("Row Num: %d", rowNum)
+//	//tracer.Printf("Column Num: %d", len(columns))
+//	//for idx, col := range columns {
+//	//	if len(col) < rowNum {
+//	//		return nil, fmt.Errorf("size of column no. %d is less than rowNum", idx)
+//	//	}
+//	//
+//	//	par, err := stmt.NewParam("", col[0], 0, Input)
+//	//	if err != nil {
+//	//		return nil, err
+//	//	}
+//	//
+//	//	maxLen := par.MaxLen
+//	//	maxCharLen := par.MaxCharLen
+//	//	dataType := par.DataType
+//	//
+//	//	for index, val := range col {
+//	//		if index == 0 {
+//	//			continue
+//	//		}
+//	//		par.Value = val
+//	//		err = par.encodeValue(0, conn)
+//	//		if err != nil {
+//	//			return nil, err
+//	//		}
+//	//
+//	//		if maxLen < par.MaxLen {
+//	//			maxLen = par.MaxLen
+//	//		}
+//	//
+//	//		if maxCharLen < par.MaxCharLen {
+//	//			maxCharLen = par.MaxCharLen
+//	//		}
+//	//
+//	//		if par.DataType != dataType && par.DataType != NCHAR {
+//	//			dataType = par.DataType
+//	//		}
+//	//	}
+//	//	par.Value = col[0]
+//	//	_ = par.encodeValue(0, conn)
+//	//	par.MaxLen = maxLen
+//	//	par.MaxCharLen = maxCharLen
+//	//	par.DataType = dataType
+//	//	stmt.Pars = append(stmt.Pars, *par)
+//	//}
+//	//session := conn.session
+//	//session.ResetBuffer()
+//	//err := stmt.basicWrite(stmt.getExeOption(), stmt.parse, stmt.define)
+//	//for x := 0; x < rowNum; x++ {
+//	//	for idx, col := range columns {
+//	//		stmt.Pars[idx].Value = col[x]
+//	//		err = stmt.Pars[idx].encodeValue(0, conn)
+//	//		if err != nil {
+//	//			return nil, err
+//	//		}
+//	//	}
+//	//	err = stmt.writePars()
+//	//	if err != nil {
+//	//		return nil, err
+//	//	}
+//	//}
+//	//err = session.Write()
+//	//if err != nil {
+//	//	return nil, err
+//	//}
+//	//dataSet := new(DataSet)
+//	//err = stmt.read(dataSet)
+//	//if err != nil {
+//	//	return nil, err
+//	//}
+//	//result := new(QueryResult)
+//	//if session.Summary != nil {
+//	//	result.rowsAffected = int64(session.Summary.CurRowNumber)
+//	//}
+//	//return result, nil
+//}
 
 func (conn *Connection) CheckNamedValue(nv *driver.NamedValue) error {
 	if _, ok := nv.Value.(driver.Valuer); ok {
@@ -1303,31 +1316,32 @@ func (conn *Connection) decodeData(data []byte, messageType aq.MessageType, udtN
 			BValue: data,
 		},
 	}
+	var err error
 	switch messageType {
 	case aq.JSON:
 		return nil, errors.New("unsupported")
 		//return NewJsonBytes(data)
 	case aq.UDT:
-		par.DataType = types.XMLType
-		for name, cust := range conn.cusTyp {
-			if name == strings.ToUpper(udtName) {
-				par.cusType = new(Object)
-				*par.cusType = cust
-				par.ToID = cust.toid
-			}
-		}
-		err := decodeObject(conn, &par, nil)
-		if err != nil {
-			return nil, err
-		}
-		output := reflect.New(par.cusType.typ)
-		err = setFieldValue(output, par.cusType, par.oPrimValue)
-		return output.Interface(), err
+		//par.DataType = types.XMLType
+		//for name, cust := range conn.cusTyp {
+		//	if name == strings.ToUpper(udtName) {
+		//		par.cusType = new(Object)
+		//		*par.cusType = cust
+		//		par.ToID = cust.toid
+		//	}
+		//}
+		//err := decodeObject(conn, &par, nil)
+		//if err != nil {
+		//	return nil, err
+		//}
+		//output := reflect.New(par.cusType.typ)
+		//err = setFieldValue(output, par.cusType, par.oPrimValue)
+		//return output.Interface(), err
 	default:
 		return nil, errors.New("unsupported message type")
 	}
 	//err := par.decodeParameterValue(conn, nil)
-	//return par.Value, err
+	return par.Value, err
 }
 func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	if query == createLob {
@@ -1664,4 +1678,12 @@ func (conn *Connection) appendTemporaryLoc(loc types.Locator) {
 		}
 	}
 	conn.temporaryLocs = append(conn.temporaryLocs, loc)
+}
+
+func (conn *Connection) GetSession() network.SessionReadWriter {
+	return conn.session
+}
+
+func (conn *Connection) NewLobStreamer() types.LobStreamer {
+	return &LobStream{conn: conn}
 }

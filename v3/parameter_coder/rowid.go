@@ -3,7 +3,6 @@ package parameter_coder
 import (
 	"fmt"
 
-	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
@@ -13,7 +12,13 @@ type RowIDParameter struct {
 	BasicParameter
 }
 
-func (param *RowIDParameter) Encode(input interface{}, _ converters.StringCoder, _ types.LobStreamer) error {
+func (param *RowIDParameter) Copy() OracleParameterCoder {
+	ret := new(RowIDParameter)
+	*ret = *param
+	return ret
+}
+
+func (param *RowIDParameter) Encode(input interface{}, _ IConnection) error {
 	param.SetDefault()
 	coder := &types.RowID{}
 	coder.SetDataType(param.DataType)
@@ -24,7 +29,7 @@ func (param *RowIDParameter) Encode(input interface{}, _ converters.StringCoder,
 	return err
 }
 
-func (param *RowIDParameter) Decode(_ converters.StringCoder) (interface{}, error) {
+func (param *RowIDParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder := &types.RowID{}
 	*decoder = param.rowid
 	decoder.SetBytes(param.BValue)

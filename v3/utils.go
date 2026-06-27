@@ -300,47 +300,47 @@ func encodeObject(session *network.Session, objectData []byte, isArray bool) []b
 	return fieldsData.Bytes()
 }
 
-func putUDTAttributes(input *Object, pars []ParameterInfo, index int) ([]ParameterInfo, int) {
-	oPrimValue := make([]ParameterInfo, 0, len(input.attribs))
-	for _, attrib := range input.attribs {
-		if attrib.cusType != nil && !attrib.cusType.isArray {
-			var tempValue []ParameterInfo
-			tempValue, index = putUDTAttributes(attrib.cusType, pars, index)
-			attrib.oPrimValue = tempValue
-			oPrimValue = append(oPrimValue, attrib)
-		} else {
-			oPrimValue = append(oPrimValue, pars[index])
-			index++
-		}
-	}
-	return oPrimValue, index
-}
+//func putUDTAttributes(input *Object, pars []ParameterInfo, index int) ([]ParameterInfo, int) {
+//	oPrimValue := make([]ParameterInfo, 0, len(input.attribs))
+//	for _, attrib := range input.attribs {
+//		if attrib.cusType != nil && !attrib.cusType.isArray {
+//			var tempValue []ParameterInfo
+//			tempValue, index = putUDTAttributes(attrib.cusType, pars, index)
+//			attrib.oPrimValue = tempValue
+//			oPrimValue = append(oPrimValue, attrib)
+//		} else {
+//			oPrimValue = append(oPrimValue, pars[index])
+//			index++
+//		}
+//	}
+//	return oPrimValue, index
+//}
 
-func getUDTAttributes(input *Object, value reflect.Value) []ParameterInfo {
-	output := make([]ParameterInfo, 0, 10)
-	for _, attrib := range input.attribs {
-		fieldValue := reflect.Value{}
-		if value.IsValid() && value.Kind() == reflect.Struct {
-			if fieldIndex, ok := input.fieldMap[attrib.Name]; ok {
-				fieldValue = value.Field(fieldIndex)
-			}
-		}
-		// if attribute is a nested type and not array
-		if attrib.cusType != nil && !attrib.cusType.isArray {
-			output = append(output, getUDTAttributes(attrib.cusType, fieldValue)...)
-		} else {
-			if isArrayValue(fieldValue) {
-				attrib.MaxNoOfArrayElements = 1
-			}
-			if fieldValue.IsValid() {
-				attrib.Value = fieldValue.Interface()
-			}
-
-			output = append(output, attrib)
-		}
-	}
-	return output
-}
+//func getUDTAttributes(input *Object, value reflect.Value) []ParameterInfo {
+//	output := make([]ParameterInfo, 0, 10)
+//	for _, attrib := range input.attribs {
+//		fieldValue := reflect.Value{}
+//		if value.IsValid() && value.Kind() == reflect.Struct {
+//			if fieldIndex, ok := input.activeFields[attrib.Name]; ok {
+//				fieldValue = value.Field(fieldIndex)
+//			}
+//		}
+//		// if attribute is a nested type and not array
+//		if attrib.cusType != nil && !attrib.cusType.isArray {
+//			output = append(output, getUDTAttributes(attrib.cusType, fieldValue)...)
+//		} else {
+//			if isArrayValue(fieldValue) {
+//				attrib.MaxNoOfArrayElements = 1
+//			}
+//			if fieldValue.IsValid() {
+//				attrib.Value = fieldValue.Interface()
+//			}
+//
+//			output = append(output, attrib)
+//		}
+//	}
+//	return output
+//}
 
 func isArrayValue(val interface{}) bool {
 	tyVal := reflect.TypeOf(val)
@@ -356,229 +356,229 @@ func isArrayValue(val interface{}) bool {
 	return false
 }
 
-func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]byte) error {
-	session := conn.session
-	if parent.parent == nil {
-		newState := network.SessionState{InBuffer: bytes.NewBuffer(parent.BValue)}
-		session.SaveState(&newState)
-		defer session.LoadState()
-		objectType, err := session.GetByte()
-		if err != nil {
-			return err
-		}
-		ctl, err := session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		if ctl == 0xFE {
-			_, err = session.GetInt(4, false, true)
-			if err != nil {
-				return err
-			}
-		}
-		switch objectType {
-		case 0x88:
-			_ /*attribsLen*/, err := session.GetInt(2, true, true)
-			if err != nil {
-				return err
-			}
-
-			itemsLen, err := session.GetInt(2, false, true)
-			if err != nil {
-				return err
-			}
-			if itemsLen == 0xFE {
-				itemsLen, err = session.GetInt(4, false, true)
-				if err != nil {
-					return err
-				}
-			}
-			pars := make([]ParameterInfo, 0, itemsLen)
-			for x := 0; x < itemsLen; x++ {
-				tempPar := parent.cusType.attribs[0]
-				// if parent.cusType.isRegularArray() {
-				//
-				// } else {
-				// 	tempPar = parent.clone()
-				// }
-
-				tempPar.Direction = parent.Direction
-				if tempPar.DataType == oraTypes.XMLType {
-					ctlByte, err := session.GetByte()
-					if err != nil {
-						return err
-					}
-					var objectBufferSize int
-					if ctlByte == 0xFE {
-						objectBufferSize, err = session.GetInt(4, false, true)
-						if err != nil {
-							return err
-						}
-					} else {
-						objectBufferSize = int(ctlByte)
-					}
-					tempPar.BValue, err = session.GetBytes(objectBufferSize)
-					if err != nil {
-						return err
-					}
-					err = decodeObject(conn, &tempPar, temporaryLobs)
-				} else {
-					err = tempPar.decodePrimValue(conn, true)
-				}
-				if err != nil {
-					return err
-				}
-				pars = append(pars, tempPar)
-			}
-			parent.oPrimValue = pars
-		case 0x85: // xmltype
-			_, err = session.GetByte() // represent 1
-			if err != nil {
-				return err
-			}
-			dataType, err := session.GetInt(4, false, true) // represent 0x14
-			if err != nil {
-				return err
-			}
-			value, err := session.GetBytes(len(parent.BValue) - 8)
-			if err != nil {
-				return err
-			}
-			switch dataType {
-			case 0x14:
-				conv, err := conn.GetDefaultStringCoder()
-				if err != nil {
-					return err
-				}
-				parent.oPrimValue = conv.Decode(value)
-			case 0x11:
-				lob := LobStream{
-					sourceLocator: value,
-					conn:          conn,
-					charsetID:     conn.getDefaultCharsetID(),
-				}
-				var strValue string
-				err = setLob(reflect.ValueOf(&strValue), lob)
-				if err != nil {
-					return err
-				}
-				parent.oPrimValue = strValue
-			}
-		case 0x84:
-			// pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
-			// collect all attributes in one list
-			// pars := getUDTAttributes(parent.cusType, reflect.Value{})
-			pars := make([]ParameterInfo, 0, 10)
-			for _, attrib := range parent.cusType.attribs {
-				attrib.Direction = parent.Direction
-				attrib.parent = parent
-				// check if this an object or array and coming value is nil
-				if attrib.DataType == oraTypes.XMLType {
-					temp, err := session.Peek()
-					if err != nil {
-						return err
-					}
-					if temp == 0xFD || temp == 0xFF {
-						_, err = session.GetByte()
-						if err != nil {
-							return err
-						}
-					} else {
-						if attrib.cusType.isArray {
-							attrib.parent = nil
-							attrib.BValue, err = session.GetFixedClr()
-						}
-						err = decodeObject(conn, &attrib, temporaryLobs)
-						if err != nil {
-							return err
-						}
-					}
-				} else {
-					err := attrib.decodePrimValue(conn, true)
-					if err != nil {
-						return err
-					}
-				}
-				// err = attrib.decodePrimValue(conn, temporaryLobs, true)
-				// if err != nil {
-				// 	return err
-				// }
-				pars = append(pars, attrib)
-			}
-			parent.oPrimValue = pars
-			// for index, _ := range pars {
-			// 	pars[index].Direction = parent.Direction
-			// 	pars[index].parent = parent
-			// 	// if we get 0xFD this means null object
-			// 	err = pars[index].decodePrimValue(conn, temporaryLobs, true)
-			// 	if err != nil {
-			// 		return err
-			// 	}
-			// }
-			// fill pars in its place in sub types
-			// parent.oPrimValue, _ = putUDTAttributes(parent.cusType, pars, 0)
-		}
-	} else {
-		pars := make([]ParameterInfo, 0, 10)
-		for _, attrib := range parent.cusType.attribs {
-			attrib.Direction = parent.Direction
-			attrib.parent = parent
-			// check if this an object or array and coming value is nil
-			if attrib.DataType == oraTypes.XMLType {
-				temp, err := session.Peek()
-				if err != nil {
-					return err
-				}
-				if temp == 0xFD || temp == 0xFF {
-					_, err = session.GetByte()
-					if err != nil {
-						return err
-					}
-				} else {
-					if attrib.cusType.isArray {
-						attrib.parent = nil
-						nb, err := session.GetByte()
-						if err != nil {
-							return err
-						}
-						var size int
-						switch nb {
-						case 0:
-							size = 0
-						case 0xFE:
-							size, err = session.GetInt(4, false, true)
-							if err != nil {
-								return err
-							}
-						default:
-							size = int(nb)
-						}
-						if size > 0 {
-							attrib.BValue, err = session.GetBytes(size)
-							if err != nil {
-								return err
-							}
-						}
-					}
-					err = decodeObject(conn, &attrib, temporaryLobs)
-					if err != nil {
-						return err
-					}
-				}
-			} else {
-				err := attrib.decodePrimValue(conn, true)
-				if err != nil {
-					return err
-				}
-			}
-
-			pars = append(pars, attrib)
-		}
-		parent.oPrimValue = pars
-	}
-
-	return nil
-}
+//func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]byte) error {
+//	session := conn.session
+//	if parent.parent == nil {
+//		newState := network.SessionState{InBuffer: bytes.NewBuffer(parent.BValue)}
+//		session.SaveState(&newState)
+//		defer session.LoadState()
+//		objectType, err := session.GetByte()
+//		if err != nil {
+//			return err
+//		}
+//		ctl, err := session.GetInt(4, true, true)
+//		if err != nil {
+//			return err
+//		}
+//		if ctl == 0xFE {
+//			_, err = session.GetInt(4, false, true)
+//			if err != nil {
+//				return err
+//			}
+//		}
+//		switch objectType {
+//		case 0x88:
+//			_ /*attribsLen*/, err := session.GetInt(2, true, true)
+//			if err != nil {
+//				return err
+//			}
+//
+//			itemsLen, err := session.GetInt(2, false, true)
+//			if err != nil {
+//				return err
+//			}
+//			if itemsLen == 0xFE {
+//				itemsLen, err = session.GetInt(4, false, true)
+//				if err != nil {
+//					return err
+//				}
+//			}
+//			pars := make([]ParameterInfo, 0, itemsLen)
+//			for x := 0; x < itemsLen; x++ {
+//				tempPar := parent.cusType.attribs[""]
+//				// if parent.cusType.isRegularArray() {
+//				//
+//				// } else {
+//				// 	tempPar = parent.clone()
+//				// }
+//
+//				tempPar.Direction = parent.Direction
+//				if tempPar.DataType == oraTypes.XMLType {
+//					ctlByte, err := session.GetByte()
+//					if err != nil {
+//						return err
+//					}
+//					var objectBufferSize int
+//					if ctlByte == 0xFE {
+//						objectBufferSize, err = session.GetInt(4, false, true)
+//						if err != nil {
+//							return err
+//						}
+//					} else {
+//						objectBufferSize = int(ctlByte)
+//					}
+//					tempPar.BValue, err = session.GetBytes(objectBufferSize)
+//					if err != nil {
+//						return err
+//					}
+//					err = decodeObject(conn, &tempPar, temporaryLobs)
+//				} else {
+//					err = tempPar.decodePrimValue(conn, true)
+//				}
+//				if err != nil {
+//					return err
+//				}
+//				pars = append(pars, tempPar)
+//			}
+//			parent.oPrimValue = pars
+//		case 0x85: // xmltype
+//			_, err = session.GetByte() // represent 1
+//			if err != nil {
+//				return err
+//			}
+//			dataType, err := session.GetInt(4, false, true) // represent 0x14
+//			if err != nil {
+//				return err
+//			}
+//			value, err := session.GetBytes(len(parent.BValue) - 8)
+//			if err != nil {
+//				return err
+//			}
+//			switch dataType {
+//			case 0x14:
+//				conv, err := conn.GetDefaultStringCoder()
+//				if err != nil {
+//					return err
+//				}
+//				parent.oPrimValue = conv.Decode(value)
+//			case 0x11:
+//				lob := LobStream{
+//					sourceLocator: value,
+//					conn:          conn,
+//					charsetID:     conn.getDefaultCharsetID(),
+//				}
+//				var strValue string
+//				err = setLob(reflect.ValueOf(&strValue), lob)
+//				if err != nil {
+//					return err
+//				}
+//				parent.oPrimValue = strValue
+//			}
+//		case 0x84:
+//			// pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))
+//			// collect all attributes in one list
+//			// pars := getUDTAttributes(parent.cusType, reflect.Value{})
+//			pars := make([]ParameterInfo, 0, 10)
+//			for _, attrib := range parent.cusType.attribs {
+//				attrib.Direction = parent.Direction
+//				attrib.parent = parent
+//				// check if this an object or array and coming value is nil
+//				if attrib.DataType == oraTypes.XMLType {
+//					temp, err := session.Peek()
+//					if err != nil {
+//						return err
+//					}
+//					if temp == 0xFD || temp == 0xFF {
+//						_, err = session.GetByte()
+//						if err != nil {
+//							return err
+//						}
+//					} else {
+//						if attrib.cusType.isArray {
+//							attrib.parent = nil
+//							attrib.BValue, err = session.GetFixedClr()
+//						}
+//						err = decodeObject(conn, &attrib, temporaryLobs)
+//						if err != nil {
+//							return err
+//						}
+//					}
+//				} else {
+//					err := attrib.decodePrimValue(conn, true)
+//					if err != nil {
+//						return err
+//					}
+//				}
+//				// err = attrib.decodePrimValue(conn, temporaryLobs, true)
+//				// if err != nil {
+//				// 	return err
+//				// }
+//				pars = append(pars, attrib)
+//			}
+//			parent.oPrimValue = pars
+//			// for index, _ := range pars {
+//			// 	pars[index].Direction = parent.Direction
+//			// 	pars[index].parent = parent
+//			// 	// if we get 0xFD this means null object
+//			// 	err = pars[index].decodePrimValue(conn, temporaryLobs, true)
+//			// 	if err != nil {
+//			// 		return err
+//			// 	}
+//			// }
+//			// fill pars in its place in sub types
+//			// parent.oPrimValue, _ = putUDTAttributes(parent.cusType, pars, 0)
+//		}
+//	} else {
+//		pars := make([]ParameterInfo, 0, 10)
+//		for _, attrib := range parent.cusType.attribs {
+//			attrib.Direction = parent.Direction
+//			attrib.parent = parent
+//			// check if this an object or array and coming value is nil
+//			if attrib.DataType == oraTypes.XMLType {
+//				temp, err := session.Peek()
+//				if err != nil {
+//					return err
+//				}
+//				if temp == 0xFD || temp == 0xFF {
+//					_, err = session.GetByte()
+//					if err != nil {
+//						return err
+//					}
+//				} else {
+//					if attrib.cusType.isArray {
+//						attrib.parent = nil
+//						nb, err := session.GetByte()
+//						if err != nil {
+//							return err
+//						}
+//						var size int
+//						switch nb {
+//						case 0:
+//							size = 0
+//						case 0xFE:
+//							size, err = session.GetInt(4, false, true)
+//							if err != nil {
+//								return err
+//							}
+//						default:
+//							size = int(nb)
+//						}
+//						if size > 0 {
+//							attrib.BValue, err = session.GetBytes(size)
+//							if err != nil {
+//								return err
+//							}
+//						}
+//					}
+//					err = decodeObject(conn, &attrib, temporaryLobs)
+//					if err != nil {
+//						return err
+//					}
+//				}
+//			} else {
+//				err := attrib.decodePrimValue(conn, true)
+//				if err != nil {
+//					return err
+//				}
+//			}
+//
+//			pars = append(pars, attrib)
+//		}
+//		parent.oPrimValue = pars
+//	}
+//
+//	return nil
+//}
 
 func parseInputField(structValue reflect.Value, name, _type string, fieldIndex int) (tempPar *ParameterInfo, err error) {
 	tempPar = &ParameterInfo{
@@ -627,6 +627,17 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 			err = typeErr
 			return
 		}
+	case "timestamp":
+		var fieldVal = &oraTypes.Date{}
+		var temp time.Time
+		temp, err = getDate(fieldValue.Interface())
+		if err != nil {
+			err = typeErr
+			return
+		}
+		fieldVal.SetDataType(oraTypes.TIMESTAMP)
+		err = fieldVal.SetValue(temp)
+		tempPar.Value = fieldVal
 	//case "timestamp":
 	//	var fieldVal time.Time
 	//	fieldVal, err = getDate(fieldValue.Interface())

@@ -1,7 +1,6 @@
 package parameter_coder
 
 import (
-	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
@@ -10,7 +9,13 @@ type NumberParameter struct {
 	BasicParameter
 }
 
-func (param *NumberParameter) Encode(input interface{}, _ converters.StringCoder, _ types.LobStreamer) error {
+func (param *NumberParameter) Copy() OracleParameterCoder {
+	ret := new(NumberParameter)
+	*ret = *param
+	return ret
+}
+
+func (param *NumberParameter) Encode(input interface{}, _ IConnection) error {
 	param.SetDefault()
 	param.DataType = types.NUMBER
 	param.MaxLen = 0x16
@@ -27,7 +32,7 @@ func (param *NumberParameter) Encode(input interface{}, _ converters.StringCoder
 	return nil
 }
 
-func (param *NumberParameter) Decode(_ converters.StringCoder) (interface{}, error) {
+func (param *NumberParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder := types.Number{}
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)
@@ -41,6 +46,6 @@ func (param *NumberParameter) Write(session network.SessionWriter) error {
 
 func (param *NumberParameter) Read(session network.SessionReader) error {
 	var err error
-	param.BValue, err = param.basicRead(session)
+	param.BValue, err = param.BasicRead(session)
 	return err
 }

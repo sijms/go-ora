@@ -1,7 +1,6 @@
 package parameter_coder
 
 import (
-	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
@@ -11,7 +10,13 @@ type VectorParameter struct {
 	lobParameter
 }
 
-func (param *VectorParameter) Encode(input interface{}, _ converters.StringCoder, _ types.LobStreamer) error {
+func (param *VectorParameter) Copy() OracleParameterCoder {
+	ret := new(VectorParameter)
+	*ret = *param
+	return ret
+}
+
+func (param *VectorParameter) Encode(input interface{}, _ IConnection) error {
 	param.SetDefault()
 	param.DataType = types.VECTOR
 	encoder := &types.Vector{}
@@ -29,7 +34,7 @@ func (param *VectorParameter) Encode(input interface{}, _ converters.StringCoder
 	return nil
 }
 
-func (param *VectorParameter) Decode(_ converters.StringCoder) (interface{}, error) {
+func (param *VectorParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder := &types.Vector{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)

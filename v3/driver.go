@@ -21,6 +21,7 @@ type OracleDriver struct {
 	dataCollected   bool
 	oracleTypeCoder map[uint16]parameter_coder.OracleParameterCoder
 	goTypeCoder     map[reflect.Type]parameter_coder.OracleParameterCoder
+	nameTypeCoder   map[string]parameter_coder.OracleParameterCoder
 	jsonEncoder     map[reflect.Type]oson.FieldEncoder
 	cusTyp          map[string]Object
 	sessionParam    map[string]string
@@ -43,6 +44,7 @@ func NewDriver() *OracleDriver {
 	drv := &OracleDriver{
 		goTypeCoder:     make(map[reflect.Type]parameter_coder.OracleParameterCoder),
 		oracleTypeCoder: make(map[uint16]parameter_coder.OracleParameterCoder),
+		nameTypeCoder:   make(map[string]parameter_coder.OracleParameterCoder),
 		//typeDecoder:  make(map[uint16]type_coder.OracleTypeDecoder),
 		cusTyp:       map[string]Object{},
 		sessionParam: map[string]string{},
@@ -82,6 +84,13 @@ func (driver *OracleDriver) init() {
 	driver.oracleTypeCoder[types.DATE] = &parameter_coder.DateParameter{}
 	driver.oracleTypeCoder[types.TIMESTAMP] = &parameter_coder.DateParameter{}
 	driver.oracleTypeCoder[types.TIMESTAMPTZ] = &parameter_coder.DateParameter{}
+	driver.oracleTypeCoder[types.TimeStampDTY] = &parameter_coder.DateParameter{}
+	driver.oracleTypeCoder[types.TimeStampTZ_DTY] = &parameter_coder.DateParameter{}
+	driver.oracleTypeCoder[types.TimeStampeLTZ] = &parameter_coder.DateParameter{}
+	driver.oracleTypeCoder[types.TimeStampLTZ_DTY] = &parameter_coder.DateParameter{}
+
+	driver.oracleTypeCoder[types.INTERVALYM_DTY] = &parameter_coder.IntervalParameter{}
+	driver.oracleTypeCoder[types.INTERVALDS_DTY] = &parameter_coder.IntervalParameter{}
 
 	driver.oracleTypeCoder[types.VECTOR] = &parameter_coder.VectorParameter{}
 	driver.oracleTypeCoder[types.JSON] = &parameter_coder.JsonParameter{}
@@ -93,6 +102,8 @@ func (driver *OracleDriver) init() {
 	driver.oracleTypeCoder[types.UROWID] = &parameter_coder.RowIDParameter{}
 
 	driver.oracleTypeCoder[types.BOOLEAN] = &parameter_coder.BoolParameter{}
+
+	driver.oracleTypeCoder[types.REFCURSOR] = &parameter_coder.CursorParameter{}
 
 	driver.goTypeCoder[types.TyString] = &parameter_coder.StringParameter{}
 	driver.goTypeCoder[types.TyNullString] = &parameter_coder.StringParameter{}
@@ -135,7 +146,23 @@ func (driver *OracleDriver) init() {
 	driver.goTypeCoder[types.TyBlob] = &parameter_coder.BlobParameter{}
 	driver.goTypeCoder[types.TyBFile] = &parameter_coder.BFileParameter{}
 
+	driver.goTypeCoder[reflect.TypeOf((*RefCursor)(nil)).Elem()] = &parameter_coder.CursorParameter{}
+
+	// name type coder
+	driver.nameTypeCoder["NUMBER"] = &parameter_coder.NumberParameter{}
+	driver.nameTypeCoder["VARCHAR2"] = &parameter_coder.StringParameter{}
+	driver.nameTypeCoder["NVARCHAR2"] = &parameter_coder.StringParameter{BasicParameter: parameter_coder.BasicParameter{CharsetForm: 2}}
+	driver.nameTypeCoder["TIMESTAMP"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampDTY}}
+	driver.nameTypeCoder["DATE"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.DATE}}
+	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TIME ZONE"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampLTZ_DTY}}
+	driver.nameTypeCoder["RAW"] = &parameter_coder.RawParameter{}
+	driver.nameTypeCoder["BLOB"] = &parameter_coder.BlobParameter{}
+	driver.nameTypeCoder["CLOB"] = &parameter_coder.ClobParameter{}
+	tempClob := &parameter_coder.ClobParameter{}
+	tempClob.CharsetForm = 2
+	driver.nameTypeCoder["NCLOB"] = tempClob
 }
+
 func (driver *OracleDriver) initFromConn(conn *Connection) error {
 	driver.mu.Lock()
 	defer driver.mu.Unlock()
@@ -336,11 +363,13 @@ func RegisterType(db *sql.DB, typeName, arrayTypeName string, typeObj interface{
 	return errors.New("the driver used is not a go-ora driver type")
 }
 
-func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, typeObj interface{}) error {
+func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, typeObj interface{}) error {
 	if len(owner) == 0 {
 		return errors.New("owner can't be empty")
 	}
-	drv := conn.Driver().(*OracleDriver)
+	typeName = strings.TrimSpace(typeName)
+	arrayTypeName = strings.TrimSpace(arrayTypeName)
+	drv := db.Driver().(*OracleDriver)
 
 	//if typeObj == nil {
 	//	return errors.New("type object cannot be nil")
@@ -361,192 +390,218 @@ func RegisterTypeWithOwner(conn *sql.DB, owner, typeName, arrayTypeName string, 
 			return errors.New("unsupported type object: Slice")
 		}
 	}
-	typeName = strings.TrimSpace(typeName)
-	arrayTypeName = strings.TrimSpace(arrayTypeName)
+
 	if len(typeName) == 0 {
 		return errors.New("typeName shouldn't be empty")
 	}
+	// process object first
 
-	cust := Object{
-		Owner: owner,
-		Name:  typeName,
-		// arrayTypeName: arrayTypeName,
-		typ: typ,
-	}
-	arrayCust := Object{Owner: owner, Name: arrayTypeName, isArray: true}
 	var err error
-	arrayParam := ParameterInfo{
-		Direction: Input,
-		BasicParameter: parameter_coder.BasicParameter{
-			Flag:       3,
-			MaxLen:     1,
-			MaxCharLen: 1,
-		},
-		TypeName: typeName,
-	}
-	switch strings.ToUpper(typeName) {
-	case "NUMBER":
-		arrayParam.DataType = types.NUMBER
-	case "VARCHAR2":
-		arrayParam.DataType = types.NCHAR
-		arrayParam.CharsetForm = 1
-		arrayParam.ContFlag = 16
-		arrayParam.CharsetID = drv.sStrConv.GetLangID()
-	case "NVARCHAR2":
-		arrayParam.DataType = types.NCHAR
-		arrayParam.CharsetForm = 2
-		arrayParam.ContFlag = 16
-		arrayParam.CharsetID = drv.nStrConv.GetLangID()
-	case "TIMESTAMP":
-		arrayParam.DataType = types.TimeStampDTY
-	case "DATE":
-		arrayParam.DataType = types.DATE
-	case "TIMESTAMP WITH LOCAL TIME ZONE":
-		arrayParam.DataType = types.TimeStampLTZ_DTY
-	// case "TIMESTAMP WITH TIME ZONE":
-	//	arrayParam.DataType = TimeStampTZ_DTY
-	//	arrayParam.MaxLen = converters.MAX_LEN_TIMESTAMP
-	case "RAW":
-		arrayParam.DataType = types.RAW
-	case "BLOB":
-		arrayParam.DataType = types.OCIBlobLocator
-	case "CLOB":
-		arrayParam.DataType = types.OCIClobLocator
-		arrayParam.CharsetForm = 1
-		arrayParam.ContFlag = 16
-		arrayParam.CharsetID = drv.sStrConv.GetLangID()
-	case "NCLOB":
-		arrayParam.DataType = types.OCIClobLocator
-		arrayParam.CharsetForm = 2
-		arrayParam.ContFlag = 16
-		arrayParam.CharsetID = drv.nStrConv.GetLangID()
-	default:
-		if cust.typ == nil {
-			return errors.New("type object cannot be nil")
+	arrayParam, ok := drv.nameTypeCoder[strings.ToUpper(typeName)]
+	if !ok {
+		// we should add this type as new type
+		obj := Object{
+			Owner: owner,
+			Name:  typeName,
+			typ:   typ,
 		}
-		if typ.Kind() != reflect.Struct {
-			return errors.New("type object should be of structure type")
-		}
-		cust.fieldMap = map[string]int{}
-		cust.toid, err = getTOID2(conn, owner, typeName)
+		err = obj.loadObjectTypeInfo(db)
 		if err != nil {
 			return err
 		}
-		sqlText := `SELECT ATTR_NAME, ATTR_TYPE_NAME, LENGTH, ATTR_NO 
-					FROM ALL_TYPE_ATTRS 
-					WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2
-					ORDER BY ATTR_NO`
-		rows, err := conn.Query(sqlText, strings.ToUpper(owner), strings.ToUpper(typeName))
-		if err != nil {
-			return err
-		}
-		var (
-			attName     sql.NullString
-			attOrder    int64
-			attTypeName sql.NullString
-			length      sql.NullInt64
-		)
-		for rows.Next() {
-			err = rows.Scan(&attName, &attTypeName, &length, &attOrder)
-			if err != nil {
-				return err
-			}
-			param := ParameterInfo{Direction: Input, BasicParameter: parameter_coder.BasicParameter{Flag: 3}}
-			param.Name = attName.String
-			param.TypeName = attTypeName.String
-			switch strings.ToUpper(attTypeName.String) {
-			case "NUMBER":
-				param.DataType = types.NUMBER
-				param.MaxLen = int64(converters.MAX_LEN_NUMBER)
-			case "VARCHAR2":
-				param.DataType = types.NCHAR
-				param.CharsetForm = 1
-				param.ContFlag = 16
-				param.MaxCharLen = length.Int64
-				param.CharsetID = drv.sStrConv.GetLangID()
-				param.MaxLen = length.Int64 * int64(converters.MaxBytePerChar(param.CharsetID))
-			case "NVARCHAR2":
-				param.DataType = types.NCHAR
-				param.CharsetForm = 2
-				param.ContFlag = 16
-				param.MaxCharLen = length.Int64
-				param.CharsetID = drv.nStrConv.GetLangID()
-				param.MaxLen = length.Int64 * int64(converters.MaxBytePerChar(param.CharsetID))
-			case "TIMESTAMP":
-				param.DataType = types.TimeStampDTY
-				param.MaxLen = int64(converters.MAX_LEN_DATE)
-			case "DATE":
-				param.DataType = types.DATE
-				param.MaxLen = int64(converters.MAX_LEN_DATE)
-			case "TIMESTAMP WITH LOCAL TIME ZONE":
-				param.DataType = types.TimeStampLTZ_DTY
-				param.MaxLen = int64(converters.MAX_LEN_DATE)
-			case "TIMESTAMP WITH TIME ZONE":
-				param.DataType = types.TimeStampTZ_DTY
-				param.MaxLen = int64(converters.MAX_LEN_TIMESTAMP)
-			case "RAW":
-				param.DataType = types.RAW
-				param.MaxLen = length.Int64
-			case "BLOB":
-				param.DataType = types.OCIBlobLocator
-				param.MaxLen = length.Int64
-			case "CLOB":
-				param.DataType = types.OCIClobLocator
-				param.CharsetForm = 1
-				param.ContFlag = 16
-				param.CharsetID = drv.sStrConv.GetLangID()
-				param.MaxCharLen = length.Int64
-				param.MaxLen = length.Int64 * int64(converters.MaxBytePerChar(param.CharsetID))
-			case "NCLOB":
-				param.DataType = types.OCIClobLocator
-				param.CharsetForm = 2
-				param.ContFlag = 16
-				param.CharsetID = drv.nStrConv.GetLangID()
-				param.MaxCharLen = length.Int64
-				param.MaxLen = length.Int64 * int64(converters.MaxBytePerChar(param.CharsetID))
-			default:
-				found := false
-				for name, value := range drv.cusTyp {
-					if strings.EqualFold(name, attTypeName.String) {
-						found = true
-						param.DataType = types.XMLType
-						param.cusType = new(Object)
-						*param.cusType = value
-						param.ToID = value.toid
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("unsupported attribute type: %s", attTypeName.String)
-				}
-			}
-			cust.attribs = append(cust.attribs, param)
-		}
-		if len(cust.attribs) == 0 {
-			return fmt.Errorf("unknown or empty type: %s", typeName)
-		}
-		arrayParam.DataType = types.XMLType
-		arrayParam.cusType = new(Object)
-		*arrayParam.cusType = cust
-
-		cust.loadFieldMap()
+		arrayParam = &ObjectParameter{obj: obj, BasicParameter: parameter_coder.BasicParameter{ToID: obj.toid}}
 		drv.mu.Lock()
-		drv.cusTyp[strings.ToUpper(typeName)] = cust
+		// map name to coder
+		drv.nameTypeCoder[strings.ToUpper(typeName)] = arrayParam
+		// map type to coder
+		drv.goTypeCoder[typ] = arrayParam
 		drv.mu.Unlock()
 	}
+
 	if len(arrayTypeName) > 0 {
-		var err error
-		arrayCust.toid, err = getTOID2(conn, owner, arrayTypeName)
+		arrayObj := Object{Owner: owner, Name: arrayTypeName, isArray: true}
+		arrayObj.attribs = make(map[string]parameter_coder.OracleParameterCoder)
+		arrayObj.attribs[""] = arrayParam.Copy()
+		arrayObj.toid, err = getTOID2(db, owner, arrayTypeName)
 		if err != nil {
 			return err
 		}
-		arrayCust.attribs = append(arrayCust.attribs, arrayParam)
 		drv.mu.Lock()
-		drv.cusTyp[strings.ToUpper(arrayTypeName)] = arrayCust
+		drv.nameTypeCoder[strings.ToUpper(arrayTypeName)] = &ObjectParameter{obj: arrayObj, BasicParameter: parameter_coder.BasicParameter{ToID: arrayObj.toid}}
 		drv.mu.Unlock()
 	}
-
 	return nil
+	//arrayParam := ParameterInfo{
+	//	Direction: Input,
+	//	BasicParameter: parameter_coder.BasicParameter{
+	//		Flag:       3,
+	//		MaxLen:     1,
+	//		MaxCharLen: 1,
+	//	},
+	//	TypeName: typeName,
+	//}
+	//switch strings.ToUpper(typeName) {
+	//case "NUMBER":
+	//	arrayParam.DataType = types.NUMBER
+	//case "VARCHAR2":
+	//	arrayParam.DataType = types.NCHAR
+	//	arrayParam.CharsetForm = 1
+	//	arrayParam.ContFlag = 16
+	//	arrayParam.CharsetID = drv.sStrConv.GetLangID()
+	//case "NVARCHAR2":
+	//	arrayParam.DataType = types.NCHAR
+	//	arrayParam.CharsetForm = 2
+	//	arrayParam.ContFlag = 16
+	//	arrayParam.CharsetID = drv.nStrConv.GetLangID()
+	//case "TIMESTAMP":
+	//	arrayParam.DataType = types.TimeStampDTY
+	//case "DATE":
+	//	arrayParam.DataType = types.DATE
+	//case "TIMESTAMP WITH LOCAL TIME ZONE":
+	//	arrayParam.DataType = types.TimeStampLTZ_DTY
+	//// case "TIMESTAMP WITH TIME ZONE":
+	////	arrayParam.DataType = TimeStampTZ_DTY
+	////	arrayParam.MaxLen = converters.MAX_LEN_TIMESTAMP
+	//case "RAW":
+	//	arrayParam.DataType = types.RAW
+	//case "BLOB":
+	//	arrayParam.DataType = types.OCIBlobLocator
+	//case "CLOB":
+	//	arrayParam.DataType = types.OCIClobLocator
+	//	arrayParam.CharsetForm = 1
+	//	arrayParam.ContFlag = 16
+	//	arrayParam.CharsetID = drv.sStrConv.GetLangID()
+	//case "NCLOB":
+	//	arrayParam.DataType = types.OCIClobLocator
+	//	arrayParam.CharsetForm = 2
+	//	arrayParam.ContFlag = 16
+	//	arrayParam.CharsetID = drv.nStrConv.GetLangID()
+	//default:
+	//	if cust.typ == nil {
+	//		return errors.New("type object cannot be nil")
+	//	}
+	//	if typ.Kind() != reflect.Struct {
+	//		return errors.New("type object should be of structure type")
+	//	}
+	//	cust.activeFields = map[string]int{}
+	//	cust.toid, err = getTOID2(db, owner, typeName)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	sqlText := `SELECT ATTR_NAME, ATTR_TYPE_NAME, LENGTH, ATTR_NO
+	//				FROM ALL_TYPE_ATTRS
+	//				WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2
+	//				ORDER BY ATTR_NO`
+	//	rows, err := db.Query(sqlText, strings.ToUpper(owner), strings.ToUpper(typeName))
+	//	if err != nil {
+	//		return err
+	//	}
+	//	var (
+	//		attName     sql.NullString
+	//		attOrder    int64
+	//		attTypeName sql.NullString
+	//		length      sql.NullInt64
+	//	)
+	//	for rows.Next() {
+	//		err = rows.Scan(&attName, &attTypeName, &length, &attOrder)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		param := ParameterInfo{Direction: Input, BasicParameter: parameter_coder.BasicParameter{Flag: 3}}
+	//		param.Name = attName.String
+	//		param.TypeName = attTypeName.String
+	//		switch strings.ToUpper(attTypeName.String) {
+	//		case "NUMBER":
+	//			param.DataType = types.NUMBER
+	//			param.MaxLen = int64(converters.MAX_LEN_NUMBER)
+	//		case "VARCHAR2":
+	//			param.DataType = types.NCHAR
+	//			param.CharsetForm = 1
+	//			param.ContFlag = 16
+	//			param.MaxCharLen = length.Int64
+	//			param.CharsetID = drv.sStrConv.GetLangID()
+	//			param.MaxLen = length.Int64 * int64(converters.MaxBytePerChar(param.CharsetID))
+	//		case "NVARCHAR2":
+	//			param.DataType = types.NCHAR
+	//			param.CharsetForm = 2
+	//			param.ContFlag = 16
+	//			param.MaxCharLen = length.Int64
+	//			param.CharsetID = drv.nStrConv.GetLangID()
+	//			param.MaxLen = length.Int64 * int64(converters.MaxBytePerChar(param.CharsetID))
+	//		case "TIMESTAMP":
+	//			param.DataType = types.TimeStampDTY
+	//			param.MaxLen = int64(converters.MAX_LEN_DATE)
+	//		case "DATE":
+	//			param.DataType = types.DATE
+	//			param.MaxLen = int64(converters.MAX_LEN_DATE)
+	//		case "TIMESTAMP WITH LOCAL TIME ZONE":
+	//			param.DataType = types.TimeStampLTZ_DTY
+	//			param.MaxLen = int64(converters.MAX_LEN_DATE)
+	//		case "TIMESTAMP WITH TIME ZONE":
+	//			param.DataType = types.TimeStampTZ_DTY
+	//			param.MaxLen = int64(converters.MAX_LEN_TIMESTAMP)
+	//		case "RAW":
+	//			param.DataType = types.RAW
+	//			param.MaxLen = length.Int64
+	//		case "BLOB":
+	//			param.DataType = types.OCIBlobLocator
+	//			param.MaxLen = length.Int64
+	//		case "CLOB":
+	//			param.DataType = types.OCIClobLocator
+	//			param.CharsetForm = 1
+	//			param.ContFlag = 16
+	//			param.CharsetID = drv.sStrConv.GetLangID()
+	//			param.MaxCharLen = length.Int64
+	//			param.MaxLen = length.Int64 * int64(converters.MaxBytePerChar(param.CharsetID))
+	//		case "NCLOB":
+	//			param.DataType = types.OCIClobLocator
+	//			param.CharsetForm = 2
+	//			param.ContFlag = 16
+	//			param.CharsetID = drv.nStrConv.GetLangID()
+	//			param.MaxCharLen = length.Int64
+	//			param.MaxLen = length.Int64 * int64(converters.MaxBytePerChar(param.CharsetID))
+	//		default:
+	//			found := false
+	//			for name, value := range drv.cusTyp {
+	//				if strings.EqualFold(name, attTypeName.String) {
+	//					found = true
+	//					param.DataType = types.XMLType
+	//					param.cusType = new(Object)
+	//					*param.cusType = value
+	//					param.ToID = value.toid
+	//					break
+	//				}
+	//			}
+	//			if !found {
+	//				return fmt.Errorf("unsupported attribute type: %s", attTypeName.String)
+	//			}
+	//		}
+	//		cust.attribs = append(cust.attribs, param)
+	//	}
+	//	if len(cust.attribs) == 0 {
+	//		return fmt.Errorf("unknown or empty type: %s", typeName)
+	//	}
+	//	arrayParam.DataType = types.XMLType
+	//	arrayParam.cusType = new(Object)
+	//	*arrayParam.cusType = cust
+	//
+	//	cust.loadActiveFields()
+	//	drv.mu.Lock()
+	//	drv.cusTyp[strings.ToUpper(typeName)] = cust
+	//	drv.mu.Unlock()
+	//}
+	//if len(arrayTypeName) > 0 {
+	//	var err error
+	//	arrayCust.toid, err = getTOID2(db, owner, arrayTypeName)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	arrayCust.attribs = append(arrayCust.attribs, arrayParam)
+	//	drv.mu.Lock()
+	//	drv.cusTyp[strings.ToUpper(arrayTypeName)] = arrayCust
+	//	drv.mu.Unlock()
+	//}
+	//return nil
 }
 
 func ParseConfig(dsn string) (*configurations.ConnectionConfig, error) {

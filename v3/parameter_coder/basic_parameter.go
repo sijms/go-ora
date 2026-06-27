@@ -6,6 +6,7 @@ import (
 )
 
 type BasicParameter struct {
+	TypeName    string
 	Flag        uint8
 	ContFlag    int
 	DataType    uint16
@@ -24,7 +25,7 @@ type BasicParameter struct {
 	VectorType   types.VectorType
 }
 
-func (basic *BasicParameter) basicRead(session network.SessionReader) ([]byte, error) {
+func (basic *BasicParameter) BasicRead(session network.SessionReader) ([]byte, error) {
 	if (basic.DataType == types.NCHAR || basic.DataType == types.CHAR) && basic.MaxLen == 0 {
 		return nil, nil
 	}
@@ -42,12 +43,16 @@ func (basic *BasicParameter) basicRead(session network.SessionReader) ([]byte, e
 }
 
 func (basic *BasicParameter) SetDefault() {
-	basic.DataType = 0
-	basic.Flag = 3
+	//basic.DataType = 0
+	if basic.Flag == 0 {
+		basic.Flag = 3
+	}
 	basic.ContFlag = 0
 	basic.CharsetID = 0
-	basic.CharsetForm = 0
-	basic.MaxLen = 1
+	//basic.CharsetForm = 0
+	if basic.MaxLen == 0 {
+		basic.MaxLen = 1
+	}
 	basic.MaxCharLen = 0
 	basic.ArraySize = 0
 	basic.BValue = nil
@@ -70,4 +75,8 @@ func (basic *BasicParameter) SetParameterInfo(data BasicParameter) {
 
 func (basic *BasicParameter) SetLobStreamer(lobStreamer types.LobStreamer) {
 
+}
+
+func (basic *BasicParameter) SetAsUDTPar() {
+	basic.IsUDTPar = true
 }

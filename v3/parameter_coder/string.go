@@ -1,7 +1,6 @@
 package parameter_coder
 
 import (
-	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
@@ -10,10 +9,18 @@ type StringParameter struct {
 	BasicParameter
 }
 
-func (param *StringParameter) Encode(input interface{}, strConv converters.StringCoder, _ types.LobStreamer) error {
+func (param *StringParameter) Copy() OracleParameterCoder {
+	ret := new(StringParameter)
+	*ret = *param
+	return ret
+}
+
+func (param *StringParameter) Encode(input interface{}, conn IConnection) error {
 	param.SetDefault()
 	param.ContFlag = 0x10
-	param.CharsetForm = 1
+	if param.CharsetForm == 0 {
+		param.CharsetForm = 1
+	}
 	switch temp := input.(type) {
 	case types.String:
 		if temp.UseNCharset {
@@ -24,7 +31,7 @@ func (param *StringParameter) Encode(input interface{}, strConv converters.Strin
 			param.CharsetForm = 2
 		}
 	}
-	conv, err := strConv.GetStringCoder(param.CharsetID, param.CharsetForm)
+	conv, err := conn.GetStringCoder(param.CharsetID, param.CharsetForm)
 	if err != nil {
 		return err
 	}
@@ -45,7 +52,7 @@ func (param *StringParameter) Encode(input interface{}, strConv converters.Strin
 	param.BValue = encoder.Bytes()
 	param.MaxLen = int64(len(param.BValue))
 	param.MaxCharLen = int64(len(param.BValue))
-	maxLen := strConv.GetMaxStringLength()
+	maxLen := conn.GetMaxStringLength()
 	if param.MaxLen > maxLen {
 		param.DataType = types.LongVarChar
 	} else {
@@ -57,8 +64,8 @@ func (param *StringParameter) Encode(input interface{}, strConv converters.Strin
 	return nil
 }
 
-func (param *StringParameter) Decode(strConv converters.StringCoder) (interface{}, error) {
-	conv, err := strConv.GetStringCoder(param.CharsetID, param.CharsetForm)
+func (param *StringParameter) Decode(conn IConnection) (interface{}, error) {
+	conv, err := conn.GetStringCoder(param.CharsetID, param.CharsetForm)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +87,6 @@ func (param *StringParameter) Write(session network.SessionWriter) error {
 
 func (param *StringParameter) Read(session network.SessionReader) error {
 	var err error
-	param.BValue, err = param.basicRead(session)
+	param.BValue, err = param.BasicRead(session)
 	return err
 }

@@ -227,6 +227,14 @@ func (session *basicSession) GetKeyVal() (key []byte, val []byte, num int, err e
 	return
 }
 
+func (session *basicSession) Peek() (byte, error) {
+	ret, err := session.GetByte()
+	if err != nil {
+		return 0, err
+	}
+	return ret, session.inBuffer.UnreadByte()
+}
+
 // PutInt write int number with size entered either use bigEndian or not and use compression or not to
 func (session *basicSession) PutInt(number interface{}, size uint8, bigEndian bool, compress bool) {
 	var num int64
@@ -409,6 +417,16 @@ func (session *basicSession) PutClr(data []byte) {
 		session.outBuffer.WriteByte(uint8(len(data)))
 		session.outBuffer.Write(data)
 	}
+}
+
+func (session *basicSession) PutFixedClr(data []byte) {
+	if len(data) > 0xFC {
+		session.PutBytes(0xFE)
+		session.PutUint(len(data), 4, true, false)
+	} else {
+		session.PutBytes(uint8(len(data)))
+	}
+	session.PutBytes(data...)
 }
 
 // PutString write a string data to output buffer

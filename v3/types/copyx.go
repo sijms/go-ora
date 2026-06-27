@@ -4,52 +4,57 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func setNil(dest any) {
-	dstValue := reflect.ValueOf(dest).Elem()
-	dstType := reflect.TypeOf(dest).Elem()
-	//if dstValue.Kind() == reflect.Ptr && dstValue.IsNil() {
-	//	return
-	//}
-	dstValue.Set(reflect.Zero(dstType))
+var truthy = []string{"true", "1"}
+
+func setNil(dest reflect.Value) error {
+	if dest.Kind() == reflect.Ptr && dest.IsNil() {
+		return nil
+	}
+	// if the value is support scanner interface call it
+	processed, err := copyWithScanner(dest, nil)
+	if processed {
+		return err
+	}
+	dest.Set(reflect.Zero(dest.Type()))
+	return nil
 }
-func copyTime(dest any, src time.Time) error {
-	dstValue := reflect.ValueOf(dest).Elem()
-	dstType := reflect.TypeOf(dest).Elem()
-	switch dstType {
+
+func copyTime(dest reflect.Value, src time.Time) error {
+	switch dest.Type() {
 	case TyString:
-		dstValue.SetString(src.Format(time.RFC3339))
+		dest.SetString(src.Format(time.RFC3339))
 	case TyTime:
-		dstValue.Set(reflect.ValueOf(src))
+		dest.Set(reflect.ValueOf(src))
 	case TyNullString:
-		dstValue.Set(reflect.ValueOf(sql.NullString{String: src.Format(time.RFC3339), Valid: true}))
+		dest.Set(reflect.ValueOf(sql.NullString{String: src.Format(time.RFC3339), Valid: true}))
 	case TyNullTime:
-		dstValue.Set(reflect.ValueOf(sql.NullTime{Time: src, Valid: true}))
+		dest.Set(reflect.ValueOf(sql.NullTime{Time: src, Valid: true}))
 	default:
 		return defaultCopy(dest, src)
 	}
 	return nil
 }
-func copyBytes(dest any, src []uint8) error {
-	dstValue := reflect.ValueOf(dest).Elem()
-	dstType := reflect.TypeOf(dest).Elem()
-	switch dstType {
+
+func copyBytes(dest reflect.Value, src []byte) error {
+	switch dest.Type() {
 	case TyString:
-		dstValue.SetString(string(src))
+		dest.SetString(string(src))
 	case TyBytes:
-		dstValue.SetBytes(src)
+		dest.SetBytes(src)
 	case TyNullString:
-		dstValue.Set(reflect.ValueOf(sql.NullString{String: string(src), Valid: src != nil}))
+		dest.Set(reflect.ValueOf(sql.NullString{String: string(src), Valid: src != nil}))
 	default:
 		return defaultCopy(dest, src)
 	}
 	return nil
 }
-func copyString(dest any, src string) error {
+func copyString(dest reflect.Value, src string) error {
 	var intErr, floatErr, timeErr error
 	tempInt, err := strconv.ParseInt(src, 10, 64)
 	if err != nil {
@@ -63,104 +68,106 @@ func copyString(dest any, src string) error {
 	if err != nil {
 		timeErr = fmt.Errorf(`can't assign string "%v" to time.Time variable`, src)
 	}
-	dstValue := reflect.ValueOf(dest).Elem()
-	dstType := reflect.TypeOf(dest).Elem()
 
-	if tSigned(dstType) {
+	if tSigned(dest.Type()) {
 		if intErr == nil {
-			dstValue.SetInt(tempInt)
+			dest.SetInt(tempInt)
 		}
 		return intErr
 	}
-	if tUnsigned(dstType) {
+	if tUnsigned(dest.Type()) {
 		if intErr == nil {
-			dstValue.SetUint(uint64(tempInt))
+			dest.SetUint(uint64(tempInt))
 		}
 		return intErr
 	}
-	if tFloat(dstType) {
+	if tFloat(dest.Type()) {
 		if floatErr == nil {
-			dstValue.SetFloat(tempFloat)
+			dest.SetFloat(tempFloat)
 		}
 		return floatErr
 	}
-	switch dstType {
+	switch dest.Type() {
 	case TyBool:
-		dstValue.SetBool(strings.ToLower(src) == "true")
+		if slices.Contains(truthy, strings.ToLower(src)) {
+			dest.SetBool(true)
+		} else {
+			dest.SetBool(false)
+		}
 	case TyString:
-		dstValue.SetString(src)
+		dest.SetString(src)
 	case TyNullString:
 		if src == "" {
-			dstValue.Set(reflect.ValueOf(sql.NullString{}))
+			dest.Set(reflect.ValueOf(sql.NullString{}))
 		} else {
-			dstValue.Set(reflect.ValueOf(sql.NullString{String: src, Valid: true}))
+			dest.Set(reflect.ValueOf(sql.NullString{String: src, Valid: true}))
 		}
 	case TyNullByte:
 		if src == "" {
-			dstValue.Set(reflect.ValueOf(sql.NullByte{}))
+			dest.Set(reflect.ValueOf(sql.NullByte{}))
 		} else {
 			if intErr == nil {
-				dstValue.Set(reflect.ValueOf(sql.NullByte{Byte: uint8(tempInt), Valid: true}))
+				dest.Set(reflect.ValueOf(sql.NullByte{Byte: uint8(tempInt), Valid: true}))
 			}
 			return intErr
 		}
 	case TyNullInt16:
 		if src == "" {
-			dstValue.Set(reflect.ValueOf(sql.NullInt16{}))
+			dest.Set(reflect.ValueOf(sql.NullInt16{}))
 		} else {
 			if intErr == nil {
-				dstValue.Set(reflect.ValueOf(sql.NullInt16{Int16: int16(tempInt), Valid: true}))
+				dest.Set(reflect.ValueOf(sql.NullInt16{Int16: int16(tempInt), Valid: true}))
 			}
 			return intErr
 		}
 	case TyNullInt32:
 		if src == "" {
-			dstValue.Set(reflect.ValueOf(sql.NullInt32{}))
+			dest.Set(reflect.ValueOf(sql.NullInt32{}))
 		} else {
 			if intErr == nil {
-				dstValue.Set(reflect.ValueOf(sql.NullInt32{Int32: int32(tempInt), Valid: true}))
+				dest.Set(reflect.ValueOf(sql.NullInt32{Int32: int32(tempInt), Valid: true}))
 			}
 			return intErr
 		}
 	case TyNullInt64:
 		if src == "" {
-			dstValue.Set(reflect.ValueOf(sql.NullInt64{}))
+			dest.Set(reflect.ValueOf(sql.NullInt64{}))
 		} else {
 			if intErr == nil {
-				dstValue.Set(reflect.ValueOf(sql.NullInt64{Int64: tempInt, Valid: true}))
+				dest.Set(reflect.ValueOf(sql.NullInt64{Int64: tempInt, Valid: true}))
 			}
 			return intErr
 		}
 
 	case TyNullFloat64:
 		if src == "" {
-			dstValue.Set(reflect.ValueOf(sql.NullFloat64{}))
+			dest.Set(reflect.ValueOf(sql.NullFloat64{}))
 		} else {
 			if floatErr == nil {
-				dstValue.Set(reflect.ValueOf(sql.NullFloat64{Float64: tempFloat, Valid: true}))
+				dest.Set(reflect.ValueOf(sql.NullFloat64{Float64: tempFloat, Valid: true}))
 			}
 			return floatErr
 		}
 
 	case TyNullBool:
 		if src == "" {
-			dstValue.Set(reflect.ValueOf(sql.NullBool{}))
+			dest.Set(reflect.ValueOf(sql.NullBool{}))
 		} else {
-			temp := strings.ToLower(src) == "true"
-			dstValue.Set(reflect.ValueOf(sql.NullBool{Bool: temp, Valid: true}))
+			temp := slices.Contains(truthy, strings.ToLower(src))
+			dest.Set(reflect.ValueOf(sql.NullBool{Bool: temp, Valid: true}))
 		}
 
 	case TyTime:
 		if timeErr == nil {
-			dstValue.Set(reflect.ValueOf(tempTime))
+			dest.Set(reflect.ValueOf(tempTime))
 		}
 		return timeErr
 	case TyNullTime:
 		if src == "" {
-			dstValue.Set(reflect.ValueOf(sql.NullTime{}))
+			dest.Set(reflect.ValueOf(sql.NullTime{}))
 		} else {
 			if timeErr == nil {
-				dstValue.Set(reflect.ValueOf(sql.NullTime{Time: tempTime, Valid: true}))
+				dest.Set(reflect.ValueOf(sql.NullTime{Time: tempTime, Valid: true}))
 			}
 			return timeErr
 		}

@@ -179,6 +179,9 @@ func (session *Session) ResetBuffer() {
 	session.resetRead()
 }
 
+func (session *Session) GetProperties() SessionProperties {
+	return session.SessionProperties
+}
 func (session *Session) SetConnected() {
 	session.mu.Lock()
 	defer session.mu.Unlock()
@@ -754,14 +757,6 @@ func (session *Session) processMarker() error {
 	// 	}
 	// 	trials ++
 	// }
-}
-
-func (session *Session) Peek() (byte, error) {
-	ret, err := session.GetByte()
-	if err != nil {
-		return 0, err
-	}
-	return ret, session.inBuffer.UnreadByte()
 }
 
 // Read numBytes of data from input buffer if requested data is larger

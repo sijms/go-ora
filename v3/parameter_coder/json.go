@@ -1,7 +1,6 @@
 package parameter_coder
 
 import (
-	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 	"github.com/sijms/go-ora/v3/types/oson"
@@ -32,7 +31,13 @@ type JsonParameter struct {
 	lobParameter
 }
 
-func (param *JsonParameter) Encode(input interface{}, _ converters.StringCoder, stream types.LobStreamer) (err error) {
+func (param *JsonParameter) Copy() OracleParameterCoder {
+	ret := new(JsonParameter)
+	*ret = *param
+	return ret
+}
+
+func (param *JsonParameter) Encode(input interface{}, _ IConnection) (err error) {
 	param.SetDefault()
 	param.DataType = types.JSON
 	encoder := &types.Json{}
@@ -50,7 +55,7 @@ func (param *JsonParameter) Encode(input interface{}, _ converters.StringCoder, 
 	return
 }
 
-func (param *JsonParameter) Decode(_ converters.StringCoder) (interface{}, error) {
+func (param *JsonParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder := &types.Json{}
 	decoder.Coder = &oson.Oson{}
 	decoder.SetStreamer(param.streamer)

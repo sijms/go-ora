@@ -17,15 +17,26 @@ func (param *lobParameter) SetLobStreamer(streamer types.LobStreamer) {
 
 func (param *lobParameter) Write(session network.SessionWriter) error {
 	if len(param.BValue) > 0 {
-		session.PutUint(len(param.BValue), 4, true, true)
+		if !param.IsArrayPar {
+			session.PutUint(len(param.BValue), 4, true, true)
+		}
+	} else {
+		if param.IsArrayPar {
+			session.PutBytes(0xFF)
+			return nil
+		}
+		if param.IsUDTPar {
+			session.PutBytes(0xFD)
+			return nil
+		}
 	}
 	session.PutClr(param.BValue)
 	return nil
 }
-func (param *lobParameter) read(session network.SessionReader) error {
+func (param *lobParameter) Read(session network.SessionReader) error {
 	var locator types.Locator
 	var err error
-	if param.streamer.GetLobStreamMode() == configurations.INLINE {
+	if !(param.IsUDTPar || param.IsArrayPar) && param.streamer.GetLobStreamMode() == configurations.INLINE {
 		// the following code is working when the lob is inline (default)
 		var maxSize int64
 		maxSize, err = session.GetInt64(4, true, true)
@@ -41,13 +52,17 @@ func (param *lobParameter) read(session network.SessionReader) error {
 			if err != nil {
 				return err
 			}
-			param.BValue, err = session.GetClr()
-			if err != nil {
-				return err
-			}
-			locator, err = session.GetClr()
-			if err != nil {
-				return err
+			if param.DataType == types.OCIFileLocator {
+				locator, err = session.GetClr()
+			} else {
+				param.BValue, err = session.GetClr()
+				if err != nil {
+					return err
+				}
+				locator, err = session.GetClr()
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			// set value nil
@@ -64,7 +79,7 @@ func (param *lobParameter) read(session network.SessionReader) error {
 			locator = nil
 			param.BValue = nil
 		} else {
-			if !param.IsUDTPar {
+			if !(param.IsUDTPar || param.IsArrayPar) {
 				locator, err = session.GetClr()
 				if err != nil {
 					return err

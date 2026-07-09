@@ -249,7 +249,7 @@ func (stmt *defaultStmt) writeDefine() error {
 		if col.isLobType() {
 			num = 0
 			// temp.ContFlag |= 0x2000000
-			if stmt.connection.connOption.Lob == configurations.INLINE && !col.IsJson {
+			if stmt.connection.connOption.Lob == configurations.INLINE && !col.IsJson && col.DataType != oraTypes.OCIFileLocator {
 				num = 0x3FFFFFFF
 				// col.MaxCharLen = 0
 				if col.DataType == oraTypes.OCIBlobLocator || col.DataType == oraTypes.VECTOR || col.DataType == oraTypes.JSON {
@@ -402,18 +402,18 @@ func (stmt *Stmt) writePars() error {
 					//session.WriteBytes(&buffer, 1, 1)
 					//session.WriteClr(&buffer, par.BValue)
 				} else {
-					if par.MaxNoOfArrayElements > 0 {
-						if par.BValue == nil {
-							ms.PutBytes(0)
-							//session.WriteBytes(&buffer, 0)
-						} else {
-							ms.PutBytes(par.BValue...)
-							//session.WriteBytes(&buffer, par.BValue...)
-						}
-					} else {
-						ms.PutClr(par.BValue)
-						//session.WriteClr(&buffer, par.BValue)
-					}
+					//if par.MaxNoOfArrayElements > 0 {
+					//	if par.BValue == nil {
+					//		ms.PutBytes(0)
+					//		//session.WriteBytes(&buffer, 0)
+					//	} else {
+					//		ms.PutBytes(par.BValue...)
+					//		//session.WriteBytes(&buffer, par.BValue...)
+					//	}
+					//} else {
+					//	ms.PutClr(par.BValue)
+					//	//session.WriteClr(&buffer, par.BValue)
+					//}
 				}
 			}
 		}
@@ -424,7 +424,7 @@ func (stmt *Stmt) writePars() error {
 			//session.WriteClr(&buffer, par.BValue)
 		}
 	}
-	buffer := ms.Write(true)
+	buffer := ms.GetWriteBuffer()
 	if len(buffer) > 0 {
 		session.PutBytes(7)
 		session.PutBytes(buffer...)
@@ -1030,7 +1030,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				stmt.multiSet = append(stmt.multiSet, cursor)
 			}
 		default:
-			err = stmt.connection.processTCCResponse(msg)
+			err = stmt.connection.ProcessTCCResponse(msg)
 			if err != nil {
 				return err
 			}
@@ -1155,7 +1155,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	if param.DataType == oraTypes.XMLType && param.IsNull {
 		return nil
 	}
-	if param.DataType != oraTypes.XMLType && param.MaxNoOfArrayElements > 0 {
+	if param.DataType != oraTypes.XMLType && param.ArraySize > 0 {
 		return nil
 	}
 	_, err = stmt.connection.session.GetInt(2, true, true)
@@ -1804,13 +1804,13 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				return nil, errors.New("output parameter should be pointer type")
 			}
 			fieldValue = fieldValue.Elem()
-			if par.MaxNoOfArrayElements > 0 {
-				if pars, ok := par.oPrimValue.([]ParameterInfo); ok {
-					err = setArray(fieldValue, pars)
-					if err != nil {
-						return nil, err
-					}
-				}
+			if par.ArraySize > 0 {
+				//if pars, ok := par.oPrimValue.([]ParameterInfo); ok {
+				//	err = setArray(fieldValue, pars)
+				//	if err != nil {
+				//		return nil, err
+				//	}
+				//}
 			} else {
 				// check if LobReadMode is auto so auto read all lobs
 				if stmt.connection.connOption.LobReadMode == configurations.LobReadMode_AUTO {
@@ -1831,10 +1831,11 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				//if err != nil {
 				//	return nil, err
 				//}
-				err = oraTypes.Copy(par.Value, par.oPrimValue)
-				if err != nil {
-					return nil, err
-				}
+
+			}
+			err = oraTypes.Copy(par.Value, par.oPrimValue)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -2177,7 +2178,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 	var err error
 	// convert from go-ora primitives to sql primitives
 	for rowIndex, row := range resultSet.rows {
-		for colIndex, col := range stmt.columns {
+		for colIndex, _ := range stmt.columns {
 			if row == nil {
 				continue
 			}
@@ -2242,35 +2243,35 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 						return err
 					}
 				}
-			//case LobStream:
-			//	if col.DataType == oraTypes.OCIClobLocator {
-			//		tempString := sql.NullString{String: "", Valid: false}
-			//		err = setLob(reflect.ValueOf(&tempString).Elem(), val)
-			//		if err != nil {
-			//			return err
-			//		}
-			//		if tempString.Valid {
-			//			resultSet.rows[rowIndex][colIndex] = tempString.String
-			//		} else {
-			//			resultSet.rows[rowIndex][colIndex] = nil
-			//		}
-			//	} else {
-			//		var tempByte []byte
-			//		err = setLob(reflect.ValueOf(&tempByte).Elem(), val)
-			//		if err != nil {
-			//			return err
-			//		}
-			//		resultSet.rows[rowIndex][colIndex] = tempByte
-			//	}
-			case []ParameterInfo:
-				if col.cusType != nil {
-					tempObject := reflect.New(col.cusType.typ)
-					err = setUDTObject(tempObject.Elem(), col.cusType, val)
-					if err != nil {
-						return err
-					}
-					resultSet.rows[rowIndex][colIndex] = tempObject.Elem().Interface()
-				}
+				//case LobStream:
+				//	if col.DataType == oraTypes.OCIClobLocator {
+				//		tempString := sql.NullString{String: "", Valid: false}
+				//		err = setLob(reflect.ValueOf(&tempString).Elem(), val)
+				//		if err != nil {
+				//			return err
+				//		}
+				//		if tempString.Valid {
+				//			resultSet.rows[rowIndex][colIndex] = tempString.String
+				//		} else {
+				//			resultSet.rows[rowIndex][colIndex] = nil
+				//		}
+				//	} else {
+				//		var tempByte []byte
+				//		err = setLob(reflect.ValueOf(&tempByte).Elem(), val)
+				//		if err != nil {
+				//			return err
+				//		}
+				//		resultSet.rows[rowIndex][colIndex] = tempByte
+				//	}
+				//case []ParameterInfo:
+				//	if col.cusType != nil {
+				//		tempObject := reflect.New(col.cusType.typ)
+				//		err = setUDTObject(tempObject.Elem(), col.cusType, val)
+				//		if err != nil {
+				//			return err
+				//		}
+				//		resultSet.rows[rowIndex][colIndex] = tempObject.Elem().Interface()
+				//	}
 			}
 		}
 	}

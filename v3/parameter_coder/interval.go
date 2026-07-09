@@ -15,8 +15,12 @@ func (param *IntervalParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *IntervalParameter) Encode(input interface{}, _ IConnection) error {
+func (param *IntervalParameter) Init() {
 	param.SetDefault()
+}
+
+func (param *IntervalParameter) Encode(input interface{}, _ IConnection) error {
+	param.Init()
 	encoder := &types.Interval{}
 	encoder.SetDataType(param.DataType)
 	err := encoder.SetValue(input)
@@ -26,6 +30,9 @@ func (param *IntervalParameter) Encode(input interface{}, _ IConnection) error {
 	if dt := encoder.GetDataType(); dt != 0 {
 		param.DataType = dt
 	}
+	if param.MaxLen < encoder.GetMaxLen() {
+		param.MaxLen = encoder.GetMaxLen()
+	}
 	param.BValue = encoder.Bytes()
 	return nil
 }
@@ -34,10 +41,6 @@ func (param *IntervalParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder := &types.Interval{}
 	decoder.SetBytes(param.BValue)
 	return decoder.Value()
-}
-func (param *IntervalParameter) Write(session network.SessionWriter) error {
-	session.PutClr(param.BValue)
-	return nil
 }
 
 func (param *IntervalParameter) Read(session network.SessionReader) error {

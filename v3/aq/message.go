@@ -3,7 +3,6 @@ package aq
 import (
 	"time"
 
-	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 	//"github.com/sijms/go-ora/v3/type_coder"
 )
@@ -81,7 +80,8 @@ type Message struct {
 	extensions []QAExtension
 }
 
-func (message *Message) read(session *network.Session) error {
+func (message *Message) read(conn IConnection) error {
+	session := conn.GetSession()
 	var err error
 	message.Priority, err = session.GetInt(4, true, true)
 	if err != nil {
@@ -103,7 +103,7 @@ func (message *Message) read(session *network.Session) error {
 		if err != nil {
 			return err
 		}
-		message.correlation = session.StrConv.Decode(temp)
+		message.correlation = conn.GetServerStringCoder().Decode(temp)
 	} else {
 		message.correlation = ""
 	}
@@ -121,7 +121,7 @@ func (message *Message) read(session *network.Session) error {
 		if err != nil {
 			return err
 		}
-		message.exceptionQueue = session.StrConv.Decode(temp)
+		message.exceptionQueue = conn.GetServerStringCoder().Decode(temp)
 	} else {
 		message.exceptionQueue = ""
 	}
@@ -154,7 +154,6 @@ func (message *Message) read(session *network.Session) error {
 		//	return err
 		//}
 		// oracle date and timestamp
-
 		//this.aqmsta = this.mEngine.UnmarshalSB4(false);
 		//if (this.mEngine.UnmarshalSB4(false) > 0) {
 		//	this.mEngine.UnmarshalCLR(this.aqmeqtBuffer, 0, this.retInt, 7, false);
@@ -162,7 +161,7 @@ func (message *Message) read(session *network.Session) error {
 		//	this.aqmeqt = new OracleTimeStamp(oracleDate.Value);
 		//}
 	}
-	if session.TTCVersion >= 3 {
+	if conn.TTCVersion() >= 3 {
 		num, err = session.GetInt(2, true, true)
 		if err != nil {
 			return err
@@ -173,7 +172,7 @@ func (message *Message) read(session *network.Session) error {
 			if err != nil {
 				return err
 			}
-			message.transactionGroup = session.StrConv.Decode(temp)
+			message.transactionGroup = conn.GetServerStringCoder().Decode(temp)
 		} else {
 			message.transactionGroup = ""
 		}
@@ -196,11 +195,11 @@ func (message *Message) read(session *network.Session) error {
 		switch num {
 		case 64:
 			if len(key) > 0 {
-				message.senderName = session.StrConv.Decode(key)
+				message.senderName = conn.GetServerStringCoder().Decode(key)
 			}
 		case 65:
 			if len(key) > 0 {
-				message.senderAddress = session.StrConv.Decode(key)
+				message.senderAddress = conn.GetServerStringCoder().Decode(key)
 			}
 		case 66:
 			if len(val) > 0 {
@@ -208,11 +207,11 @@ func (message *Message) read(session *network.Session) error {
 			}
 		case 69:
 			if len(val) > 0 {
-				message.ID = session.StrConv.Decode(val)
+				message.ID = conn.GetServerStringCoder().Decode(val)
 			}
 		}
 	}
-	if session.TTCVersion >= 3 {
+	if conn.TTCVersion() >= 3 {
 		_, err = session.GetInt(2, true, true)
 		if err != nil {
 			return err
@@ -226,7 +225,7 @@ func (message *Message) read(session *network.Session) error {
 			return err
 		}
 	}
-	if session.TTCVersion >= 4 {
+	if conn.TTCVersion() >= 4 {
 		var flag int
 		flag, err = session.GetInt(4, true, true)
 		if err != nil {
@@ -237,7 +236,7 @@ func (message *Message) read(session *network.Session) error {
 		}
 		message.DeliveryMode = DeliveryMode(flag)
 	}
-	if session.TTCVersion >= 16 {
+	if conn.TTCVersion() >= 16 {
 		message.shareNum, err = session.GetInt(4, true, true)
 		if err != nil {
 			return err
@@ -245,12 +244,13 @@ func (message *Message) read(session *network.Session) error {
 	}
 	return nil
 }
-func (message *Message) write(session *network.Session) {
+func (message *Message) write(conn IConnection) {
+	session := conn.GetSession()
 	session.PutInt(message.Priority, 4, true, true)
 	session.PutInt(message.Delay, 4, true, true)
 	session.PutInt(message.Expiration, 4, true, true)
 	if len(message.correlation) > 0 {
-		temp := session.StrConv.Encode(message.correlation)
+		temp := conn.GetServerStringCoder().Encode(message.correlation)
 		session.PutInt(len(temp), 2, true, true)
 		session.PutClr(temp)
 	} else {
@@ -258,7 +258,7 @@ func (message *Message) write(session *network.Session) {
 	}
 	session.PutBytes(0)
 	if len(message.exceptionQueue) > 0 {
-		temp := session.StrConv.Encode(message.exceptionQueue)
+		temp := conn.GetServerStringCoder().Encode(message.exceptionQueue)
 		session.PutInt(len(message.exceptionQueue), 2, true, true)
 		session.PutClr(temp)
 	} else {
@@ -266,8 +266,8 @@ func (message *Message) write(session *network.Session) {
 	}
 	session.PutInt(int(message.State), 4, true, true)
 	session.PutBytes(0)
-	if session.TTCVersion >= 3 {
-		temp := session.StrConv.Encode(message.transactionGroup)
+	if conn.TTCVersion() >= 3 {
+		temp := conn.GetServerStringCoder().Encode(message.transactionGroup)
 		if len(temp) > 0 {
 			session.PutInt(len(temp), 2, true, true)
 			session.PutClr(temp)
@@ -281,13 +281,13 @@ func (message *Message) write(session *network.Session) {
 	session.PutKeyValString(message.senderAddress, "", 65)
 	session.PutKeyVal(nil, []byte{message.senderProtocol}, 66)
 	session.PutKeyValString("", message.ID, 69)
-	if session.TTCVersion >= 3 {
+	if conn.TTCVersion() >= 3 {
 		session.PutBytes(0, 0, 0)
 	}
-	if session.TTCVersion >= 4 {
+	if conn.TTCVersion() >= 4 {
 		session.PutBytes(0)
 	}
-	if session.TTCVersion >= 16 {
+	if conn.TTCVersion() >= 16 {
 		session.PutUint(message.shareNum, 2, true, true)
 	}
 }

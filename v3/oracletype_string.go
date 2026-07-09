@@ -55,7 +55,7 @@ func _() {
 	_ = x[oraTypes.IntervalDS-190]
 	_ = x[oraTypes.UROWID-208]
 	_ = x[oraTypes.TimeStampLTZ_DTY-231]
-	_ = x[oraTypes.TimeStampeLTZ-232]
+	_ = x[oraTypes.TimeStampLTZ-232]
 }
 
 const _OracleType_name = "NCHARNUMBERSB1FLOATNullStrVarNumLONGVARCHARROWIDDATEVarRawBFloatBDoubleRAWLongRawUINTLongVarCharLongVarRawCHARCHARZIBFloatIBDoubleREFCURSOROCIXMLTypeXMLTypeOCIRefOCIClobLocatorOCIBlobLocatorOCIFileLocatorResultSetOCIStringOCIDateTimeStampDTYTimeStampTZ_DTYIntervalYM_DTYIntervalDS_DTYTimeTZTIMESTAMPTimeStampTZIntervalYMIntervalDSUROWIDTimeStampLTZ_DTYTimeStampeLTZ"

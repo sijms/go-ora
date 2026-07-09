@@ -2,11 +2,10 @@ package go_ora
 
 import (
 	"database/sql"
-	"database/sql/driver"
-	"fmt"
 	"reflect"
 
 	"github.com/sijms/go-ora/v3/converters"
+	"github.com/sijms/go-ora/v3/parameter_coder"
 	oraTypes "github.com/sijms/go-ora/v3/types"
 )
 
@@ -631,7 +630,7 @@ import (
 
 func (par *ParameterInfo) init() {
 	par.SetDefault()
-	par.MaxNoOfArrayElements = 0
+	par.Flag = 0
 	par.iPrimValue = nil
 	par.oPrimValue = nil
 }
@@ -639,6 +638,7 @@ func (par *ParameterInfo) init() {
 func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error {
 	par.init()
 	var err error
+	par.MaxLen = size
 	if par.Value == nil {
 		par.Value = sql.NullString{}
 	}
@@ -648,57 +648,109 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 		return err
 	}
 
-	if coder, ok := connection.goTypeCoder[tempType]; ok {
-		par.encoder = coder.Copy()
-		err = par.encoder.Encode(tempValue, connection)
+	if value, ok := tempValue.(oraTypes.Object); ok {
+		par.encoder, err = connection.GetParameterCoder(value.Name)
 		if err != nil {
 			return err
 		}
-		par.SetParameterInfo(par.encoder.GetParameterInfo())
-		if par.MaxLen < size {
-			par.MaxLen = size
+		par.Value = value.Value
+		tempValue, err = getValue(par.Value)
+		if err != nil {
+			return err
 		}
 	} else {
-		// here code for object should be added
-		switch tempType.Kind() {
-		case reflect.Array, reflect.Slice:
-			var inVal driver.Value = nil
-			rValue := reflect.ValueOf(tempValue)
-			size := rValue.Len()
-			if size > 0 && rValue.Index(0).CanInterface() {
-				inVal, err = getValue(rValue.Index(0).Interface())
+		if par.encoder, err = connection.GetParameterCoder(tempType); err == nil {
+		} else {
+			connection.tracer.Printf("Error get parameter encoder for type %v: %v", tempType, err)
+			if reflect.TypeOf(tempValue) != nil && tempType != reflect.TypeOf(tempValue) {
+				par.encoder, err = connection.GetParameterCoder(reflect.TypeOf(tempValue))
 				if err != nil {
+					connection.tracer.Printf("Error get parameter encoder for type %v: %v", reflect.TypeOf(tempValue), err)
+				}
+			}
+			if par.encoder == nil {
+				if tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice {
+					// get array item and ensure it is registered in parameter coders
+					itemType := tempType.Elem()
+					if itemType != nil {
+						for itemType.Kind() == reflect.Ptr {
+							itemType = itemType.Elem()
+						}
+					}
+					tempCoder, err := connection.GetParameterCoder(itemType)
+					if err != nil {
+						return err
+					}
+					tempCoder.Init()
+					// if item is of type xml so search for slice of item in the registered parameter coders
+					if tempCoder.GetParameterInfo().DataType == oraTypes.XMLType {
+						par.encoder, err = connection.GetParameterCoder(reflect.SliceOf(itemType))
+					} else {
+						// if max length > 1 (mean it is set with size) so transfer size to array size
+						if par.MaxLen > 1 {
+							par.ArraySize = int(par.MaxLen)
+							par.MaxLen = 1
+						}
+						// if item is not xml type go for arrays
+						par.encoder = &parameter_coder.ArrayParameter{}
+					}
+				} else {
 					return err
 				}
 			}
-			tempType = getType(inVal)
-			tempValue, err = getValue(inVal)
-			if err != nil {
-				return err
-			}
-			if coder, ok = connection.goTypeCoder[tempType]; ok {
-				par.encoder = coder.Copy()
-				err = par.encoder.Encode(tempValue, connection)
-				if err != nil {
-					return err
-				}
-				par.SetParameterInfo(par.encoder.GetParameterInfo())
-				if par.MaxLen < int64(size) {
-					par.MaxLen = int64(size)
-				}
-				if par.DataType != oraTypes.XMLType {
-					par.Flag = 0x43
-				}
-				par.ArraySize = 1
-			} else {
-				// return err
-			}
-
-			return nil
-		default:
-			return fmt.Errorf("no encoder register for data type: %T", par.Value)
 		}
 	}
+	par.encoder.SetParameterInfo(par.GetParameterInfo())
+	err = par.encoder.Encode(tempValue, connection)
+	if err != nil {
+		return err
+	}
+	par.SetParameterInfo(par.encoder.GetParameterInfo())
+	if par.MaxLen < size {
+		par.MaxLen = size
+	}
+
+	//else {
+	//
+	//	switch tempType.Kind() {
+	//	case reflect.Array, reflect.Slice:
+	//		var inVal driver.Value = nil
+	//		rValue := reflect.ValueOf(tempValue)
+	//		size := rValue.Len()
+	//		if size > 0 && rValue.Index(0).CanInterface() {
+	//			inVal, err = getValue(rValue.Index(0).Interface())
+	//			if err != nil {
+	//				return err
+	//			}
+	//		}
+	//		tempType = getType(inVal)
+	//		tempValue, err = getValue(inVal)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		if coder, ok = connection.goTypeCoder[tempType]; ok {
+	//			par.encoder = coder.Copy()
+	//			err = par.encoder.Encode(tempValue, connection)
+	//			if err != nil {
+	//				return err
+	//			}
+	//			par.SetParameterInfo(par.encoder.GetParameterInfo())
+	//			if par.MaxLen < int64(size) {
+	//				par.MaxLen = int64(size)
+	//			}
+	//			if par.DataType != oraTypes.XMLType {
+	//				par.Flag = 0x43
+	//			}
+	//			par.ArraySize = 1
+	//		} else {
+	//			// return err
+	//		}
+	//
+	//		return nil
+	//	default:
+	//		return fmt.Errorf("no encoder register for data type: %T", par.Value)
+	//	}
+	//}
 
 	//if par.encoder != nil {
 	//	err = par.encoder.Encode(connection, nil)
@@ -716,12 +768,20 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	if par.DataType == oraTypes.OCIFileLocator {
 		par.MaxLen = int64(size)
 		if par.MaxLen == 0 {
-			par.MaxLen = 4000
+			par.MaxLen = oraTypes.MaxLenBFile
 		}
 	}
 	if par.Direction == Output && !(par.DataType == oraTypes.XMLType) {
 		par.BValue = nil
 	}
+	//if par.MaxLen < int64(size) {
+	//	par.MaxLen = int64(size)
+	//}
+	//if par.DataType == oraTypes.NCHAR {
+	//	if par.MaxCharLen < int64(size) {
+	//		par.MaxCharLen = int64(size)
+	//	}
+	//}
 	return nil
 
 	//if par.MaxNoOfArrayElements > 0 && par.MaxNoOfArrayElements < int(size) {
@@ -769,15 +829,15 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	if par.Direction == Output && !(par.DataType == oraTypes.XMLType) {
 		par.BValue = nil
 		// fix max size for each array item (non-xml arrays)
-		if par.MaxNoOfArrayElements > 0 {
-			switch par.DataType {
-			case oraTypes.NCHAR:
-				par.MaxLen = connection.maxLen.varchar
-				par.MaxCharLen = connection.maxLen.varchar
-			case oraTypes.RAW:
-				par.MaxLen = connection.maxLen.raw
-			}
-		}
+		//if par.MaxNoOfArrayElements > 0 {
+		//	switch par.DataType {
+		//	case oraTypes.NCHAR:
+		//		par.MaxLen = connection.maxLen.varchar
+		//		par.MaxCharLen = connection.maxLen.varchar
+		//	case oraTypes.RAW:
+		//		par.MaxLen = connection.maxLen.raw
+		//	}
+		//}
 	}
 	return nil
 }

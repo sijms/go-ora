@@ -1,7 +1,6 @@
 package parameter_coder
 
 import (
-	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
 
@@ -16,10 +15,18 @@ func (param *ClobParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *ClobParameter) Encode(input interface{}, conn IConnection) (err error) {
+func (param *ClobParameter) Init() {
 	param.SetDefault()
 	param.DataType = types.OCIClobLocator
-	param.CharsetForm = 1
+	if param.CharsetForm == 0 {
+		param.CharsetForm = 1
+	}
+
+}
+
+func (param *ClobParameter) Encode(input interface{}, conn IConnection) (err error) {
+	param.Init()
+
 	switch input := input.(type) {
 	case types.String:
 		if input.UseNCharset {
@@ -45,12 +52,15 @@ func (param *ClobParameter) Encode(input interface{}, conn IConnection) (err err
 	}
 	param.CharsetID = encoder.Conv.GetLangID()
 	encoder.SetDataType(param.DataType)
-	err = 	encoder.SetValue(input)
+	err = encoder.SetValue(input)
+	if err != nil {
+		return
+	}
 	if dt := encoder.GetDataType(); dt != 0 {
 		param.DataType = dt
 	}
-	if err != nil {
-		return
+	if param.MaxLen < encoder.GetMaxLen() {
+		param.MaxLen = encoder.GetMaxLen()
 	}
 	if !encoder.IsDataUploaded() && len(encoder.Bytes()) > 0 {
 		encoder.SetStreamer(conn.NewLobStreamer())
@@ -109,8 +119,4 @@ func (param *ClobParameter) Decode(conn IConnection) (interface{}, error) {
 		decoder.Conv, err = conn.GetStringCoder(param.CharsetID, param.CharsetForm)
 	}
 	return decoder, err
-}
-
-func (param *ClobParameter) Read(session network.SessionReader) error {
-	return param.read(session)
 }

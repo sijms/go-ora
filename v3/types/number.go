@@ -10,14 +10,22 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-
-	"github.com/sijms/go-ora/v3/utils"
 )
 
 type Number struct {
 	Basic
 }
 
+func (number *Number) GetMaxLen() int64 {
+	switch number.dataType {
+	case IBFLOAT:
+		return MaxLenBFloat
+	case BDOUBLE:
+		return MaxLenBDouble
+	default:
+		return MaxLenNumber
+	}
+}
 func (number *Number) isZero() bool {
 	return len(number.bValue) > 0 && number.bValue[0] == 0x80
 }
@@ -428,25 +436,25 @@ func NewNumber(n interface{}) (*Number, error) {
 //}
 
 func (number *Number) decodeDouble() (float64, error) {
-	if len(number.bValue) < 8 {
+	if len(number.bValue) < int(MaxLenBDouble) {
 		return 0, fmt.Errorf("error decoding binary double, supplied buffer length: %d and required length: %d", len(number.bValue), 8)
 	}
 	if number.bValue[0]&128 != 0 {
 		number.bValue[0] = number.bValue[0] & 127
 	} else {
-		xorBuffer(number.bValue, 8)
+		xorBuffer(number.bValue, int(MaxLenBDouble))
 	}
 	return math.Float64frombits(binary.BigEndian.Uint64(number.bValue)), nil
 }
 
 func (number *Number) decodeFloat() (float32, error) {
-	if len(number.bValue) < 4 {
+	if len(number.bValue) < int(MaxLenBFloat) {
 		return 0, fmt.Errorf("error decoding binary float, supplied buffer length: %d and required length: %d", len(number.bValue), 4)
 	}
 	if number.bValue[0]&128 != 0 {
 		number.bValue[0] = number.bValue[0] & 127
 	} else {
-		xorBuffer(number.bValue, 4)
+		xorBuffer(number.bValue, int(MaxLenBFloat))
 	}
 	return math.Float32frombits(binary.BigEndian.Uint32(number.bValue)), nil
 }
@@ -490,7 +498,7 @@ func (number *Number) encodeUint(input uint64) error {
 	return err
 }
 func (number *Number) encodeFloat64(input float64) error {
-	number.bValue = make([]byte, 8)
+	number.bValue = make([]byte, MaxLenBDouble)
 	temp := math.Float64bits(input)
 	binary.BigEndian.PutUint64(number.bValue, temp)
 	if input > 0 {
@@ -498,10 +506,11 @@ func (number *Number) encodeFloat64(input float64) error {
 	} else {
 		xorBuffer(number.bValue, 8)
 	}
+	number.dataType = IBDOUBLE
 	return nil
 }
 func (number *Number) encodeFloat32(input float32) error {
-	number.bValue = make([]byte, 4)
+	number.bValue = make([]byte, MaxLenBFloat)
 	temp := math.Float32bits(input)
 	binary.BigEndian.PutUint32(number.bValue, temp)
 	if input > 0 {
@@ -509,6 +518,7 @@ func (number *Number) encodeFloat32(input float32) error {
 	} else {
 		xorBuffer(number.bValue, 4)
 	}
+	number.dataType = IBFLOAT
 	return nil
 }
 func (number *Number) encodeFloat(input float64) error {
@@ -571,20 +581,23 @@ func (number *Number) encodeString(input string) error {
 }
 func (number *Number) SetValue(input interface{}) error {
 	var err error
-	input, err = utils.GetValue(input)
-	if err != nil {
-		return err
-	}
+	defer func(input *Number) {
+		if input.dataType == 0 {
+			input.dataType = NUMBER
+		}
+	}(number)
 	if input == nil {
 		number.bValue = nil
 		return nil
 	}
 	rType := reflect.TypeOf(input)
 	rValue := reflect.ValueOf(input)
-
 	if rType == TyNumber {
 		if num, ok := input.(Number); ok {
-			number.bValue = num.bValue
+			*number = num
+			if number.dataType == 0 {
+				number.dataType = NUMBER
+			}
 		} else {
 			return fmt.Errorf("conversion of unsupported type %T to number", input)
 		}
@@ -650,6 +663,7 @@ func (number *Number) SetValue(input interface{}) error {
 	default:
 		return fmt.Errorf("conversion of unsupported type %T to number", input)
 	}
+
 	switch temp := tempValue.(type) {
 	case int64:
 		switch number.dataType {

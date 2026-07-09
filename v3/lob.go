@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"go/types"
 
 	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/converters"
@@ -12,24 +11,24 @@ import (
 	ora_types "github.com/sijms/go-ora/v3/types"
 )
 
-type Clob struct {
-	locator []byte
-	String  string
-	Valid   bool
-}
+//type Clob struct {
+//	locator []byte
+//	String  string
+//	Valid   bool
+//}
 
-type NClob Clob
+//type NClob Clob
 
 //type lobInterface interface {
 //	getLocator() []byte
 //}
 
-type Blob struct {
-	locator []byte
-	Data    []byte
-	// deprecated
-	Valid bool
-}
+//type Blob struct {
+//	locator []byte
+//	Data    []byte
+//	// deprecated
+//	Valid bool
+//}
 
 var errEmptyLocator = errors.New("call lob operation on an empty locator")
 
@@ -544,7 +543,7 @@ func (lob *LobStream) read() error {
 				return err
 			}
 		default:
-			err = lob.conn.processTCCResponse(msg)
+			err = lob.conn.ProcessTCCResponse(msg)
 			if err != nil {
 				return err
 			}
@@ -611,93 +610,93 @@ func (lob *LobStream) copy(srcLocator, dstLocator []byte, srcOffset, dstOffset, 
 	return processReset(err, lob.conn)
 }
 
-func (val *Clob) Scan(value interface{}) error {
-	val.Valid = true
-	if value == nil {
-		val.Valid = false
-		val.String = ""
-		return nil
-	}
-	switch temp := value.(type) {
-	case Clob:
-		*val = temp
-	case *Clob:
-		*val = *temp
-	case NClob:
-		*val = Clob(temp)
-	case *NClob:
-		*val = Clob(*temp)
-	case string:
-		val.String = temp
-	case types.Nil:
-		val.String = ""
-		val.Valid = false
-	default:
-		return errors.New("go-ora: Clob column type require Clob or string values")
-	}
-	return nil
-}
+//func (val *Clob) Scan(value interface{}) error {
+//	val.Valid = true
+//	if value == nil {
+//		val.Valid = false
+//		val.String = ""
+//		return nil
+//	}
+//	switch temp := value.(type) {
+//	case Clob:
+//		*val = temp
+//	case *Clob:
+//		*val = *temp
+//	case NClob:
+//		*val = Clob(temp)
+//	case *NClob:
+//		*val = Clob(*temp)
+//	case string:
+//		val.String = temp
+//	case types.Nil:
+//		val.String = ""
+//		val.Valid = false
+//	default:
+//		return errors.New("go-ora: Clob column type require Clob or string values")
+//	}
+//	return nil
+//}
 
-func (val *Blob) Scan(value interface{}) error {
-	// val.Valid = true
-	if value == nil {
-		// val.Valid = false
-		val.Data = nil
-		return nil
-	}
-	switch temp := value.(type) {
-	case Blob:
-		*val = temp
-	case *Blob:
-		*val = *temp
-	case []byte:
-		val.Data = temp
-	case types.Nil:
-		val.Data = nil
-	default:
-		return errors.New("go-ora: Blob column type require Blob or []byte values")
-	}
-	return nil
-}
+//func (val *Blob) Scan(value interface{}) error {
+//	// val.Valid = true
+//	if value == nil {
+//		// val.Valid = false
+//		val.Data = nil
+//		return nil
+//	}
+//	switch temp := value.(type) {
+//	case Blob:
+//		*val = temp
+//	case *Blob:
+//		*val = *temp
+//	case []byte:
+//		val.Data = temp
+//	case types.Nil:
+//		val.Data = nil
+//	default:
+//		return errors.New("go-ora: Blob column type require Blob or []byte values")
+//	}
+//	return nil
+//}
 
-func (val *NClob) Scan(value interface{}) error {
-	val.Valid = true
-	if value == nil {
-		val.Valid = false
-		val.String = ""
-		return nil
-	}
-	switch temp := value.(type) {
-	case Clob:
-		*val = NClob(temp)
-	case *Clob:
-		*val = NClob(*temp)
-	case NClob:
-		*val = temp
-	case *NClob:
-		*val = *temp
-	case string:
-		val.String = temp
-	case types.Nil:
-		val.String = ""
-		val.Valid = false
-	default:
-		return errors.New("go-ora: Clob column type require Clob or string values")
-	}
-	return nil
-}
-
-func (val Blob) getLocator() []byte {
-	return val.locator
-}
-
-func (val Clob) getLocator() []byte {
-	return val.locator
-}
-
-func (val NClob) getLocator() []byte {
-	return val.locator
-}
+//func (val *NClob) Scan(value interface{}) error {
+//	val.Valid = true
+//	if value == nil {
+//		val.Valid = false
+//		val.String = ""
+//		return nil
+//	}
+//	switch temp := value.(type) {
+//	case Clob:
+//		*val = NClob(temp)
+//	case *Clob:
+//		*val = NClob(*temp)
+//	case NClob:
+//		*val = temp
+//	case *NClob:
+//		*val = *temp
+//	case string:
+//		val.String = temp
+//	case types.Nil:
+//		val.String = ""
+//		val.Valid = false
+//	default:
+//		return errors.New("go-ora: Clob column type require Clob or string values")
+//	}
+//	return nil
+//}
+//
+//func (val Blob) getLocator() []byte {
+//	return val.locator
+//}
+//
+//func (val Clob) getLocator() []byte {
+//	return val.locator
+//}
+//
+//func (val NClob) getLocator() []byte {
+//	return val.locator
+//}
 
 //func (val Clob) Value() (driver.Value, error) {
 //	if val.Valid {

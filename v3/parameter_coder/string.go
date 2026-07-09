@@ -3,6 +3,7 @@ package parameter_coder
 import (
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
+	"github.com/sijms/go-ora/v3/utils"
 )
 
 type StringParameter struct {
@@ -15,12 +16,17 @@ func (param *StringParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *StringParameter) Encode(input interface{}, conn IConnection) error {
+func (param *StringParameter) Init() {
 	param.SetDefault()
+	param.DataType = types.NCHAR
 	param.ContFlag = 0x10
 	if param.CharsetForm == 0 {
 		param.CharsetForm = 1
 	}
+}
+
+func (param *StringParameter) Encode(input interface{}, conn IConnection) error {
+	param.Init()
 	switch temp := input.(type) {
 	case types.String:
 		if temp.UseNCharset {
@@ -50,16 +56,18 @@ func (param *StringParameter) Encode(input interface{}, conn IConnection) error 
 		param.DataType = dt
 	}
 	param.BValue = encoder.Bytes()
-	param.MaxLen = int64(len(param.BValue))
-	param.MaxCharLen = int64(len(param.BValue))
-	maxLen := conn.GetMaxStringLength()
-	if param.MaxLen > maxLen {
+	length := int64(len(param.BValue))
+	length = utils.Max(length, param.MaxLen, param.MaxCharLen)
+	param.MaxLen = length
+	param.MaxCharLen = length
+	length = conn.GetMaxStringLength()
+	if param.MaxLen > length {
 		param.DataType = types.LongVarChar
 	} else {
 		param.DataType = types.NCHAR
 	}
-	if param.MaxLen == 0 {
-		param.MaxLen = 1
+	if param.MaxLen < encoder.GetMaxLen() {
+		param.MaxLen = encoder.GetMaxLen()
 	}
 	return nil
 }
@@ -78,11 +86,6 @@ func (param *StringParameter) Decode(conn IConnection) (interface{}, error) {
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)
 	return decoder.Value()
-}
-
-func (param *StringParameter) Write(session network.SessionWriter) error {
-	session.PutClr(param.BValue)
-	return nil
 }
 
 func (param *StringParameter) Read(session network.SessionReader) error {

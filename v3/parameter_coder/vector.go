@@ -16,9 +16,13 @@ func (param *VectorParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *VectorParameter) Encode(input interface{}, _ IConnection) error {
+func (param *VectorParameter) Init() {
 	param.SetDefault()
 	param.DataType = types.VECTOR
+}
+
+func (param *VectorParameter) Encode(input interface{}, _ IConnection) error {
+	param.Init()
 	encoder := &types.Vector{}
 	encoder.SetDataType(param.DataType)
 	err := encoder.SetValue(input)
@@ -27,6 +31,9 @@ func (param *VectorParameter) Encode(input interface{}, _ IConnection) error {
 	}
 	if dt := encoder.GetDataType(); dt != 0 {
 		param.DataType = dt
+	}
+	if param.MaxLen < encoder.GetMaxLen() {
+		param.MaxLen = encoder.GetMaxLen()
 	}
 	param.BValue = encoder.Bytes()
 	param.locator = encoder.GetLocator()
@@ -50,8 +57,4 @@ func (param *VectorParameter) Write(session network.SessionWriter) error {
 		session.PutClr(param.locator)
 	}
 	return nil
-}
-
-func (param *VectorParameter) Read(session network.SessionReader) error {
-	return param.read(session)
 }

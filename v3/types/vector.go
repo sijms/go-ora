@@ -553,14 +553,14 @@ func (vector *Vector) Scan(input interface{}) error {
 }
 func (vector *Vector) CopyTo(dest driver.Value) error {
 	val, err := vector.Value()
+	//switch value := val.(type) {
+	//case nil:
+	//case []uint8:
+	//case []float32:
+	//case []float64:
+	//}
 	if err != nil {
 		return err
-	}
-	switch dst := dest.(type) {
-
-	case *[]byte:
-		*dst = vector.bValue
-		return nil
 	}
 	switch dst := dest.(type) {
 	case *Vector:
@@ -575,7 +575,6 @@ func (vector *Vector) CopyTo(dest driver.Value) error {
 			*dst = v
 			return nil
 		}
-
 	case *[]float32:
 		if val == nil {
 			*dst = nil

@@ -52,7 +52,7 @@ const (
 	IntervalDS                uint16 = 190
 	UROWID                    uint16 = 208
 	TimeStampLTZ_DTY          uint16 = 231
-	TimeStampeLTZ             uint16 = 232
+	TimeStampLTZ              uint16 = 232
 	BOOLEAN                   uint16 = 0xFC
 )
 

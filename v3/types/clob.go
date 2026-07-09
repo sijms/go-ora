@@ -246,8 +246,9 @@ func (clob *Clob) CopyTo(dest driver.Value) error {
 	case *string:
 		if temp == nil {
 			*dst = ""
+		} else {
+			*dst = temp.(string)
 		}
-		*dst = temp.(string)
 	case *sql.NullString:
 		if temp == nil {
 			dst.Valid = false

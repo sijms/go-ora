@@ -21,7 +21,7 @@ func (loc Locator) IsValueBased() bool {
 	return len(loc) > 4 && loc[4]&0x20 == 0x20
 }
 func (loc Locator) IsTemporary() bool {
-	return len(loc) > 7 && loc[7]&1 == 1 || loc[4]&0x40 == 0x40 || loc.IsValueBased()
+	return len(loc) > 7 && loc[7]&1 == 1 || len(loc) > 4 && loc[4]&0x40 == 0x40 || loc.IsValueBased()
 }
 func (loc Locator) IsVarWidthChar() bool {
 	return len(loc) > 6 && loc[6]&0x80 == 0x80

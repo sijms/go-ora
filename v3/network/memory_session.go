@@ -32,12 +32,8 @@ func (ms *MemorySession) read(length int) ([]byte, error) {
 	}
 	return output, nil
 }
-func (ms *MemorySession) Write(reset bool) []byte {
-	output := ms.outBuffer.Bytes()
-	if reset {
-		ms.outBuffer.Reset()
-	}
-	return output
+func (ms *MemorySession) Write() error {
+	return nil
 }
 func (ms *MemorySession) ResetBuffer() {
 	ms.inBuffer.Reset()

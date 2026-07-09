@@ -1,7 +1,6 @@
 package parameter_coder
 
 import (
-	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
 
@@ -14,17 +13,23 @@ func (param *BlobParameter) Copy() OracleParameterCoder {
 	*ret = *param
 	return ret
 }
-func (param *BlobParameter) Encode(input interface{}, conn IConnection) (err error) {
+func (param *BlobParameter) Init() {
 	param.SetDefault()
 	param.DataType = types.OCIBlobLocator
+}
+func (param *BlobParameter) Encode(input interface{}, conn IConnection) (err error) {
+	param.Init()
 	encoder := &types.Blob{}
 	encoder.SetDataType(param.DataType)
 	err = encoder.SetValue(input)
+	if err != nil {
+		return
+	}
 	if dt := encoder.GetDataType(); dt != 0 {
 		param.DataType = dt
 	}
-	if err != nil {
-		return
+	if param.MaxLen < encoder.GetMaxLen() {
+		param.MaxLen = encoder.GetMaxLen()
 	}
 	if !encoder.IsDataUploaded() && len(encoder.Bytes()) > 0 {
 		encoder.SetStreamer(conn.NewLobStreamer())
@@ -41,8 +46,4 @@ func (param *BlobParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)
 	return decoder, nil
-}
-
-func (param *BlobParameter) Read(session network.SessionReader) error {
-	return param.read(session)
 }

@@ -22,3 +22,5 @@ func (b *Basic) SetDataType(dt uint16) {
 func (b *Basic) GetDataType() uint16 {
 	return b.dataType
 }
+
+func (b *Basic) GetMaxLen() int64 { return 1 }

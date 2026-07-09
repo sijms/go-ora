@@ -18,12 +18,11 @@ import (
 	"time"
 
 	"github.com/sijms/go-ora/v3/aq"
+	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/lazy_init"
 	"github.com/sijms/go-ora/v3/parameter_coder"
-	"github.com/sijms/go-ora/v3/types"
-
-	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/trace"
+	"github.com/sijms/go-ora/v3/types"
 
 	"github.com/sijms/go-ora/v3/advanced_nego"
 	"github.com/sijms/go-ora/v3/converters"
@@ -115,7 +114,7 @@ type Connection struct {
 	oracleTypeCoder   map[uint16]parameter_coder.OracleParameterCoder
 	nameTypeCoder     map[string]parameter_coder.OracleParameterCoder
 	//typeDecoder       map[uint16]type_coder.OracleTypeDecoder
-	cusTyp map[string]Object
+	cusTyp map[string]types.Object
 	maxLen struct {
 		varchar   int64
 		nvarchar  int64
@@ -132,7 +131,7 @@ type Connection struct {
 }
 
 type ConnectionProperties struct {
-	cusTyp map[string]Object
+	cusTyp map[string]types.Object
 	maxLen struct {
 		varchar   int
 		nvarchar  int
@@ -401,7 +400,12 @@ func (conn *Connection) GetMaxStringLength() int64 {
 	}
 	return conn.maxLen.varchar
 }
-
+func (conn *Connection) GetMaxRawLength() int64 {
+	if conn.maxLen.raw == 0 {
+		return 0x7FFF
+	}
+	return conn.maxLen.raw
+}
 func (conn *Connection) getDefaultCharsetID() int {
 
 	//if conn.cStrConv != nil {
@@ -495,7 +499,7 @@ func (conn *Connection) read() error {
 		if err != nil {
 			return err
 		}
-		err = conn.processTCCResponse(msg)
+		err = conn.ProcessTCCResponse(msg)
 		if err != nil {
 			return err
 		}
@@ -740,7 +744,7 @@ func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) 
 		cStrConv:        converters.NewStringConverter(config.CharsetID),
 		autoCommit:      true,
 		oracleTypeCoder: nil,
-		cusTyp:          map[string]Object{},
+		cusTyp:          map[string]types.Object{},
 		maxLen: struct {
 			varchar   int64
 			nvarchar  int64
@@ -888,7 +892,7 @@ func (conn *Connection) doAuth() error {
 		//	this.ProcessImplicitResultSet(ref implicitRSList);
 		//	continue;
 		default:
-			err = conn.processTCCResponse(msg)
+			err = conn.ProcessTCCResponse(msg)
 			if err != nil {
 				return err
 			}
@@ -1398,15 +1402,19 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 		udtName := args[2].Value.(string)
 		var toid []byte = nil
 		if len(udtName) > 0 {
-			cust, ok := conn.cusTyp[strings.ToUpper(udtName)]
-			if ok {
-				toid = cust.toid
-			} else {
-				return nil, fmt.Errorf("unregister user define type: %s", udtName)
+			coder, err := conn.GetParameterCoder(udtName)
+			if err != nil {
+				return nil, err
 			}
+			toid = coder.GetParameterInfo().ToID
+			//cust, ok := conn.cusTyp[strings.ToUpper(udtName)]
+			//if ok {
+			//	toid = cust.toid
+			//} else {
+			//	return nil, fmt.Errorf("unregister user define type: %s", udtName)
+			//}
 		}
-		holder := aq.NewQueueHolder(conn.session, name, messageType, udtName, toid,
-			conn.processTCCResponse, conn.encodeData, conn.decodeData)
+		holder := aq.NewQueueHolder(conn, name, messageType, udtName, toid)
 		return holder, nil
 	}
 	stmt := NewStmt(query, conn)
@@ -1440,7 +1448,7 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 	return NewStmt(query, conn), nil
 }
 
-func (conn *Connection) processTCCResponse(msgCode uint8) error {
+func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 	session := conn.session
 	tracer := conn.tracer
 	var err error
@@ -1686,4 +1694,44 @@ func (conn *Connection) GetSession() network.SessionReadWriter {
 
 func (conn *Connection) NewLobStreamer() types.LobStreamer {
 	return &LobStream{conn: conn}
+}
+
+func (conn *Connection) GetParameterCoder(input interface{}) (parameter_coder.OracleParameterCoder, error) {
+	switch input := input.(type) {
+	case reflect.Type:
+		if coder, ok := conn.goTypeCoder[input]; ok {
+			return coder.Copy(), nil
+		}
+
+		return nil, fmt.Errorf("no parameter coder registered for go type %s", input.String())
+	case string:
+		if coder, ok := conn.nameTypeCoder[strings.ToUpper(input)]; ok {
+			return coder.Copy(), nil
+		}
+		return nil, fmt.Errorf("no parameter coder registered for name %s", input)
+	case int, int16, int32, int64:
+		index := reflect.ValueOf(input).Int()
+		if coder, ok := conn.oracleTypeCoder[uint16(index)]; ok {
+			return coder.Copy(), nil
+		}
+
+		return nil, fmt.Errorf("no parameter coder registered for oracle type %d", index)
+	case uint, uint16, uint32, uint64:
+		index := reflect.ValueOf(input).Uint()
+		if coder, ok := conn.oracleTypeCoder[uint16(index)]; ok {
+			return coder.Copy(), nil
+		}
+
+		return nil, fmt.Errorf("no parameter coder registered for oracle type %d", index)
+	default:
+		return nil, fmt.Errorf("accepted values for GetParameterCoder: reflec.Type, int/uint or string")
+	}
+}
+
+func (conn *Connection) SendTimeZoneAsUTC() bool {
+	return !(conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion)
+}
+
+func (conn *Connection) TTCVersion() uint8 {
+	return conn.session.TTCVersion
 }

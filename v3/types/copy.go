@@ -71,28 +71,25 @@ func defaultCopy(dest reflect.Value, src any) error {
 		return nil
 	}
 
-	return fmt.Errorf("can't copy value of type %T into type %v", src, dest.Type().Name())
+	return fmt.Errorf("can't copy value of type %T into type %v", src, dest.Type().String())
 
 }
 
 func RCopy(dest reflect.Value, src any) (err error) {
-	if src == nil {
-		return setNil(dest)
-	}
 	if dest.Kind() == reflect.Ptr {
 		if dest.IsNil() {
 			dest.Set(reflect.New(dest.Type().Elem()))
 		}
 		return RCopy(dest.Elem(), src)
 	}
-	//if dest.Kind() == reflect.Ptr && dest.Elem().Kind() == reflect.Interface {
-	//	dest.Elem().Set(reflect.ValueOf(src))
-	//	return
-	//}
+	if src == nil {
+		return setNil(dest)
+	}
 	if dest.Kind() == reflect.Interface {
 		dest.Set(reflect.ValueOf(src))
 		return
 	}
+
 	switch src := src.(type) {
 	case string:
 		err = copyString(dest, src)
@@ -100,13 +97,16 @@ func RCopy(dest reflect.Value, src any) (err error) {
 		err = copyTime(dest, src)
 	case []byte:
 		err = copyBytes(dest, src)
+	case []interface{}:
+		err = copyArray(dest, src)
 	default:
 		err = defaultCopy(dest, src)
 	}
 	return err
 }
 func Copy(dest, src any) error {
-	return RCopy(reflect.ValueOf(dest), src)
+	temp := reflect.ValueOf(dest)
+	return RCopy(temp, src)
 	//var dstValue reflect.Value
 	//var dstType reflect.Type
 	//if dst == nil {

@@ -15,9 +15,13 @@ func (param *BoolParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *BoolParameter) Encode(input interface{}, _ IConnection) error {
+func (param *BoolParameter) Init() {
 	param.SetDefault()
 	param.DataType = types.BOOLEAN
+}
+
+func (param *BoolParameter) Encode(input interface{}, _ IConnection) error {
+	param.Init()
 	encoder := &types.Bool{}
 	encoder.SetDataType(param.DataType)
 	err := encoder.SetValue(input)
@@ -26,6 +30,9 @@ func (param *BoolParameter) Encode(input interface{}, _ IConnection) error {
 	}
 	if dt := encoder.GetDataType(); dt != 0 {
 		param.DataType = dt
+	}
+	if param.MaxLen < encoder.GetMaxLen() {
+		param.MaxLen = encoder.GetMaxLen()
 	}
 	param.BValue = encoder.Bytes()
 	return nil
@@ -36,11 +43,6 @@ func (param *BoolParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)
 	return decoder.Value()
-}
-
-func (param *BoolParameter) Write(session network.SessionWriter) error {
-	session.PutClr(param.BValue)
-	return nil
 }
 
 func (param *BoolParameter) Read(session network.SessionReader) error {

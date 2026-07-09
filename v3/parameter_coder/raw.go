@@ -15,8 +15,13 @@ func (param *RawParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *RawParameter) Encode(input interface{}, conn IConnection) error {
+func (param *RawParameter) Init() {
 	param.SetDefault()
+	param.DataType = types.RAW
+}
+
+func (param *RawParameter) Encode(input interface{}, conn IConnection) error {
+	param.Init()
 	encoder := types.Raw{}
 	encoder.SetDataType(param.DataType)
 	err := encoder.SetValue(input)
@@ -35,6 +40,9 @@ func (param *RawParameter) Encode(input interface{}, conn IConnection) error {
 	} else {
 		param.DataType = types.LongRaw
 	}
+	if param.MaxLen < encoder.GetMaxLen() {
+		param.MaxLen = encoder.GetMaxLen()
+	}
 	return nil
 }
 
@@ -43,11 +51,6 @@ func (param *RawParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)
 	return decoder.Value()
-}
-
-func (param *RawParameter) Write(session network.SessionWriter) error {
-	session.PutClr(param.BValue)
-	return nil
 }
 
 func (param *RawParameter) Read(session network.SessionReader) error {

@@ -18,13 +18,20 @@ func (param *RowIDParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *RowIDParameter) Encode(input interface{}, _ IConnection) error {
+func (param *RowIDParameter) Init() {
 	param.SetDefault()
+}
+
+func (param *RowIDParameter) Encode(input interface{}, _ IConnection) error {
+	param.Init()
 	coder := &types.RowID{}
 	coder.SetDataType(param.DataType)
 	err := coder.SetValue(input)
 	if dt := coder.GetDataType(); dt != 0 {
 		param.DataType = dt
+	}
+	if param.MaxLen < coder.GetMaxLen() {
+		param.MaxLen = coder.GetMaxLen()
 	}
 	return err
 }

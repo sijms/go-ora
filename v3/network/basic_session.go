@@ -16,7 +16,9 @@ type basicSession struct {
 	inBuffer  *bytes.Buffer
 	outBuffer *bytes.Buffer
 	SessionProperties
-	terminal TerminalReader
+	terminal   TerminalReader
+	TTCVersion uint8
+	ttcIndex   uint8
 }
 
 // GetByte read one uint8 from input buffer
@@ -454,4 +456,25 @@ func (session *basicSession) PutKeyVal(key []byte, val []byte, num uint8) {
 // PutKeyValString write key, val (in form of string) and flag number to output buffer
 func (session *basicSession) PutKeyValString(key string, val string, num uint8) {
 	session.PutKeyVal([]byte(key), []byte(val), num)
+}
+
+func (session *basicSession) GetWriteBuffer() []byte {
+	return session.outBuffer.Bytes()
+}
+
+// PutTTCFunc write bytes that represent ttc function with specific code
+func (session *basicSession) PutTTCFunc(ttcCode, funcCode uint8) {
+	if session.ttcIndex == 0 || session.ttcIndex == 255 {
+		session.ttcIndex = 1
+	}
+	if session.TTCVersion >= 18 {
+		session.PutBytes(ttcCode, funcCode, session.ttcIndex, 0)
+	} else {
+		session.PutBytes(ttcCode, funcCode, session.ttcIndex)
+	}
+	session.ttcIndex++
+}
+
+func (session *basicSession) Write() error {
+	return nil
 }

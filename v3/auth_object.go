@@ -123,7 +123,7 @@ func newAuthObject(conn *Connection) (*AuthObject, error) {
 		//		return nil, err
 		//	}
 		default:
-			err = conn.processTCCResponse(messageCode)
+			err = conn.ProcessTCCResponse(messageCode)
 			if err != nil {
 				return nil, err
 			}

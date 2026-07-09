@@ -2,22 +2,26 @@ package aq
 
 import (
 	"errors"
+	"fmt"
 	"time"
-	//go_ora "github.com/sijms/go-ora/v3"
+
 	"github.com/sijms/go-ora/v3/network"
+	"github.com/sijms/go-ora/v3/parameter_coder"
+	"github.com/sijms/go-ora/v3/types"
 )
 
 type Queue struct {
-	Name               string
-	version            int
-	session            *network.Session
-	messageType        MessageType
-	udtName            string
-	toid               []byte
-	AutoCommit         bool
-	processTTCResponse func(msgCode uint8) error
-	encodeData         func(data interface{}) ([]byte, error)
-	decodeData         func(data []byte, messageType MessageType, udtName string) (interface{}, error)
+	Name    string
+	version int
+	conn    IConnection
+	//session            *network.Session
+	messageType MessageType
+	udtName     string
+	toid        []byte
+	AutoCommit  bool
+	//processTTCResponse func(msgCode uint8) error
+	//encodeData         func(data interface{}) ([]byte, error)
+	//decodeData         func(data []byte, messageType MessageType, udtName string) (interface{}, error)
 }
 
 //func NewQueue(session *network.Session, name string, messageType MessageType, udtTypeName string, udt_toid []byte) *Queue {
@@ -59,39 +63,40 @@ func (queue *Queue) NewMessage(data interface{}) (*Message, error) {
 		Payload:          data,
 		extensions:       nil,
 	}
+	var encoder parameter_coder.OracleParameterCoder
 	switch queue.messageType {
 	case RAW:
-		message.payloadInBytes, err = queue.encodeData(data)
+		encoder, err = queue.conn.GetParameterCoder(types.RAW)
+		//message.payloadInBytes, err = queue.encodeData(data)
 	case UDT:
-		message.payloadInBytes, err = queue.encodeData(data)
+		encoder, err = queue.conn.GetParameterCoder(queue.udtName)
 	case JSON:
-		message.payloadInBytes, err = queue.encodeData(data)
-		//if temp, ok := data.(string); ok {
-		//	buffer := bytes.Buffer{}
-		//	conn.session.WriteUint(&buffer, len(value.lob.sourceLocator), 4, true, true)
-		//	conn.session.WriteClr(&buffer, value.lob.sourceLocator)
-		//	conn.session.WriteClr(&buffer, value.bValue)
-		//	par.BValue = buffer.Bytes()
-		//
-		//	data, err = json.EncodeJsonString(temp, true)
-		//	Locator := utils.CreateQuasiLocator(uint64(len(val.bValue)))
-		//
-		//} else {
-		//	return nil, errors.New("invalid JSON data type (string required)")
-		//}
-
-		//par.Value = go_ora.NewObject("", queue.UdtTypeName, data)
+		encoder, err = queue.conn.GetParameterCoder(types.JSON)
+		if err != nil {
+			return nil, err
+		}
+		encoder.SetAQMessage()
 	default:
-		return nil, errors.New("unsupported message type")
+		err = fmt.Errorf("unsupported message type: %v", queue.messageType)
 	}
-
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(data, queue.conn)
+	if err != nil {
+		return nil, err
+	}
+	ms := network.NewMemorySession(nil, nil, queue.conn.GetSession().GetProperties())
+	err = encoder.Write(ms)
+	message.payloadInBytes = ms.GetWriteBuffer()
 	return message, err
 }
 func (queue *Queue) Enqueue(message *Message) error {
-	session := queue.session
+	session := queue.conn.GetSession()
 	session.ResetBuffer()
 	session.PutTTCFunc(0x3, 0x79)
-	queueNameBytes := session.StrConv.Encode(queue.Name)
+
+	queueNameBytes := queue.conn.GetServerStringCoder().Encode(queue.Name)
 	if len(queueNameBytes) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(queueNameBytes), 2, true, true)
@@ -99,7 +104,7 @@ func (queue *Queue) Enqueue(message *Message) error {
 		session.PutBytes(0, 0)
 	}
 	// message.marshal()
-	message.write(queue.session)
+	message.write(queue.conn)
 	if len(message.recipients) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(message.recipients)*3, 2, true, true)
@@ -153,10 +158,10 @@ func (queue *Queue) Enqueue(message *Message) error {
 		session.PutBytes(0, 0)
 	}
 	session.PutBytes(0, 0, 0, 0, 0)
-	if session.TTCVersion >= 4 {
+	if queue.conn.TTCVersion() >= 4 {
 		session.PutBytes(0, 0, 0, 0, 0, 0, 0, 0)
 	}
-	if session.TTCVersion >= 14 {
+	if queue.conn.TTCVersion() >= 14 {
 		if queue.messageType == JSON {
 			session.PutBytes(1)
 		} else {
@@ -178,11 +183,12 @@ func (queue *Queue) Enqueue(message *Message) error {
 	case RAW:
 		session.PutBytes(message.payloadInBytes...)
 	case UDT:
-		session.PutBytes(0, 0, 0, 0)
-		size := len(message.payloadInBytes)
-		session.PutUint(size, 4, true, true)
-		session.PutBytes(1, 1)
-		session.PutClr(message.payloadInBytes)
+		session.PutBytes(message.payloadInBytes...)
+		//session.PutBytes(0, 0, 0, 0)
+		//size := len(message.payloadInBytes)
+		//session.PutUint(size, 4, true, true)
+		//session.PutBytes(1, 1)
+		//session.PutClr(message.payloadInBytes)
 	//if (!this.isRawQueue)
 	//{
 	//	if (!this.isJsonQueue)
@@ -231,10 +237,10 @@ func (queue *Queue) Enqueue(message *Message) error {
 
 func (queue *Queue) Dequeue(options *DequeueOptions) (*Message, error) {
 	outMsg := &Message{}
-	session := queue.session
+	session := queue.conn.GetSession()
 	session.ResetBuffer()
 	session.PutTTCFunc(0x3, 0x7A)
-	queueNameBytes := session.StrConv.Encode(queue.Name)
+	queueNameBytes := queue.conn.GetServerStringCoder().Encode(queue.Name)
 	if len(queueNameBytes) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(queueNameBytes), 2, true, true)
@@ -242,7 +248,7 @@ func (queue *Queue) Dequeue(options *DequeueOptions) (*Message, error) {
 		session.PutBytes(0, 0)
 	}
 	session.PutBytes(1, 1, 1, 1)
-	consumer := session.StrConv.Encode(options.Consumer)
+	consumer := queue.conn.GetServerStringCoder().Encode(options.Consumer)
 	if len(consumer) > 0 {
 		session.PutBytes(1)
 		session.PutUint(len(consumer), 4, true, true)
@@ -259,7 +265,7 @@ func (queue *Queue) Dequeue(options *DequeueOptions) (*Message, error) {
 	} else {
 		session.PutBytes(0, 0)
 	}
-	correlation := session.StrConv.Encode(options.Correlation)
+	correlation := queue.conn.GetServerStringCoder().Encode(options.Correlation)
 	if len(correlation) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(correlation), 4, true, true)
@@ -288,7 +294,7 @@ func (queue *Queue) Dequeue(options *DequeueOptions) (*Message, error) {
 		num |= 16
 	}
 	session.PutUint(num, 4, true, true)
-	condition := session.StrConv.Encode(options.Condition)
+	condition := queue.conn.GetServerStringCoder().Encode(options.Condition)
 	if len(condition) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(condition), 4, true, true)
@@ -301,10 +307,10 @@ func (queue *Queue) Dequeue(options *DequeueOptions) (*Message, error) {
 	} else {
 		session.PutBytes(0, 0)
 	}
-	if session.TTCVersion >= 14 {
+	if queue.conn.TTCVersion() >= 14 {
 		session.PutBytes(0)
 	}
-	if session.TTCVersion >= 16 {
+	if queue.conn.TTCVersion() >= 16 {
 		session.PutInt(0xFFFF, 4, true, true)
 	}
 	if len(queueNameBytes) > 0 {
@@ -335,7 +341,7 @@ func (queue *Queue) Dequeue(options *DequeueOptions) (*Message, error) {
 }
 
 func (queue *Queue) readEnqueueResponse(message *Message) error {
-	session := queue.session
+	session := queue.conn.GetSession()
 	loop := true
 	for loop {
 		msg, err := session.GetByte()
@@ -347,7 +353,7 @@ func (queue *Queue) readEnqueueResponse(message *Message) error {
 			message.messageID, err = session.GetBytes(16)
 			_, err = session.GetInt(2, true, true)
 		default:
-			err = queue.processTTCResponse(msg)
+			err = queue.conn.ProcessTCCResponse(msg)
 			if err != nil {
 				return err
 			}
@@ -360,7 +366,7 @@ func (queue *Queue) readEnqueueResponse(message *Message) error {
 }
 
 func (queue *Queue) readDequeueResponse(message *Message) error {
-	session := queue.session
+	session := queue.conn.GetSession()
 	loop := true
 	for loop {
 		msg, err := session.GetByte()
@@ -376,7 +382,7 @@ func (queue *Queue) readDequeueResponse(message *Message) error {
 				return err
 			}
 			if num > 0 {
-				err = message.read(session)
+				err = message.read(queue.conn)
 				if err != nil {
 					return err
 				}
@@ -428,37 +434,45 @@ func (queue *Queue) readDequeueResponse(message *Message) error {
 				return err
 			}
 			if imageLen > 0 {
+
 				message.payloadInBytes, err = session.GetClr()
 				if err != nil {
 					return err
 				}
+				var decoder parameter_coder.OracleParameterDecoder
 				switch queue.messageType {
 				case RAW:
-					if len(message.payloadInBytes) > 4 {
-						message.Payload = message.payloadInBytes[4:]
-					} else {
-						message.Payload = message.payloadInBytes
-					}
+					decoder, err = queue.conn.GetParameterCoder(types.RAW)
 				case JSON:
-					if len(message.payloadInBytes) > 4 {
-						message.Payload, err = queue.decodeData(message.payloadInBytes[4:], queue.messageType, queue.udtName)
-					} else {
-						message.Payload, err = queue.decodeData(message.payloadInBytes, queue.messageType, queue.udtName)
-					}
-					if err != nil {
-						return err
-					}
+					decoder, err = queue.conn.GetParameterCoder(types.JSON)
 				default:
-					message.Payload, err = queue.decodeData(message.payloadInBytes, queue.messageType, queue.udtName)
-					if err != nil {
-						return nil
+					decoder, err = queue.conn.GetParameterCoder(queue.udtName)
+				}
+				if err != nil {
+					return err
+				}
+				if queue.messageType == RAW || queue.messageType == JSON && len(message.payloadInBytes) > 4 {
+					decoder.SetBytes(message.payloadInBytes[4:])
+				} else {
+					decoder.SetBytes(message.payloadInBytes)
+				}
+				message.Payload, err = decoder.Decode(queue.conn)
+				if queue.messageType == JSON {
+					if temp, ok := message.Payload.(*types.Json); ok {
+						message.Payload, err = temp.Value()
+						if err != nil {
+							return err
+						}
 					}
+				}
+				if err != nil {
+					return nil
 				}
 			}
 			message.messageID, err = session.GetBytes(16)
 			//_, err = session.GetInt(2, true, true)
 		default:
-			err = queue.processTTCResponse(msg)
+			err = queue.conn.ProcessTCCResponse(msg)
 			if err != nil {
 				return err
 			}

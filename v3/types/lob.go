@@ -123,9 +123,6 @@ func (l *lobBase) ReadBytesFromPos(ctx context.Context, pos, count int64) ([]byt
 		defer l.stream.EndContext(done)
 		return l.stream.Read(pos, count)
 	}
-	if l.stream == nil {
-		return nil, errEmptyLocator
-	}
 	return nil, nil
 }
 

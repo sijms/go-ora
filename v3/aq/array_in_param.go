@@ -1,16 +1,15 @@
 package aq
 
-import "github.com/sijms/go-ora/v3/network"
-
 type AQArrayInParam struct {
 	flag    int // equal to AQ.flag
 	message Message
 }
 
-func (param *AQArrayInParam) write(session *network.Session) error {
+func (param *AQArrayInParam) write(conn IConnection) error {
+	session := conn.GetSession()
 	session.PutBytes(7)
 	session.PutUint(param.flag, 4, true, true)
-	param.message.write(session)
+	param.message.write(conn)
 	if len(param.message.recipients) > 0 {
 		session.PutInt(len(param.message.recipients)*3, 2, true, true)
 		for _, recipient := range param.message.recipients {

@@ -36,7 +36,7 @@ var (
 
 	TyNumber   = reflect.TypeOf((*Number)(nil)).Elem()
 	TyBoolean  = reflect.TypeOf((*Bool)(nil)).Elem()
-	TyVarchar  = reflect.TypeOf((*string)(nil)).Elem()
+	TyVarchar  = reflect.TypeOf((*String)(nil)).Elem()
 	TyDate     = reflect.TypeOf((*Date)(nil)).Elem()
 	TyInterval = reflect.TypeOf((*Interval)(nil)).Elem()
 	TyRaw      = reflect.TypeOf((*Raw)(nil)).Elem()
@@ -45,6 +45,19 @@ var (
 	TyClob     = reflect.TypeOf((*Clob)(nil)).Elem()
 	TyBlob     = reflect.TypeOf((*Blob)(nil)).Elem()
 	TyBFile    = reflect.TypeOf((*BFile)(nil)).Elem()
+	TyObject   = reflect.TypeOf((*Object)(nil)).Elem()
+)
+
+const (
+	MaxLenNumber      int64 = 0x16
+	MaxLenBFloat      int64 = 0x4
+	MaxLenBDouble     int64 = 0x8
+	MaxLenDate        int64 = 0x7
+	MaxLenTimeStamp   int64 = 0xB
+	MaxLenTimeStampTZ int64 = 0xD
+	MaxLenIntervalYM  int64 = 0x5
+	MaxLenIntervalDS  int64 = 0xB
+	MaxLenBFile       int64 = 4000
 )
 
 func xorBuffer(buffer []byte, length int) {

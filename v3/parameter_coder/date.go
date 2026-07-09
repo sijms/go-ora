@@ -15,10 +15,14 @@ func (param *DateParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *DateParameter) Encode(input interface{}, _ IConnection) error {
+func (param *DateParameter) Init() {
 	param.SetDefault()
-	param.DataType = types.DATE
+}
+
+func (param *DateParameter) Encode(input interface{}, conn IConnection) error {
+	param.Init()
 	encoder := types.Date{}
+	encoder.AsUTC = conn.SendTimeZoneAsUTC()
 	encoder.SetDataType(param.DataType)
 	err := encoder.SetValue(input)
 	if err != nil {
@@ -27,10 +31,13 @@ func (param *DateParameter) Encode(input interface{}, _ IConnection) error {
 	if dt := encoder.GetDataType(); dt != 0 {
 		param.DataType = dt
 	}
-	param.BValue = encoder.Bytes()
-	if len(param.BValue) > 0 {
-		param.MaxLen = int64(len(param.BValue))
+	if param.MaxLen < encoder.GetMaxLen() {
+		param.MaxLen = encoder.GetMaxLen()
 	}
+	param.BValue = encoder.Bytes()
+	//if len(param.BValue) > 0 {
+	//	param.MaxLen = int64(len(param.BValue))
+	//}
 	return nil
 }
 
@@ -39,11 +46,6 @@ func (param *DateParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)
 	return decoder.Value()
-}
-
-func (param *DateParameter) Write(session network.SessionWriter) error {
-	session.PutClr(param.BValue)
-	return nil
 }
 
 func (param *DateParameter) Read(session network.SessionReader) error {

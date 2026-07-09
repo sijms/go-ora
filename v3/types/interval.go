@@ -29,6 +29,14 @@ func NewDaySecondInterval(day, hour, minute, second, nanosecond int) (*Interval,
 	return ret, err
 }
 
+func (interval *Interval) GetMaxLen() int64 {
+	switch interval.dataType {
+	case INTERVALYM_DTY:
+		return MaxLenIntervalYM
+	default:
+		return MaxLenIntervalDS
+	}
+}
 func (interval *Interval) Value() (interface{}, error) {
 	if len(interval.bValue) == 0 {
 		return nil, nil
@@ -38,23 +46,23 @@ func (interval *Interval) Value() (interface{}, error) {
 		typeId                                       = interval.dataType
 	)
 	if typeId == 0 {
-		if len(interval.bValue) >= 0xB {
+		if len(interval.bValue) >= int(MaxLenIntervalDS) {
 			typeId = INTERVALDS_DTY
 		}
-		if len(interval.bValue) >= 5 {
+		if len(interval.bValue) >= int(MaxLenIntervalYM) {
 			typeId = INTERVALYM_DTY
 		}
 	}
 	switch typeId {
 	case INTERVALYM_DTY:
-		if len(interval.bValue) < 5 {
+		if len(interval.bValue) < int(MaxLenIntervalYM) {
 			return nil, fmt.Errorf("interval data length is too short")
 		}
 		year = int(binary.BigEndian.Uint32(interval.bValue)) - 0x80000000
 		month = int(interval.bValue[4] - 60)
 		return time.Date(year, time.Month(month), 0, 0, 0, 0, 0, time.UTC), nil
 	case INTERVALDS_DTY:
-		if len(interval.bValue) < 0xB {
+		if len(interval.bValue) < int(MaxLenIntervalDS) {
 			return nil, fmt.Errorf("interval data length is too short")
 		}
 		day = int(binary.BigEndian.Uint32(interval.bValue)) - 0x80000000

@@ -50,9 +50,17 @@ func (js *Json) SetValue(input interface{}) error {
 	var err error
 	switch value := input.(type) {
 	case Json:
+		currentCoder := js.Coder
 		*js = value
+		if currentCoder != nil && js.Coder == nil {
+			js.Coder = currentCoder
+		}
 	case *Json:
+		currentCoder := js.Coder
 		*js = *value
+		if currentCoder != nil && js.Coder == nil {
+			js.Coder = currentCoder
+		}
 	case string:
 		value = strings.TrimSpace(value)
 		if len(value) == 0 {
@@ -75,7 +83,10 @@ func (js *Json) SetValue(input interface{}) error {
 		}
 		return js.SetValue(temp)
 	default:
-		js.bValue, err = js.Coder.EncodeJson(input)
+		if js.Coder != nil {
+			js.bValue, err = js.Coder.EncodeJson(input)
+		}
+
 		//return fmt.Errorf("cannot set value of type %T into Json", input)
 	}
 	if err == nil {

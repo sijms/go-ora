@@ -177,3 +177,19 @@ func copyString(dest reflect.Value, src string) error {
 	}
 	return nil
 }
+
+func copyArray(dest reflect.Value, src []interface{}) error {
+	if dest.Kind() != reflect.Slice {
+		return defaultCopy(dest, src)
+	}
+	var err error
+	tempSlice := reflect.MakeSlice(dest.Type(), len(src), len(src))
+	for index, item := range src {
+		err = RCopy(tempSlice.Index(index), item)
+		if err != nil {
+			return err
+		}
+	}
+	dest.Set(tempSlice)
+	return nil
+}

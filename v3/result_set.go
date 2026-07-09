@@ -176,7 +176,7 @@ func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 		fallthrough
 	case types.TimeStampDTY:
 		fallthrough
-	case types.TimeStampeLTZ, types.TimeStampLTZ_DTY:
+	case types.TimeStampLTZ, types.TimeStampLTZ_DTY:
 		fallthrough
 	case types.TIMESTAMPTZ, types.TimeStampTZ_DTY:
 		return types.TyTime

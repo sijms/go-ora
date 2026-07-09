@@ -30,8 +30,10 @@ func getValue(origVal driver.Value) (driver.Value, error) {
 }
 func getType(value driver.Value) reflect.Type {
 	valueType := reflect.TypeOf(value)
-	for valueType.Kind() == reflect.Ptr {
-		valueType = valueType.Elem()
+	if valueType != nil {
+		for valueType.Kind() == reflect.Ptr {
+			valueType = valueType.Elem()
+		}
 	}
 	return valueType
 }
@@ -257,69 +259,69 @@ func getBytes(col interface{}) ([]byte, error) {
 //}
 
 // get lob from supported types
-func getLob(col interface{}, conn *Connection) (*LobStream, error) {
-	var err error
-	col, err = getValue(col)
-	if err != nil {
-		return nil, err
-	}
-	if col == nil {
-		return nil, nil
-	}
-	charsetID := conn.getDefaultCharsetID()
-	charsetForm := 1
-	stringVar := ""
-	var byteVar []byte
-	switch val := col.(type) {
-	case string:
-		stringVar = val
-	case Clob:
-		if !val.Valid {
-			return nil, nil
-		}
-		stringVar = val.String
-	case NVarChar:
-		stringVar = string(val)
-		charsetForm = 2
-		charsetID = conn.tcpNego.ServernCharset
-	case NClob:
-		charsetForm = 2
-		charsetID = conn.tcpNego.ServernCharset
-		if !val.Valid {
-			return nil, nil
-		}
-		stringVar = val.String
-	case []byte:
-		byteVar = val
-	case Blob:
-		byteVar = val.Data
-		//case Vector:
-		//	byteVar, err = val.encode()
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//lob := newLob(conn)
-		//lob.createQuasiLocator(uint64(len(byteVar)))
-		//lob.data.Reset()
-
-	}
-	if len(stringVar) > 0 {
-		lob := &LobStream{conn: conn}
-		lob.sourceLocator, err = lob.CreateTemporaryLocator(charsetID, charsetForm)
-		if err != nil {
-			return nil, err
-		}
-		err = lob.putString(stringVar)
-		return lob, err
-	}
-	if len(byteVar) > 0 {
-		lob := &LobStream{conn: conn}
-		lob.sourceLocator, err = lob.CreateTemporaryLocator(0, 0)
-		if err != nil {
-			return nil, err
-		}
-		err = lob.putData(byteVar)
-		return lob, err
-	}
-	return nil, nil
-}
+//func getLob(col interface{}, conn *Connection) (*LobStream, error) {
+//	var err error
+//	col, err = getValue(col)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if col == nil {
+//		return nil, nil
+//	}
+//	charsetID := conn.getDefaultCharsetID()
+//	charsetForm := 1
+//	stringVar := ""
+//	var byteVar []byte
+//	switch val := col.(type) {
+//	case string:
+//		stringVar = val
+//	case Clob:
+//		if !val.Valid {
+//			return nil, nil
+//		}
+//		stringVar = val.String
+//	//case NVarChar:
+//	//	stringVar = string(val)
+//	//	charsetForm = 2
+//	//	charsetID = conn.tcpNego.ServernCharset
+//	case NClob:
+//		charsetForm = 2
+//		charsetID = conn.tcpNego.ServernCharset
+//		if !val.Valid {
+//			return nil, nil
+//		}
+//		stringVar = val.String
+//	case []byte:
+//		byteVar = val
+//	case Blob:
+//		byteVar = val.Data
+//		//case Vector:
+//		//	byteVar, err = val.encode()
+//		//	if err != nil {
+//		//		return nil, err
+//		//	}
+//		//lob := newLob(conn)
+//		//lob.createQuasiLocator(uint64(len(byteVar)))
+//		//lob.data.Reset()
+//
+//	}
+//	if len(stringVar) > 0 {
+//		lob := &LobStream{conn: conn}
+//		lob.sourceLocator, err = lob.CreateTemporaryLocator(charsetID, charsetForm)
+//		if err != nil {
+//			return nil, err
+//		}
+//		err = lob.putString(stringVar)
+//		return lob, err
+//	}
+//	if len(byteVar) > 0 {
+//		lob := &LobStream{conn: conn}
+//		lob.sourceLocator, err = lob.CreateTemporaryLocator(0, 0)
+//		if err != nil {
+//			return nil, err
+//		}
+//		err = lob.putData(byteVar)
+//		return lob, err
+//	}
+//	return nil, nil
+//}

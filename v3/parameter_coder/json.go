@@ -9,7 +9,6 @@ import (
 //type jsonCoder struct {
 //	streamer types.LobStreamer
 //}
-
 //func (c *jsonCoder) EncodeJson(input interface{}) ([]byte, error) {
 //	return oson.Encode(input)
 //}
@@ -29,6 +28,7 @@ import (
 type JsonParameter struct {
 	locator types.Locator
 	lobParameter
+	isQueueMessage bool
 }
 
 func (param *JsonParameter) Copy() OracleParameterCoder {
@@ -37,9 +37,13 @@ func (param *JsonParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *JsonParameter) Encode(input interface{}, _ IConnection) (err error) {
+func (param *JsonParameter) Init() {
 	param.SetDefault()
 	param.DataType = types.JSON
+}
+
+func (param *JsonParameter) Encode(input interface{}, _ IConnection) (err error) {
+	param.Init()
 	encoder := &types.Json{}
 	encoder.Coder = &oson.Oson{}
 	encoder.SetDataType(param.DataType)
@@ -50,8 +54,11 @@ func (param *JsonParameter) Encode(input interface{}, _ IConnection) (err error)
 	if dt := encoder.GetDataType(); dt != 0 {
 		param.DataType = dt
 	}
+	if param.MaxLen < encoder.GetMaxLen() {
+		param.MaxLen = encoder.GetMaxLen()
+	}
 	param.BValue = encoder.Bytes()
-	param.BValue = encoder.GetLocator()
+	param.locator = encoder.GetLocator()
 	return
 }
 
@@ -66,13 +73,18 @@ func (param *JsonParameter) Decode(_ IConnection) (interface{}, error) {
 func (param *JsonParameter) Write(session network.SessionWriter) error {
 	if param.locator != nil {
 		session.PutUint(len(param.locator), 4, true, true)
-		session.PutClr(param.locator)
+		if param.isQueueMessage {
+			session.PutBytes(param.locator...)
+		} else {
+			session.PutClr(param.locator)
+		}
 		session.PutClr(param.BValue)
 	} else {
 		session.PutClr(param.locator)
 	}
 	return nil
 }
-func (param *JsonParameter) Read(session network.SessionReader) error {
-	return param.read(session)
+
+func (param *JsonParameter) SetAQMessage() {
+	param.isQueueMessage = true
 }

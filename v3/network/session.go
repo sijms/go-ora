@@ -52,7 +52,6 @@ type Session struct {
 	sendPcks          []PacketInterface
 	breakIndex        int
 	TimeZone          []byte
-	TTCVersion        uint8
 	HasEOSCapability  bool
 	HasFSAPCapability bool
 	Summary           *SummaryObject
@@ -67,8 +66,7 @@ type Session struct {
 		roots              *x509.CertPool
 		tlsCertificates    []tls.Certificate
 	}
-	tracer   trace.Tracer
-	ttcIndex uint8
+	tracer trace.Tracer
 	basicSession
 }
 
@@ -1023,19 +1021,6 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		// fmt.Printf("Packet Data: %#v\n", packetData)
 		return nil, fmt.Errorf("unsupported packet type: %d", pckType)
 	}
-}
-
-// PutTTCFunc write bytes that represent ttc function with specific code
-func (session *Session) PutTTCFunc(ttcCode, funcCode uint8) {
-	if session.ttcIndex == 0 || session.ttcIndex == 255 {
-		session.ttcIndex = 1
-	}
-	if session.TTCVersion >= 18 {
-		session.PutBytes(ttcCode, funcCode, session.ttcIndex, 0)
-	} else {
-		session.PutBytes(ttcCode, funcCode, session.ttcIndex)
-	}
-	session.ttcIndex++
 }
 
 func (session *Session) WriteBytes(buffer *bytes.Buffer, data ...byte) {

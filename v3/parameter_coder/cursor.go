@@ -15,9 +15,13 @@ func (param *CursorParameter) Copy() OracleParameterCoder {
 	return ret
 }
 
-func (param *CursorParameter) Encode(input interface{}, _ IConnection) error {
+func (param *CursorParameter) Init() {
 	param.SetDefault()
 	param.DataType = types.REFCURSOR
+}
+
+func (param *CursorParameter) Encode(input interface{}, _ IConnection) error {
+	param.Init()
 	param.BValue = nil
 	return nil
 }

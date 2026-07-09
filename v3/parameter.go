@@ -2,7 +2,6 @@ package go_ora
 
 import (
 	"database/sql/driver"
-	"fmt"
 	"math"
 	"strings"
 
@@ -51,29 +50,29 @@ type Out struct {
 //)
 
 type ParameterInfo struct {
-	Name                 string
-	SchemaName           string
-	DomainSchema         string
-	DomainName           string
-	Direction            ParameterDirection
-	IsNull               bool
-	AllowNull            bool
-	IsJson               bool
-	ColAlias             string
-	IsXmlType            bool
-	Precision            uint8
-	Scale                uint8
-	MaxNoOfArrayElements int
-	Version              int
-	Value                driver.Value
-	encoder              parameter_coder.OracleParameterEncoder
-	iPrimValue           driver.Value
-	oPrimValue           driver.Value
-	getDataFromServer    bool
-	oaccollid            int
-	cusType              *Object
-	parent               *ParameterInfo
-	Annotations          map[string]string
+	Name         string
+	SchemaName   string
+	DomainSchema string
+	DomainName   string
+	Direction    ParameterDirection
+	IsNull       bool
+	AllowNull    bool
+	IsJson       bool
+	ColAlias     string
+	IsXmlType    bool
+	Precision    uint8
+	Scale        uint8
+	//MaxNoOfArrayElements int
+
+	Value             driver.Value
+	encoder           parameter_coder.OracleParameterEncoder
+	iPrimValue        driver.Value
+	oPrimValue        driver.Value
+	getDataFromServer bool
+	oaccollid         int
+	cusType           *oraTypes.Object
+	parent            *ParameterInfo
+	Annotations       map[string]string
 	parameter_coder.BasicParameter
 }
 
@@ -110,7 +109,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		fallthrough
 	case oraTypes.TimeStampLTZ_DTY:
 		fallthrough
-	case oraTypes.TimeStampeLTZ:
+	case oraTypes.TimeStampLTZ:
 		scale, err := session.GetInt(2, true, true)
 		if err != nil {
 			return err
@@ -160,7 +159,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	case oraTypes.IntervalDS:
 		par.MaxLen = 11
 	}
-	par.MaxNoOfArrayElements, err = session.GetInt(4, true, true)
+	par.ArraySize, err = session.GetInt(4, true, true)
 	if err != nil {
 		return err
 	}
@@ -219,7 +218,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if par.DataType == oraTypes.XMLType && par.TypeName != "XMLTYPE" {
 		for typName, cusTyp := range conn.cusTyp {
 			if typName == par.TypeName {
-				par.cusType = new(Object)
+				par.cusType = new(oraTypes.Object)
 				*par.cusType = cusTyp
 			}
 		}
@@ -331,7 +330,7 @@ func (par *ParameterInfo) write(session *network.Session) error {
 	session.PutBytes(uint8(par.DataType), par.Flag, par.Precision, par.Scale)
 	session.PutUint(par.MaxLen, 4, true, true)
 	// MaxNoOfArrayElements should be 0 in case of XML type
-	session.PutInt(par.MaxNoOfArrayElements, 4, true, true)
+	session.PutInt(par.ArraySize, 4, true, true)
 	if session.TTCVersion >= 10 {
 		session.PutInt(par.ContFlag, 8, true, true)
 	} else {
@@ -423,33 +422,37 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	var err error
 	par.oPrimValue = nil
 	par.BValue = nil
-	if par.MaxNoOfArrayElements > 0 {
-		size, err := session.GetInt(4, true, true)
-		if err != nil {
-			return err
-		}
-		if size > 0 {
-			par.MaxNoOfArrayElements = size
-			pars := make([]ParameterInfo, 0, size)
-			for x := 0; x < size; x++ {
-				tempPar := par.clone()
-				err = tempPar.decodeParameterValue(conn)
-				if err != nil {
-					return err
-				}
-				//, err = tempPar.decodeValue(stmt.connection, false)
-				//if x < size-1 {
-				_, err = session.GetInt(2, true, true)
-				if err != nil {
-					return err
-				}
-				//}
-				pars = append(pars, tempPar)
-			}
-			par.oPrimValue = pars
-		}
-		return nil
-	}
+	var decoder parameter_coder.OracleParameterCoder
+	//if par.ArraySize > 0 {
+	//
+	//	decoder.SetParameterInfo(par.GetParameterInfo())
+	//
+	//	size, err := session.GetInt(4, true, true)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	if size > 0 {
+	//		par.ArraySize = size
+	//		pars := make([]ParameterInfo, 0, size)
+	//		for x := 0; x < size; x++ {
+	//			tempPar := par.clone()
+	//			err = tempPar.decodeParameterValue(conn)
+	//			if err != nil {
+	//				return err
+	//			}
+	//			//, err = tempPar.decodeValue(stmt.connection, false)
+	//			//if x < size-1 {
+	//			_, err = session.GetInt(2, true, true)
+	//			if err != nil {
+	//				return err
+	//			}
+	//			//}
+	//			pars = append(pars, tempPar)
+	//		}
+	//		par.oPrimValue = pars
+	//	}
+	//	return nil
+	//}
 	//if par.DataType == oraTypes.XMLType && par.parent == nil {
 	//	_, err = session.GetDlc() // contain toid and some 0s
 	//	if err != nil {
@@ -480,42 +483,29 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	//	}
 	//	par.IsNull = false
 	//}
-	if par.DataType == oraTypes.XMLType {
-		if decoder, ok := conn.nameTypeCoder[par.TypeName]; ok {
-			if par.isLobType() {
-				streamer := &LobStream{conn: conn}
-				decoder.SetLobStreamer(streamer)
-			}
-			err = decoder.Read(session)
-			if err != nil {
-				return err
-			}
-			par.oPrimValue, err = decoder.Decode(conn)
-			if err != nil {
-				return err
-			}
-		} else {
-			return fmt.Errorf("no decoder register for data type: %s", par.TypeName)
-		}
-		return nil
-	}
-	if decoder, ok := conn.oracleTypeCoder[par.DataType]; ok {
-		decoder.SetParameterInfo(par.BasicParameter)
-		if par.isLobType() {
-			streamer := &LobStream{conn: conn}
-			decoder.SetLobStreamer(streamer)
-		}
-		err = decoder.Read(session)
-		if err != nil {
-			return err
-		}
-		par.oPrimValue, err = decoder.Decode(conn)
-		if err != nil {
-			return err
-		}
+	if par.ArraySize > 0 {
+		decoder = &parameter_coder.ArrayParameter{}
 	} else {
-		return fmt.Errorf("no decoder register for data type: %d", par.DataType)
+		if par.DataType == oraTypes.XMLType {
+			decoder, err = conn.GetParameterCoder(par.TypeName)
+		} else {
+			decoder, err = conn.GetParameterCoder(par.DataType)
+		}
 	}
+	if err != nil {
+		return err
+	}
+	decoder.SetParameterInfo(par.GetParameterInfo())
+	if par.isLobType() {
+		streamer := &LobStream{conn: conn}
+		decoder.SetLobStreamer(streamer)
+	}
+	err = decoder.Read(session)
+	if err != nil {
+		return err
+	}
+	par.oPrimValue, err = decoder.Decode(conn)
+	return err
 
 	//switch par.DataType {
 

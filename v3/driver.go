@@ -23,7 +23,7 @@ type OracleDriver struct {
 	goTypeCoder     map[reflect.Type]parameter_coder.OracleParameterCoder
 	nameTypeCoder   map[string]parameter_coder.OracleParameterCoder
 	jsonEncoder     map[reflect.Type]oson.FieldEncoder
-	cusTyp          map[string]Object
+	cusTyp          map[string]types.Object
 	sessionParam    map[string]string
 	mu              sync.Mutex
 	sStrConv        converters.IStringConverter
@@ -46,7 +46,7 @@ func NewDriver() *OracleDriver {
 		oracleTypeCoder: make(map[uint16]parameter_coder.OracleParameterCoder),
 		nameTypeCoder:   make(map[string]parameter_coder.OracleParameterCoder),
 		//typeDecoder:  make(map[uint16]type_coder.OracleTypeDecoder),
-		cusTyp:       map[string]Object{},
+		cusTyp:       map[string]types.Object{},
 		sessionParam: map[string]string{},
 	}
 	drv.init()
@@ -77,20 +77,20 @@ func (driver *OracleDriver) init() {
 	driver.oracleTypeCoder[types.RAW] = &parameter_coder.RawParameter{}
 	driver.oracleTypeCoder[types.LongRaw] = &parameter_coder.RawParameter{}
 
-	driver.oracleTypeCoder[types.NUMBER] = &parameter_coder.NumberParameter{}
-	driver.oracleTypeCoder[types.IBFLOAT] = &parameter_coder.NumberParameter{}
-	driver.oracleTypeCoder[types.IBDOUBLE] = &parameter_coder.NumberParameter{}
+	driver.oracleTypeCoder[types.NUMBER] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}}
+	driver.oracleTypeCoder[types.IBFLOAT] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}}
+	driver.oracleTypeCoder[types.IBDOUBLE] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}}
 
-	driver.oracleTypeCoder[types.DATE] = &parameter_coder.DateParameter{}
-	driver.oracleTypeCoder[types.TIMESTAMP] = &parameter_coder.DateParameter{}
-	driver.oracleTypeCoder[types.TIMESTAMPTZ] = &parameter_coder.DateParameter{}
-	driver.oracleTypeCoder[types.TimeStampDTY] = &parameter_coder.DateParameter{}
-	driver.oracleTypeCoder[types.TimeStampTZ_DTY] = &parameter_coder.DateParameter{}
-	driver.oracleTypeCoder[types.TimeStampeLTZ] = &parameter_coder.DateParameter{}
-	driver.oracleTypeCoder[types.TimeStampLTZ_DTY] = &parameter_coder.DateParameter{}
+	driver.oracleTypeCoder[types.DATE] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}}
+	driver.oracleTypeCoder[types.TIMESTAMP] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStamp}}
+	driver.oracleTypeCoder[types.TIMESTAMPTZ] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TIMESTAMPTZ, MaxLen: types.MaxLenTimeStampTZ}}
+	driver.oracleTypeCoder[types.TimeStampDTY] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampDTY, MaxLen: types.MaxLenTimeStampTZ}}
+	driver.oracleTypeCoder[types.TimeStampTZ_DTY] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
+	driver.oracleTypeCoder[types.TimeStampLTZ] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampLTZ, MaxLen: types.MaxLenTimeStampTZ}}
+	driver.oracleTypeCoder[types.TimeStampLTZ_DTY] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
 
-	driver.oracleTypeCoder[types.INTERVALYM_DTY] = &parameter_coder.IntervalParameter{}
-	driver.oracleTypeCoder[types.INTERVALDS_DTY] = &parameter_coder.IntervalParameter{}
+	driver.oracleTypeCoder[types.INTERVALYM_DTY] = &parameter_coder.IntervalParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.INTERVALYM_DTY, MaxLen: types.MaxLenIntervalYM}}
+	driver.oracleTypeCoder[types.INTERVALDS_DTY] = &parameter_coder.IntervalParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.INTERVALDS_DTY, MaxLen: types.MaxLenIntervalDS}}
 
 	driver.oracleTypeCoder[types.VECTOR] = &parameter_coder.VectorParameter{}
 	driver.oracleTypeCoder[types.JSON] = &parameter_coder.JsonParameter{}
@@ -149,18 +149,31 @@ func (driver *OracleDriver) init() {
 	driver.goTypeCoder[reflect.TypeOf((*RefCursor)(nil)).Elem()] = &parameter_coder.CursorParameter{}
 
 	// name type coder
-	driver.nameTypeCoder["NUMBER"] = &parameter_coder.NumberParameter{}
+	driver.nameTypeCoder["NUMBER"] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}}
+	driver.nameTypeCoder["IBFLOAT"] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}}
+	driver.nameTypeCoder["IBDOUBLE"] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}}
 	driver.nameTypeCoder["VARCHAR2"] = &parameter_coder.StringParameter{}
 	driver.nameTypeCoder["NVARCHAR2"] = &parameter_coder.StringParameter{BasicParameter: parameter_coder.BasicParameter{CharsetForm: 2}}
-	driver.nameTypeCoder["TIMESTAMP"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampDTY}}
-	driver.nameTypeCoder["DATE"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.DATE}}
-	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TIME ZONE"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampLTZ_DTY}}
+	driver.nameTypeCoder["TIMESTAMP"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStampTZ}}
+	driver.nameTypeCoder["DATE"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}}
+	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TIME ZONE"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampLTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
 	driver.nameTypeCoder["RAW"] = &parameter_coder.RawParameter{}
 	driver.nameTypeCoder["BLOB"] = &parameter_coder.BlobParameter{}
 	driver.nameTypeCoder["CLOB"] = &parameter_coder.ClobParameter{}
 	tempClob := &parameter_coder.ClobParameter{}
 	tempClob.CharsetForm = 2
 	driver.nameTypeCoder["NCLOB"] = tempClob
+
+	// initialize all
+	for _, coder := range driver.goTypeCoder {
+		coder.Init()
+	}
+	for _, coder := range driver.oracleTypeCoder {
+		coder.Init()
+	}
+	for _, coder := range driver.nameTypeCoder {
+		coder.Init()
+	}
 }
 
 func (driver *OracleDriver) initFromConn(conn *Connection) error {
@@ -374,9 +387,8 @@ func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, ty
 	//if typeObj == nil {
 	//	return errors.New("type object cannot be nil")
 	//}
-	var typ reflect.Type
+	typ := getType(typeObj)
 	if typeObj != nil {
-		typ = reflect.TypeOf(typeObj)
 		switch typ.Kind() {
 		case reflect.Ptr:
 			return errors.New("unsupported type object: Ptr")
@@ -400,34 +412,47 @@ func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, ty
 	arrayParam, ok := drv.nameTypeCoder[strings.ToUpper(typeName)]
 	if !ok {
 		// we should add this type as new type
-		obj := Object{
-			Owner: owner,
-			Name:  typeName,
-			typ:   typ,
+		objCoder := &ObjectParameter{
+			typ: typ,
 		}
-		err = obj.loadObjectTypeInfo(db)
+		objCoder.Init()
+		objCoder.TypeName = typeName
+		err = objCoder.loadObjectTypeInfo(db, owner, typeName)
 		if err != nil {
 			return err
 		}
-		arrayParam = &ObjectParameter{obj: obj, BasicParameter: parameter_coder.BasicParameter{ToID: obj.toid}}
 		drv.mu.Lock()
 		// map name to coder
-		drv.nameTypeCoder[strings.ToUpper(typeName)] = arrayParam
+		drv.nameTypeCoder[strings.ToUpper(typeName)] = objCoder
 		// map type to coder
-		drv.goTypeCoder[typ] = arrayParam
+		drv.goTypeCoder[typ] = objCoder
 		drv.mu.Unlock()
+		arrayParam = objCoder.Copy()
 	}
 
 	if len(arrayTypeName) > 0 {
-		arrayObj := Object{Owner: owner, Name: arrayTypeName, isArray: true}
-		arrayObj.attribs = make(map[string]parameter_coder.OracleParameterCoder)
-		arrayObj.attribs[""] = arrayParam.Copy()
-		arrayObj.toid, err = getTOID2(db, owner, arrayTypeName)
+		arrayCoder := &ObjectParameter{
+			isArray: true,
+		}
+		arrayCoder.Init()
+		if typeObj != nil {
+			arrayCoder.typ = reflect.SliceOf(typ)
+		}
+		arrayCoder.TypeName = arrayTypeName
+		arrayCoder.attribs = make(map[string]parameter_coder.OracleParameterCoder)
+		arrayParam.SetAsArrayPar()
+		arrayCoder.attribs[""] = arrayParam
+		arrayCoder.ToID, err = getTOID2(db, owner, arrayTypeName)
 		if err != nil {
 			return err
 		}
 		drv.mu.Lock()
-		drv.nameTypeCoder[strings.ToUpper(arrayTypeName)] = &ObjectParameter{obj: arrayObj, BasicParameter: parameter_coder.BasicParameter{ToID: arrayObj.toid}}
+		drv.nameTypeCoder[strings.ToUpper(arrayTypeName)] = arrayCoder
+		// map type to coder
+		if typeObj != nil {
+			drv.goTypeCoder[arrayCoder.typ] = arrayCoder
+		}
+		//drv.goTypeCoder[reflect.SliceOf(typ)] = arrayParam
 		drv.mu.Unlock()
 	}
 	return nil

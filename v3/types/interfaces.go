@@ -36,6 +36,7 @@ type OracleType interface {
 	CopyTo(dest driver.Value) error
 	SetDataType(dt uint16)
 	GetDataType() uint16
+	GetMaxLen() int64
 	sql.Scanner
 }
 

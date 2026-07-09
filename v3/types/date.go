@@ -12,25 +12,61 @@ import (
 
 type Date struct {
 	Basic
-	asUTC bool
+	AsUTC bool
 }
 
+func NewTimeStamp(t time.Time) *Date {
+	ret := new(Date)
+	ret.dataType = TIMESTAMP
+	_ = ret.SetValue(t)
+	return ret
+}
+func NewTimeStampTZ(t time.Time) *Date {
+	ret := new(Date)
+	ret.dataType = TimeStampTZ_DTY
+	_ = ret.SetValue(t)
+	return ret
+}
+
+//	func NewTimeStampLTZ(t time.Time) *Date {
+//		ret := new(Date)
+//		ret.dataType = TimeStampLTZ_DTY
+//		_ = ret.SetValue(t)
+//		return ret
+//
+// }
+func (date *Date) GetMaxLen() int64 {
+	switch date.dataType {
+	case DATE:
+		return MaxLenDate
+	case TIMESTAMP:
+		return MaxLenTimeStamp
+	default:
+		return MaxLenTimeStampTZ
+	}
+}
 func (date *Date) Value() (interface{}, error) {
 	if len(date.bValue) == 0 {
 		return nil, nil
 	}
 	return date.decode()
 }
-func (date *Date) encode(input time.Time, typeId uint16) (bytes []byte, err error) {
-	switch typeId {
+func (date *Date) encode(input time.Time) (bytes []byte, err error) {
+	if date.dataType == 0 {
+		date.dataType = DATE
+	}
+	if date.AsUTC {
+		input = input.UTC()
+	}
+	switch date.dataType {
 	case DATE:
-		bytes = make([]byte, 7)
+		bytes = make([]byte, MaxLenDate)
 		putDate(bytes, &input)
 	case TIMESTAMP:
-		bytes = make([]byte, 0xB)
+		bytes = make([]byte, MaxLenTimeStamp)
 		putTimestamp(bytes, &input)
-	case TIMESTAMPTZ:
-		bytes = make([]byte, 0xD)
+	case TIMESTAMPTZ, TimeStampTZ_DTY, TimeStampLTZ, TimeStampLTZ_DTY:
+		bytes = make([]byte, MaxLenTimeStamp)
 		putTimestamp(bytes, &input)
 		zoneLoc := input.Location()
 		zoneID := 0
@@ -51,7 +87,7 @@ func (date *Date) encode(input time.Time, typeId uint16) (bytes []byte, err erro
 			zone2 := uint8((offset/60)%60) + 60
 			bytes = append(bytes, zone1, zone2)
 		}
-		if date.asUTC {
+		if !date.AsUTC {
 			if bytes[11]&0x80 != 0 {
 				bytes[12] |= 1
 				if input.IsDST() {
@@ -65,7 +101,13 @@ func (date *Date) encode(input time.Time, typeId uint16) (bytes []byte, err erro
 	return
 
 }
+
 func (date *Date) SetValue(input interface{}) (err error) {
+	defer func(input *Date) {
+		if input.dataType == 0 {
+			input.dataType = DATE
+		}
+	}(date)
 	if input == nil {
 		date.bValue = nil
 		return
@@ -76,28 +118,29 @@ func (date *Date) SetValue(input interface{}) (err error) {
 	case *Date:
 		*date = *data
 	case time.Time:
-		date.bValue, err = date.encode(data, date.dataType)
+		date.bValue, err = date.encode(data)
 	case *time.Time:
-		date.bValue, err = date.encode(*data, date.dataType)
+		date.bValue, err = date.encode(*data)
 	case sql.NullTime:
 		if data.Valid {
-			date.bValue, err = date.encode(data.Time, date.dataType)
+			date.bValue, err = date.encode(data.Time)
 		} else {
 			date.bValue = nil
 		}
 	case *sql.NullTime:
 		if data.Valid {
-			date.bValue, err = date.encode(data.Time, date.dataType)
+			date.bValue, err = date.encode(data.Time)
 		} else {
 			date.bValue = nil
 		}
 	default:
 		err = fmt.Errorf("cannot set value of type %T into date/time", input)
 	}
+
 	return
 }
 func (date *Date) decode() (output time.Time, err error) {
-	if len(date.bValue) < 7 {
+	if len(date.bValue) < int(MaxLenDate) {
 		err = errors.New("abnormal data representation for date/time")
 		return
 	}

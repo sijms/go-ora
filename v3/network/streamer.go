@@ -21,10 +21,13 @@ type SessionWriter interface {
 	PutUint(number interface{}, size uint8, bigEndian, compress bool)
 	PutBytes(data ...byte)
 	PutClr(data []byte)
-	//PutFixedClr(data []byte)
+	PutFixedClr(data []byte)
 	PutString(data string)
 	PutKeyVal(key, val []byte, num uint8)
 	PutKeyValString(key, val string, num uint8)
+	PutTTCFunc(ttcCode, funcCode uint8)
+	GetWriteBuffer() []byte
+	Write() error
 }
 type SessionReadWriter interface {
 	ResetBuffer()

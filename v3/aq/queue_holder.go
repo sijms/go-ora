@@ -2,7 +2,6 @@ package aq
 
 import (
 	"database/sql/driver"
-	"github.com/sijms/go-ora/v3/network"
 )
 
 type QueueHolder struct {
@@ -24,20 +23,14 @@ func (qh *QueueHolder) Next(dest []driver.Value) error {
 	return nil
 }
 
-func NewQueueHolder(session *network.Session, name string, messageType MessageType, udtName string, toid []byte,
-	processTTCResponse func(msgCode uint8) error,
-	encodeData func(data interface{}) ([]byte, error),
-	decodeData func(data []byte, messageType MessageType, udtName string) (interface{}, error)) *QueueHolder {
+func NewQueueHolder(conn IConnection, name string, messageType MessageType, udtName string, toid []byte) *QueueHolder {
 	queue := Queue{
-		session:            session,
-		Name:               name,
-		version:            1,
-		AutoCommit:         false,
-		messageType:        messageType,
-		udtName:            udtName,
-		processTTCResponse: processTTCResponse,
-		encodeData:         encodeData,
-		decodeData:         decodeData,
+		conn:        conn,
+		Name:        name,
+		version:     1,
+		AutoCommit:  false,
+		messageType: messageType,
+		udtName:     udtName,
 	}
 	switch messageType {
 	case RAW:

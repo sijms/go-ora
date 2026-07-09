@@ -14,6 +14,15 @@ type (
 	ParameterDirection int
 )
 
+func Max(params ...int64) int64 {
+	ret := params[0]
+	for i := 1; i < len(params); i++ {
+		if ret < params[i] {
+			ret = params[i]
+		}
+	}
+	return ret
+}
 func CreateQuasiLocator(dataLength uint64) []byte {
 	ret := make([]byte, 40)
 	ret[1] = 38
@@ -115,6 +124,15 @@ func GetValue(origVal driver.Value) (driver.Value, error) {
 	return proVal.Interface(), nil
 }
 
+func GetType(value driver.Value) reflect.Type {
+	valueType := reflect.TypeOf(value)
+	if valueType != nil {
+		for valueType.Kind() == reflect.Ptr {
+			valueType = valueType.Elem()
+		}
+	}
+	return valueType
+}
 func ExtractTag(tag string) (name, _type string, size int, direction int) {
 	extractNameValue := func(input string, pos int) {
 		parts := strings.Split(input, "=")
@@ -172,6 +190,9 @@ func ExtractTag(tag string) (name, _type string, size int, direction int) {
 	}
 	if len(tagFields) > 3 {
 		extractNameValue(tagFields[3], 3)
+	}
+	if direction == 0 {
+		direction = 1
 	}
 	return
 }

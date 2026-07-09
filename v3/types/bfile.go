@@ -37,7 +37,9 @@ func CreateBFile(db *sql.DB, dirName, fileName string) (*BFile, error) {
 	}
 	return ret, ret.SetValue(filePath)
 }
-
+func (file *BFile) GetMaxLen() int64 {
+	return MaxLenBFile
+}
 func (file *BFile) SetValue(input interface{}) error {
 	if input == nil {
 		file.bValue = nil

@@ -1,8 +1,6 @@
 package go_ora
 
 import (
-	"database/sql"
-	"fmt"
 	"reflect"
 
 	"github.com/sijms/go-ora/v3/types"
@@ -212,20 +210,20 @@ import (
 //
 //		return nil
 //	}
-func setWithScanner(dest reflect.Value, input interface{}) error {
-	if temp, ok := dest.Interface().(sql.Scanner); ok {
-		if temp != nil && !reflect.ValueOf(temp).IsNil() {
-			return temp.Scan(input)
-		}
-	}
-	if dest.CanAddr() {
-		if temp, ok := dest.Addr().Interface().(sql.Scanner); ok {
-			err := temp.Scan(input)
-			return err
-		}
-	}
-	return fmt.Errorf("can't set %T to type: %v", input, dest.Type().Name())
-}
+//func setWithScanner(dest reflect.Value, input interface{}) error {
+//	if temp, ok := dest.Interface().(sql.Scanner); ok {
+//		if temp != nil && !reflect.ValueOf(temp).IsNil() {
+//			return temp.Scan(input)
+//		}
+//	}
+//	if dest.CanAddr() {
+//		if temp, ok := dest.Addr().Interface().(sql.Scanner); ok {
+//			err := temp.Scan(input)
+//			return err
+//		}
+//	}
+//	return fmt.Errorf("can't set %T to type: %v", input, dest.Type().String())
+//}
 
 //func setBlob(dest reflect.Value, input oraTypes.Blob) error {
 //	if dest.Kind() == reflect.Ptr {
@@ -435,42 +433,42 @@ func setArray(value reflect.Value, input []ParameterInfo) error {
 	return nil
 }
 
-func setUDTObject(value reflect.Value, cust *Object, input []ParameterInfo) error {
-	if value.Kind() == reflect.Ptr {
-		if value.IsNil() {
-			value.Set(reflect.New(value.Type().Elem()))
-		}
-		return setUDTObject(value.Elem(), cust, input)
-	}
-	if value.Kind() == reflect.Slice || value.Kind() == reflect.Array {
-		return setArray(value, input)
-		// if cust.isRegularArray() {
-		//
-		// } else {
-		// 	arrayObj := reflect.MakeSlice(reflect.SliceOf(cust.typ), 0, len(input))
-		// 	for _, par := range input {
-		// 		if temp, ok := par.oPrimValue.([]ParameterInfo); ok {
-		// 			tempObj2 := reflect.New(cust.typ)
-		// 			err := setFieldValue(tempObj2.Elem(), par.cusType, temp)
-		// 			if err != nil {
-		// 				return err
-		// 			}
-		// 			arrayObj = reflect.Append(arrayObj, tempObj2.Elem())
-		// 		}
-		// 	}
-		// 	value.Set(arrayObj)
-		// }
-	} else {
-		tempObj := reflect.New(cust.typ)
-		for _, par := range input {
-			if fieldIndex, ok := cust.activeFields[par.Name]; ok {
-				err := types.RCopy(tempObj.Elem().Field(fieldIndex), par.oPrimValue)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		value.Set(tempObj.Elem())
-	}
-	return nil
-}
+//func setUDTObject(value reflect.Value, cust *Object, input []ParameterInfo) error {
+//	if value.Kind() == reflect.Ptr {
+//		if value.IsNil() {
+//			value.Set(reflect.New(value.Type().Elem()))
+//		}
+//		return setUDTObject(value.Elem(), cust, input)
+//	}
+//	if value.Kind() == reflect.Slice || value.Kind() == reflect.Array {
+//		return setArray(value, input)
+//		// if cust.isRegularArray() {
+//		//
+//		// } else {
+//		// 	arrayObj := reflect.MakeSlice(reflect.SliceOf(cust.typ), 0, len(input))
+//		// 	for _, par := range input {
+//		// 		if temp, ok := par.oPrimValue.([]ParameterInfo); ok {
+//		// 			tempObj2 := reflect.New(cust.typ)
+//		// 			err := setFieldValue(tempObj2.Elem(), par.cusType, temp)
+//		// 			if err != nil {
+//		// 				return err
+//		// 			}
+//		// 			arrayObj = reflect.Append(arrayObj, tempObj2.Elem())
+//		// 		}
+//		// 	}
+//		// 	value.Set(arrayObj)
+//		// }
+//	} else {
+//		//tempObj := reflect.New(cust.typ)
+//		//for _, par := range input {
+//		//	if fieldIndex, ok := cust.activeFields[par.Name]; ok {
+//		//		err := types.RCopy(tempObj.Elem().Field(fieldIndex), par.oPrimValue)
+//		//		if err != nil {
+//		//			return err
+//		//		}
+//		//	}
+//		//}
+//		//value.Set(tempObj.Elem())
+//	}
+//	return nil
+//}

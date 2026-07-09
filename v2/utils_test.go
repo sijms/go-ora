@@ -362,6 +362,41 @@ func TestCatchReturning(t *testing.T) {
 	}
 }
 
+// issue 717: a quote inside a "--" line comment was treated as the start of
+// a string literal, so all text after the comment was dropped
+func TestRefineSqlTextIssue717(t *testing.T) {
+	testScenarios := []struct {
+		description string
+		input       string
+		expected    string
+	}{
+		{
+			description: "line comment with embedded single quote",
+			input:       "-- Oracle's built-in advisor\nSELECT 1 FROM DUAL",
+			expected:    "SELECT 1 FROM DUAL",
+		},
+		{
+			description: "line comment without quotes",
+			input:       "-- plain comment\nSELECT 1 FROM DUAL",
+			expected:    "SELECT 1 FROM DUAL",
+		},
+		{
+			description: "block comment with embedded single quote",
+			input:       "/* Oracle's built-in advisor */SELECT 1 FROM DUAL",
+			expected:    "SELECT 1 FROM DUAL",
+		},
+	}
+
+	for _, scenario := range testScenarios {
+		t.Run(scenario.description, func(t *testing.T) {
+			result := refineSqlText(scenario.input)
+			if result != scenario.expected {
+				t.Errorf("expected %q got %q", scenario.expected, result)
+			}
+		})
+	}
+}
+
 func TestIsEqualLoc(t *testing.T) {
 	testScenarios := []struct {
 		description string

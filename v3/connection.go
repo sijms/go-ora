@@ -611,15 +611,30 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			return err
 		}
 	}
+	if conn.isFastLoginEnabled() {
+		tracer := conn.tracer
+		tracer.Print("Fast Authentication is enabled")
+		session.ResetBuffer()
+		session.PutBytes(0x22, 1, 0, 0)
+		conn.tcpNego = &TCPNego{conn: conn, ServerFlags: 3, ServerCharset: 0x369, ServerNCharset: 0x7D0}
+		conn.tcpNego.writeMessage()
+		session.PutUint(conn.tcpNego.ServerCharset, 2, false, false)
+		session.PutBytes(conn.tcpNego.ServerFlags)
+		session.PutUint(conn.tcpNego.ServerNCharset, 2, false, false)
+		session.PutBytes(0x18)
+		conn.dataNego = buildTypeNego(conn.tcpNego, conn)
+		conn.dataNego.writeMessage()
+	} else {
+		err = conn.protocolNegotiation()
+		if err != nil {
+			return err
+		}
+		err = conn.dataTypeNegotiation()
+		if err != nil {
+			return err
+		}
+	}
 
-	err = conn.protocolNegotiation()
-	if err != nil {
-		return err
-	}
-	err = conn.dataTypeNegotiation()
-	if err != nil {
-		return err
-	}
 	err = conn.doAuth()
 	if errors.Is(err, network.ErrConnReset) {
 		err = conn.read()
@@ -827,12 +842,23 @@ func (conn *Connection) Close() (err error) {
 	return
 }
 
+func (conn *Connection) isFastLoginEnabled() bool {
+	return conn.session.Context.FastAuthEnabled && conn.connOption.FastLogin
+}
+
 // doAuth a login step that occur during open connection
 func (conn *Connection) doAuth() error {
-	conn.tracer.Print("doAuth")
-	var authObject *AuthObject
+	tracer := conn.tracer
+	tracer.Print("doAuth")
+	authObject := &AuthObject{
+		conn:       conn,
+		tcpNego:    conn.tcpNego,
+		usePadding: false,
+	}
 	if len(conn.connOption.UserID) > 0 && len(conn.connOption.Password) > 0 {
-		conn.session.ResetBuffer()
+		if !conn.isFastLoginEnabled() {
+			conn.session.ResetBuffer()
+		}
 		conn.session.PutTTCFunc(0x3, 0x76)
 		conn.session.PutBytes(1)
 		conn.session.PutUint(len(conn.connOption.UserID), 4, true, true)
@@ -851,17 +877,27 @@ func (conn *Connection) doAuth() error {
 		if err != nil {
 			return err
 		}
-		authObject, err = newAuthObject(conn)
+
+		if conn.isFastLoginEnabled() {
+			err = conn.tcpNego.readMessage()
+			if err != nil {
+				return err
+			}
+			conn.tcpNego.ServerFlags |= 2
+			conn.dataNego = buildTypeNego(conn.tcpNego, conn)
+			conn.dbTimeZone, err = conn.dataNego.read()
+			if err != nil {
+				return err
+			}
+		}
+		err = authObject.read()
 		if err != nil {
 			return err
 		}
-	} else {
-		authObject = &AuthObject{
-			conn:       conn,
-			tcpNego:    conn.tcpNego,
-			usePadding: false,
-			customHash: conn.tcpNego.ServerCompileTimeCaps[4]&32 != 0,
-		}
+		//authObject, err = newAuthObject(conn)
+		//if err != nil {
+		//	return err
+		//}
 	}
 	// if proxyAuth ==> mode |= PROXY
 	err := authObject.Write()
@@ -1573,6 +1609,7 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 			return err
 		}
 	case 28:
+		tracer.Print("Fast Negotiation REJECTED by Server")
 		err = conn.protocolNegotiation()
 		if err != nil {
 			return err
@@ -1610,71 +1647,30 @@ func (conn *Connection) dataTypeNegotiation() error {
 	tracer := conn.tracer
 	var err error
 	tracer.Print("Data Type Negotiation")
-	conn.dataNego = buildTypeNego(conn.tcpNego, conn.session)
-	err = conn.dataNego.write(conn.session)
+	conn.dataNego = buildTypeNego(conn.tcpNego, conn)
+	err = conn.dataNego.write()
 	if err != nil {
 		return err
 	}
-	conn.dbTimeZone, err = conn.dataNego.read(conn.session)
-	if err != nil {
-		return err
-	}
-	if conn.dbTimeZone == nil {
-		conn.tracer.Print("DB timezone not retrieved in data type negotiation")
-		conn.tracer.Print("try to query DB timezone")
-		err = conn.getDBTimeZone()
-		if err != nil {
-			conn.tracer.Print("error during get DB timezone: ", err)
-			conn.tracer.Print("set DB timezone to: UTC(+00:00)")
-			conn.dbTimeZone = time.UTC
-		}
-	}
-	conn.tracer.Print("DB timezone: ", conn.dbTimeZone)
-	conn.session.TTCVersion = conn.dataNego.CompileTimeCaps[7]
-	conn.session.UseBigScn = conn.tcpNego.ServerCompileTimeCaps[7] >= 8
-	if conn.tcpNego.ServerCompileTimeCaps[7] < conn.session.TTCVersion {
-		conn.session.TTCVersion = conn.tcpNego.ServerCompileTimeCaps[7]
-	}
-	tracer.Print("TTC Version: ", conn.session.TTCVersion)
-	if len(conn.tcpNego.ServerRuntimeCaps) > 6 && conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
-		conn.maxLen.varchar = 0x7FFF
-		conn.maxLen.nvarchar = 0x7FFF
-		conn.maxLen.raw = 0x7FFF
-	} else {
-		conn.maxLen.varchar = 0xFA0
-		conn.maxLen.nvarchar = 0xFA0
-		conn.maxLen.raw = 0xFA0
-	}
-	return nil
-	// this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
-	// this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
-	// this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompileTimeCapabilities[7] >= (byte) 8;
+	conn.dbTimeZone, err = conn.dataNego.read()
+	return err
 }
 
 func (conn *Connection) protocolNegotiation() error {
 	tracer := conn.tracer
 	var err error
 	tracer.Print("TCP Negotiation")
-	conn.tcpNego, err = newTCPNego(conn.session)
+	conn.tcpNego = &TCPNego{conn: conn}
+	err = conn.tcpNego.write()
+	if err != nil {
+		return err
+	}
+	err = conn.tcpNego.readMessage()
 	if err != nil {
 		return err
 	}
 	tracer.Print("Server Charset: ", conn.tcpNego.ServerCharset)
-	tracer.Print("Server National Charset: ", conn.tcpNego.ServernCharset)
-	// create string converter object
-	if conn.sStrConv == nil {
-		conn.sStrConv = converters.NewStringConverter(conn.tcpNego.ServerCharset)
-		if conn.sStrConv == nil {
-			return fmt.Errorf("the server use charset with id: %d which is not supported by the driver", conn.tcpNego.ServerCharset)
-		}
-	}
-	conn.session.StrConv = conn.sStrConv
-	if conn.nStrConv == nil {
-		conn.nStrConv = converters.NewStringConverter(conn.tcpNego.ServernCharset)
-		if conn.nStrConv == nil {
-			return fmt.Errorf("the server use ncharset with id: %d which is not supported by the driver", conn.tcpNego.ServernCharset)
-		}
-	}
+	tracer.Print("Server National Charset: ", conn.tcpNego.ServerNCharset)
 	conn.tcpNego.ServerFlags |= 2
 	return nil
 }

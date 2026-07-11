@@ -41,7 +41,7 @@ type SessionContext struct {
 		IV         []byte
 	}
 	isRedirect       bool
-	fastAuthEnabled  bool
+	FastAuthEnabled  bool
 	EODDAFlagEnabled bool
 	UUID             []byte
 }

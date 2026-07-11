@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/types"
 )
 
 type DataTypeNego struct {
+	conn                   *Connection
 	MessageCode            uint8
 	Server                 *TCPNego
 	TypeAndRep             []uint16
@@ -77,8 +77,9 @@ func (n *DataTypeNego) addTypeRep(dty uint16, ndty uint16, rep uint16) {
 	}
 }
 
-func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
+func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 	result := DataTypeNego{
+		conn:        conn,
 		MessageCode: 2,
 		Server:      nego,
 		TypeAndRep:  make([]uint16, bufferGrow),
@@ -109,39 +110,41 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 		// RuntimeCap:             []byte{2, 1, 0, 0, 18, 0, 87},
 		b32kTypeSupported:      false,
 		supportSessionStateOps: false,
-		clientTZVersion:        0x20,
+		clientTZVersion:        0x21,
 	}
-	if len(result.Server.ServerCompileTimeCaps) <= 27 || result.Server.ServerCompileTimeCaps[27] == 0 {
-		result.CompileTimeCaps[27] = 0
-	}
-	xmlTypeClientSideDecoding := false
-	if len(result.Server.ServerCompileTimeCaps) > 7 {
-		if result.Server.ServerCompileTimeCaps[7] >= 8 && xmlTypeClientSideDecoding {
-			result.CompileTimeCaps[36] = 4
-		} else if result.Server.ServerCompileTimeCaps[7] < 7 {
-			result.CompileTimeCaps[36] = 0
+	if result.Server != nil && len(result.Server.ServerCompileTimeCaps) > 0 {
+		if len(result.Server.ServerCompileTimeCaps) <= 27 || result.Server.ServerCompileTimeCaps[27] == 0 {
+			result.CompileTimeCaps[27] = 0
 		}
-	}
-	if len(result.Server.ServerRuntimeCaps) < 1 || result.Server.ServerRuntimeCaps[1]&1 != 1 {
-		result.RuntimeCap[1] &= 0
-	}
-	if len(result.Server.ServerRuntimeCaps) > 6 {
-		if result.Server.ServerRuntimeCaps[6]&4 == 4 {
-			result.RuntimeCap[6] |= 4
-			result.b32kTypeSupported = true
+		xmlTypeClientSideDecoding := false
+		if len(result.Server.ServerCompileTimeCaps) > 7 {
+			if result.Server.ServerCompileTimeCaps[7] >= 8 && xmlTypeClientSideDecoding {
+				result.CompileTimeCaps[36] = 4
+			} else if result.Server.ServerCompileTimeCaps[7] < 7 {
+				result.CompileTimeCaps[36] = 0
+			}
 		}
-		if result.Server.ServerRuntimeCaps[6]&16 == 16 {
-			result.supportSessionStateOps = true
+		if len(result.Server.ServerRuntimeCaps) < 1 || result.Server.ServerRuntimeCaps[1]&1 != 1 {
+			result.RuntimeCap[1] &= 0
 		}
-		if result.Server.ServerRuntimeCaps[6]&2 == 2 {
-			result.RuntimeCap[6] |= 2
+		if len(result.Server.ServerRuntimeCaps) > 6 {
+			if result.Server.ServerRuntimeCaps[6]&4 == 4 {
+				result.RuntimeCap[6] |= 4
+				result.b32kTypeSupported = true
+			}
+			if result.Server.ServerRuntimeCaps[6]&16 == 16 {
+				result.supportSessionStateOps = true
+			}
+			if result.Server.ServerRuntimeCaps[6]&2 == 2 {
+				result.RuntimeCap[6] |= 2
+			}
 		}
-	}
-	if len(result.Server.ServerCompileTimeCaps) <= 37 || result.Server.ServerCompileTimeCaps[37]&2 != 2 {
-		result.CompileTimeCaps[37] = 0
-		result.CompileTimeCaps[1] = 0
-	}
+		if len(result.Server.ServerCompileTimeCaps) <= 37 || result.Server.ServerCompileTimeCaps[37]&2 != 2 {
+			result.CompileTimeCaps[37] = 0
+			result.CompileTimeCaps[1] = 0
+		}
 
+	}
 	result.TypeAndRep[0] = 1
 	result.addTypeRep(types.NCHAR, types.NCHAR, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(types.NUMBER, types.NUMBER, TNS_TYPE_REP_ORACLE)
@@ -506,13 +509,15 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 			result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1100]
 		}
 	} else {
-		result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1100]
+		result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1200]
 	}
+	//result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1200]
 	return &result
 }
 
-func (nego *DataTypeNego) read(session *network.Session) (zone *time.Location, err error) {
+func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 	var msg uint8
+	session := nego.conn.session
 	msg, err = session.GetByte()
 	if err != nil {
 		return
@@ -561,17 +566,40 @@ func (nego *DataTypeNego) read(session *network.Session) (zone *time.Location, e
 		}
 		level++
 	}
+	tracer := nego.conn.tracer
+	if zone != nil {
+		tracer.Print("DB timezone: ", zone)
+	} else {
+		tracer.Print("DB timezone not retrieved in data type negotiation")
+		tracer.Print("set DB timezone to: UTC(+00:00)")
+		nego.conn.dbTimeZone = time.UTC
+	}
+
+	if nego.Server.ServerCompileTimeCaps[7] < nego.conn.session.TTCVersion {
+		nego.conn.session.TTCVersion = nego.Server.ServerCompileTimeCaps[7]
+	}
+	nego.conn.session.UseBigScn = nego.Server.ServerCompileTimeCaps[7] >= 8
+	tracer.Print("TTC Version: ", nego.conn.session.TTCVersion)
+	if len(nego.conn.tcpNego.ServerRuntimeCaps) > 6 && nego.conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
+		nego.conn.maxLen.varchar = 0x7FFF
+		nego.conn.maxLen.nvarchar = 0x7FFF
+		nego.conn.maxLen.raw = 0x7FFF
+	} else {
+		nego.conn.maxLen.varchar = 0xFA0
+		nego.conn.maxLen.nvarchar = 0xFA0
+		nego.conn.maxLen.raw = 0xFA0
+	}
 	// fmt.Println("server timezone version: ", nego.serverTZVersion)
 	// fmt.Println("client timezone version: ", nego.clientTZVersion)
 	// fmt.Println("server timezone: ", nego.dbTimeZone)
 	return
 }
 
-func (nego *DataTypeNego) write(session *network.Session) error {
-	session.ResetBuffer()
-	if nego.Server.ServerCompileTimeCaps == nil || len(nego.Server.ServerCompileTimeCaps) <= 27 || nego.Server.ServerCompileTimeCaps[27] == 0 {
+func (nego *DataTypeNego) writeMessage() {
+	if nego.Server.ServerCompileTimeCaps != nil && (len(nego.Server.ServerCompileTimeCaps) <= 27 || nego.Server.ServerCompileTimeCaps[27] == 0) {
 		nego.CompileTimeCaps[27] = 0
 	}
+	session := nego.conn.session
 	session.PutBytes(nego.MessageCode)
 	// client remote in
 	// session.PutBytes(0, 0, 0, 0)
@@ -589,7 +617,7 @@ func (nego *DataTypeNego) write(session *network.Session) error {
 			// session.PutBytes(0, 0, 0, uint8(nego.clientTZVersion))
 		}
 	}
-	session.PutInt(nego.Server.ServernCharset, 2, false, false)
+	session.PutInt(nego.Server.ServerNCharset, 2, false, false)
 	// marshal type reps
 	size := nego.RuntimeTypeAndRep[0]
 	if nego.CompileTimeCaps[27] == 0 {
@@ -603,6 +631,11 @@ func (nego *DataTypeNego) write(session *network.Session) error {
 		}
 		session.PutBytes(0, 0)
 	}
+}
+func (nego *DataTypeNego) write() error {
+	session := nego.conn.session
+	session.ResetBuffer()
+	nego.writeMessage()
 	return session.Write()
 }
 

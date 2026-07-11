@@ -5,118 +5,139 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sijms/go-ora/v3/network"
+	"github.com/sijms/go-ora/v3/converters"
 )
 
 type TCPNego struct {
+	conn                  *Connection
 	MessageCode           uint8
-	ProtocolServerVersion uint8
 	ProtocolServerString  string
 	OracleVersion         int
 	ServerCharset         int
 	ServerFlags           uint8
-	CharsetElem           int
-	ServernCharset        int
+	ServerNCharset        int
 	ServerCompileTimeCaps []byte
 	ServerRuntimeCaps     []byte
 }
 
-// newTCPNego create TCPNego object by reading data from network session
-func newTCPNego(session *network.Session) (*TCPNego, error) {
-	session.ResetBuffer()
-	// 1 = ttc message code
-	// 6, 0 = client version
+func (nego *TCPNego) writeMessage() {
+	session := nego.conn.session
 	session.PutBytes(1, 6, 0)
 	session.PutBytes([]byte("OracleClientGo\x00")...)
-	err := session.Write()
+}
+
+func (nego *TCPNego) write() error {
+	session := nego.conn.session
+	session.ResetBuffer()
+	nego.writeMessage()
+	return session.Write()
+}
+
+func (nego *TCPNego) readMessage() error {
+	var err error
+	session := nego.conn.session
+	tracer := nego.conn.tracer
+	nego.MessageCode, err = session.GetByte()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	result := TCPNego{}
-	result.MessageCode, err = session.GetByte()
+	if nego.MessageCode != 1 {
+		return fmt.Errorf("message code error: received code %d and expected code is 1", nego.MessageCode)
+	}
+	var protocolServerVersion uint8
+	protocolServerVersion, err = session.GetByte()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if result.MessageCode != 1 {
-		return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 1", result.MessageCode))
-	}
-	result.ProtocolServerVersion, err = session.GetByte()
-	if err != nil {
-		return nil, err
-	}
-	switch result.ProtocolServerVersion {
+	switch protocolServerVersion {
 	case 4:
-		result.OracleVersion = 7230
+		nego.OracleVersion = 7230
 	case 5:
-		result.OracleVersion = 8030
+		nego.OracleVersion = 8030
 	case 6:
-		result.OracleVersion = 8100
+		nego.OracleVersion = 8100
 	default:
-		return nil, errors.New("unsupported server version")
+		return fmt.Errorf("unsupported protocol server version: %d", protocolServerVersion)
 	}
-	_, _ = session.GetByte()
-	result.ProtocolServerString, err = session.GetNullTermString()
+	_, err = session.GetByte()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	result.ServerCharset, err = session.GetInt(2, false, false)
+	nego.ProtocolServerString, err = session.GetNullTermString()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	result.ServerFlags, err = session.GetByte()
+	nego.ServerCharset, err = session.GetInt(2, false, false)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	result.CharsetElem, err = session.GetInt(2, false, false)
+	tracer.Print("Server Charset: ", nego.ServerCharset)
+	// create string converter object
+	if nego.conn.sStrConv == nil {
+		nego.conn.sStrConv = converters.NewStringConverter(nego.ServerCharset)
+		if nego.conn.sStrConv == nil {
+			return fmt.Errorf("the server use charset with id: %d which is not supported by the driver", nego.ServerCharset)
+		}
+	}
+	nego.conn.session.StrConv = nego.conn.sStrConv
+	nego.ServerFlags, err = session.GetByte()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if result.CharsetElem > 0 {
-		_, _ = session.GetBytes(result.CharsetElem * 5)
+	var charsetElem int
+	charsetElem, err = session.GetInt(2, false, false)
+	if err != nil {
+		return err
 	}
-
+	if charsetElem > 0 {
+		_, _ = session.GetBytes(charsetElem * 5)
+	}
 	len1, err := session.GetInt(2, false, true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	numArray, err := session.GetBytes(len1)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	num3 := int(6 + (numArray[5]) + (numArray[6]))
-	result.ServernCharset = int(binary.BigEndian.Uint16(numArray[(num3 + 3):(num3 + 5)]))
+	nego.ServerNCharset = int(binary.BigEndian.Uint16(numArray[(num3 + 3):(num3 + 5)]))
+	if nego.conn.nStrConv == nil {
+		nego.conn.nStrConv = converters.NewStringConverter(nego.ServerNCharset)
+		if nego.conn.nStrConv == nil {
+			return fmt.Errorf("the server use ncharset with id: %d which is not supported by the driver", nego.ServerNCharset)
+		}
+	}
+	tracer.Print("Server National Charset: ", nego.ServerNCharset)
 	len2, err := session.GetByte()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	result.ServerCompileTimeCaps, err = session.GetBytes(int(len2))
+	nego.ServerCompileTimeCaps, err = session.GetBytes(int(len2))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	len3, err := session.GetByte()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	result.ServerRuntimeCaps, err = session.GetBytes(int(len3))
+	nego.ServerRuntimeCaps, err = session.GetBytes(int(len3))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if len(result.ServerCompileTimeCaps) > 15 && result.ServerCompileTimeCaps[15]&1 != 0 {
+	if len(nego.ServerCompileTimeCaps) > 15 && nego.ServerCompileTimeCaps[15]&1 != 0 {
 		session.HasEOSCapability = true
 	}
-	if len(result.ServerCompileTimeCaps) > 16 && result.ServerCompileTimeCaps[16]&1 != 0 {
+	if len(nego.ServerCompileTimeCaps) > 16 && nego.ServerCompileTimeCaps[16]&1 != 0 {
 		session.HasFSAPCapability = true
 	}
-	if result.ServerCompileTimeCaps == nil || len(result.ServerCompileTimeCaps) < 8 {
-		return nil, errors.New("server compile time caps length less than 8")
+	if nego.ServerCompileTimeCaps == nil || len(nego.ServerCompileTimeCaps) < 8 {
+		return errors.New("server compile time caps length less than 8")
 	}
-	if len(result.ServerCompileTimeCaps) > 37 && result.ServerCompileTimeCaps[37]&32 != 0 {
+	if len(nego.ServerCompileTimeCaps) > 37 && nego.ServerCompileTimeCaps[37]&32 != 0 {
 		session.UseBigClrChunks = true
 		session.ClrChunkSize = 0x7FFF
 	}
-	// this.m_b32kTypeSupported = this.m_dtyNeg.m_b32kTypeSupported;
-	// this.m_bSupportSessionStateOps = this.m_dtyNeg.m_bSupportSessionStateOps;
-	// this.m_marshallingEngine.m_bServerUsingBigSCN = this.m_serverCompiletimeCapabilities[7] >= (byte) 8;
-	return &result, nil
+
+	return nil
 }

@@ -36,71 +36,76 @@ type AuthObject struct {
 	pbkdf2SderCount  int
 	globalUniqueDBID string
 	usePadding       bool
-	customHash       bool
-	VerifierType     int
-	tcpNego          *TCPNego
-	conn             *Connection
+	//customHash       bool
+	VerifierType int
+	tcpNego      *TCPNego
+	conn         *Connection
 }
 
 // create authentication object through reading data from network
-func newAuthObject(conn *Connection) (*AuthObject, error) {
-	session := conn.session
-	ret := new(AuthObject)
-	ret.conn = conn
-	ret.tcpNego = conn.tcpNego
-	ret.usePadding = false
-	ret.customHash = ret.tcpNego.ServerCompileTimeCaps[4]&32 != 0
+//func newAuthObject(conn *Connection) (*AuthObject, error) {
+//	session := conn.session
+//	ret := new(AuthObject)
+//	ret.conn = conn
+//	ret.tcpNego = conn.tcpNego
+//	ret.usePadding = false
+//	//ret.customHash = ret.tcpNego.ServerCompileTimeCaps[4]&32 != 0
+//
+//}
+
+func (obj *AuthObject) read() error {
 	loop := true
+	session := obj.conn.session
 	for loop {
 		messageCode, err := session.GetByte()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		switch messageCode {
 		case 8:
 			dictLen, err := session.GetInt(4, true, true)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			for x := 0; x < dictLen; x++ {
 				key, val, num, err := session.GetKeyVal()
 				if err != nil {
-					return nil, err
+					return err
 				}
 				if bytes.Equal(key, []byte("AUTH_SESSKEY")) {
-					if len(ret.EServerSessKey) == 0 {
-						ret.EServerSessKey = string(val)
+					if len(obj.EServerSessKey) == 0 {
+						obj.EServerSessKey = string(val)
 					}
 				} else if bytes.Equal(key, []byte("AUTH_VFR_DATA")) {
-					if len(ret.Salt) == 0 {
-						ret.Salt = string(val)
-						ret.VerifierType = num
+					if len(obj.Salt) == 0 {
+						obj.Salt = string(val)
+						obj.VerifierType = num
 					}
 				} else if bytes.Equal(key, []byte("AUTH_PBKDF2_CSK_SALT")) {
-					if len(ret.pbkdf2ChkSalt) == 0 {
-						ret.pbkdf2ChkSalt = string(val)
-						if len(ret.pbkdf2ChkSalt) != 32 {
-							return nil, network.NewOracleError(28041)
+					if len(obj.pbkdf2ChkSalt) == 0 {
+						obj.pbkdf2ChkSalt = string(val)
+						if len(obj.pbkdf2ChkSalt) != 32 {
+							return network.NewOracleError(28041)
 						}
 					}
 				} else if bytes.Equal(key, []byte("AUTH_PBKDF2_VGEN_COUNT")) {
-					if ret.pbkdf2VgenCount == 0 {
-						ret.pbkdf2VgenCount, err = strconv.Atoi(string(val))
+					if obj.pbkdf2VgenCount == 0 {
+						obj.pbkdf2VgenCount, err = strconv.Atoi(string(val))
 						if err != nil {
-							return nil, network.NewOracleError(28041)
+							return network.NewOracleError(28041)
 						}
-						if ret.pbkdf2VgenCount < 4096 || ret.pbkdf2VgenCount > 100000000 {
-							ret.pbkdf2VgenCount = 4096
+						if obj.pbkdf2VgenCount < 4096 || obj.pbkdf2VgenCount > 100000000 {
+							obj.pbkdf2VgenCount = 4096
 						}
 					}
 				} else if bytes.Equal(key, []byte("AUTH_PBKDF2_SDER_COUNT")) {
-					ret.pbkdf2SderCount, err = strconv.Atoi(string(val))
-					if ret.pbkdf2SderCount == 0 {
+					obj.pbkdf2SderCount, err = strconv.Atoi(string(val))
+					if obj.pbkdf2SderCount == 0 {
 						if err != nil {
-							return nil, network.NewOracleError(28041)
+							return network.NewOracleError(28041)
 						}
-						if ret.pbkdf2SderCount < 3 || ret.pbkdf2SderCount > 100000000 {
-							ret.pbkdf2SderCount = 3
+						if obj.pbkdf2SderCount < 3 || obj.pbkdf2SderCount > 100000000 {
+							obj.pbkdf2SderCount = 3
 						}
 					}
 				}
@@ -123,111 +128,111 @@ func newAuthObject(conn *Connection) (*AuthObject, error) {
 		//		return nil, err
 		//	}
 		default:
-			err = conn.ProcessTCCResponse(messageCode)
+			err = obj.conn.ProcessTCCResponse(messageCode)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if messageCode == 4 {
 				if session.HasError() {
-					return nil, session.GetError()
+					return session.GetError()
 				}
 				loop = false
 			}
 			// return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", messageCode))
 		}
 	}
-	if len(ret.EServerSessKey) != 64 && len(ret.EServerSessKey) != 96 {
-		return nil, errors.New("session key should be either 64, 96 bytes long")
+	if len(obj.EServerSessKey) != 64 && len(obj.EServerSessKey) != 96 {
+		return errors.New("session key should be either 64, 96 bytes long")
 	}
 	var key []byte
 	var speedyKey []byte
 	padding := false
 	var err error
 
-	if ret.VerifierType == 2361 {
-		key, err = getKeyFromUserNameAndPassword(conn.connOption.UserID, conn.connOption.Password)
+	if obj.VerifierType == 2361 {
+		key, err = getKeyFromUserNameAndPassword(obj.conn.connOption.UserID, obj.conn.connOption.Password)
 		if err != nil {
-			return nil, err
+			return err
 		}
-	} else if ret.VerifierType == 6949 {
+	} else if obj.VerifierType == 6949 {
 
-		if ret.tcpNego.ServerCompileTimeCaps[4]&2 == 0 {
+		if obj.tcpNego.ServerCompileTimeCaps[4]&2 == 0 {
 			padding = true
 		}
-		result, err := hex.DecodeString(ret.Salt)
+		result, err := hex.DecodeString(obj.Salt)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		result = append([]byte(conn.connOption.Password), result...)
+		result = append([]byte(obj.conn.connOption.Password), result...)
 		hash := sha1.New()
 		_, err = hash.Write(result)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		key = hash.Sum(nil)           // 20 byte key
 		key = append(key, 0, 0, 0, 0) // 24 byte key
-	} else if ret.VerifierType == 18453 {
-		salt, err := hex.DecodeString(ret.Salt)
+	} else if obj.VerifierType == 18453 {
+		salt, err := hex.DecodeString(obj.Salt)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		message := append(salt, []byte("AUTH_PBKDF2_SPEEDY_KEY")...)
-		speedyKey = generateSpeedyKey(message, []byte(conn.connOption.Password), ret.pbkdf2VgenCount)
+		speedyKey = generateSpeedyKey(message, []byte(obj.conn.connOption.Password), obj.pbkdf2VgenCount)
 
 		buffer := append(speedyKey, salt...)
 		hash := sha512.New()
 		hash.Write(buffer)
 		key = hash.Sum(nil)[:32]
 	} else {
-		return nil, errors.New("unsupported verifier type")
+		return errors.New("unsupported verifier type")
 	}
 	// get the server session key
-	ret.ServerSessKey, err = decryptSessionKey(padding, key, ret.EServerSessKey)
+	obj.ServerSessKey, err = decryptSessionKey(padding, key, obj.EServerSessKey)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// note if serverSessKey length is less than the expected length according to verifier generate random one
 	// generate new key for client
-	ret.ClientSessKey = make([]byte, len(ret.ServerSessKey))
+	obj.ClientSessKey = make([]byte, len(obj.ServerSessKey))
 	for {
-		_, err = rand.Read(ret.ClientSessKey)
+		_, err = rand.Read(obj.ClientSessKey)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if !bytes.Equal(ret.ClientSessKey, ret.ServerSessKey) {
+		if !bytes.Equal(obj.ClientSessKey, obj.ServerSessKey) {
 			break
 		}
 	}
 
 	// encrypt the client key
-	ret.EClientSessKey, err = encryptSessionKey(padding, key, ret.ClientSessKey)
+	obj.EClientSessKey, err = encryptSessionKey(padding, key, obj.ClientSessKey)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// get the hash key form server and client session key
-	newKey, err := ret.generatePasswordEncKey()
+	newKey, err := obj.generatePasswordEncKey()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if ret.VerifierType == 18453 {
+	if obj.VerifierType == 18453 {
 		padding = false
 	} else {
 		padding = true
 	}
 	// encrypt the password
-	ret.EPassword, err = encryptPassword([]byte(conn.connOption.Password), newKey, true)
+	obj.EPassword, err = encryptPassword([]byte(obj.conn.connOption.Password), newKey, true)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if ret.VerifierType == 18453 {
-		ret.ESpeedyKey, err = encryptPassword(speedyKey, newKey, padding)
+	if obj.VerifierType == 18453 {
+		obj.ESpeedyKey, err = encryptPassword(speedyKey, newKey, padding)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return ret, nil
+	return nil
 }
 
 // write authentication data to network

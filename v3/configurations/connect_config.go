@@ -49,6 +49,7 @@ type ConnectionConfig struct {
 	PrefetchRows  int
 	Lob           LobFetch
 	LobReadMode   LobReadMode
+	FastLogin     bool
 }
 
 func (config *ConnectionConfig) ConnectionData() string {
@@ -94,6 +95,7 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 	q := u.Query()
 	config := &ConnectionConfig{
 		PrefetchRows: 25,
+		FastLogin:    true,
 		SessionInfo: SessionInfo{
 			ConnectTimeout: time.Duration(60 * time.Second),
 			Timeout:        0,
@@ -264,6 +266,8 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 				return nil, errors.New("TIMEOUT value must be an integer")
 			}
 			config.SessionInfo.ConnectTimeout = time.Second * time.Duration(to)
+		case "FAST LOGIN":
+			config.FastLogin = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
 		case "TRACE FILE":
 			config.TraceFilePath = val[0]
 			// if len(val[0]) > 0 {

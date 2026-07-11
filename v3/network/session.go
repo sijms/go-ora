@@ -106,6 +106,7 @@ func NewSession(config *configurations.ConnectionConfig, tracer trace.Tracer) *S
 	ret.UseBigClrChunks = false
 	ret.ClrChunkSize = 0x40
 	ret.terminal = ret
+	ret.TTCVersion = 24
 	return ret
 }
 

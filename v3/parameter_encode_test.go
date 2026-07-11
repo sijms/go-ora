@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	conn      = &Connection{tcpNego: &TCPNego{ServernCharset: 870, ServerCharset: 0x230}}
+	conn      = &Connection{tcpNego: &TCPNego{ServerNCharset: 870, ServerCharset: 0x230}}
 	expNilPar = ParameterInfo{
 		DataType: NCHAR,
 		Flag:     3,

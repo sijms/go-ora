@@ -72,7 +72,8 @@ func newAcceptPacketFromData(packetData []byte, config *configurations.Connectio
 			flag:       packetData[5],
 		},
 	}
-	pck.sessionCtx.fastAuthEnabled = pck.sessionCtx.NegotiatedOptions2&0x10000000 != 0
+	//this.m_FastAuthEnabled = (this.m_ACFL2 & TNSPacketOffsets.NSGENBFAT) != 0;
+	pck.sessionCtx.FastAuthEnabled = pck.sessionCtx.NegotiatedOptions2&0x10000000 != 0
 	pck.sessionCtx.EODDAFlagEnabled = pck.sessionCtx.NegotiatedOptions2&0x2000000 != 0
 	pck.buffer = packetData[int(pck.dataOffset):]
 	if pck.sessionCtx.Version >= 319 && pck.length >= (45+16) {

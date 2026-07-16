@@ -106,7 +106,7 @@ func NewSession(config *configurations.ConnectionConfig, tracer trace.Tracer) *S
 	ret.UseBigClrChunks = false
 	ret.ClrChunkSize = 0x40
 	ret.terminal = ret
-	ret.TTCVersion = 24
+	//ret.TTCVersion = 24
 	return ret
 }
 
@@ -601,7 +601,7 @@ func (session *Session) Connect(ctx context.Context) error {
 }
 
 func (session *Session) WriteFinalPacket() error {
-	data, err := newDataPacket(nil, session.Context, session.tracer, &session.mu)
+	data, err := newDataPacket(nil, session.Context, session.tracer, &session.mu, 0)
 	if err != nil {
 		return err
 	}
@@ -624,16 +624,19 @@ func (session *Session) Disconnect() {
 	}
 }
 
-// Write send data store in output buffer through network
-//
-// if data bigger than fSessionDataUnit it should be divided into
-// segment and each segment sent in data packet
-func (session *Session) Write() error {
+func (session *Session) WriteRPC(start, end bool) error {
+	dataFlag := uint16(0)
+	if start {
+		dataFlag |= 0x1000
+	}
+	if end {
+		dataFlag |= 0x800
+	}
 	outputBytes := session.outBuffer.Bytes()
 	size := session.outBuffer.Len()
 	if size == 0 {
 		// send empty data packet
-		pck, err := newDataPacket(nil, session.Context, session.tracer, &session.mu)
+		pck, err := newDataPacket(nil, session.Context, session.tracer, &session.mu, dataFlag)
 		if err != nil {
 			return err
 		}
@@ -647,7 +650,7 @@ func (session *Session) Write() error {
 		segment := make([]byte, segmentLen)
 		for size > segmentLen {
 			copy(segment, outputBytes[offset:offset+segmentLen])
-			pck, err := newDataPacket(segment, session.Context, session.tracer, &session.mu)
+			pck, err := newDataPacket(segment, session.Context, session.tracer, &session.mu, dataFlag)
 			if err != nil {
 				return err
 			}
@@ -661,7 +664,7 @@ func (session *Session) Write() error {
 		}
 	}
 	if size != 0 {
-		pck, err := newDataPacket(outputBytes[offset:], session.Context, session.tracer, &session.mu)
+		pck, err := newDataPacket(outputBytes[offset:], session.Context, session.tracer, &session.mu, dataFlag)
 		if err != nil {
 			return err
 		}
@@ -672,6 +675,14 @@ func (session *Session) Write() error {
 		}
 	}
 	return nil
+}
+
+// Write send data store in output buffer through network
+//
+// if data bigger than fSessionDataUnit it should be divided into
+// segment and each segment sent in data packet
+func (session *Session) Write() error {
+	return session.WriteRPC(false, false)
 }
 
 func (session *Session) processMarker() error {

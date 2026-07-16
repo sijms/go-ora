@@ -1,7 +1,14 @@
 package go_ora
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
 	"database/sql"
+	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -147,6 +154,44 @@ func parseQueryParametersNames(text string) (names []string, err error) {
 		}
 	}
 	return names, nil
+}
+
+func generateTokenHeader(host, service string, port int) string {
+	ret := fmt.Sprintf("date:%s\n(request-target):%s\nhost:%s:%d", time.Now().UTC().Format(time.RFC1123), service, host, port)
+	ret = strings.ReplaceAll(ret, "UTC", "GMT")
+	return ret
+}
+
+func signTokenHeader(data string, privateKey []byte) (signature string, err error) {
+	block, _ := pem.Decode(privateKey)
+	if block == nil || block.Type != "RSA PRIVATE KEY" && block.Type != "PRIVATE KEY" {
+		err = errors.New("invalid private key PEM")
+		return
+	}
+	var key any
+	key, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			err = errors.New("failed to parse private key")
+			return
+		}
+	}
+
+	priv, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		err = errors.New("not an RSA private key")
+		return
+	}
+
+	hashed := sha256.Sum256([]byte(data))
+	var sig []byte
+	sig, err = rsa.SignPKCS1v15(rand.Reader, priv, crypto.SHA256, hashed[:])
+	if err != nil {
+		return
+	}
+	signature = base64.StdEncoding.EncodeToString(sig)
+	return
 }
 
 //func copy_(dest, source any) error {

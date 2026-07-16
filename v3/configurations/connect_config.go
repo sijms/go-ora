@@ -44,12 +44,14 @@ type ConnectionConfig struct {
 	DatabaseInfo
 	SessionInfo
 	AdvNegoServiceInfo
-	TraceFilePath string
-	TraceDir      string
-	PrefetchRows  int
-	Lob           LobFetch
-	LobReadMode   LobReadMode
-	FastLogin     bool
+	TraceFilePath       string
+	TraceDir            string
+	PrefetchRows        int
+	Lob                 LobFetch
+	LobReadMode         LobReadMode
+	FastLogin           bool
+	TokenFile           string
+	TokenPrivateKeyFile string
 }
 
 func (config *ConnectionConfig) ConnectionData() string {
@@ -72,17 +74,25 @@ func (config *ConnectionConfig) ConnectionData() string {
 		address = "(ADDRESS=(PROTOCOL=" + protocol + ")(HOST=" + host.Addr + ")(PORT=" + strconv.Itoa(host.Port) + "))"
 	}
 
-	result := "(CONNECT_DATA="
+	connectData := "(CONNECT_DATA="
 	if config.SID != "" {
-		result += "(SID=" + config.SID + ")"
+		connectData += "(SID=" + config.SID + ")"
 	} else {
-		result += "(SERVICE_NAME=" + config.ServiceName + ")"
+		connectData += "(SERVICE_NAME=" + config.ServiceName + ")"
 	}
 	if config.InstanceName != "" {
-		result += "(INSTANCE_NAME=" + config.InstanceName + ")"
+		connectData += "(INSTANCE_NAME=" + config.InstanceName + ")"
 	}
-	result += FulCid
-	return "(DESCRIPTION=" + address + result + "))"
+	// should add connection id also here
+	//(CONNECTION_ID=/lKthdECvk6r+ivbdaDGJQ==)
+	connectData += FulCid
+
+	// (security=(ssl_server_dn_match=yes))
+	security := ""
+	if config.SSLVerify {
+		security = "(security=(ssl_server_dn_match=yes))"
+	}
+	return "(DESCRIPTION=" + address + connectData + security + "))"
 }
 
 func ParseConfig(dsn string) (*ConnectionConfig, error) {
@@ -299,6 +309,14 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 			}
 		case "UNIX SOCKET":
 			config.SessionInfo.UnixAddress = val[0]
+		case "TOKEN":
+			fallthrough
+		case "TOKEN FILE":
+			config.TokenFile = val[0]
+		case "TOKEN PRIVATE KEY":
+			fallthrough
+		case "TOKEN PRIVATE KEY FILE":
+			config.TokenPrivateKeyFile = val[0]
 		case "PROXY CLIENT NAME":
 			config.DatabaseInfo.ProxyClientName = val[0]
 		//case "FAILOVER":
@@ -488,9 +506,26 @@ func (config *ConnectionConfig) validate() error {
 	if config.AuthType == TCPS {
 		config.AuthService = append(config.AuthService, "TCPS")
 	}
-	if len(config.UserID) == 0 || len(config.Password) == 0 && config.AuthType == Normal {
-		config.AuthType = OS
+	//if len(config.TokenFile) > 0 {
+	//	config.tokenBytes, err = os.ReadFile(config.TokenFile)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	//if len(config.TokenPrivateKeyFile) > 0 {
+	//	config.tokenPrivateKeyBytes, err = os.ReadFile(config.TokenPrivateKeyFile)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	if len(config.TokenFile) > 0 && len(config.TokenPrivateKeyFile) > 0 {
+
+	} else {
+		if len(config.UserID) == 0 || len(config.Password) == 0 && config.AuthType == Normal {
+			config.AuthType = OS
+		}
 	}
+
 	if config.AuthType == OS {
 		if runtime.GOOS == "windows" {
 			config.AuthService = append(config.AuthService, "NTS")

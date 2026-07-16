@@ -250,6 +250,8 @@ func (obj *AuthObject) Write() error {
 		flags = append(flags, f)
 	}
 	index := 0
+	appendKeyVal("AUTH_CLIENT_CAPABILITIES", "1", 0)
+	index++
 	if len(obj.EClientSessKey) > 0 {
 		appendKeyVal("AUTH_SESSKEY", obj.EClientSessKey, 1)
 		index++
@@ -270,8 +272,10 @@ func (obj *AuthObject) Write() error {
 	index++
 	appendKeyVal("AUTH_PID", fmt.Sprintf("%d", connOption.ClientInfo.PID), 0)
 	index++
-	appendKeyVal("AUTH_SID", connOption.ClientInfo.OSUserName, 0)
-	index++
+	if len(connOption.ClientInfo.OSUserName) > 0 {
+		appendKeyVal("AUTH_SID", connOption.ClientInfo.OSUserName, 0)
+		index++
+	}
 	appendKeyVal("AUTH_CONNECT_STRING", connOption.ConnectionData(), 0)
 	index++
 	appendKeyVal("SESSION_CLIENT_CHARSET", strconv.Itoa(int(obj.tcpNego.ServerCharset)), 0)
@@ -280,7 +284,7 @@ func (obj *AuthObject) Write() error {
 	index++
 	appendKeyVal("SESSION_CLIENT_DRIVER_NAME", connOption.ClientInfo.DriverName, 0)
 	index++
-	appendKeyVal("SESSION_CLIENT_VERSION", "2.0.0.0", 0)
+	appendKeyVal("SESSION_CLIENT_VERSION", "3.0.0.0", 0)
 	index++
 	appendKeyVal("SESSION_CLIENT_LOBATTR", "1", 0)
 	index++
@@ -297,6 +301,8 @@ func (obj *AuthObject) Write() error {
 		}
 		tz = fmt.Sprintf("%+03d:%02d", hours, minutes)
 	}
+	appendKeyVal("AUTH_ENABLED_ROLE_NAMES", "", 1)
+	index++
 	appendKeyVal("AUTH_ALTER_SESSION",
 		fmt.Sprintf("ALTER SESSION SET NLS_LANGUAGE='%s' NLS_TERRITORY='%s'  TIME_ZONE='%s'\x00",
 			connOption.Language, connOption.Territory, tz), 1)
@@ -305,7 +311,24 @@ func (obj *AuthObject) Write() error {
 		appendKeyVal("PROXY_CLIENT_NAME", connOption.ProxyClientName, 0)
 		index++
 	}
-	session.ResetBuffer()
+	if len(obj.conn.token) > 0 {
+		addr := obj.conn.connOption.GetActiveServer(false)
+		if addr != nil {
+			serviceName := obj.conn.connOption.ServiceName
+			header := generateTokenHeader(addr.Addr, serviceName, addr.Port)
+			signature, err := signTokenHeader(header, obj.conn.tokenPrivateKey)
+			if err != nil {
+				return err
+			}
+			appendKeyVal("AUTH_TOKEN", string(obj.conn.token), 0)
+			index++
+			appendKeyVal("AUTH_HEADER", header, 0)
+			index++
+			appendKeyVal("AUTH_SIGNATURE", signature, 0)
+			index++
+		}
+	}
+	//session.ResetBuffer()
 	session.PutTTCFunc(0x3, 0x73)
 	if len(connOption.UserID) > 0 {
 		session.PutBytes(1)
@@ -327,7 +350,12 @@ func (obj *AuthObject) Write() error {
 	for i := 0; i < index; i++ {
 		session.PutKeyValString(keys[i], values[i], flags[i])
 	}
-	return session.Write()
+	if (len(obj.conn.connOption.UserID) == 0 || len(obj.conn.connOption.Password) == 0) && obj.conn.isFastLoginEnabled() {
+		return session.WriteRPC(false, true)
+	} else {
+		return session.Write()
+	}
+
 }
 
 func generateSpeedyKey(buffer, key []byte, turns int) []byte {

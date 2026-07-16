@@ -439,12 +439,14 @@ func (session *basicSession) PutString(data string) {
 // PutKeyVal write key, val (in form of bytearray) and flag number to output buffer
 func (session *basicSession) PutKeyVal(key []byte, val []byte, num uint8) {
 	if len(key) == 0 {
+		//session.PutBytes(0)
 		session.outBuffer.WriteByte(0)
 	} else {
 		session.PutUint(len(key), 4, true, true)
 		session.PutClr(key)
 	}
 	if len(val) == 0 {
+		//session.PutBytes(0)
 		session.outBuffer.WriteByte(0)
 	} else {
 		session.PutUint(len(val), 4, true, true)

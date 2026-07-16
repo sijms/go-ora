@@ -58,31 +58,40 @@ const (
 	TNS_DATA_TYPE_INT_REF   uint16 = 111
 )
 
-func (n *DataTypeNego) addTypeRep(dty uint16, ndty uint16, rep uint16) {
-	if n.TypeAndRep == nil {
-		n.TypeAndRep = make([]uint16, bufferGrow)
-	}
-	if len(n.TypeAndRep) < int(n.TypeAndRep[0]+4) {
-		n.TypeAndRep = append(n.TypeAndRep, make([]uint16, bufferGrow)...)
-	}
-	index := n.TypeAndRep[0]
-	n.TypeAndRep[index] = dty
-	n.TypeAndRep[index+1] = ndty
-	if ndty == 0 {
-		n.TypeAndRep[0] = index + 2
-	} else {
-		n.TypeAndRep[index+2] = rep
-		n.TypeAndRep[index+3] = 0
-		n.TypeAndRep[0] = index + 4
+func (nego *DataTypeNego) addTypeRep(dty uint16, ndty uint16, rep uint16) {
+	nego.TypeAndRep = append(nego.TypeAndRep, dty)
+	nego.TypeAndRep = append(nego.TypeAndRep, ndty)
+	if ndty != 0 {
+		nego.TypeAndRep = append(nego.TypeAndRep, rep)
+		nego.TypeAndRep = append(nego.TypeAndRep, 0)
 	}
 }
+
+//func (n *DataTypeNego) addTypeRep(dty uint16, ndty uint16, rep uint16) {
+//	if n.TypeAndRep == nil {
+//		n.TypeAndRep = make([]uint16, bufferGrow)
+//	}
+//	if len(n.TypeAndRep) < int(n.TypeAndRep[0]+4) {
+//		n.TypeAndRep = append(n.TypeAndRep, make([]uint16, bufferGrow)...)
+//	}
+//	index := n.TypeAndRep[0]
+//	n.TypeAndRep[index] = dty
+//	n.TypeAndRep[index+1] = ndty
+//	if ndty == 0 {
+//		n.TypeAndRep[0] = index + 2
+//	} else {
+//		n.TypeAndRep[index+2] = rep
+//		n.TypeAndRep[index+3] = 0
+//		n.TypeAndRep[0] = index + 4
+//	}
+//}
 
 func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 	result := DataTypeNego{
 		conn:        conn,
 		MessageCode: 2,
 		Server:      nego,
-		TypeAndRep:  make([]uint16, bufferGrow),
+		TypeAndRep:  make([]uint16, 0, bufferGrow),
 		CompileTimeCaps: []byte{
 			6, 1, 0, 0, 234, 28, 1, 24, 1, 1,
 			1, 1, 1, 1, 0, 41, 144, 3, 7, 3,
@@ -110,7 +119,7 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 		// RuntimeCap:             []byte{2, 1, 0, 0, 18, 0, 87},
 		b32kTypeSupported:      false,
 		supportSessionStateOps: false,
-		clientTZVersion:        0x21,
+		clientTZVersion:        0x2B,
 	}
 	if result.Server != nil && len(result.Server.ServerCompileTimeCaps) > 0 {
 		if len(result.Server.ServerCompileTimeCaps) <= 27 || result.Server.ServerCompileTimeCaps[27] == 0 {
@@ -145,7 +154,7 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 		}
 
 	}
-	result.TypeAndRep[0] = 1
+	//result.TypeAndRep[0] = 1
 	result.addTypeRep(types.NCHAR, types.NCHAR, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(types.NUMBER, types.NUMBER, TNS_TYPE_REP_ORACLE)
 	result.addTypeRep(types.LONG, types.LONG, TNS_TYPE_REP_UNIVERSAL)
@@ -451,7 +460,7 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 	result.addTypeRep(241, TNS_DATA_TYPE_INT_NAMED, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(515, 0, TNS_TYPE_REP_NATIVE)
 
-	result.DataTypeRepFor1100 = result.TypeAndRep[0]
+	result.DataTypeRepFor1100 = uint16(len(result.TypeAndRep))
 	result.addTypeRep(590, 590, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(591, 591, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(592, 592, TNS_TYPE_REP_UNIVERSAL)
@@ -491,7 +500,7 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 	result.addTypeRep(637, 637, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(638, 638, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(636, 636, TNS_TYPE_REP_UNIVERSAL)
-	result.DataTypeRepFor1200 = result.TypeAndRep[0]
+	result.DataTypeRepFor1200 = uint16(len(result.TypeAndRep))
 	result.addTypeRep(663, 663, TNS_TYPE_REP_UNIVERSAL)
 	//result.addTypeRep(639, 639, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(640, 640, TNS_TYPE_REP_UNIVERSAL)
@@ -509,7 +518,7 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 			result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1100]
 		}
 	} else {
-		result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1200]
+		result.RuntimeTypeAndRep = result.TypeAndRep
 	}
 	//result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1200]
 	return &result
@@ -619,14 +628,14 @@ func (nego *DataTypeNego) writeMessage() {
 	}
 	session.PutInt(nego.Server.ServerNCharset, 2, false, false)
 	// marshal type reps
-	size := nego.RuntimeTypeAndRep[0]
+	//size := nego.RuntimeTypeAndRep[0]
 	if nego.CompileTimeCaps[27] == 0 {
-		for _, x := range nego.RuntimeTypeAndRep[1:size] {
+		for _, x := range nego.RuntimeTypeAndRep {
 			session.PutBytes(uint8(x))
 		}
 		session.PutBytes(0)
 	} else {
-		for _, x := range nego.RuntimeTypeAndRep[1:size] {
+		for _, x := range nego.RuntimeTypeAndRep {
 			session.PutInt(x, 2, true, false)
 		}
 		session.PutBytes(0, 0)

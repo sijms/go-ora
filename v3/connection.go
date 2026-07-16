@@ -48,8 +48,8 @@ const (
 	SysKm       LogonMode = 0x04000000
 	SysRac      LogonMode = 0x08000000
 	UserAndPass LogonMode = 0x100
-	// WithNewPass LogonMode = 0x2
-	// PROXY       LogonMode = 0x400
+	WithNewPass LogonMode = 0x2
+	PROXY       LogonMode = 0x400
 )
 
 // from GODROR
@@ -128,6 +128,8 @@ type Connection struct {
 	dbServerTimeZone         *time.Location // equivalent to timezone of the server carry the database
 	dbServerTimeZoneExplicit *time.Location
 	temporaryLocs            []types.Locator
+	token                    []byte
+	tokenPrivateKey          []byte
 }
 
 type ConnectionProperties struct {
@@ -611,6 +613,11 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			return err
 		}
 	}
+	if conn.session.Context.FastAuthEnabled {
+		session.UseBigClrChunks = true
+		session.ClrChunkSize = 0x7FFF
+		session.TTCVersion = 24
+	}
 	if conn.isFastLoginEnabled() {
 		tracer := conn.tracer
 		tracer.Print("Fast Authentication is enabled")
@@ -749,7 +756,22 @@ func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) 
 			return nil, errors.New("database url or configuration is required")
 		}
 	}
-
+	var token, tokenPrivateKey []byte
+	if len(config.TokenFile) > 0 {
+		token, err = os.ReadFile(config.TokenFile)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(config.TokenPrivateKeyFile) > 0 {
+		tokenPrivateKey, err = os.ReadFile(config.TokenPrivateKeyFile)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(token) > 0 && len(tokenPrivateKey) == 0 {
+		return nil, errors.New("token private key file is required")
+	}
 	// conStr, err := newConnectionStringFromUrl(databaseUrl)
 	temp := new(configurations.ConnectionConfig)
 	*temp = *config
@@ -768,6 +790,8 @@ func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) 
 			date      int64
 			timestamp int64
 		}{varchar: 0x7FFF, nvarchar: 0x7FFF, raw: 0x7FFF, number: 0x16, date: 0xB, timestamp: 0xB},
+		token:           token,
+		tokenPrivateKey: tokenPrivateKey,
 	}, nil
 }
 
@@ -855,10 +879,10 @@ func (conn *Connection) doAuth() error {
 		tcpNego:    conn.tcpNego,
 		usePadding: false,
 	}
+	if !conn.isFastLoginEnabled() {
+		conn.session.ResetBuffer()
+	}
 	if len(conn.connOption.UserID) > 0 && len(conn.connOption.Password) > 0 {
-		if !conn.isFastLoginEnabled() {
-			conn.session.ResetBuffer()
-		}
 		conn.session.PutTTCFunc(0x3, 0x76)
 		conn.session.PutBytes(1)
 		conn.session.PutUint(len(conn.connOption.UserID), 4, true, true)
@@ -894,15 +918,24 @@ func (conn *Connection) doAuth() error {
 		if err != nil {
 			return err
 		}
-		//authObject, err = newAuthObject(conn)
-		//if err != nil {
-		//	return err
-		//}
+		conn.session.ResetBuffer()
 	}
 	// if proxyAuth ==> mode |= PROXY
 	err := authObject.Write()
 	if err != nil {
 		return err
+	}
+	if (len(conn.connOption.UserID) == 0 || len(conn.connOption.Password) == 0) && conn.isFastLoginEnabled() {
+		err = conn.tcpNego.readMessage()
+		if err != nil {
+			return err
+		}
+		conn.tcpNego.ServerFlags |= 2
+		conn.dataNego = buildTypeNego(conn.tcpNego, conn)
+		conn.dbTimeZone, err = conn.dataNego.read()
+		if err != nil {
+			return err
+		}
 	}
 	stop := false
 	for !stop {

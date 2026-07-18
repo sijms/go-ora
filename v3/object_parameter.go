@@ -130,7 +130,7 @@ func (param *ObjectParameter) Encode(input interface{}, conn parameter_coder.ICo
 		size := rValue.Len()
 		if size > 0 {
 			session.PutBytes(1, 3)
-			if size > 0xFC {
+			if size > 0xF5 {
 				session.PutUint(0xFE, 2, true, false)
 				session.PutUint(size, 4, true, false)
 			} else {

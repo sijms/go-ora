@@ -54,8 +54,10 @@ const (
 
 // from GODROR
 const wrapResultset = "--WRAP-RESULTSET--"
-const createQueue = "--CREATE-QUEUE--"
+
+// const createQueue = "--CREATE-QUEUE--"
 const createLob = "--CREATE-LOB-STREAM--"
+const connRef = "--GET-CONNECTION-REF--"
 
 // Querier is the QueryContext of sql.Conn.
 type Querier interface {
@@ -1411,21 +1413,6 @@ func WrapRefCursor(ctx context.Context, q Querier, cursor *RefCursor) (*sql.Rows
 	return q.QueryContext(ctx, wrapResultset, rows)
 }
 
-func NewQueue(q Querier, name string, messageType aq.MessageType, udtName string) (*aq.Queue, error) {
-	rows, err := q.QueryContext(context.Background(), createQueue, name, messageType, udtName)
-	if err != nil {
-		return nil, err
-	}
-	var output aq.Queue
-	if rows.Next() {
-		err = rows.Scan(&output)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &output, nil
-}
-
 func (conn *Connection) encodeData(data interface{}) ([]byte, error) {
 	par := ParameterInfo{}
 	par.Value = data
@@ -1500,6 +1487,15 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 		//}
 		return nil, nil
 	}
+	if query == connRef {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("GetConnectionRef: expected 1 arguments, got %d", len(args))
+		}
+		tempVal := reflect.ValueOf(args[0].Value)
+		tempVal.Elem().Set(reflect.ValueOf(conn))
+		//args[0].Value = conn
+		return nil, nil
+	}
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
 	result, err := stmt.ExecContext(ctx, args)
@@ -1514,27 +1510,6 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	if query == wrapResultset {
 		return args[0].Value.(driver.Rows), nil
-	}
-	if query == createQueue {
-		name := args[0].Value.(string)
-		messageType := args[1].Value.(aq.MessageType)
-		udtName := args[2].Value.(string)
-		var toid []byte = nil
-		if len(udtName) > 0 {
-			coder, err := conn.GetParameterCoder(udtName)
-			if err != nil {
-				return nil, err
-			}
-			toid = coder.GetParameterInfo().ToID
-			//cust, ok := conn.cusTyp[strings.ToUpper(udtName)]
-			//if ok {
-			//	toid = cust.toid
-			//} else {
-			//	return nil, fmt.Errorf("unregister user define type: %s", udtName)
-			//}
-		}
-		holder := aq.NewQueueHolder(conn, name, messageType, udtName, toid)
-		return holder, nil
 	}
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true

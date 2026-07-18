@@ -8,35 +8,50 @@ import (
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/parameter_coder"
 	"github.com/sijms/go-ora/v3/types"
+	"github.com/sijms/go-ora/v3/utils"
 )
 
 type Queue struct {
-	Name    string
-	version int
-	conn    IConnection
-	//session            *network.Session
+	Name        string
+	version     int
+	conn        IConnection
 	messageType MessageType
 	udtName     string
 	toid        []byte
 	AutoCommit  bool
-	//processTTCResponse func(msgCode uint8) error
-	//encodeData         func(data interface{}) ([]byte, error)
-	//decodeData         func(data []byte, messageType MessageType, udtName string) (interface{}, error)
 }
 
-//func NewQueue(session *network.Session, name string, messageType MessageType, udtTypeName string, udt_toid []byte) *Queue {
-//	output := &Queue{
-//		session:     session,
-//		Name:        name,
-//		version:     1,
-//		messageType: messageType,
-//		udtName:     udtTypeName,
-//		AutoCommit:  false,
-//	}
-//
-//	return output
-//}
+func CreateQueue(db utils.Execuer, name string, messageType MessageType, udtName string) (*Queue, error) {
+	ret := &Queue{
+		Name:        name,
+		messageType: messageType,
+		udtName:     udtName,
+	}
+	_, err := db.Exec("--GET-CONNECTION-REF--", &ret.conn)
+	if err != nil {
+		return nil, err
+	}
 
+	switch messageType {
+	case RAW:
+		ret.toid = RAW_TOID
+	case JSON:
+		ret.toid = JSON_TOID
+	case XML:
+		ret.toid = XMLTYPE_TOID
+	default:
+		if len(udtName) > 0 {
+			coder, err := ret.conn.GetParameterCoder(udtName)
+			if err != nil {
+				return nil, err
+			}
+			ret.toid = coder.GetParameterInfo().ToID
+		} else {
+			return nil, fmt.Errorf("message type udt should have udtName")
+		}
+	}
+	return ret, nil
+}
 func (queue *Queue) NewMessage(data interface{}) (*Message, error) {
 	var err error
 	message := &Message{

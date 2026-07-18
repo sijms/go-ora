@@ -130,6 +130,7 @@ type Connection struct {
 	temporaryLocs            []types.Locator
 	token                    []byte
 	tokenPrivateKey          []byte
+	connectionCookie         *ConnectionCookie
 }
 
 type ConnectionProperties struct {
@@ -618,20 +619,50 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		session.UseBigClrChunks = true
 		session.ClrChunkSize = 0x7FFF
 		session.TTCVersion = 24
+		session.HasFSAPCapability = true
 	}
 	if conn.isFastLoginEnabled() {
 		tracer := conn.tracer
 		tracer.Print("Fast Authentication is enabled")
 		session.ResetBuffer()
-		session.PutBytes(0x22, 1, 0, 0)
-		conn.tcpNego = &TCPNego{conn: conn, ServerFlags: 3, ServerCharset: 0x369, ServerNCharset: 0x7D0}
-		conn.tcpNego.writeMessage()
-		session.PutUint(conn.tcpNego.ServerCharset, 2, false, false)
-		session.PutBytes(conn.tcpNego.ServerFlags)
-		session.PutUint(conn.tcpNego.ServerNCharset, 2, false, false)
-		session.PutBytes(session.TTCVersion)
-		conn.dataNego = buildTypeNego(conn.tcpNego, conn)
-		conn.dataNego.writeMessage()
+		cookie := lookupCookie(conn)
+		if cookie != nil {
+			conn.connectionCookie = cookie
+			tracer.Print("Using cookie-based optimization")
+			conn.tcpNego = &TCPNego{
+				conn:                  conn,
+				ServerFlags:           cookie.ServerFlags,
+				ServerCharset:         cookie.ServerCharset,
+				ServerNCharset:        cookie.ServerNCharset,
+				OracleVersion:         cookie.OracleVersion,
+				ProtocolServerString:  cookie.ProtocolServerString,
+				ServerCompileTimeCaps: cookie.ServerCompileTimeCaps,
+				ServerRuntimeCaps:     cookie.ServerRuntimeCaps,
+			}
+			if conn.sStrConv == nil {
+				conn.sStrConv = converters.NewStringConverter(cookie.ServerCharset)
+			}
+			if conn.nStrConv == nil {
+				conn.nStrConv = converters.NewStringConverter(cookie.ServerNCharset)
+			}
+			session.StrConv = conn.sStrConv
+			session.PutBytes(0x22, 1, 0, 0)
+			session.PutBytes([]byte("OracleClientGo\x00")...)
+			cookie.writeTTICookie(session)
+			conn.dataNego = buildTypeNego(conn.tcpNego, conn)
+			conn.dataNego.writeMessage()
+		} else {
+			tracer.Print("First connection optimization")
+			session.PutBytes(0x22, 1, 0, 0)
+			conn.tcpNego = &TCPNego{conn: conn, ServerFlags: 3, ServerCharset: 0x369, ServerNCharset: 0x7D0}
+			conn.tcpNego.writeMessage()
+			session.PutUint(conn.tcpNego.ServerCharset, 2, false, false)
+			session.PutBytes(conn.tcpNego.ServerFlags)
+			session.PutUint(conn.tcpNego.ServerNCharset, 2, false, false)
+			session.PutBytes(session.TTCVersion)
+			conn.dataNego = buildTypeNego(conn.tcpNego, conn)
+			conn.dataNego.writeMessage()
+		}
 	} else {
 		err = conn.protocolNegotiation()
 		if err != nil {
@@ -645,12 +676,26 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 
 	err = conn.doAuth()
 	if errors.Is(err, network.ErrConnReset) {
+		if conn.isFastLoginEnabled() {
+			err = conn.tcpNego.readMessage()
+			if err != nil {
+				return err
+			}
+			conn.dataNego = buildTypeNego(conn.tcpNego, conn)
+			conn.dbTimeZone, err = conn.dataNego.read()
+			if err != nil {
+				return err
+			}
+		}
 		err = conn.read()
 	}
 	if err != nil {
 		return err
 	}
 	conn.State = Opened
+	if conn.connectionCookie == nil && conn.isFastLoginEnabled() && conn.tcpNego != nil {
+		saveCookie(conn)
+	}
 	conn.dBVersion, err = GetDBVersion(conn.session)
 	if err != nil {
 		return err
@@ -904,11 +949,13 @@ func (conn *Connection) doAuth() error {
 		}
 
 		if conn.isFastLoginEnabled() {
-			err = conn.tcpNego.readMessage()
-			if err != nil {
-				return err
+			if conn.connectionCookie == nil {
+				err = conn.tcpNego.readMessage()
+				if err != nil {
+					return err
+				}
+				conn.tcpNego.ServerFlags |= 2
 			}
-			conn.tcpNego.ServerFlags |= 2
 			conn.dataNego = buildTypeNego(conn.tcpNego, conn)
 			conn.dbTimeZone, err = conn.dataNego.read()
 			if err != nil {
@@ -927,11 +974,13 @@ func (conn *Connection) doAuth() error {
 		return err
 	}
 	if (len(conn.connOption.UserID) == 0 || len(conn.connOption.Password) == 0) && conn.isFastLoginEnabled() {
-		err = conn.tcpNego.readMessage()
-		if err != nil {
-			return err
+		if conn.connectionCookie == nil {
+			err = conn.tcpNego.readMessage()
+			if err != nil {
+				return err
+			}
+			conn.tcpNego.ServerFlags |= 2
 		}
-		conn.tcpNego.ServerFlags |= 2
 		conn.dataNego = buildTypeNego(conn.tcpNego, conn)
 		conn.dbTimeZone, err = conn.dataNego.read()
 		if err != nil {

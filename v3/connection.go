@@ -613,6 +613,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			return err
 		}
 	}
+	// if fast login enabled this means new features are available
 	if conn.session.Context.FastAuthEnabled {
 		session.UseBigClrChunks = true
 		session.ClrChunkSize = 0x7FFF
@@ -628,7 +629,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		session.PutUint(conn.tcpNego.ServerCharset, 2, false, false)
 		session.PutBytes(conn.tcpNego.ServerFlags)
 		session.PutUint(conn.tcpNego.ServerNCharset, 2, false, false)
-		session.PutBytes(0x18)
+		session.PutBytes(session.TTCVersion)
 		conn.dataNego = buildTypeNego(conn.tcpNego, conn)
 		conn.dataNego.writeMessage()
 	} else {

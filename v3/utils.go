@@ -100,11 +100,11 @@ func refineSqlText(text string) string {
 				}
 			}
 		case '\'':
-			if !skip && !inDoubleQuote {
+			if !skip && !lineComment && !inDoubleQuote {
 				inSingleQuote = !inSingleQuote
 			}
 		case '"':
-			if !skip && !inSingleQuote {
+			if !skip && !lineComment && !inSingleQuote {
 				inDoubleQuote = !inDoubleQuote
 			}
 		case '-':

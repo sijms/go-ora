@@ -89,6 +89,9 @@ func (serv *authService) readServiceData(subPacketNum int) error {
 	if status == 0xFAFF && subPacketNum > 2 {
 		// get 1 byte with header
 		_, err = comm.readUB1()
+		if err != nil {
+			return err
+		}
 		serv.serviceName, err = comm.readString()
 		if err != nil {
 			return err

@@ -67,10 +67,10 @@ type Message struct {
 	sender         OracleAgent
 	EnqTime        time.Time
 
-	propModified   bool
-	Payload        interface{}
-	payloadInBytes []byte
-	shareNum       int
+	propModified bool
+	Payload      interface{}
+	bValue       []byte
+	shareNum     int
 
 	senderName       string
 	senderAddress    string

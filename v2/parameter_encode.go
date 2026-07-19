@@ -614,13 +614,12 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 							objectBuffer.Write(attrib.BValue)
 						} else {
 							// Use Oracle's object image length encoding for VARRAY
-							// data inside UDT objects. WriteFixedClr uses TNS CLR
-							// encoding (0xFE + compressed varint) which Oracle's KOPI
-							// deserializer cannot parse for data > 252 bytes, causing
-							// ORA-00600 [kopi2_readlen083]. The correct format uses
-							// 0xFF + 4-byte big-endian length, matching the encoding
-							// used by python-oracledb (DbObjectPickleBuffer.write_length).
-							// For data <= 245 bytes both formats produce identical output.
+							// data inside UDT objects (1-byte length, or 0xFE + 4-byte
+							// big-endian length past 245 bytes), matching python-oracledb
+							// DbObjectPickleBuffer.write_length. Chunked CLR here causes
+							// ORA-00600 [kopi2_readlen083]; a 0xFF prefix reads as the
+							// attribute-null marker and lands the collection empty.
+							// For data <= 245 bytes all these formats look identical.
 							writeObjImageBytes(&objectBuffer, attrib.BValue)
 						}
 					} else {
@@ -648,18 +647,22 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 // writeObjImageBytes writes data with Oracle's object image length encoding.
 // This is the correct format for VARRAY/collection data inside UDT objects:
 //   - data <= 245 bytes: [1-byte length] [data]
-//   - data > 245 bytes:  [0xFF] [4-byte big-endian length] [data]
+//   - data > 245 bytes:  [0xFE] [4-byte big-endian length] [data]
 //
-// This differs from WriteFixedClr which uses TNS CLR encoding (0xFE marker
-// with compressed varint length). Oracle's KOPI object deserializer expects
-// the object image format, not CLR, for nested collection attributes.
-// Reference: python-oracledb DbObjectPickleBuffer.write_length()
+// 0xFE is the long-length indicator; 0xFF is the attribute-null marker and
+// must never prefix a non-null collection. Oracle's KOPI object deserializer
+// expects this object image format, not chunked CLR, for nested collection
+// attributes. Reference: python-oracledb DbObjectPickleBuffer.write_length()
 func writeObjImageBytes(buf *bytes.Buffer, data []byte) {
 	n := len(data)
 	if n <= 245 {
 		buf.WriteByte(byte(n))
 	} else {
-		buf.WriteByte(0xFF)
+		// 0xFE is the object-image long-length indicator
+		// (python-oracledb TNS_LONG_LENGTH_INDICATOR = 254). 0xFF is the
+		// attribute-null marker — using it here makes the server read any
+		// collection > 245 bytes as NULL and silently store it empty.
+		buf.WriteByte(0xFE)
 		temp := make([]byte, 4)
 		binary.BigEndian.PutUint32(temp, uint32(n))
 		buf.Write(temp)

@@ -14,7 +14,9 @@ import (
 type Queue interface {
 	NewMessage(data interface{}) (*Message, error)
 	Enqueue(message *Message) error
+	EnqueueMessages(messages []*Message) error
 	Dequeue(options *DequeueOptions) (*Message, error)
+	DequeueMessages(options *DequeueOptions, count int) ([]*Message, error)
 	SetAutoCommit(autoCommit bool)
 }
 type queue struct {
@@ -32,6 +34,7 @@ func CreateQueue(db utils.Execuer, name string, messageType MessageType, udtName
 		Name:        name,
 		messageType: messageType,
 		udtName:     udtName,
+		version:     1,
 	}
 	_, err := db.Exec("--GET-CONNECTION-REF--", &ret.conn)
 	if err != nil {
@@ -93,7 +96,6 @@ func (qu *queue) NewMessage(data interface{}) (*Message, error) {
 	switch qu.messageType {
 	case RAW:
 		encoder, err = qu.conn.GetParameterCoder(types.RAW)
-		//message.payloadInBytes, err = queue.encodeData(data)
 	case UDT:
 		encoder, err = qu.conn.GetParameterCoder(qu.udtName)
 	case JSON:
@@ -101,13 +103,13 @@ func (qu *queue) NewMessage(data interface{}) (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		encoder.SetAQMessage()
 	default:
 		err = fmt.Errorf("unsupported message type: %v", qu.messageType)
 	}
 	if err != nil {
 		return nil, err
 	}
+	encoder.SetAQMessage()
 	err = encoder.Encode(data, qu.conn)
 	if err != nil {
 		return nil, err
@@ -195,7 +197,7 @@ func (qu *queue) Enqueue(message *Message) error {
 		}
 	}
 	if len(queueNameBytes) > 0 {
-		session.PutClr(queueNameBytes)
+		session.PutCHR(queueNameBytes)
 	}
 	for _, recipient := range message.recipients {
 		session.PutKeyValString(recipient.Key, recipient.Value, recipient.Num)
@@ -207,26 +209,9 @@ func (qu *queue) Enqueue(message *Message) error {
 	switch qu.messageType {
 	case JSON:
 	case RAW:
-		session.PutBytes(message.bValue...)
+		fallthrough
 	case UDT:
 		session.PutBytes(message.bValue...)
-		//session.PutBytes(0, 0, 0, 0)
-		//size := len(message.payloadInBytes)
-		//session.PutUint(size, 4, true, true)
-		//session.PutBytes(1, 1)
-		//session.PutClr(message.payloadInBytes)
-	//if (!this.isRawQueue)
-	//{
-	//	if (!this.isJsonQueue)
-	//	{
-	//		this.toh.Init(this.payloadToid, this.messageDataLength);
-	//		this.toh.Marshal(this.m_marshallingEngine);
-	//		if (this.messageData != null)
-	//		{
-	//			this.m_marshallingEngine.MarshalCLR(this.messageData, 0, this.messageDataLength);
-	//		}
-	//	}
-	//}
 	default:
 		return errors.New("unsupported message type")
 	}
@@ -235,14 +220,6 @@ func (qu *queue) Enqueue(message *Message) error {
 	}
 	if qu.messageType == JSON {
 		session.PutBytes(message.bValue...)
-		//// create quasi locator
-		//quasi := utils.CreateQuasiLocator(uint64(len(message.payloadInBytes)))
-		//// pass uint4 length of locator
-		//session.PutUint(len(quasi), 4, true, true)
-		//// pass locator as clr
-		//session.PutBytes(quasi...)
-		//// pass data as clr
-		//session.PutClr(message.payloadInBytes)
 	}
 	err := session.Write()
 	if err != nil {
@@ -418,81 +395,14 @@ func (qu *queue) readDequeueResponse(message *Message) error {
 				return err
 			}
 			// unmarshal toc
-			num, err = session.GetInt(4, true, true)
-			if err != nil {
-				return err
-			}
-			if num > 0 {
-				qu.toid, err = session.GetClr()
-				if err != nil {
-					return err
-				}
-			}
-			num, err = session.GetInt(4, true, true)
-			if err != nil {
-				return err
-			}
-			if num > 0 {
-				/*oid*/ _, err = session.GetClr()
-				if err != nil {
-					return err
-				}
-			}
-			num, err = session.GetInt(4, true, true)
-			if num > 0 {
-				/*snapshot*/ _, err = session.GetClr()
-			}
-			//if session.TTCVersion >= 8 {
-			//	this.ksnp.Unmarshal(meg)
-			//} else {
-			//}
-			qu.version, err = session.GetInt(2, true, true)
-			if err != nil {
-				return err
-			}
-			var imageLen int
-			imageLen, err = session.GetInt(4, true, true)
-			if err != nil {
-				return err
-			}
-			/*flag*/ _, err = session.GetInt(2, true, true)
+			imageLen, err := qu.readTypeInformation()
 			if err != nil {
 				return err
 			}
 			if imageLen > 0 {
-
-				message.bValue, err = session.GetClr()
+				err = message.readData(qu.conn, qu.messageType, qu.udtName)
 				if err != nil {
 					return err
-				}
-				var decoder parameter_coder.OracleParameterDecoder
-				switch qu.messageType {
-				case RAW:
-					decoder, err = qu.conn.GetParameterCoder(types.RAW)
-				case JSON:
-					decoder, err = qu.conn.GetParameterCoder(types.JSON)
-				default:
-					decoder, err = qu.conn.GetParameterCoder(qu.udtName)
-				}
-				if err != nil {
-					return err
-				}
-				if qu.messageType == RAW || qu.messageType == JSON && len(message.bValue) > 4 {
-					decoder.SetBytes(message.bValue[4:])
-				} else {
-					decoder.SetBytes(message.bValue)
-				}
-				message.Payload, err = decoder.Decode(qu.conn)
-				if qu.messageType == JSON {
-					if temp, ok := message.Payload.(*types.Json); ok {
-						message.Payload, err = temp.Value()
-						if err != nil {
-							return err
-						}
-					}
-				}
-				if err != nil {
-					return nil
 				}
 			}
 			message.messageID, err = session.GetBytes(16)
@@ -508,4 +418,136 @@ func (qu *queue) readDequeueResponse(message *Message) error {
 		}
 	}
 	return nil
+}
+
+func (qu *queue) readTypeInformation() (dataLen int, err error) {
+	session := qu.conn.GetSession()
+	_ /*qu.toid*/, err = session.GetDlc()
+	if err != nil {
+		return
+	}
+	_ /*oid*/, err = session.GetDlc()
+	if err != nil {
+		return
+	}
+	_ /*snapshot*/, err = session.GetDlc()
+	if err != nil {
+		return
+	}
+	_ /*version*/, err = session.GetInt(2, true, true)
+	if err != nil {
+		return
+	}
+	dataLen, err = session.GetInt(4, true, true)
+	if err != nil {
+		return
+	}
+	_ /*flag*/, err = session.GetInt(2, true, true)
+	return
+}
+
+func (qu *queue) readArrayResponse(messages []*Message, isEnqueue bool) error {
+	session := qu.conn.GetSession()
+	loop := true
+	for loop {
+		msgCode, err := session.GetByte()
+		if err != nil {
+			return err
+		}
+		switch msgCode {
+		case 8:
+			err = qu.readArrayRPA(messages, isEnqueue)
+			if err != nil {
+				return err
+			}
+		default:
+			err = qu.conn.ProcessTCCResponse(msgCode)
+			if err != nil {
+				return err
+			}
+			if msgCode == 4 || msgCode == 9 {
+				loop = false
+			}
+		}
+	}
+	return nil
+}
+
+func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) error {
+	session := qu.conn.GetSession()
+
+	numResp, err := session.GetInt(4, true, true)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < numResp; i++ {
+		if i >= len(messages) {
+			break
+		}
+		var num int
+		num, err = session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+		if num > 0 {
+			_, err = session.GetByte()
+			if err != nil {
+				return err
+			}
+			err = messages[i].read(qu.conn)
+			if err != nil {
+				return err
+			}
+		}
+		_, err = session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+		var dataLen int
+		dataLen, err = session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+		if !isEnqueue {
+			// get type information
+			dataLen, err = qu.readTypeInformation()
+			if err != nil {
+				return err
+			}
+		}
+		if dataLen > 0 {
+			err = messages[i].readData(qu.conn, qu.messageType, qu.udtName)
+			if err != nil {
+				return err
+			}
+		}
+		msgID, err := session.GetDlc()
+		if err != nil {
+			return err
+		}
+		if len(msgID) == 0x10 {
+			messages[i].messageID = make([]byte, 0x10)
+			copy(messages[i].messageID, msgID)
+		}
+		if len(msgID)/0x10 == len(messages) {
+			for j := range messages {
+				messages[j].messageID = make([]byte, 0x10)
+				copy(messages[j].messageID, msgID[i*16:(i+1)*0x10])
+			}
+		}
+		_, err = session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+		_, err = session.GetInt(2, true, true)
+		if err != nil {
+			return err
+		}
+
+	}
+	if isEnqueue {
+		_ /*count*/, err = session.GetInt(4, true, true)
+	}
+	return err
 }

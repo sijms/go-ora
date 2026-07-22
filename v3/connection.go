@@ -695,6 +695,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		return err
 	}
 	conn.State = Opened
+	conn.session.ServerFlags = conn.tcpNego.ServerFlags
 	if conn.connectionCookie == nil && conn.isFastLoginEnabled() && conn.tcpNego != nil {
 		saveCookie(conn)
 	}

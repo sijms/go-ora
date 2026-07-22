@@ -20,11 +20,11 @@ func (obj *objectField) Value() (interface{}, error) {
 	return obj.value, nil
 }
 
-func NewobjectField(value map[string]interface{}, header *header) (*objectField, error) {
+func NewobjectField(objData map[string]interface{}, header *header) (*objectField, error) {
 	ret := new(objectField)
 	ret.header = header
 	var err error
-	for keyName, value := range value {
+	for keyName, value := range objData {
 		var field Field
 		if value == nil {
 			field = &nullField{}

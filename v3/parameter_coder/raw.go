@@ -7,6 +7,7 @@ import (
 
 type RawParameter struct {
 	BasicParameter
+	isQueueMessage bool
 }
 
 func (param *RawParameter) Copy() OracleParameterCoder {
@@ -57,4 +58,17 @@ func (param *RawParameter) Read(session network.SessionReader) error {
 	var err error
 	param.BValue, err = param.BasicRead(session)
 	return err
+}
+
+func (param *RawParameter) SetAQMessage() {
+	param.isQueueMessage = true
+}
+
+func (param *RawParameter) Write(session network.SessionWriter) error {
+	if param.isQueueMessage {
+		session.PutBytes(param.BValue...)
+		return nil
+	}
+
+	return param.BasicParameter.Write(session)
 }

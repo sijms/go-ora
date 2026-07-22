@@ -3,6 +3,7 @@ package aq
 import (
 	"time"
 
+	"github.com/sijms/go-ora/v3/parameter_coder"
 	"github.com/sijms/go-ora/v3/types"
 	//"github.com/sijms/go-ora/v3/type_coder"
 )
@@ -290,6 +291,72 @@ func (message *Message) write(conn IConnection) {
 	if conn.TTCVersion() >= 16 {
 		session.PutUint(message.shareNum, 2, true, true)
 	}
+}
+
+func (message *Message) ServerMessageID() []byte {
+	return message.messageID
+}
+
+func (message *Message) readData(conn IConnection, messageType MessageType, udtName string) error {
+	var err error
+	session := conn.GetSession()
+	message.bValue, err = session.GetClr()
+	if err != nil {
+		return err
+	}
+	var decoder parameter_coder.OracleParameterDecoder
+	switch messageType {
+	case RAW:
+		decoder, err = conn.GetParameterCoder(types.RAW)
+		//if err != nil {
+		//	return err
+		//}
+		//var ms *network.MemorySession
+
+		//if len(message.bValue) > 4 {
+		//	decoder.SetBytes(message.bValue[4:])
+		//	//ms = network.NewMemorySession(message.bValue[4:], nil, session.GetProperties())
+		//} else {
+		//	decoder.SetBytes(message.bValue)
+		//	//ms = network.NewMemorySession(message.bValue, nil, session.GetProperties())
+		//}
+		//err = decoder.Read(ms)
+		//if err != nil {
+		//	return err
+		//}
+	case JSON:
+		decoder, err = conn.GetParameterCoder(types.JSON)
+		//if len(message.bValue) > 4 {
+		//	decoder.SetBytes(message.bValue[4:])
+		//} else {
+		//	decoder.SetBytes(message.bValue)
+		//}
+	default:
+		decoder, err = conn.GetParameterCoder(udtName)
+
+		//decoder.SetBytes(message.bValue)
+	}
+	if err != nil {
+		return err
+	}
+	if (messageType == RAW || messageType == JSON) && len(message.bValue) > 4 {
+		decoder.SetBytes(message.bValue[4:])
+	} else {
+		decoder.SetBytes(message.bValue)
+	}
+	message.Payload, err = decoder.Decode(conn)
+	if err != nil {
+		return err
+	}
+	if messageType == JSON {
+		if temp, ok := message.Payload.(*types.Json); ok {
+			message.Payload, err = temp.Value()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 //func NewMessage(data interface{}, messageType MessageType) (*Message, error) {

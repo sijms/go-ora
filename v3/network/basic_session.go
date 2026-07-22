@@ -11,6 +11,7 @@ type SessionProperties struct {
 	UseBigClrChunks bool
 	UseBigScn       bool
 	ClrChunkSize    int
+	ServerFlags     uint8
 }
 type basicSession struct {
 	inBuffer  *bytes.Buffer
@@ -392,6 +393,15 @@ func (session *basicSession) PutBytes(data ...byte) {
 	session.outBuffer.Write(data)
 }
 
+func (session *basicSession) PutCHR(data []byte) {
+	if session.ServerFlags&2 > 0 {
+		session.PutClr(data)
+	} else {
+		session.outBuffer.Write(data)
+	}
+
+}
+
 // PutClr write variable length bytearray to output buffer
 func (session *basicSession) PutClr(data []byte) {
 	dataLen := len(data)
@@ -431,6 +441,13 @@ func (session *basicSession) PutFixedClr(data []byte) {
 	session.PutBytes(data...)
 }
 
+func (session *basicSession) PutDlc(data []byte) {
+	if len(data) > 0 {
+		session.PutUint(len(data), 4, true, true)
+	}
+	session.PutClr(data)
+}
+
 // PutString write a string data to output buffer
 func (session *basicSession) PutString(data string) {
 	session.PutClr([]byte(data))
@@ -438,20 +455,22 @@ func (session *basicSession) PutString(data string) {
 
 // PutKeyVal write key, val (in form of bytearray) and flag number to output buffer
 func (session *basicSession) PutKeyVal(key []byte, val []byte, num uint8) {
-	if len(key) == 0 {
-		//session.PutBytes(0)
-		session.outBuffer.WriteByte(0)
-	} else {
-		session.PutUint(len(key), 4, true, true)
-		session.PutClr(key)
-	}
-	if len(val) == 0 {
-		//session.PutBytes(0)
-		session.outBuffer.WriteByte(0)
-	} else {
-		session.PutUint(len(val), 4, true, true)
-		session.PutClr(val)
-	}
+	//if len(key) == 0 {
+	//	//session.PutBytes(0)
+	//	session.outBuffer.WriteByte(0)
+	//} else {
+	//	session.PutUint(len(key), 4, true, true)
+	//	session.PutClr(key)
+	//}
+	//if len(val) == 0 {
+	//	//session.PutBytes(0)
+	//	session.outBuffer.WriteByte(0)
+	//} else {
+	//	session.PutUint(len(val), 4, true, true)
+	//	session.PutClr(val)
+	//}
+	session.PutDlc(key)
+	session.PutDlc(val)
 	session.PutInt(num, 4, true, true)
 }
 

@@ -1,58 +1,43 @@
 package aq
 
-type AQArrayInParam struct {
-	flag    int // equal to AQ.flag
-	message Message
-}
+//type AQArrayInParam struct {
+//	flag    int // equal to AQ.flag
+//	message Message
+//}
 
-func (param *AQArrayInParam) write(conn IConnection) error {
-	session := conn.GetSession()
-	session.PutBytes(7)
-	session.PutUint(param.flag, 4, true, true)
-	param.message.write(conn)
-	if len(param.message.recipients) > 0 {
-		session.PutInt(len(param.message.recipients)*3, 2, true, true)
-		for _, recipient := range param.message.recipients {
-			session.PutKeyValString(recipient.Key, recipient.Value, recipient.Num)
-		}
-	} else {
-		session.PutBytes(0)
-	}
-	//if param.message.isJsonQueue() {
-	//
-	//}
-	//param.message.payloadInBytes
-	return nil
-}
-
-//func MarshalData() {
-//
-//
-//	int num;
-//	if (this.messageData != null) {
-//		num = this.messageData.Length;
-//	} else
-//	{
-//		num = 0;
-//	}
-//	if (this.isJSONQueue) {
-//		int num2 = ((this.messageData != null) ? this.messageData.Length : 0);
-//		byte[] array2 = TTCLob.CreateQuasiLocator((long) num2);
-//		this.m_marshallingEngine.MarshalUB4((long)array2.Length);
-//		this.m_marshallingEngine.MarshalB1Array(array2);
-//		this.m_marshallingEngine.MarshalCLR(this.messageData, 0, num2);
-//		return;
-//	}
-//	if (!this.isRawQueue) {
-//		this.toh.Init(this.messageOid, num);
-//		this.toh.Marshal(this.m_marshallingEngine);
-//		if (this.messageData != null) {
-//			this.m_marshallingEngine.MarshalCLR(this.messageData, 0, num);
-//			return;
+//func (param *AQArrayInParam) write(conn IConnection, messageType MessageType) error {
+//	session := conn.GetSession()
+//	session.PutBytes(7)
+//	session.PutUint(param.flag, 4, true, true)
+//	param.message.write(conn)
+//	if len(param.message.recipients) > 0 {
+//		session.PutInt(len(param.message.recipients)*3, 2, true, true)
+//		for _, recipient := range param.message.recipients {
+//			session.PutKeyValString(recipient.Key, recipient.Value, recipient.Num)
 //		}
-//	} else
-//	{
-//		this.m_marshallingEngine.MarshalUB4((long)num);
-//		this.m_marshallingEngine.MarshalB1Array(this.messageData);
+//	} else {
+//		session.PutBytes(0)
 //	}
+//
+//	switch messageType {
+//	case RAW:
+//		session.PutUint(len(param.message.bValue), 4, true, true)
+//		session.PutBytes(param.message.bValue...)
+//	case JSON:
+//		quasi := utils.CreateQuasiLocator(uint64(len(param.message.bValue)))
+//		session.PutUint(len(quasi), 4, true, true)
+//		session.PutBytes(quasi...)
+//		session.PutClr(param.message.bValue)
+//	case UDT:
+//		dataLen := len(param.message.bValue)
+//		session.PutUint(0, 4, true, true)
+//		session.PutUint(dataLen, 4, true, true)
+//		session.PutBytes(1, 1)
+//		if dataLen > 0 {
+//			session.PutClr(param.message.bValue)
+//		}
+//	default:
+//		return errors.New("unsupported message type for enqueue")
+//	}
+//	return nil
 //}

@@ -10,13 +10,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/sijms/go-ora/v2/aq"
 	"github.com/sijms/go-ora/v2/lazy_init"
 
 	"github.com/sijms/go-ora/v2/configurations"
@@ -52,7 +50,8 @@ const (
 
 // from GODROR
 const wrapResultset = "--WRAP_RESULTSET--"
-const createQueue = "--CREATE_QUEUE--"
+
+//const createQueue = "--CREATE_QUEUE--"
 
 // Querier is the QueryContext of sql.Conn.
 type Querier interface {
@@ -160,8 +159,8 @@ func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, err
 		return nil, err
 	}
 	conn.cusTyp = connector.drv.cusTyp
-	//"TCP negotiation for character set updates fails when multiple database connections 
-	// with varying encodings coexist in the same process, 
+	//"TCP negotiation for character set updates fails when multiple database connections
+	// with varying encodings coexist in the same process,
 	// due to the cloning of the character converter."
 	// eg. Chinese GBK and UTF8
 	// if connector.drv.sStrConv != nil {
@@ -1152,21 +1151,6 @@ func WrapRefCursor(ctx context.Context, q Querier, cursor *RefCursor) (*sql.Rows
 	return q.QueryContext(ctx, wrapResultset, rows)
 }
 
-func NewQueue(q Querier, name string, messageType aq.MessageType, udtName string) (*aq.Queue, error) {
-	rows, err := q.QueryContext(context.Background(), createQueue, name, messageType, udtName)
-	if err != nil {
-		return nil, err
-	}
-	var output aq.Queue
-	if rows.Next() {
-		err = rows.Scan(&output)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &output, nil
-}
-
 func (conn *Connection) encodeData(data interface{}) ([]byte, error) {
 	par := ParameterInfo{}
 	par.Value = data
@@ -1174,33 +1158,6 @@ func (conn *Connection) encodeData(data interface{}) ([]byte, error) {
 	return par.BValue, err
 }
 
-func (conn *Connection) decodeData(data []byte, messageType aq.MessageType, udtName string) (interface{}, error) {
-	par := ParameterInfo{
-		BValue: data,
-	}
-	switch messageType {
-	case aq.UDT:
-		par.DataType = XMLType
-		for name, cust := range conn.cusTyp {
-			if name == strings.ToUpper(udtName) {
-				par.cusType = new(customType)
-				*par.cusType = cust
-				par.ToID = cust.toid
-			}
-		}
-		err := decodeObject(conn, &par, nil)
-		if err != nil {
-			return nil, err
-		}
-		output := reflect.New(par.cusType.typ)
-		err = setFieldValue(output, par.cusType, par.oPrimValue)
-		return output.Interface(), err
-	default:
-		return nil, errors.New("unsupported message type")
-	}
-	//err := par.decodeParameterValue(conn, nil)
-	//return par.Value, err
-}
 func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
@@ -1216,23 +1173,6 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	if query == wrapResultset {
 		return args[0].Value.(driver.Rows), nil
-	}
-	if query == createQueue {
-		name := args[0].Value.(string)
-		messageType := args[1].Value.(aq.MessageType)
-		udtName := args[2].Value.(string)
-		var toid []byte = nil
-		if len(udtName) > 0 {
-			cust, ok := conn.cusTyp[strings.ToUpper(udtName)]
-			if ok {
-				toid = cust.toid
-			} else {
-				return nil, fmt.Errorf("unregister user define type: %s", udtName)
-			}
-		}
-		holder := aq.NewQueueHolder(conn.session, name, messageType, udtName, toid,
-			conn.processTCCResponse, conn.encodeData, conn.decodeData)
-		return holder, nil
 	}
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true

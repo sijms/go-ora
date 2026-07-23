@@ -674,6 +674,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
 	}
 
 	err = conn.doAuth()
@@ -690,6 +691,15 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			}
 		}
 		err = conn.read()
+	}
+	if errors.Is(err, driver.ErrBadConn) && conn.connectionCookie != nil {
+		// if cookie based remove cookie and reconnect
+		tracer.Print("Bad connection")
+		tracer.Print("Remove cookie with key: ", conn.connectionCookie.cookieKey)
+		deleteCookie(conn)
+		conn.connectionCookie = nil
+		tracer.Print("Reconnect")
+		return conn.OpenWithContext(ctx)
 	}
 	if err != nil {
 		return err

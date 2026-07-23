@@ -584,10 +584,12 @@ func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 		nego.conn.dbTimeZone = time.UTC
 	}
 
-	if nego.Server.ServerCompileTimeCaps[7] < nego.conn.session.TTCVersion {
-		nego.conn.session.TTCVersion = nego.Server.ServerCompileTimeCaps[7]
-	}
+	//nego.conn.session.TTCVersion = nego.Server.ServerCompileTimeCaps[7]
+	nego.conn.session.TTCVersion = nego.conn.dataNego.CompileTimeCaps[7]
 	nego.conn.session.UseBigScn = nego.Server.ServerCompileTimeCaps[7] >= 8
+	if nego.conn.tcpNego.ServerCompileTimeCaps[7] < nego.conn.session.TTCVersion {
+		nego.conn.session.TTCVersion = nego.conn.tcpNego.ServerCompileTimeCaps[7]
+	}
 	tracer.Print("TTC Version: ", nego.conn.session.TTCVersion)
 	if len(nego.conn.tcpNego.ServerRuntimeCaps) > 6 && nego.conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
 		nego.conn.maxLen.varchar = 0x7FFF

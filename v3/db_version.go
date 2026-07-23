@@ -24,11 +24,8 @@ func GetDBVersion(session *network.Session) (*DBVersion, error) {
 	session.ResetBuffer()
 	session.PutTTCFunc(0x3, 0x3B)
 	session.PutBytes(1)
-	// session.PutUint(1, 1, false, false)
 	session.PutUint(0x100, 2, true, true)
 	session.PutBytes(1, 1)
-	// session.PutUint(1, 1, false, false)
-	// session.PutUint(1, 1, false, false)
 	if session.TTCVersion >= 11 {
 		session.PutUint(1, 4, true, true)
 	}

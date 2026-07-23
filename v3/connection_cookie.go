@@ -38,7 +38,7 @@ func getCookieKey(conn *Connection) string {
 	}
 	raw := base64.StdEncoding.EncodeToString(uuid) + "|" + serviceName
 	h := md5.Sum([]byte(raw))
-	return string(h[:])
+	return string(base64.StdEncoding.EncodeToString(h[:]))
 }
 
 func lookupCookie(conn *Connection) *ConnectionCookie {
@@ -50,7 +50,14 @@ func lookupCookie(conn *Connection) *ConnectionCookie {
 	defer cookieMu.Unlock()
 	return cookieStore[key]
 }
-
+func deleteCookie(conn *Connection) {
+	key := getCookieKey(conn)
+	if len(key) > 0 {
+		cookieMu.Lock()
+		defer cookieMu.Unlock()
+		delete(cookieStore, key)
+	}
+}
 func saveCookie(conn *Connection) {
 	key := getCookieKey(conn)
 	if key == "" || conn.tcpNego == nil {

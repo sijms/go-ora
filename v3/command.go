@@ -1179,7 +1179,8 @@ func (stmt *defaultStmt) Close() error {
 	if stmt.cursorID != 0 {
 		session := stmt.connection.session
 		session.ResetBuffer()
-		session.PutBytes(0x11, 0x69, 0, 0, 1, 1, 1)
+		session.PutTTCFunc(0x11, 0x69)
+		session.PutBytes(1, 1, 1)
 		session.PutInt(stmt.cursorID, 4, true, true)
 		return (&simpleObject{
 			connection:  stmt.connection,

@@ -1021,7 +1021,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			if dataPck.dataFlag == 0x40 {
 				// close connection
 				session.Disconnect()
-				err = driver.ErrBadConn
+				return nil, driver.ErrBadConn
 			}
 			_, err = session.inBuffer.Write(dataPck.buffer)
 		}

@@ -22,7 +22,7 @@ func (param *DateParameter) Init() {
 func (param *DateParameter) Encode(input interface{}, conn IConnection) error {
 	param.Init()
 	encoder := types.Date{}
-	encoder.AsUTC = conn.SendTimeZoneAsUTC()
+	encoder.AsUTC = conn.SendTimeAsUTC()
 	encoder.SetDataType(param.DataType)
 	err := encoder.SetValue(input)
 	if err != nil {
@@ -41,8 +41,11 @@ func (param *DateParameter) Encode(input interface{}, conn IConnection) error {
 	return nil
 }
 
-func (param *DateParameter) Decode(_ IConnection) (interface{}, error) {
-	decoder := types.Date{}
+func (param *DateParameter) Decode(conn IConnection) (interface{}, error) {
+	decoder := types.Date{
+		DBTimeZone:       conn.GetDBTimeZone(),
+		DBServerTimeZone: conn.GetDBServerTimeZone(),
+	}
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)
 	return decoder.Value()

@@ -1,6 +1,8 @@
 package aq
 
 import (
+	"time"
+
 	"github.com/sijms/go-ora/v3/converters"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/parameter_coder"
@@ -17,7 +19,9 @@ type (
 		//GetOracleParameterCoder(oracleType uint16) OracleParameterCoder
 		//GetNameParameterCoder(nameType string) OracleParameterCoder
 		GetParameterCoder(input interface{}) (parameter_coder.OracleParameterCoder, error)
-		SendTimeZoneAsUTC() bool
+		SendTimeAsUTC() bool
+		GetDBTimeZone() *time.Location
+		GetDBServerTimeZone() *time.Location
 		TTCVersion() uint8
 		GetMaxRawLength() int64
 	}

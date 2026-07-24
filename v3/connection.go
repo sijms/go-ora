@@ -1793,8 +1793,17 @@ func (conn *Connection) GetParameterCoder(input interface{}) (parameter_coder.Or
 	}
 }
 
-func (conn *Connection) SendTimeZoneAsUTC() bool {
-	return !(conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion)
+func (conn *Connection) SendTimeAsUTC() bool {
+	return conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion == conn.dataNego.serverTZVersion
+	//return !(conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion)
+}
+
+func (conn *Connection) GetDBTimeZone() *time.Location {
+	return conn.dbTimeZone
+}
+
+func (conn *Connection) GetDBServerTimeZone() *time.Location {
+	return conn.dbServerTimeZone
 }
 
 func (conn *Connection) TTCVersion() uint8 {

@@ -12,7 +12,9 @@ import (
 
 type Date struct {
 	Basic
-	AsUTC bool
+	AsUTC            bool
+	DBTimeZone       *time.Location
+	DBServerTimeZone *time.Location
 }
 
 func NewTimeStamp(t time.Time) *Date {
@@ -55,9 +57,6 @@ func (date *Date) encode(input time.Time) (bytes []byte, err error) {
 	if date.dataType == 0 {
 		date.dataType = DATE
 	}
-	if date.AsUTC {
-		input = input.UTC()
-	}
 	switch date.dataType {
 	case DATE:
 		bytes = make([]byte, MaxLenDate)
@@ -65,9 +64,19 @@ func (date *Date) encode(input time.Time) (bytes []byte, err error) {
 	case TIMESTAMP:
 		bytes = make([]byte, MaxLenTimeStamp)
 		putTimestamp(bytes, &input)
+	//case TimeStampLTZ, TimeStampLTZ_DTY:
+	//	//input = input.UTC()
+	//	bytes = make([]byte, MaxLenTimeStampTZ)
+	//	putTimestamp(bytes, &input)
 	case TIMESTAMPTZ, TimeStampTZ_DTY, TimeStampLTZ, TimeStampLTZ_DTY:
+		var val time.Time
+		if date.AsUTC {
+			val = input.UTC()
+		} else {
+			val = input
+		}
 		bytes = make([]byte, MaxLenTimeStamp)
-		putTimestamp(bytes, &input)
+		putTimestamp(bytes, &val)
 		zoneLoc := input.Location()
 		zoneID := 0
 		for key, val := range oracleZones {
@@ -99,7 +108,6 @@ func (date *Date) encode(input time.Time) (bytes []byte, err error) {
 		}
 	}
 	return
-
 }
 
 func (date *Date) SetValue(input interface{}) (err error) {
@@ -114,9 +122,27 @@ func (date *Date) SetValue(input interface{}) (err error) {
 	}
 	switch data := input.(type) {
 	case Date:
-		*date = data
+		if date.AsUTC == data.AsUTC {
+			*date = data
+		} else {
+			temp, err := data.decode()
+			if err != nil {
+				return err
+			}
+			date.dataType = data.dataType
+			return date.SetValue(temp)
+		}
 	case *Date:
-		*date = *data
+		if date.AsUTC == data.AsUTC {
+			*date = *data
+		} else {
+			temp, err := data.decode()
+			if err != nil {
+				return err
+			}
+			date.dataType = data.dataType
+			return date.SetValue(temp)
+		}
 	case time.Time:
 		date.bValue, err = date.encode(data)
 	case *time.Time:
@@ -160,30 +186,43 @@ func (date *Date) decode() (output time.Time, err error) {
 	}
 	output = time.Date(year, time.Month(date.bValue[2]), int(date.bValue[3]),
 		int(date.bValue[4]-1), int(date.bValue[5]-1), int(date.bValue[6]-1), nanoSec, time.UTC)
-	if tzHour == 0 && tzMin == 0 {
-		return
-	}
+	if tzHour != 0 || tzMin != 0 {
 
-	var zone *time.Location
-	var timeInZone bool
-	if date.bValue[11]&0x80 != 0 {
-		regionCode := (int(date.bValue[11]) & 0x7F) << 6
-		regionCode += (int(date.bValue[12]) & 0xFC) >> 2
-		timeInZone = date.bValue[12]&0x1 == 1
-		name, found := oracleZones[regionCode]
-		if found {
-			zone, _ = time.LoadLocation(name)
+		var zone *time.Location
+		var timeInZone bool
+		if date.bValue[11]&0x80 != 0 {
+			regionCode := (int(date.bValue[11]) & 0x7F) << 6
+			regionCode += (int(date.bValue[12]) & 0xFC) >> 2
+			timeInZone = date.bValue[12]&0x1 == 1
+			name, found := oracleZones[regionCode]
+			if found {
+				zone, _ = time.LoadLocation(name)
+			}
+		} else {
+			timeInZone = date.bValue[11]&0x40 == 0x40
 		}
-	} else {
-		timeInZone = date.bValue[11]&0x40 == 0x40
+		if zone == nil {
+			zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHour, tzMin), tzHour*60*60+tzMin*60)
+		}
+		if timeInZone {
+			output = time.Date(year, time.Month(date.bValue[2]), int(date.bValue[3]),
+				int(date.bValue[4]-1), int(date.bValue[5]-1), int(date.bValue[6]-1), nanoSec, zone)
+		} else {
+			output = output.In(zone)
+		}
 	}
-	if zone == nil {
-		zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHour, tzMin), tzHour*60*60+tzMin*60)
-	}
-	if timeInZone {
-		output = time.Date(year, time.Month(date.bValue[2]), int(date.bValue[3]),
-			int(date.bValue[4]-1), int(date.bValue[5]-1), int(date.bValue[6]-1), nanoSec, zone)
-		return
+	switch date.dataType {
+	case DATE, TIMESTAMP, TimeStampDTY:
+		if date.DBServerTimeZone != nil && !isEqualLoc(date.DBServerTimeZone, time.UTC) {
+			output = time.Date(output.Year(), output.Month(), output.Day(),
+				output.Hour(), output.Minute(), output.Second(), output.Nanosecond(), date.DBServerTimeZone)
+		}
+	case TimeStampLTZ, TimeStampLTZ_DTY:
+		if date.DBTimeZone != nil && !isEqualLoc(date.DBTimeZone, time.UTC) {
+			output = time.Date(output.Year(), output.Month(), output.Day(),
+				output.Hour(), output.Minute(), output.Second(), output.Nanosecond(), date.DBTimeZone)
+		}
+
 	}
 	return
 }

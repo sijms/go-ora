@@ -652,8 +652,13 @@ func (nego *DataTypeNego) write() error {
 
 func TZBytes() []byte {
 	_, offset := time.Now().Zone()
-	hours := int8(offset / 3600)
-	minutes := int8((offset / 60) % 60)
-	seconds := int8(offset % 60)
-	return []byte{128, 0, 0, 0, uint8(hours + 60), uint8(minutes + 60), uint8(seconds + 60), 128, 0, 0, 0}
+	hours := offset / 3600
+	minutes := (offset / 60) % 60
+	seconds := offset % 60
+	interval, _ := types.NewDaySecondInterval(0, hours, minutes, seconds, 0)
+	if interval != nil {
+		return interval.Bytes()
+	}
+	return nil
+	//return []byte{128, 0, 0, 0, uint8(hours + 60), uint8(minutes + 60), uint8(seconds + 60), 128, 0, 0, 0}
 }

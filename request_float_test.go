@@ -18,7 +18,8 @@ func TestMain(m *testing.M) {
 	var err error
 	connStr := os.Getenv("GOORA_TESTDB")
 	if connStr == "" {
-		log.Fatal(fmt.Errorf("Provide  oracle server url in environment variable GOORA_TESTDB"))
+		fmt.Println("Skipping tests: GOORA_TESTDB not set")
+		os.Exit(0)
 	}
 	conn, err = sql.Open("oracle", connStr)
 	if err != nil {

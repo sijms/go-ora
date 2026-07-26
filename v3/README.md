@@ -1,73 +1,92 @@
 # go-ora v3
 
-Pure Go Oracle database driver for [database/sql](https://pkg.go.dev/database/sql) - a major rewrite with new abstractions, new types, and improved performance.
+A pure Go Oracle database driver for [`database/sql`](https://pkg.go.dev/database/sql).
 
-## What's New in v3
+v3 is a major rewrite focused on extensibility, modern Oracle features, and clean architecture. It uses Go interfaces throughout to make adding new types, nested objects, and array types straightforward.
 
-### 1. Architecture Abstractions
+## Features
 
-v3 introduces a modular architecture with clear separation of concerns:
+- **Pure Go** -- no C dependencies, no Oracle client installation required
+- **`database/sql` compatible** -- works with any `database/sql` pool, retry logic, and health checking
+- **Oracle 23ai types** -- VECTOR, BOOLEAN, JSON
+- **Advanced Queuing** -- native AQ support (RAW, JSON, UDT, XML)
+- **Fast Authentication** -- reduced round-trips with cookie-based caching and token login
+- **TTC v24** -- latest protocol version with FSAP capability
+- **User-Defined Types** -- nested objects, collections, and struct mapping
+- **Extensible type system** -- plug in custom encoders/decoders for any Oracle type
+- **TLS/SSL** -- full support with wallet, mutual TLS, and Kerberos
 
-#### Network & Session (`network/`)
-- Full abstraction of the Oracle TTC (Two-Task Common) protocol
-- Packet-based communication layer (`ConnectPacket`, `DataPacket`, `MarkerPacket`, etc.)
-- `MemorySession` for in-memory buffer operations (parameter encoding, AQ message marshaling)
-- TLS/SSL negotiation and support
-- Connection break/cancel with OOB (out-of-band) support
-- Redirect handling
+## Installation
 
-#### Connection (`Connection`)
-- `driver.Connector` interface support via `OracleConnector`
-- Pluggable `Dialer`, `TLSConfig`, `Kerberos`, and `Wallet` configuration
-- Automatic reconnection on bad connections
-- Session parameter management at driver level
-
-#### Types (`types/`)
-- Complete type system with encoding/decoding abstraction
-- Each Oracle type has its own Go implementation
-- Unified `SetValue` / `Value` / `Scan` / `CopyTo` interface
-- LOB streaming support via `LobStreamer` interface
-
-#### Parameter Encoding/Decoding (`parameter_coder/`)
-- Pluggable `OracleParameterCoder` interface for encoding and decoding
-- Three-way type mapping: Oracle type ID → Go `reflect.Type` → SQL type name
-- Custom type registration via `AddParameterCoder`
-- Each parameter type (string, number, date, vector, json, bool, LOB, etc.) has its own coder implementation
-
-### 2. Fast Login, Token Login & Cookie Login
-
-v3 implements Oracle's **Fast Authentication** mechanism (TTC version 24):
-
-- **Fast Login**: When the server supports it (`FastAuthEnabled`), the driver uses a reduced negotiation round-trip, skipping full TCP and data type negotiation on subsequent connections.
-- **Cookie Login**: Server negotiation results are cached in an in-memory `ConnectionCookie` store. On reconnection, cached data (charset, capabilities, version) is sent directly to the server, avoiding repeated negotiation.
-- **Token Login**: Support for token-based authentication via `TokenFile` and `TokenPrivateKeyFile` configuration options.
-
-```go
-// Token-based connection
-db, err := sql.Open("oracle", "oracle://user@host:1521/service?TOKEN_FILE=token.enc&TOKEN_PRIVATE_KEY_FILE=key.pem")
+```bash
+go get github.com/sijms/go-ora/v3
 ```
 
-### 3. Client Version 24
+**Requires Go 1.24+**
 
-v3 upgrades the TTC protocol version to **24**, enabling:
+## Quick Start
 
-- Big CLR chunks (`ClrChunkSize = 0x7FFF`)
-- Fast Session Affinity Protocol (FSAP) capability
-- Extended data type negotiation
-- Improved session property handling
+```go
+package main
 
-### 4. New Oracle Type Support
+import (
+    "database/sql"
+    "fmt"
+    "log"
 
-#### VECTOR (Oracle 23ai)
-Full support for the `VECTOR` data type with multiple element formats:
+    _ "github.com/sijms/go-ora/v3"
+)
+
+func main() {
+    db, err := sql.Open("oracle", "oracle://user:pass@host:1521/service")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    if err := db.Ping(); err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("Connected to Oracle")
+}
+```
+
+## Connection Options
+
+```text
+oracle://USER:PASSWORD@HOST:PORT/SERVICE_NAME?PARAM1=value&PARAM2=value
+```
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `USER` | Database username | -- |
+| `PASSWORD` | Database password | -- |
+| `SERVER` | Hostname or IP | -- |
+| `PORT` | Listener port | `1521` |
+| `SERVICE` | Oracle service name | -- |
+| `SSL` | Enable TLS | `false` |
+| `SSL VERIFY` | Verify server certificate | `true` |
+| `WALLET` | Path to Oracle wallet | -- |
+| `AUTH TYPE` | Authentication type (`KERBEROS`) | -- |
+| `FAST LOGIN` | Enable fast login optimization | `false` |
+| `TOKEN FILE` | Path to authentication token file | -- |
+| `TOKEN PRIVATE KEY FILE` | Path to token private key | -- |
+| `LOB READ` | `AUTO`/`IMPLICIT` (default) or `NO`/`EXPLICIT` | `AUTO` |
+| `TRACE DIR` | Directory for trace files | -- |
+| `CONNECT TIMEOUT` | Connection timeout | -- |
+
+## New Types
+
+### VECTOR (Oracle 23ai)
 
 ```go
 import "github.com/sijms/go-ora/v3/types"
 
-// Create vectors from Go slices
-v1, _ := types.CreateVector([]uint8{10, 20, 30})       // INT8
-v2, _ := types.CreateVector([]float32{-10.1, -20.2})    // FLOAT32
-v3, _ := types.CreateVector([]float64{10.1, 20.2, 30.3}) // FLOAT64
+// Create from Go slices
+v1, _ := types.CreateVector([]uint8{10, 20, 30})          // INT8
+v2, _ := types.CreateVector([]float32{-10.1, -20.2})       // FLOAT32
+v3, _ := types.CreateVector([]float64{10.1, 20.2, 30.3})   // FLOAT64
 
 // Scan from database
 var vec types.Vector
@@ -78,18 +97,14 @@ var data []float32
 vec.CopyTo(&data)
 ```
 
-Supported formats: `INT8` (uint8), `FLOAT32`, `FLOAT64` - both dense and sparse vectors.
+Formats: `INT8` (`[]uint8`), `FLOAT32`, `FLOAT64` -- dense and sparse.
 
-#### JSON (Oracle 21c+)
-Native JSON type support with pluggable coders:
+### JSON (Oracle 21c+)
 
 ```go
-import "github.com/sijms/go-ora/v3/types"
-
 var js types.Json
 js.SetValue(`{"key": "value"}`)
 
-// Copy to Go types
 var s string
 js.CopyTo(&s)
 
@@ -97,24 +112,18 @@ var m map[string]interface{}
 js.CopyTo(&m)
 ```
 
-Supports `oson` (Oracle Binary JSON) encoding via the `types/oson` package.
+Oracle Binary JSON (OSON) encoding is supported via the `types/oson` package.
 
-#### BOOLEAN (Oracle 23c+)
-Native Oracle BOOLEAN type support:
+### BOOLEAN (Oracle 23c+)
 
 ```go
-import "github.com/sijms/go-ora/v3/types"
-
 input := types.Bool{}
 input.SetValue(true)
 
-// Use in PL/SQL calls
 db.Exec("BEGIN my_proc(:1, :2); END;", input, go_ora.Out{Dest: &message})
 ```
 
-### 5. Advanced Queuing (AQ)
-
-Full Oracle Advanced Queuing support via the `aq` package:
+## Advanced Queuing
 
 ```go
 import "github.com/sijms/go-ora/v3/aq"
@@ -122,144 +131,93 @@ import "github.com/sijms/go-ora/v3/aq"
 // Create a queue
 queue, err := aq.CreateQueue(db, "my_queue", aq.RAW, "")
 
-// Enqueue a message
+// Enqueue
 msg, _ := queue.NewMessage([]byte("hello"))
 queue.Enqueue(msg)
 
-// Dequeue a message
-deqOpts := &aq.DequeueOptions{
+// Dequeue
+msg, err = queue.Dequeue(&aq.DequeueOptions{
     Consumer: "my_consumer",
     Mode:     aq.DequeueModeBrowse,
-    Wait:     5,  // seconds
-}
-msg, err = queue.Dequeue(deqOpts)
+    Wait:     5,
+})
 ```
 
-Supported message types: `RAW`, `JSON`, `UDT`, `XML`.
+Message types: `RAW`, `JSON`, `UDT`, `XML`
 
-Features:
-- Single and batch enqueue/dequeue
-- Persistent and buffered delivery modes
-- Visibility modes (on-commit, immediate)
-- Dequeue modes (browse, locked, remove)
-- Navigation modes (first, next, transactional)
-- Message expiration and delay
-- Correlation-based filtering
+Features: batch enqueue/dequeue, persistent and buffered delivery, visibility modes, navigation modes, message expiration, correlation filtering.
 
-### 6. User-Defined Types (UDT)
-
-Enhanced UDT registration with nested type support:
+## User-Defined Types
 
 ```go
-// Register a type with its array counterpart
+// Register with array counterpart
 go_ora.RegisterType(db, "MY_OBJECT", "MY_ARRAY", MyStruct{})
 
 // Register with explicit owner
 go_ora.RegisterTypeWithOwner(db, "SCHEMA", "MY_OBJECT", "MY_ARRAY", MyStruct{})
 ```
 
-Supports nested objects, collections (VARRAY, TABLE OF), and automatic struct mapping via `udt` tags.
+Supports nested objects, collections (VARRAY, TABLE OF), and struct mapping via `udt` tags.
 
-### 7. Session Parameters
-
-Runtime session parameter management without reconnecting:
+## Session Parameters
 
 ```go
-// Set session parameters
 go_ora.AddSessionParam(db, "cursor_sharing", "force")
 go_ora.AddSessionParam(db, "nls_language", "arabic")
-
-// Parameters persist across connections in the pool
 go_ora.DelSessionParam(db, "nls_language")
 ```
 
-### 8. Custom Type Coders
+Parameters persist across connections in the pool.
 
-Register custom encoders/decoders for new types:
+## Custom Type Coders
 
 ```go
 go_ora.AddParameterCoder(db, reflect.TypeOf(MyType{}), MY_ORACLE_TYPE_ID, &MyCoder{})
 ```
 
-## Installation
+Implement the `OracleParameterCoder` interface to add support for any Oracle type.
 
-```bash
-go get github.com/sijms/go-ora/v3
-```
-
-## Quick Start
-
-```go
-import (
-    "database/sql"
-    _ "github.com/sijms/go-ora/v3"
-)
-
-func main() {
-    db, err := sql.Open("oracle", "oracle://user:pass@host:1521/service")
-    if err != nil {
-        panic(err)
-    }
-    defer db.Close()
-
-    err = db.Ping()
-    if err != nil {
-        panic(err)
-    }
-}
-```
-
-## Connection String Options
-
-| Option | Description |
-|--------|-------------|
-| `SERVER` | Database server hostname or IP |
-| `PORT` | Database port (default 1521) |
-| `SERVICE` | Oracle service name |
-| `USER` | Database username |
-| `PASSWORD` | Database password |
-| `SSL` | Enable SSL/TLS connection |
-| `SSL VERIFY` | Verify server certificate |
-| `WALLET` | Path to Oracle wallet |
-| `AUTH TYPE` | Authentication type (KERBEROS, etc.) |
-| `FAST LOGIN` | Enable fast login optimization |
-| `TOKEN FILE` | Path to authentication token file |
-| `TOKEN PRIVATE KEY FILE` | Path to token private key |
-| `TRACE DIR` | Directory for trace files |
-| `CONNECT TIMEOUT` | Connection timeout duration |
-| `LOB READ` | LOB read mode: `AUTO` or `IMPLICIT` (driver reads LOB automatically, default) or `NO` or `EXPLICIT` (manual LOB read by application) |
-
-## Package Structure
+## Architecture
 
 ```
 go-ora/v3/
-├── advanced_nego/     # Advanced authentication negotiation (NTS, Kerberos)
-├── aq/                # Advanced Queuing (enqueue/dequeue)
-├── configurations/    # Connection configuration parsing
+├── advanced_nego/     # NTS, Kerberos authentication
+├── aq/                # Advanced Queuing
+├── configurations/    # Connection string parsing
 ├── converters/        # String and data converters
-├── lazy_init/         # Lazy initialization utilities
-├── network/           # TTC protocol, packets, session management
-│   └── security/      # Security-related network utilities
-├── parameter_coder/   # Parameter encoding/decoding implementations
-├── trace/             # Trace and logging
+├── network/           # TTC protocol, packets, session
+│   └── security/      # Network security utilities
+├── parameter_coder/   # Type encoding/decoding
+├── trace/             # Logging and tracing
 ├── types/             # Oracle type implementations
-│   └── oson/          # Oracle Binary JSON (OSON) coder
+│   └── oson/          # Oracle Binary JSON (OSON)
 ├── utils/             # General utilities
 ├── connection.go      # Connection implementation
-├── driver.go          # Driver registration and type coder maps
+├── driver.go          # Driver registration
 ├── command.go         # Statement execution
 ├── parameter.go       # Parameter handling
 ├── lob.go             # LOB streaming
-├── udt.go             # User-Defined Type support
-├── transaction.go     # Transaction support
-└── bulk_copy.go       # Bulk copy operations
+├── udt.go             # User-Defined Types
+├── transaction.go     # Transactions
+└── bulk_copy.go       # Bulk copy
 ```
+
+### Design Principles
+
+- **Interface-based type system** -- each Oracle type has its own `OracleParameterCoder` implementation, making it trivial to add new types
+- **Three-way type mapping** -- Oracle type ID ↔ Go `reflect.Type` ↔ SQL type name
+- **Pluggable coders** -- register custom encoders/decoders without modifying driver internals
+- **MemorySession** -- lightweight in-memory buffer for parameter encoding and AQ message marshaling
+- **No driver-level failover** -- relies on `database/sql` connection pooling and retry logic
 
 ## Migration from v2
 
-1. Update import path: `github.com/sijms/go-ora/v2` → `github.com/sijms/go-ora/v3`
-2. New types (`Vector`, `Json`, `Bool`) are in `github.com/sijms/go-ora/v3/types`
-3. AQ API changed from `go_ora/dbms.NewAQ` to `aq.CreateQueue`
-4. UDT registration uses `go_ora.RegisterType` with struct-based type mapping
-5. Session parameters managed via `go_ora.AddSessionParam` / `go_ora.DelSessionParam`
-6. Connection string format remains compatible
+| v2 | v3 |
+|----|-----|
+| `github.com/sijms/go-ora/v2` | `github.com/sijms/go-ora/v3` |
+| Types in driver package | Types in `github.com/sijms/go-ora/v3/types` |
+| `go_ora/dbms.NewAQ` | `aq.CreateQueue` |
+| Manual UDT setup | `go_ora.RegisterType` with struct tags |
+| URL options for session params | `go_ora.AddSessionParam` / `DelSessionParam` |
+
+Connection string format is compatible.

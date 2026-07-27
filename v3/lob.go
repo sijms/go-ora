@@ -81,6 +81,9 @@ func (lob *LobStream) SetLocator(locator ora_types.Locator) {
 	}
 
 }
+func (lob *LobStream) SetCharsetID(id int) {
+	lob.charsetID = id
+}
 func (lob *LobStream) GetTracer() trace.Tracer {
 	return lob.conn.tracer
 }
@@ -186,9 +189,21 @@ func (lob *LobStream) putString(data string) error {
 	conn := lob.conn
 	conn.tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
 	lob.initialize()
-	strConv, err := conn.GetStringCoder(lob.charsetID, 0)
-	if err != nil {
-		return err
+	var strConv converters.IStringConverter
+	if lob.sourceLocator.IsVarWidthChar() {
+		if conn.dBVersion.Number < 10200 && lob.sourceLocator.IsLittleEndian() {
+			strConv, _ = conn.GetStringCoder(2002, 0)
+			lob.charsetID = 2002
+		} else {
+			strConv, _ = conn.GetStringCoder(2000, 0)
+			lob.charsetID = 2000
+		}
+	} else {
+		var err error
+		strConv, err = conn.GetStringCoder(lob.charsetID, 0)
+		if err != nil {
+			return err
+		}
 	}
 	lobData := strConv.Encode(data)
 	// lob.size = int64(len([]rune(data)))
@@ -198,7 +213,7 @@ func (lob *LobStream) putString(data string) error {
 	lob.writeOp(0x40)
 	lob.conn.session.PutBytes(0xE)
 	lob.conn.session.PutClr(lobData)
-	err = lob.conn.session.Write()
+	err := lob.conn.session.Write()
 	if err != nil {
 		return err
 	}

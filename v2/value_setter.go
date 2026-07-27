@@ -3,12 +3,11 @@ package go_ora
 import (
 	"database/sql"
 	"fmt"
+	"github.com/sijms/go-ora/v2/converters"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/sijms/go-ora/v2/converters"
 )
 
 // set null value from supported types
@@ -432,9 +431,18 @@ func setLob(value reflect.Value, input Lob) error {
 		return setNull(value)
 	}
 	getStrConv := func() (converters.IStringConverter, error) {
-		ret, err := conn.getStrConv(input.charsetID)
-		if err != nil {
-			return nil, err
+		var ret converters.IStringConverter
+		if input.variableWidthChar() {
+			if conn.dBVersion.Number < 10200 && input.littleEndianClob() {
+				ret, _ = conn.getStrConv(2002)
+			} else {
+				ret, _ = conn.getStrConv(2000)
+			}
+		} else {
+			ret, err = conn.getStrConv(input.charsetID)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return ret, nil
 	}

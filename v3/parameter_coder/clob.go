@@ -107,7 +107,16 @@ func (param *ClobParameter) Decode(conn IConnection) (interface{}, error) {
 	decoder := &types.Clob{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)
+	locator := param.streamer.GetLocator()
 	var err error
-	decoder.Conv, err = conn.GetStringCoder(param.CharsetID, param.CharsetForm)
+	if locator.IsVarWidthChar() {
+		if param.streamer.DatabaseVersionNumber() < 10200 && locator.IsLittleEndian() {
+			decoder.Conv, err = conn.GetStringCoder(2002, 0)
+		} else {
+			decoder.Conv, err = conn.GetStringCoder(2000, 0)
+		}
+	} else {
+		decoder.Conv, err = conn.GetStringCoder(param.CharsetID, param.CharsetForm)
+	}
 	return decoder, err
 }

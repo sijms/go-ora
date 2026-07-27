@@ -33,18 +33,6 @@ func (clob *Clob) Upload() error {
 		if err != nil {
 			return err
 		}
-		if clob.Conv != nil {
-			locator := clob.GetLocator()
-			if locator.IsVarWidthChar() {
-				tempValue := clob.Conv.Decode(clob.bValue)
-				if clob.stream.DatabaseVersionNumber() < 10200 && locator.IsLittleEndian() {
-					clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(2002, 0)
-				} else {
-					clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(2000, 0)
-				}
-				clob.bValue = clob.Conv.Encode(tempValue)
-			}
-		}
 		err = clob.stream.Write(clob.bValue)
 	}
 	return err

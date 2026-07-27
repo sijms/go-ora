@@ -173,54 +173,6 @@ func (lob *LobStream) Write(data []byte) error {
 	return processReset(err, lob.conn)
 }
 
-// getData return lob data
-func (lob *LobStream) getData() (data []byte, err error) {
-	return lob.Read(0, 0)
-}
-
-func (lob *LobStream) putData(data []byte) error {
-	return lob.Write(data)
-}
-
-func (lob *LobStream) putString(data string) error {
-	if lob.sourceLocator == nil {
-		return errEmptyLocator
-	}
-	conn := lob.conn
-	conn.tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
-	lob.initialize()
-	var strConv converters.IStringConverter
-	if lob.sourceLocator.IsVarWidthChar() {
-		if conn.dBVersion.Number < 10200 && lob.sourceLocator.IsLittleEndian() {
-			strConv, _ = conn.GetStringCoder(2002, 0)
-			lob.charsetID = 2002
-		} else {
-			strConv, _ = conn.GetStringCoder(2000, 0)
-			lob.charsetID = 2000
-		}
-	} else {
-		var err error
-		strConv, err = conn.GetStringCoder(lob.charsetID, 0)
-		if err != nil {
-			return err
-		}
-	}
-	lobData := strConv.Encode(data)
-	// lob.size = int64(len([]rune(data)))
-	// lob.sendSize = true
-	lob.sourceOffset = 1
-	lob.conn.session.ResetBuffer()
-	lob.writeOp(0x40)
-	lob.conn.session.PutBytes(0xE)
-	lob.conn.session.PutClr(lobData)
-	err := lob.conn.session.Write()
-	if err != nil {
-		return err
-	}
-	err = lob.read()
-	return processReset(err, lob.conn)
-}
-
 func (lob *LobStream) Exists() (bool, error) {
 	if lob.sourceLocator == nil {
 		return false, errEmptyLocator

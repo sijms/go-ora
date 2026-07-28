@@ -19,7 +19,7 @@ func newEncryptService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoS
 			comm:        comm,
 			level:       negoInfo.EncServiceLevel,
 			serviceType: 2,
-			version:     0x17000000,
+			version:     version,
 			availableServiceNames: []string{
 				"", "RC4_40", "RC4_56", "RC4_128", "RC4_256",
 				"DES40C", "DES56C", "3DES112", "3DES168", "AES128", "AES192", "AES256",
@@ -72,7 +72,13 @@ func (serv *encryptService) getServiceDataLength() int {
 
 func (serv *encryptService) activateAlgorithm() error {
 	key := serv.comm.session.Context.AdvancedService.SessionKey
-	iv := serv.comm.session.Context.AdvancedService.IV
+	var iv []byte
+	if isNew(serv.version) {
+		iv = serv.comm.session.Context.AdvancedService.IV[:16]
+	} else {
+		iv = nil
+	}
+
 	// iv := make([]byte, 16)
 	var algo security.OracleNetworkEncryption = nil
 	var err error
@@ -80,9 +86,10 @@ func (serv *encryptService) activateAlgorithm() error {
 	case 0:
 		return nil
 	case 1:
+		iv = serv.comm.session.Context.AdvancedService.IV
 		algo, err = security.NewOracleNetworkRC4Cryptor(key, iv, 40)
 	case 2:
-		algo, err = security.NewOracleNetworkDESCryptor(key[:8], nil)
+		algo, err = security.NewOracleNetworkDESCryptor(key[:8], iv)
 	case 6:
 		algo, err = security.NewOracleNetworkRC4Cryptor(key, iv, 256)
 	case 8:
@@ -90,11 +97,11 @@ func (serv *encryptService) activateAlgorithm() error {
 	case 10:
 		algo, err = security.NewOracleNetworkRC4Cryptor(key, iv, 128)
 	case 15:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], nil)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], iv)
 	case 16:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:24], nil)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:24], iv)
 	case 17:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:32], nil)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:32], iv)
 	default:
 		err = errors.New(fmt.Sprintf("advanced negotiation error: encryption service algorithm: %d still not supported", serv.algoID))
 	}

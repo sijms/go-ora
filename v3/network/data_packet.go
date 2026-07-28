@@ -46,6 +46,9 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext, tracer trace.
 	}
 	if sessionCtx.AdvancedService.HashAlgo != nil || sessionCtx.AdvancedService.CryptAlgo != nil {
 		foldingKey := uint8(0)
+		if sessionCtx.AdvancedService.keyFolding {
+			foldingKey = uint8(1)
+		}
 		initialData = append(initialData, foldingKey)
 	}
 

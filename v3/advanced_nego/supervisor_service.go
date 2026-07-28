@@ -15,7 +15,7 @@ func newSupervisorService(comm *AdvancedNegoComm) (*supervisorService, error) {
 		defaultService: defaultService{
 			comm:        comm,
 			serviceType: 4,
-			version:     0x17000000,
+			version:     version,
 		},
 		cid:       []byte{0, 0, 16, 28, 102, 236, 40, 234},
 		servArray: []int{4, 1, 2, 3},

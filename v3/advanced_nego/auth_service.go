@@ -19,7 +19,7 @@ func newAuthService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoServ
 			comm:        comm,
 			serviceType: 1,
 			level:       -1,
-			version:     0x17000000,
+			version:     version,
 		},
 		status: 0xFCFF,
 	}

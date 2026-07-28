@@ -133,6 +133,7 @@ type Connection struct {
 	token                    []byte
 	tokenPrivateKey          []byte
 	connectionCookie         *ConnectionCookie
+	newKey                   []byte
 }
 
 type ConnectionProperties struct {
@@ -597,9 +598,10 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		return err
 	}
 	// advanced negotiation
+	var ano *advanced_nego.AdvNego = nil
 	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
 		tracer.Print("Advance Negotiation")
-		ano, err := advanced_nego.NewAdvNego(session, conn.tracer, conn.connOption)
+		ano, err = advanced_nego.NewAdvNego(session, conn.tracer, conn.connOption)
 		if err != nil {
 			return err
 		}
@@ -704,6 +706,11 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		tracer.Print("Reconnect")
 		return conn.OpenWithContext(ctx)
 	}
+	if err != nil {
+		return err
+	}
+	externalAuth := len(conn.connOption.UserID) == 0 || len(conn.connOption.Password) == 0
+	err = conn.session.Context.SetKeyFolding(conn.newKey, ano, externalAuth, conn.LogonMode&0x20 > 0 || conn.LogonMode&0x40 > 0)
 	if err != nil {
 		return err
 	}
@@ -1023,9 +1030,6 @@ func (conn *Connection) doAuth() error {
 				}
 				conn.SessionProperties[string(key)] = string(val)
 			}
-		// case 27:
-		//	this.ProcessImplicitResultSet(ref implicitRSList);
-		//	continue;
 		default:
 			err = conn.ProcessTCCResponse(msg)
 			if err != nil {

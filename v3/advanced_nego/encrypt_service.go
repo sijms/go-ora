@@ -73,7 +73,7 @@ func (serv *encryptService) getServiceDataLength() int {
 func (serv *encryptService) activateAlgorithm() error {
 	key := serv.comm.session.Context.AdvancedService.SessionKey
 	var iv []byte
-	if isNew(serv.version) {
+	if isNew(serv.version) && len(serv.comm.session.Context.AdvancedService.IV) >= 16 {
 		iv = serv.comm.session.Context.AdvancedService.IV[:16]
 	} else {
 		iv = nil

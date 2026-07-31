@@ -423,66 +423,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	par.oPrimValue = nil
 	par.BValue = nil
 	var decoder parameter_coder.OracleParameterCoder
-	//if par.ArraySize > 0 {
-	//
-	//	decoder.SetParameterInfo(par.GetParameterInfo())
-	//
-	//	size, err := session.GetInt(4, true, true)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if size > 0 {
-	//		par.ArraySize = size
-	//		pars := make([]ParameterInfo, 0, size)
-	//		for x := 0; x < size; x++ {
-	//			tempPar := par.clone()
-	//			err = tempPar.decodeParameterValue(conn)
-	//			if err != nil {
-	//				return err
-	//			}
-	//			//, err = tempPar.decodeValue(stmt.connection, false)
-	//			//if x < size-1 {
-	//			_, err = session.GetInt(2, true, true)
-	//			if err != nil {
-	//				return err
-	//			}
-	//			//}
-	//			pars = append(pars, tempPar)
-	//		}
-	//		par.oPrimValue = pars
-	//	}
-	//	return nil
-	//}
-	//if par.DataType == oraTypes.XMLType && par.parent == nil {
-	//	_, err = session.GetDlc() // contain toid and some 0s
-	//	if err != nil {
-	//		return err
-	//	}
-	//	_, err = session.GetBytes(3) // 3 0s
-	//	if err != nil {
-	//		return err
-	//	}
-	//	var size int
-	//	size, err = session.GetInt(4, true, true)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	_, err = session.GetBytes(2) // 0x1 0x1
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if size == 0 {
-	//		// the object is null
-	//		_, err = session.GetBytes(2) // 0x81 0x01
-	//		if err != nil {
-	//			return err
-	//		}
-	//		par.oPrimValue = nil
-	//		par.IsNull = true
-	//		return nil
-	//	}
-	//	par.IsNull = false
-	//}
 	if par.ArraySize > 0 {
 		decoder = &parameter_coder.ArrayParameter{}
 	} else {

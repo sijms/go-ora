@@ -700,12 +700,12 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 			}
 		}
 	}
-	par.encoder.SetParameterInfo(par.GetParameterInfo())
+	par.encoder.UpdateParameterInfo(par.GetParameterInfo())
 	err = par.encoder.Encode(tempValue, connection)
 	if err != nil {
 		return err
 	}
-	par.SetParameterInfo(par.encoder.GetParameterInfo())
+	par.UpdateParameterInfo(par.encoder.GetParameterInfo())
 	if par.MaxLen < size {
 		par.MaxLen = size
 	}

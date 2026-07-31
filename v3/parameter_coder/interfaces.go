@@ -40,7 +40,7 @@ type (
 		Encode(input interface{}, conn IConnection) error
 		network.ValueStreamWriter
 		GetParameterInfo() BasicParameter
-		SetParameterInfo(data BasicParameter)
+		UpdateParameterInfo(data BasicParameter)
 	}
 
 	OracleParameterDecoder interface {

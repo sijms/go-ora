@@ -113,6 +113,13 @@ func (serv *dataIntegrityService) readServiceData(subPacketNum int) error {
 	serv.tracer.LogPacket("Public Key:", serv.publicKey)
 	serv.tracer.LogPacket("Server Public Key:", serverPublicKeyBytes)
 	serv.tracer.LogPacket("Shared Key:", serv.sharedKey)
+
+	serv.comm.session.Context.AdvancedService.SessionKey = serv.sharedKey
+	if isNew(serv.version) {
+		serv.comm.session.Context.AdvancedService.IV = serv.iv
+	} else {
+		serv.comm.session.Context.AdvancedService.IV = serv.oldIV
+	}
 	return nil
 }
 
@@ -135,12 +142,8 @@ func (serv *dataIntegrityService) getServiceDataLength() int {
 }
 
 func (serv *dataIntegrityService) activateAlgorithm() error {
-	serv.comm.session.Context.AdvancedService.SessionKey = serv.sharedKey
-	if isNew(serv.version) {
-		serv.comm.session.Context.AdvancedService.IV = serv.iv
-	} else {
-		serv.comm.session.Context.AdvancedService.IV = serv.oldIV
-	}
+	key := serv.comm.session.Context.AdvancedService.SessionKey
+	iv := serv.comm.session.Context.AdvancedService.IV
 
 	// return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
 	var algo security.OracleNetworkDataIntegrity = nil
@@ -149,15 +152,15 @@ func (serv *dataIntegrityService) activateAlgorithm() error {
 	case 0:
 		algo = nil
 	case 1:
-		algo, err = security.NewOracleNetworkHash(md5.New(), serv.sharedKey, serv.oldIV)
+		algo, err = security.NewOracleNetworkHash(md5.New(), key, serv.oldIV, false)
 	case 3:
-		algo, err = security.NewOracleNetworkHash(crypto.SHA1.New(), serv.sharedKey, serv.oldIV)
+		algo, err = security.NewOracleNetworkHash(crypto.SHA1.New(), key, iv, isNew(serv.version))
 	case 4:
-		algo, err = security.NewOracleNetworkHash2(crypto.SHA512.New(), serv.sharedKey, serv.oldIV)
+		algo, err = security.NewOracleNetworkHash2(crypto.SHA512.New(), key, iv, isNew(serv.version))
 	case 5:
-		algo, err = security.NewOracleNetworkHash2(crypto.SHA256.New(), serv.sharedKey, serv.oldIV)
+		algo, err = security.NewOracleNetworkHash2(crypto.SHA256.New(), key, iv, isNew(serv.version))
 	case 6:
-		algo, err = security.NewOracleNetworkHash2(crypto.SHA384.New(), serv.sharedKey, serv.oldIV)
+		algo, err = security.NewOracleNetworkHash2(crypto.SHA384.New(), key, iv, isNew(serv.version))
 	default:
 		err = errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
 	}

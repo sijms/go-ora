@@ -221,8 +221,6 @@ func (obj *AuthObject) read() error {
 	} else {
 		padding = true
 	}
-	// use new key to make key folding in ano services
-
 	// encrypt the password
 	obj.EPassword, err = encryptPassword([]byte(obj.conn.connOption.Password), obj.conn.newKey, true)
 	if err != nil {

@@ -31,25 +31,11 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext, tracer trace.
 	var err error
 	mu.Lock()
 	defer mu.Unlock()
-	if sessionCtx.AdvancedService.HashAlgo != nil {
-		hashData := sessionCtx.AdvancedService.HashAlgo.Compute(initialData)
-		initialData = append(initialData, hashData...)
-	}
-	if sessionCtx.AdvancedService.CryptAlgo != nil {
-		// outputData = make([]byte, len(outputData))
-		// copy(outputData, outputData)
-		tracer.LogPacket("Write packet (Decrypted): ", initialData)
-		initialData, err = sessionCtx.AdvancedService.CryptAlgo.Encrypt(initialData)
+	if sessionCtx.nego != nil {
+		initialData, err = sessionCtx.nego.WriteDataBuffer(initialData)
 		if err != nil {
 			return nil, err
 		}
-	}
-	if sessionCtx.AdvancedService.HashAlgo != nil || sessionCtx.AdvancedService.CryptAlgo != nil {
-		foldingKey := uint8(0)
-		if sessionCtx.AdvancedService.keyFolding {
-			foldingKey = uint8(1)
-		}
-		initialData = append(initialData, foldingKey)
 	}
 
 	return &DataPacket{
@@ -87,23 +73,11 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, tracer
 	} else {
 		pck.length = uint32(binary.BigEndian.Uint16(packetData))
 	}
-	if len(pck.buffer) > 1 {
+	if len(pck.buffer) > 1 && sessionCtx.nego != nil {
 		var err error
-		if sessionCtx.AdvancedService.CryptAlgo != nil || sessionCtx.AdvancedService.HashAlgo != nil {
-			pck.buffer = pck.buffer[:len(pck.buffer)-1]
-		}
-		if sessionCtx.AdvancedService.CryptAlgo != nil {
-			pck.buffer, err = sessionCtx.AdvancedService.CryptAlgo.Decrypt(pck.buffer)
-			if err != nil {
-				return nil, err
-			}
-			tracer.LogPacket("Read packet (Decrypted): ", pck.buffer)
-		}
-		if sessionCtx.AdvancedService.HashAlgo != nil {
-			pck.buffer, err = sessionCtx.AdvancedService.HashAlgo.Validate(pck.buffer)
-			if err != nil {
-				return nil, err
-			}
+		pck.buffer, err = sessionCtx.nego.ReadDataBuffer(pck.buffer)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return pck, nil

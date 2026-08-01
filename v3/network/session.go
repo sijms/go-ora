@@ -693,14 +693,8 @@ func (session *Session) processMarker() error {
 	if err != nil {
 		return err
 	}
-	if session.Context.AdvancedService.HashAlgo != nil {
-		err = session.Context.AdvancedService.HashAlgo.Init()
-		if err != nil {
-			return err
-		}
-	}
-	if session.Context.AdvancedService.CryptAlgo != nil {
-		err = session.Context.AdvancedService.CryptAlgo.Reset()
+	if session.Context.nego != nil {
+		err = session.Context.nego.Reset()
 		if err != nil {
 			return err
 		}

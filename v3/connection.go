@@ -618,6 +618,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			return err
 		}
 	}
+	conn.session.Context.SetAdvancedNegotiator(ano)
 	// if fast login enabled this means new features are available
 	if conn.session.Context.FastAuthEnabled {
 		session.UseBigClrChunks = true
@@ -709,11 +710,14 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	externalAuth := len(conn.connOption.UserID) == 0 || len(conn.connOption.Password) == 0
-	err = conn.session.Context.SetKeyFolding(conn.newKey, ano, externalAuth, conn.LogonMode&0x20 > 0 || conn.LogonMode&0x40 > 0)
-	if err != nil {
-		return err
+	if ano != nil {
+		externalAuth := len(conn.connOption.UserID) == 0 || len(conn.connOption.Password) == 0
+		err = ano.SetKeyFolding(conn.newKey, externalAuth, conn.LogonMode&0x20 > 0 || conn.LogonMode&0x40 > 0)
+		if err != nil {
+			return err
+		}
 	}
+
 	conn.State = Opened
 	conn.session.ServerFlags = conn.tcpNego.ServerFlags
 	if conn.connectionCookie == nil && conn.isFastLoginEnabled() && conn.tcpNego != nil {

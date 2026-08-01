@@ -13,10 +13,10 @@ type authService struct {
 	active      bool
 }
 
-func newAuthService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoServiceInfo) (*authService, error) {
+func newAuthService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo) (*authService, error) {
 	output := &authService{
 		defaultService: defaultService{
-			comm:        comm,
+			ano:         ano,
 			serviceType: 1,
 			level:       -1,
 			version:     version,
@@ -61,7 +61,7 @@ func newAuthService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoServ
 
 func (serv *authService) writeServiceData() error {
 	serv.writeHeader(3 + (len(serv.selectedIndices) * 2))
-	comm := serv.comm
+	comm := serv.ano.comm
 	comm.writeVersion(serv.getVersion())
 	comm.writeUB2(0xE0E1)
 	comm.writeStatus(serv.status)
@@ -76,7 +76,7 @@ func (serv *authService) writeServiceData() error {
 func (serv *authService) readServiceData(subPacketNum int) error {
 	// read version
 	var err error
-	comm := serv.comm
+	comm := serv.ano.comm
 	serv.version, err = comm.readVersion()
 	if err != nil {
 		return err

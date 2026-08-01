@@ -10,10 +10,10 @@ type supervisorService struct {
 	servArray []int
 }
 
-func newSupervisorService(comm *AdvancedNegoComm) (*supervisorService, error) {
+func newSupervisorService(ano *AdvNego) (*supervisorService, error) {
 	output := &supervisorService{
 		defaultService: defaultService{
-			comm:        comm,
+			ano:         ano,
 			serviceType: 4,
 			version:     version,
 		},
@@ -25,7 +25,7 @@ func newSupervisorService(comm *AdvancedNegoComm) (*supervisorService, error) {
 
 func (serv *supervisorService) readServiceData(subPacketNum int) error {
 	var err error
-	comm := serv.comm
+	comm := serv.ano.comm
 	_, err = comm.readVersion()
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func (serv *supervisorService) readServiceData(subPacketNum int) error {
 
 func (serv *supervisorService) writeServiceData() error {
 	serv.writeHeader(3)
-	comm := serv.comm
+	comm := serv.ano.comm
 	comm.writeVersion(serv.getVersion())
 	// send cid
 	comm.writeBytes(serv.cid)

@@ -2,7 +2,6 @@ package network
 
 import (
 	"github.com/sijms/go-ora/v3/configurations"
-	"github.com/sijms/go-ora/v3/network/security"
 )
 
 type SessionContext struct {
@@ -33,13 +32,14 @@ type SessionContext struct {
 	IsNTConnected       bool
 	OnBreakReset        bool
 	GotReset            bool
-	AdvancedService     struct {
-		CryptAlgo  security.OracleNetworkEncryption
-		HashAlgo   security.OracleNetworkDataIntegrity
-		SessionKey []byte
-		IV         []byte
-		keyFolding bool
-	}
+	nego                AdvancedNegotiator
+	//AdvancedService     struct {
+	//	CryptAlgo  security.OracleNetworkEncryption
+	//	HashAlgo   security.OracleNetworkDataIntegrity
+	//	SessionKey []byte
+	//	IV         []byte
+	//	keyFolding bool
+	//}
 	isRedirect       bool
 	FastAuthEnabled  bool
 	EODDAFlagEnabled bool
@@ -63,53 +63,56 @@ func NewSessionContext(config *configurations.ConnectionConfig) *SessionContext 
 	return ctx
 }
 
-type AdvancedNegotiation interface {
-	StartServices() error
-	IsNewVersion(serviceType int) bool
-	IsNTSAuth() bool
-	IsKerberosAuth() bool
+type AdvancedNegotiator interface {
+	WriteDataBuffer(data []byte) ([]byte, error)
+	ReadDataBuffer(data []byte) ([]byte, error)
+	Reset() error
 }
 
-func (ctx *SessionContext) SetKeyFolding(key []byte, ano AdvancedNegotiation, isExternalAuth, isSys bool) error {
-	ctx.AdvancedService.keyFolding = false
-	if isExternalAuth {
-		if ano.IsNTSAuth() && (!isSys) {
-			return nil
-		}
-		//if ano.IsKerberosAuth() && ano.IsNewVersion(1) && ano.kkey != null {
-		//	Key = ano.kkey
-		//}
-	}
-	if key == nil {
-		return nil
-	}
-	if ano == nil {
-		return nil
-	}
-
-	length := len(key)
-	if length > len(ctx.AdvancedService.SessionKey) {
-		length = len(ctx.AdvancedService.SessionKey)
-	}
-	for i := 0; i < length; i++ {
-		ctx.AdvancedService.SessionKey[i] ^= key[i]
-	}
-	// service type: 2 = encryption, 3 = data integrity
-	if ano.IsNewVersion(2) || ano.IsNewVersion(3) {
-		length = len(key)
-		if length > len(ctx.AdvancedService.IV) {
-			length = len(ctx.AdvancedService.IV)
-		}
-		for i := 0; i < length; i++ {
-			ctx.AdvancedService.IV[i] ^= key[i]
-		}
-	}
-	if ctx.AdvancedService.CryptAlgo != nil || ctx.AdvancedService.HashAlgo != nil {
-		err := ano.StartServices()
-		if err != nil {
-			return err
-		}
-		ctx.AdvancedService.keyFolding = true
-	}
-	return nil
+func (ctx *SessionContext) SetAdvancedNegotiator(nego AdvancedNegotiator) {
+	ctx.nego = nego
 }
+
+//func (ctx *SessionContext) SetKeyFolding(key []byte, ano AdvancedNegotiation, isExternalAuth, isSys bool) error {
+//	ctx.AdvancedService.keyFolding = false
+//	if isExternalAuth {
+//		if ano.IsNTSAuth() && (!isSys) {
+//			return nil
+//		}
+//		//if ano.IsKerberosAuth() && ano.IsNewVersion(1) && ano.kkey != null {
+//		//	Key = ano.kkey
+//		//}
+//	}
+//	if key == nil {
+//		return nil
+//	}
+//	if ano == nil {
+//		return nil
+//	}
+//
+//	length := len(key)
+//	if length > len(ctx.AdvancedService.SessionKey) {
+//		length = len(ctx.AdvancedService.SessionKey)
+//	}
+//	for i := 0; i < length; i++ {
+//		ctx.AdvancedService.SessionKey[i] ^= key[i]
+//	}
+//	// service type: 2 = encryption, 3 = data integrity
+//	if ano.IsNewVersion(2) || ano.IsNewVersion(3) {
+//		length = len(key)
+//		if length > len(ctx.AdvancedService.IV) {
+//			length = len(ctx.AdvancedService.IV)
+//		}
+//		for i := 0; i < length; i++ {
+//			ctx.AdvancedService.IV[i] ^= key[i]
+//		}
+//	}
+//	if ctx.AdvancedService.CryptAlgo != nil || ctx.AdvancedService.HashAlgo != nil {
+//		err := ano.StartServices()
+//		if err != nil {
+//			return err
+//		}
+//		ctx.AdvancedService.keyFolding = true
+//	}
+//	return nil
+//}

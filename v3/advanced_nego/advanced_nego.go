@@ -8,6 +8,7 @@ import (
 
 	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/network"
+	"github.com/sijms/go-ora/v3/network/security"
 	"github.com/sijms/go-ora/v3/trace"
 )
 
@@ -32,6 +33,12 @@ type AdvNego struct {
 	negoInfo     *configurations.AdvNegoServiceInfo
 	tracer       trace.Tracer
 	serviceList  []AdvNegoService
+	sessionKey   []byte
+	iv           []byte
+	oldIV        []byte
+	cryptAlgo    security.OracleNetworkEncryption
+	hashAlgo     security.OracleNetworkDataIntegrity
+	keyFolding   bool
 }
 
 func NewAdvNego(session *network.Session, tracer trace.Tracer, config *configurations.ConnectionConfig) (*AdvNego, error) {
@@ -44,19 +51,19 @@ func NewAdvNego(session *network.Session, tracer trace.Tracer, config *configura
 		serviceList: make([]AdvNegoService, 5),
 	}
 	var err error
-	output.serviceList[1], err = newAuthService(output.comm, output.negoInfo)
+	output.serviceList[1], err = newAuthService(output, output.negoInfo)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[2], err = newEncryptService(output.comm, output.negoInfo)
+	output.serviceList[2], err = newEncryptService(output, output.negoInfo)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[3], err = newDataIntegrityService(output.comm, output.negoInfo, output.tracer)
+	output.serviceList[3], err = newDataIntegrityService(output, output.negoInfo, output.tracer)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[4], err = newSupervisorService(output.comm)
+	output.serviceList[4], err = newSupervisorService(output)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +314,7 @@ func (nego *AdvNego) StartServices() error {
 
 func (nego *AdvNego) IsNewVersion(serviceType int) bool {
 	if serviceType < len(nego.serviceList) {
-		return isNew(nego.serviceList[serviceType].getVersion())
+		return nego.serviceList[serviceType].isNewVersion()
 	}
 
 	return isNew(nego.version)
@@ -424,4 +431,109 @@ func getHostIPAddress() (net.IP, error) {
 		}
 	}
 	return nil, errors.New("advanced negotiation error: during get local ip address")
+}
+
+func (nego *AdvNego) WriteDataBuffer(data []byte) ([]byte, error) {
+	if nego.hashAlgo != nil {
+		hashData := nego.hashAlgo.Compute(data)
+		data = append(data, hashData...)
+	}
+	var err error
+	tracer := nego.tracer
+	if nego.cryptAlgo != nil {
+		// outputData = make([]byte, len(outputData))
+		// copy(outputData, outputData)
+		tracer.LogPacket("Write packet (Decrypted): ", data)
+		data, err = nego.cryptAlgo.Encrypt(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if nego.hashAlgo != nil || nego.cryptAlgo != nil {
+		foldingKey := uint8(0)
+		if nego.keyFolding {
+			foldingKey = uint8(1)
+		}
+		data = append(data, foldingKey)
+	}
+	return data, nil
+}
+
+func (nego *AdvNego) ReadDataBuffer(data []byte) ([]byte, error) {
+	var err error
+	if nego.cryptAlgo != nil || nego.hashAlgo != nil {
+		data = data[:len(data)-1]
+	}
+	tracer := nego.tracer
+	if nego.cryptAlgo != nil {
+		data, err = nego.cryptAlgo.Decrypt(data)
+		if err != nil {
+			return nil, err
+		}
+		tracer.LogPacket("Read packet (Decrypted): ", data)
+	}
+	if nego.hashAlgo != nil {
+		data, err = nego.hashAlgo.Validate(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return data, nil
+}
+
+func (nego *AdvNego) SetKeyFolding(key []byte, isExternalAuth, isSys bool) error {
+	nego.keyFolding = false
+	if isExternalAuth {
+		if nego.IsNTSAuth() && (!isSys) {
+			return nil
+		}
+		//if ano.IsKerberosAuth() && ano.IsNewVersion(1) && ano.kkey != null {
+		//	Key = ano.kkey
+		//}
+	}
+	if len(key) == 0 || len(nego.sessionKey) == 0 || len(nego.iv) == 0 {
+		return nil
+	}
+
+	length := len(key)
+	if length > len(nego.sessionKey) {
+		length = len(nego.sessionKey)
+	}
+	for i := 0; i < length; i++ {
+		nego.sessionKey[i] ^= key[i]
+	}
+	if nego.IsNewVersion(ENCRYPTION_SERVICE_ID) || nego.IsNewVersion(DATA_INTEGRITY_SERVICE_ID) {
+		length = len(key)
+		if length > len(nego.iv) {
+			length = len(nego.iv)
+		}
+		for i := 0; i < length; i++ {
+			nego.iv[i] ^= key[i]
+		}
+	}
+	if nego.cryptAlgo != nil || nego.hashAlgo != nil {
+		err := nego.StartServices()
+		if err != nil {
+			return err
+		}
+		nego.keyFolding = true
+	}
+	return nil
+}
+
+func (nego *AdvNego) Reset() error {
+	var err error
+	if nego.hashAlgo != nil {
+		err = nego.hashAlgo.Init()
+		if err != nil {
+			return err
+		}
+	}
+	if nego.cryptAlgo != nil {
+		err = nego.cryptAlgo.Reset()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

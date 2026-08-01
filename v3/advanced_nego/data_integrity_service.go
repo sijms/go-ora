@@ -17,16 +17,16 @@ type dataIntegrityService struct {
 	defaultService
 	algoID    int
 	publicKey []byte
-	sharedKey []byte
-	oldIV     []byte
-	iv        []byte
-	tracer    trace.Tracer
+	//sharedKey []byte
+	//oldIV     []byte
+	//iv        []byte
+	tracer trace.Tracer
 }
 
-func newDataIntegrityService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoServiceInfo, tracer trace.Tracer) (*dataIntegrityService, error) {
+func newDataIntegrityService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo, tracer trace.Tracer) (*dataIntegrityService, error) {
 	output := &dataIntegrityService{
 		defaultService: defaultService{
-			comm:                  comm,
+			ano:                   ano,
 			level:                 negoInfo.IntServiceLevel,
 			serviceType:           3,
 			version:               version,
@@ -45,7 +45,7 @@ func newDataIntegrityService(comm *AdvancedNegoComm, negoInfo *configurations.Ad
 
 func (serv *dataIntegrityService) readServiceData(subPacketNum int) error {
 	var err error
-	comm := serv.comm
+	comm := serv.ano.comm
 	serv.version, err = comm.readVersion()
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func (serv *dataIntegrityService) readServiceData(subPacketNum int) error {
 	if err != nil {
 		return err
 	}
-	serv.oldIV, err = comm.readBytes()
+	serv.ano.oldIV, err = comm.readBytes()
 	if err != nil {
 		return err
 	}
@@ -102,30 +102,23 @@ func (serv *dataIntegrityService) readServiceData(subPacketNum int) error {
 	sharedKey := new(big.Int).Exp(serverPublicKey, privateKey, prime)
 	serv.publicKey = make([]byte, byteLen)
 	publicKey.FillBytes(serv.publicKey)
-	serv.sharedKey = make([]byte, byteLen)
-	sharedKey.FillBytes(serv.sharedKey)
-	serv.iv = make([]byte, 0x20)
-	copy(serv.iv, serv.sharedKey[0x20:])
+	serv.ano.sessionKey = make([]byte, byteLen)
+	sharedKey.FillBytes(serv.ano.sessionKey)
+	serv.ano.iv = make([]byte, 0x20)
+	copy(serv.ano.iv, serv.ano.sessionKey[0x20:])
 	serv.tracer.Print("Diffie Hellman Keys:")
 	serv.tracer.LogPacket("Generator:", genBytes)
 	serv.tracer.LogPacket("Prime:", primeBytes)
 	serv.tracer.LogPacket("Private Key:", privateKeyBytes)
 	serv.tracer.LogPacket("Public Key:", serv.publicKey)
 	serv.tracer.LogPacket("Server Public Key:", serverPublicKeyBytes)
-	serv.tracer.LogPacket("Shared Key:", serv.sharedKey)
-
-	serv.comm.session.Context.AdvancedService.SessionKey = serv.sharedKey
-	if isNew(serv.version) {
-		serv.comm.session.Context.AdvancedService.IV = serv.iv
-	} else {
-		serv.comm.session.Context.AdvancedService.IV = serv.oldIV
-	}
+	serv.tracer.LogPacket("Shared Key:", serv.ano.sessionKey)
 	return nil
 }
 
 func (serv *dataIntegrityService) writeServiceData() error {
 	serv.writeHeader(2)
-	comm := serv.comm
+	comm := serv.ano.comm
 	comm.writeVersion(serv.getVersion())
 	selectedIndices := make([]byte, len(serv.selectedIndices))
 	for i := 0; i < len(serv.selectedIndices); i++ {
@@ -137,13 +130,22 @@ func (serv *dataIntegrityService) writeServiceData() error {
 	return nil
 }
 
+func (serv *dataIntegrityService) isNewVersion() bool {
+	if serv.algoID == 1 {
+		return false
+	}
+	return serv.defaultService.isNewVersion()
+}
 func (serv *dataIntegrityService) getServiceDataLength() int {
 	return 12 + len(serv.selectedIndices)
 }
 
 func (serv *dataIntegrityService) activateAlgorithm() error {
-	key := serv.comm.session.Context.AdvancedService.SessionKey
-	iv := serv.comm.session.Context.AdvancedService.IV
+	key := serv.ano.sessionKey
+	iv := serv.ano.oldIV
+	if serv.isNewVersion() {
+		iv = serv.ano.iv
+	}
 
 	// return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
 	var algo security.OracleNetworkDataIntegrity = nil
@@ -152,22 +154,22 @@ func (serv *dataIntegrityService) activateAlgorithm() error {
 	case 0:
 		algo = nil
 	case 1:
-		algo, err = security.NewOracleNetworkHash(md5.New(), key, serv.oldIV, false)
+		algo, err = security.NewOracleNetworkHash(md5.New(), key, iv, serv.isNewVersion())
 	case 3:
-		algo, err = security.NewOracleNetworkHash(crypto.SHA1.New(), key, iv, isNew(serv.version))
+		algo, err = security.NewOracleNetworkHash(crypto.SHA1.New(), key, iv, serv.isNewVersion())
 	case 4:
-		algo, err = security.NewOracleNetworkHash2(crypto.SHA512.New(), key, iv, isNew(serv.version))
+		algo, err = security.NewOracleNetworkHash2(crypto.SHA512.New(), key, iv, serv.isNewVersion())
 	case 5:
-		algo, err = security.NewOracleNetworkHash2(crypto.SHA256.New(), key, iv, isNew(serv.version))
+		algo, err = security.NewOracleNetworkHash2(crypto.SHA256.New(), key, iv, serv.isNewVersion())
 	case 6:
-		algo, err = security.NewOracleNetworkHash2(crypto.SHA384.New(), key, iv, isNew(serv.version))
+		algo, err = security.NewOracleNetworkHash2(crypto.SHA384.New(), key, iv, serv.isNewVersion())
 	default:
 		err = errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
 	}
 	if err != nil {
 		return err
 	}
-	serv.comm.session.Context.AdvancedService.HashAlgo = algo
+	serv.ano.hashAlgo = algo
 	return nil
 	// you can use also IDs
 }

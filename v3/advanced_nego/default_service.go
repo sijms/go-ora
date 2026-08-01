@@ -13,10 +13,12 @@ type AdvNegoService interface {
 	validateResponse() error
 	getVersion() uint32
 	activateAlgorithm() error
+	isNewVersion() bool
 }
 
 type defaultService struct {
-	comm                  *AdvancedNegoComm
+	ano *AdvNego
+	//comm                  *AdvancedNegoComm
 	serviceType           int
 	level                 int
 	availableServiceNames []string
@@ -27,6 +29,9 @@ type defaultService struct {
 	// avaServs     map[string]int
 }
 
+func (serv *defaultService) isNewVersion() bool {
+	return isNew(serv.version)
+}
 func (serv *defaultService) getVersion() uint32 {
 	return serv.version
 }
@@ -97,9 +102,10 @@ func (serv *defaultService) activateAlgorithm() error {
 //		return
 //	}
 func (serv *defaultService) writeHeader(serviceSubPackets int) {
-	serv.comm.session.PutInt(serv.serviceType, 2, true, false)
-	serv.comm.session.PutInt(serviceSubPackets, 2, true, false)
-	serv.comm.session.PutInt(0, 4, true, false)
+	comm := serv.ano.comm
+	comm.session.PutInt(serv.serviceType, 2, true, false)
+	comm.session.PutInt(serviceSubPackets, 2, true, false)
+	comm.session.PutInt(0, 4, true, false)
 }
 
 //func (serv *defaultService) readVersion(session *network.Session) (uint32, error) {

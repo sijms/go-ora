@@ -81,6 +81,9 @@ func (lob *LobStream) SetLocator(locator ora_types.Locator) {
 	}
 
 }
+func (lob *LobStream) SetCharsetID(id int) {
+	lob.charsetID = id
+}
 func (lob *LobStream) GetTracer() trace.Tracer {
 	return lob.conn.tracer
 }

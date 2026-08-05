@@ -15,6 +15,7 @@ type LobStreamer interface {
 	EndContext(done chan struct{})
 	GetLocator() Locator
 	SetLocator(locator Locator)
+	SetCharsetID(int)
 	DatabaseVersionNumber() int
 	GetStringCoder() converters.StringCoder
 	GetLobStreamMode() configurations.LobFetch

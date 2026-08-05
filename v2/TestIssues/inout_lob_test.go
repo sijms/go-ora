@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestInoutLob(t *testing.T) {
@@ -17,7 +18,7 @@ func TestInoutLob(t *testing.T) {
 	par_03 out varchar2,
 	par_04 out varchar2) AS
 BEGIN
-	par_01 := par_01 || ' output string';
+	par_01 := par_01 || ' output string العربية';
 	par_02 := 15;
 	par_03 := 'this is a test1';
 	par_04 := 'this is a test2';
@@ -35,8 +36,9 @@ END;`)
 			par_03 string
 			par_04 string
 		)
+		input := strings.Repeat("این یک متن تستی است ", 0x8010/20)
 		par_01 = go_ora.Clob{
-			String: strings.Repeat("a", 0x8010),
+			String: input,
 			Valid:  true,
 		}
 		_, err := db.Exec("BEGIN proc_626(:par_01, :par_02, :par_03, :par_04); END;",
@@ -47,7 +49,7 @@ END;`)
 		if err != nil {
 			return err
 		}
-		if par_01.String != strings.Repeat("a", 0x8010)+" output string" {
+		if par_01.String != input+" output string العربية" {
 			return errors.New("parameter par_01 return unexpected value")
 		}
 		if par_02 != 15 {

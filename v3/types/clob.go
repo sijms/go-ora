@@ -39,8 +39,10 @@ func (clob *Clob) Upload() error {
 				tempValue := clob.Conv.Decode(clob.bValue)
 				if clob.stream.DatabaseVersionNumber() < 10200 && locator.IsLittleEndian() {
 					clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(2002, 0)
+					clob.stream.SetCharsetID(2002)
 				} else {
 					clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(2000, 0)
+					clob.stream.SetCharsetID(2000)
 				}
 				clob.bValue = clob.Conv.Encode(tempValue)
 			}

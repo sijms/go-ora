@@ -44,6 +44,12 @@ func newAcceptPacketFromData(packetData []byte, config *configurations.Connectio
 	if reconAddStart != 0 && reconAddLen != 0 && uint16(len(packetData)) > (reconAddStart+reconAddLen) {
 		reconAdd = string(packetData[reconAddStart:(reconAddStart + reconAddLen)])
 	}
+	// servers speaking TNS versions below 315 (e.g. Oracle 11g) send a 32-byte
+	// accept packet without the fast-auth negotiation flags at bytes [41:45]
+	negOptions2 := uint32(0)
+	if len(packetData) >= 45 {
+		negOptions2 = binary.BigEndian.Uint32(packetData[41:])
+	}
 	pck := AcceptPacket{
 		Packet: Packet{
 			sessionCtx: &SessionContext{
@@ -58,7 +64,7 @@ func newAcceptPacketFromData(packetData []byte, config *configurations.Connectio
 				ReconAddr:           reconAdd,
 				ACFL0:               packetData[22],
 				ACFL1:               packetData[23],
-				NegotiatedOptions2:  binary.BigEndian.Uint32(packetData[41:]),
+				NegotiatedOptions2:  negOptions2,
 				SessionDataUnit:     uint32(binary.BigEndian.Uint16(packetData[12:])),
 				TransportDataUnit:   uint32(binary.BigEndian.Uint16(packetData[14:])),
 				UsingAsyncReceivers: false,

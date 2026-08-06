@@ -42,22 +42,23 @@ type defaultStmt struct {
 	connection *Connection
 	text       string
 	// disableCompression bool
-	_hasLONG          bool
-	_hasBLOB          bool
-	_hasMoreRows      bool
-	_hasReturnClause  bool
-	_noOfRowsToFetch  int
-	stmtType          StmtType
-	cursorID          int
-	queryID           uint64
-	Pars              []ParameterInfo
-	columns           []ParameterInfo
-	scnForSnapshot    []int
-	arrayBindCount    int
-	containOutputPars bool
-	autoClose         bool
-	temporaryLobs     [][]byte
-	multiSet          []RefCursor
+	_hasLONG           bool
+	_hasBLOB           bool
+	_hasMoreRows       bool
+	_hasReturnClause   bool
+	_noOfRowsToFetch   int
+	stmtType           StmtType
+	cursorID           int
+	queryID            uint64
+	Pars               []ParameterInfo
+	columns            []ParameterInfo
+	scnForSnapshot     []int
+	arrayBindCount     int
+	containOutputPars  bool
+	autoClose          bool
+	temporaryLobs      [][]byte
+	multiSet           []RefCursor
+	disableBatchErrors bool // When true, skip 0x4000 flag to allow APPEND_VALUES hint
 }
 
 func (stmt *defaultStmt) CanAutoClose() bool {
@@ -150,7 +151,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 		session.PutBytes(0, 0, 0, 0, 0)
 	}
 	if session.TTCVersion >= 7 {
-		if stmt.stmtType == DML && stmt.arrayBindCount > 0 {
+		if stmt.stmtType == DML && stmt.arrayBindCount > 0 && !stmt.disableBatchErrors {
 			session.PutBytes(1)
 			session.PutInt(stmt.arrayBindCount, 4, true, true)
 			session.PutBytes(1)
@@ -179,7 +180,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	case PLSQL:
 		if stmt.arrayBindCount > 0 {
 			al8i4[1] = stmt.arrayBindCount
-			if stmt.stmtType == DML {
+			if stmt.stmtType == DML && !stmt.disableBatchErrors {
 				al8i4[9] = 0x4000
 			}
 		} else {
@@ -318,6 +319,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	stmt.text = text
 	stmt._hasBLOB = false
 	stmt._hasLONG = false
+	stmt.disableBatchErrors = conn.DisableBatchErrors
 	// stmt.disableCompression = false
 	stmt.arrayBindCount = 0
 	stmt.scnForSnapshot = make([]int, 2)
@@ -376,11 +378,20 @@ func (stmt *Stmt) writePars() error {
 				}
 			} else {
 				if par.cusType != nil {
+					// Per-row UDT envelope. For non-NULL the wire layout is
+					//   <4 zero bytes>  <ub4 packed-length>  <ub4 flags=TNS_OBJ_TOP_LEVEL>  <packed-data>
+					// For NULL the trailing packed-data block must be omitted entirely,
+					// matching python-oracledb (write_ub4(0) for the four header
+					// fields plus write_ub4(TNS_OBJ_TOP_LEVEL) and nothing else).
+					// Sending an extra zero length byte trips ORA-03146 "invalid
+					// buffer length for TTC field" on bulk binds with mixed-NULL UDT rows.
 					session.WriteBytes(&buffer, 0, 0, 0, 0)
 					size := len(par.BValue)
 					session.WriteUint(&buffer, size, 4, true, true)
 					session.WriteBytes(&buffer, 1, 1)
-					session.WriteClr(&buffer, par.BValue)
+					if size > 0 {
+						session.WriteClr(&buffer, par.BValue)
+					}
 				} else {
 					if par.MaxNoOfArrayElements > 0 {
 						if par.BValue == nil {
@@ -885,7 +896,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 					}
 				}
 			}
-			if session.TTCVersion >= 7 && stmt.stmtType == DML && stmt.arrayBindCount > 0 {
+			if session.TTCVersion >= 7 && stmt.stmtType == DML && stmt.arrayBindCount > 0 && !stmt.disableBatchErrors {
 				length, err := session.GetInt(4, true, true)
 				if err != nil {
 					return err

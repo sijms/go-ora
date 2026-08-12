@@ -102,6 +102,10 @@ func BuildUrl(server string, port int, service, user, password string, options m
 		ret += "?"
 		for key, val := range options {
 			val = strings.TrimSpace(val)
+			if strings.ToUpper(key) == "CONNSTR" {
+				ret += fmt.Sprintf("%s=%s&", key, url.QueryEscape(val))
+				continue
+			}
 			for _, temp := range strings.Split(val, ",") {
 				temp = strings.TrimSpace(temp)
 				if strings.ToUpper(key) == "SERVER" {

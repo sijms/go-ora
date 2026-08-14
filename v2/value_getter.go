@@ -239,6 +239,19 @@ func getLob(col interface{}, conn *Connection) (*Lob, error) {
 		if err != nil {
 			return nil, err
 		}
+		if lob.variableWidthChar() {
+			desiredCharset := 2000
+			if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
+				desiredCharset = 2002
+			}
+			if charsetID != desiredCharset {
+				_ = lob.freeTemporary()
+				err = lob.createTemporaryClob(desiredCharset, charsetForm)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
 		err = lob.putString(stringVar)
 		return lob, err
 	}

@@ -44,3 +44,28 @@ func TestNewAcceptPacketFromDataShortPacket(t *testing.T) {
 		t.Error("EODDAFlagEnabled = true, want false for short accept packet")
 	}
 }
+
+// Malformed responses (a non-Oracle peer whose bytes happen to carry the
+// ACCEPT type) make newAcceptPacketFromData return nil. readPacket must
+// translate that nil into an error instead of handing callers a typed-nil
+// interface, which passes their type assertions and panics on first field
+// access (see Session.Connect).
+func TestNewAcceptPacketFromDataMalformed(t *testing.T) {
+	// truncated header: 8-byte TNS header, ACCEPT type, no body
+	short := make([]byte, 8)
+	short[4] = uint8(ACCEPT)
+	if pck := newAcceptPacketFromData(short, &configurations.ConnectionConfig{}); pck != nil {
+		t.Errorf("expected nil for 8-byte accept packet, got %+v", pck)
+	}
+
+	// full-size header whose accept-data length disagrees with the actual
+	// buffer length (bytes [18:20] announce 4 bytes but the data offset
+	// leaves none)
+	mismatch := make([]byte, 64)
+	mismatch[4] = uint8(ACCEPT)
+	binary.BigEndian.PutUint16(mismatch[18:], 4)  // accept data length
+	binary.BigEndian.PutUint16(mismatch[20:], 64) // accept data offset
+	if pck := newAcceptPacketFromData(mismatch, &configurations.ConnectionConfig{}); pck != nil {
+		t.Errorf("expected nil for length-mismatch accept packet, got %+v", pck)
+	}
+}

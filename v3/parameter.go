@@ -425,6 +425,16 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	var decoder parameter_coder.OracleParameterCoder
 	if par.ArraySize > 0 {
 		decoder = &parameter_coder.ArrayParameter{}
+	} else if par.DataType == 0 {
+		// untyped NULL column (e.g. SELECT NULL FROM dual): read the
+		// null value from the stream without needing a registered coder
+		par.BValue, err = session.GetClr()
+		if err != nil {
+			return err
+		}
+		par.oPrimValue = nil
+		par.IsNull = true
+		return nil
 	} else {
 		if par.DataType == oraTypes.XMLType {
 			decoder, err = conn.GetParameterCoder(par.TypeName)

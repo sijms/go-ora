@@ -1014,11 +1014,25 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return session.readPacket()
 	case ACCEPT:
-		return newAcceptPacketFromData(packetData, session.Context.connConfig), nil
+		// packet constructors return nil on malformed input; without this
+		// check the typed-nil interface passes the caller's type assertion
+		// and panics on first field access
+		acceptPck := newAcceptPacketFromData(packetData, session.Context.connConfig)
+		if acceptPck == nil {
+			return nil, fmt.Errorf("invalid accept packet received from server")
+		}
+		return acceptPck, nil
 	case REFUSE:
-		return newRefusePacketFromData(packetData), nil
+		refusePck := newRefusePacketFromData(packetData)
+		if refusePck == nil {
+			return nil, fmt.Errorf("invalid refuse packet received from server")
+		}
+		return refusePck, nil
 	case REDIRECT:
 		pck := newRedirectPacketFromData(packetData)
+		if pck == nil {
+			return nil, fmt.Errorf("invalid redirect packet received from server")
+		}
 		dataLen := binary.BigEndian.Uint16(packetData[8:])
 		var data string
 		if uint16(pck.length) <= pck.dataOffset {
@@ -1058,7 +1072,11 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return nil, err
 	case MARKER:
-		return newMarkerPacketFromData(packetData, session.Context), nil
+		markerPck := newMarkerPacketFromData(packetData, session.Context)
+		if markerPck == nil {
+			return nil, fmt.Errorf("invalid marker packet received from server")
+		}
+		return markerPck, nil
 	default:
 		// fmt.Printf("Packet Data: %#v\n", packetData)
 		return nil, fmt.Errorf("unsupported packet type: %d", pckType)

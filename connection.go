@@ -228,7 +228,6 @@ func (conn *Connection) Ping(ctx context.Context) error {
 		operationID: 0x93,
 		data:        nil,
 	}).write().read()
-	return nil
 }
 
 //func (conn *Connection) Logoff() error {

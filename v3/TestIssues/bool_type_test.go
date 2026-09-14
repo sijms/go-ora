@@ -1,9 +1,12 @@
+//go:build integration
+
 package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/sijms/go-ora/v3"
 	"testing"
+
+	go_ora "github.com/sijms/go-ora/v3"
 )
 
 func TestBoolType(t *testing.T) {

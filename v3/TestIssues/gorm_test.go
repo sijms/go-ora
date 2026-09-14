@@ -1,11 +1,14 @@
+//go:build integration
+
 package TestIssues
 
 import (
+	"testing"
+	"time"
+
 	oracle "github.com/godoes/gorm-oracle"
 	go_ora "github.com/sijms/go-ora/v3"
 	"gorm.io/gorm"
-	"testing"
-	"time"
 )
 
 func TestGorm(t *testing.T) {

@@ -5,10 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestArray(t *testing.T) {
@@ -28,9 +29,9 @@ func TestArray(t *testing.T) {
 
 			args[x] = TempStruct{
 				Id:   x + 1,
-				Name: sql.NullString{strings.Repeat("*", 20), true},
-				Val:  sql.NullFloat64{float64(length) / float64(x+1), true},
-				Date: sql.NullTime{expectedTime, true},
+				Name: sql.NullString{String: strings.Repeat("*", 20), Valid: true},
+				Val:  sql.NullFloat64{Float64: float64(length) / float64(x+1), Valid: true},
+				Date: sql.NullTime{Time: expectedTime, Valid: true},
 				Data: bytes.Repeat([]byte{55}, 20),
 			}
 			if x == 2 {
@@ -177,7 +178,7 @@ func TestArray(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		expectedString := sql.NullString{strings.Repeat("*", 20), true}
+		expectedString := sql.NullString{String: strings.Repeat("*", 20), Valid: true}
 
 		if nameArray[0] != expectedString {
 			return fmt.Errorf("expected name %s, got %s at position 0", expectedString.String, nameArray[0].String)

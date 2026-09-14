@@ -3,10 +3,11 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestNestedUDT(t *testing.T) {
@@ -108,9 +109,9 @@ END TP_NESTED_UDT;`)
 			data[index].Sep2 = strings.Repeat("-", 100)
 			data[index].Data1.Num = baseValue + float64(index)
 			if index%5 == 0 {
-				data[index].Data1.S1 = sql.NullString{"", false}
+				data[index].Data1.S1 = sql.NullString{String: "", Valid: false}
 			} else {
-				data[index].Data1.S1 = sql.NullString{"NAME", true}
+				data[index].Data1.S1 = sql.NullString{String: "NAME", Valid: true}
 			}
 			data[index].Data1.Sub1.Num = baseValue + float64(index+1)
 			data[index].Data1.Sub1.Name = "TEST"
@@ -169,7 +170,7 @@ END TP_NESTED_UDT;`)
 					LDate: expectedTime,
 				},
 			},
-			S1: sql.NullString{"NAME", true},
+			S1: sql.NullString{String: "NAME", Valid: true},
 		}
 		if !isEqual(expected, got) {
 			return fmt.Errorf("expected: %v and got %v", expected, got)
@@ -187,7 +188,7 @@ END TP_NESTED_UDT;`)
 					LDate: expectedTime,
 				},
 			},
-			S1: sql.NullString{"test", true},
+			S1: sql.NullString{String: "test", Valid: true},
 		}
 		var output = mainS{}
 		_, err := db.Exec(`
@@ -211,7 +212,7 @@ END TP_NESTED_UDT;`)
 					LDate: expectedTime,
 				},
 			},
-			S1: sql.NullString{"test", true},
+			S1: sql.NullString{String: "test", Valid: true},
 		}
 		if !isEqual(expected, output) {
 			return fmt.Errorf("expected: %v and got %v", expected, output)

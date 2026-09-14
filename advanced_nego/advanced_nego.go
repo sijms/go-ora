@@ -116,7 +116,6 @@ func (nego *AdvNego) Read() error {
 		if authServ.active {
 			if authServ.serviceName == "KERBEROS5" {
 				return errors.New("advanced negotiation: KERBEROS5 authentication still not supported")
-				authKerberos = true
 			} else if authServ.serviceName == "NTS" {
 				authNTS = true
 			}

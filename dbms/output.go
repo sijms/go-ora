@@ -35,7 +35,7 @@ func EnableOutput(ctx context.Context, conn *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	context.WithValue(ctx, KeyInContext, out)
+	_ = context.WithValue(ctx, KeyInContext, out)
 	return nil
 }
 

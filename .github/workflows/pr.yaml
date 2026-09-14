@@ -5,43 +5,53 @@ on:
 
 jobs:
   test:
-    name: basic check
+    name: basic check (${{ matrix.module }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: [ '1.19.x','1.20.x' ]
-
+        go-version: [ '1.24.x', '1.25.x' ]
+        module: [ '.', 'v2', 'v3' ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
-      
+
       - name: check format
+        working-directory: ${{ matrix.module }}
         run: go fmt ./...
 
+      - name: vet
+        working-directory: ${{ matrix.module }}
+        run: go vet ./...
+
       - name: build
+        working-directory: ${{ matrix.module }}
         run: go build ./...
 
       - name: test
-        run: go test
+        working-directory: ${{ matrix.module }}
+        run: go test ./... -count=1
 
   # https://github.com/golangci/golangci-lint-action
   golangci:
-    name: lint
+    name: lint (${{ matrix.module }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [ '.', 'v2', 'v3' ]
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: '1.20.x'
+          go-version: '1.24.x'
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6
         with:
           version: latest
           only-new-issues: true
-
+          working-directory: ${{ matrix.module }}

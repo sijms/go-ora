@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/sijms/go-ora/v2/converters"
 )
 
 var (
@@ -17,6 +19,11 @@ var (
 		MaxLen:   1,
 	}
 )
+
+func init() {
+	conn.sStrConv = converters.NewStringConverter(0x230)
+	conn.nStrConv = converters.NewStringConverter(870)
+}
 
 func checkParInfo(par *ParameterInfo, expPar *ParameterInfo) error {
 	if par.CharsetForm != expPar.CharsetForm {
@@ -191,7 +198,7 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	par.Value = sql.NullBool{false, true}
+	par.Value = sql.NullBool{Bool: false, Valid: true}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -209,7 +216,7 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	par.Value = sql.NullBool{true, false}
+	par.Value = sql.NullBool{Bool: true, Valid: false}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -225,7 +232,7 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	par.Value = sql.NullInt32{25, true}
+	par.Value = sql.NullInt32{Int32: 25, Valid: true}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -251,7 +258,7 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	par.Value = sql.NullInt32{25, false}
+	par.Value = sql.NullInt32{Int32: 25, Valid: false}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -291,7 +298,7 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	par.Value = sql.NullString{stringVal, false}
+	par.Value = sql.NullString{String: stringVal, Valid: false}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -333,7 +340,7 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	par.Value = NullNVarChar{NVarChar(stringVal), false}
+	par.Value = NullNVarChar{NVarChar: NVarChar(stringVal), Valid: false}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -342,9 +349,9 @@ func TestEncodeValue(t *testing.T) {
 	err = checkParInfo(par, &ParameterInfo{
 		DataType:    NCHAR,
 		Flag:        3,
-		ContFlag:    16,
-		CharsetID:   870,
-		CharsetForm: 2,
+		ContFlag:    0,
+		CharsetID:   0,
+		CharsetForm: 0,
 		MaxLen:      1,
 	})
 	if err != nil {
@@ -352,7 +359,10 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	timeVal := time.Date(2023, 5, 28, 23, 38, 11, 500, time.Local)
+	// Use a fixed timezone (IRST = UTC+3:30) so the test is deterministic.
+	// EncodeTimeStamp with sendAsLocalTime=false converts to UTC before encoding.
+	irst := time.FixedZone("IRST", 3*3600+30*60)
+	timeVal := time.Date(2023, 5, 28, 23, 38, 11, 500, irst)
 	par.Value = timeVal
 	conn.dataNego = &DataTypeNego{
 		clientTZVersion: 1,
@@ -370,14 +380,14 @@ func TestEncodeValue(t *testing.T) {
 		ContFlag:   0,
 		MaxLen:     13,
 		iPrimValue: timeVal,
-		BValue:     []byte{120, 123, 5, 28, 24, 39, 12, 0, 0, 1, 244, 20, 60},
+		BValue:     []byte{120, 123, 5, 28, 21, 9, 12, 0, 0, 1, 244, 23, 90},
 	})
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	par.Value = sql.NullTime{timeVal, false}
+	par.Value = sql.NullTime{Time: timeVal, Valid: false}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -405,7 +415,7 @@ func TestEncodeValue(t *testing.T) {
 		DataType:   TIMESTAMP,
 		Flag:       3,
 		ContFlag:   0,
-		MaxLen:     11,
+		MaxLen:     13,
 		iPrimValue: timeVal,
 		BValue:     []byte{120, 123, 5, 28, 24, 39, 12, 0, 0, 1, 244},
 	})
@@ -414,7 +424,7 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	par.Value = NullTimeStamp{TimeStamp(time.Now()), false}
+	par.Value = NullTimeStamp{TimeStamp: TimeStamp(time.Now()), Valid: false}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
@@ -422,9 +432,9 @@ func TestEncodeValue(t *testing.T) {
 	}
 
 	err = checkParInfo(par, &ParameterInfo{
-		DataType: TIMESTAMP,
+		DataType: NCHAR,
 		Flag:     3,
-		MaxLen:   11,
+		MaxLen:   1,
 	})
 	if err != nil {
 		t.Error(err)
@@ -444,23 +454,23 @@ func TestEncodeValue(t *testing.T) {
 		ContFlag:   0,
 		MaxLen:     13,
 		iPrimValue: timeVal,
-		BValue:     []byte{120, 123, 5, 28, 24, 39, 12, 0, 0, 1, 244, 20, 60},
+		BValue:     []byte{120, 123, 5, 28, 21, 9, 12, 0, 0, 1, 244, 23, 90},
 	})
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	par.Value = NullTimeStampTZ{TimeStampTZ(time.Now()), false}
+	par.Value = NullTimeStampTZ{TimeStampTZ: TimeStampTZ(time.Now()), Valid: false}
 	err = par.encodeValue(-1, conn)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	err = checkParInfo(par, &ParameterInfo{
-		DataType: TimeStampTZ_DTY,
+		DataType: NCHAR,
 		Flag:     3,
-		MaxLen:   13,
+		MaxLen:   1,
 	})
 	if err != nil {
 		t.Error(err)

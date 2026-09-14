@@ -58,18 +58,18 @@ func (interval *Interval) Value() (interface{}, error) {
 		if len(interval.bValue) < int(MaxLenIntervalYM) {
 			return nil, fmt.Errorf("interval data length is too short")
 		}
-		year = int(binary.BigEndian.Uint32(interval.bValue)) - 0x80000000
+		year = int(int64(binary.BigEndian.Uint32(interval.bValue)) - 0x80000000)
 		month = int(interval.bValue[4] - 60)
 		return time.Date(year, time.Month(month), 0, 0, 0, 0, 0, time.UTC), nil
 	case INTERVALDS_DTY:
 		if len(interval.bValue) < int(MaxLenIntervalDS) {
 			return nil, fmt.Errorf("interval data length is too short")
 		}
-		day = int(binary.BigEndian.Uint32(interval.bValue)) - 0x80000000
+		day = int(int64(binary.BigEndian.Uint32(interval.bValue)) - 0x80000000)
 		hour = int(interval.bValue[4] - 60)
 		minute = int(interval.bValue[5] - 60)
 		second = int(interval.bValue[6] - 60)
-		mSec = int(binary.BigEndian.Uint32(interval.bValue[7:]) - 0x80000000)
+		mSec = int(int64(binary.BigEndian.Uint32(interval.bValue[7:])) - 0x80000000)
 		return time.Date(0, 0, day, hour, minute, second, mSec*1000, time.UTC), nil
 	default:
 		return nil, fmt.Errorf("unsupported type id: %d used for decoding interval", typeId)
@@ -80,7 +80,7 @@ func (interval *Interval) encode(input time.Time) error {
 	buffer := new(bytes.Buffer)
 	switch interval.dataType {
 	case INTERVALYM_DTY:
-		err := binary.Write(buffer, binary.BigEndian, uint32(input.Year()+0x80000000))
+		err := binary.Write(buffer, binary.BigEndian, uint32(int64(input.Year())+0x80000000))
 		if err != nil {
 			return err
 		}
@@ -89,7 +89,7 @@ func (interval *Interval) encode(input time.Time) error {
 			return err
 		}
 	case INTERVALDS_DTY:
-		err := binary.Write(buffer, binary.BigEndian, uint32(input.Day()+0x80000000))
+		err := binary.Write(buffer, binary.BigEndian, uint32(int64(input.Day())+0x80000000))
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func (interval *Interval) encode(input time.Time) error {
 		if err != nil {
 			return err
 		}
-		err = binary.Write(buffer, binary.BigEndian, uint32((input.Nanosecond()/1000)+0x80000000))
+		err = binary.Write(buffer, binary.BigEndian, uint32(int64(input.Nanosecond()/1000)+0x80000000))
 		if err != nil {
 			return err
 		}

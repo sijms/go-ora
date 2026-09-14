@@ -4,11 +4,12 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/v2/network"
-	"github.com/sijms/go-ora/v2/trace"
 	"io"
 	"reflect"
 	"strings"
+
+	"github.com/sijms/go-ora/v2/network"
+	"github.com/sijms/go-ora/v2/trace"
 )
 
 type Row []driver.Value
@@ -162,10 +163,14 @@ func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 	case CHAR, NCHAR:
 		fallthrough
 	case OCIClobLocator:
+		fallthrough
+	case LongVarChar:
 		return tyString
 	case RAW:
 		fallthrough
 	case OCIBlobLocator, OCIFileLocator:
+		fallthrough
+	case LongRaw, LongVarRaw:
 		return tyBytes
 	case DATE, TIMESTAMP:
 		fallthrough

@@ -10,6 +10,8 @@ import (
 
 const defaultPort int = 1521
 
+var generalQuoteRegexp = regexp.MustCompile(`(?i)([a-z0-9_]+\s*=\s*)"([^"]*)"`)
+
 type DBAPrivilege int
 
 const (
@@ -97,6 +99,8 @@ func ExtractServers(connStr string) (addresses []ServerAddr, err error) {
 func (info *DatabaseInfo) UpdateDatabaseInfo(connStr string) (err error) {
 	connStr = strings.ReplaceAll(connStr, "\r", "")
 	connStr = strings.ReplaceAll(connStr, "\n", "")
+
+	connStr = generalQuoteRegexp.ReplaceAllString(connStr, "$1$2")
 
 	info.Servers, err = ExtractServers(connStr)
 	if err != nil {

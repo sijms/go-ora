@@ -101,7 +101,7 @@ func (resultSet *ResultSet) Close() error {
 }
 
 func (resultSet *ResultSet) Columns() []string {
-	if len(*resultSet.cols) == 0 {
+	if resultSet.cols == nil || len(*resultSet.cols) == 0 {
 		return nil
 	}
 	ret := make([]string, len(*resultSet.cols))

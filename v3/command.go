@@ -2066,6 +2066,9 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 		}
 		return nil, err
 	}
+	if dataSet == nil {
+		return nil, fmt.Errorf("go-ora: query returned no result set (connection reset)")
+	}
 	return dataSet, nil
 }
 

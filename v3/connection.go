@@ -1774,7 +1774,21 @@ func (conn *Connection) GetParameterCoder(input interface{}) (parameter_coder.Or
 		if coder, ok := conn.goTypeCoder[input]; ok {
 			return coder.Copy(), nil
 		}
-
+		// handle type aliases (e.g. type StringAlias string) by falling
+		// back to the underlying Kind when exact type identity didn't
+		// match a registered coder (#699)
+		switch input.Kind() {
+		case reflect.String:
+			if coder, ok := conn.goTypeCoder[types.TyString]; ok {
+				return coder.Copy(), nil
+			}
+		case reflect.Slice:
+			if input.Elem().Kind() == reflect.Uint8 {
+				if coder, ok := conn.goTypeCoder[types.TyBytes]; ok {
+					return coder.Copy(), nil
+				}
+			}
+		}
 		return nil, fmt.Errorf("no parameter coder registered for go type %s", input.String())
 	case string:
 		if coder, ok := conn.nameTypeCoder[strings.ToUpper(input)]; ok {

@@ -49,6 +49,22 @@ func (par *ParameterInfo) setDataType(conn *Connection, goType reflect.Type, dat
 	case tyBytes:
 		par.DataType = RAW
 		return nil
+	default:
+		// handle type aliases (e.g. type StringAlias string) by checking
+		// the underlying Kind when exact type identity didn't match (#699)
+		switch goType.Kind() {
+		case reflect.String:
+			par.DataType = NCHAR
+			par.CharsetForm = 1
+			par.ContFlag = 16
+			par.CharsetID = conn.getDefaultCharsetID()
+			return nil
+		case reflect.Slice:
+			if goType.Elem().Kind() == reflect.Uint8 {
+				par.DataType = RAW
+				return nil
+			}
+		}
 	}
 	// 3- call getValue
 	vData, err := getValue(data)

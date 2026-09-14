@@ -343,7 +343,10 @@ func (session *Session) negotiate() {
 
 	if tlsConfig := connOption.TLSConfig; tlsConfig != nil {
 		tlsConfig.ServerName = host.Addr
-		session.sslConn = tls.Client(session.conn, tlsConfig)
+		sslConn := tls.Client(session.conn, tlsConfig)
+		session.mu.Lock()
+		session.sslConn = sslConn
+		session.mu.Unlock()
 		return
 	}
 
@@ -365,7 +368,10 @@ func (session *Session) negotiate() {
 	if !connOption.SSLVerify {
 		config.InsecureSkipVerify = true
 	}
-	session.sslConn = tls.Client(session.conn, config)
+	sslConn := tls.Client(session.conn, config)
+	session.mu.Lock()
+	session.sslConn = sslConn
+	session.mu.Unlock()
 }
 
 func (session *Session) ResetBreak() {
@@ -538,11 +544,19 @@ func (session *Session) Connect(ctx context.Context) error {
 			return errors.New("no available servers to connect to")
 		}
 		addr := host.NetworkAddr()
+		var conn net.Conn
 		if len(session.Context.connConfig.UnixAddress) > 0 {
-			session.conn, err = dialer.DialContext(ctx, "unix", session.Context.connConfig.UnixAddress)
+			conn, err = dialer.DialContext(ctx, "unix", session.Context.connConfig.UnixAddress)
 		} else {
-			session.conn, err = dialer.DialContext(ctx, "tcp", addr)
+			conn, err = dialer.DialContext(ctx, "tcp", addr)
 		}
+		// publish conn under the mutex to avoid a data race with
+		// Disconnect() which may be called concurrently by the
+		// StartContext watchdog when the context is canceled during
+		// connection establishment (#736)
+		session.mu.Lock()
+		session.conn = conn
+		session.mu.Unlock()
 
 		if err != nil {
 			session.tracer.Printf("using: %s ..... [FAILED]", addr)

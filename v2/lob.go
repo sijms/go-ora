@@ -5,8 +5,6 @@ import (
 	"context"
 	"errors"
 	"go/types"
-
-	"github.com/sijms/go-ora/v2/converters"
 )
 
 type Clob struct {
@@ -146,19 +144,9 @@ func (lob *Lob) putString(data string) error {
 	conn := lob.connection
 	conn.tracer.Printf("Put Lob String: %d character", int64(len([]rune(data))))
 	lob.initialize()
-	var strConv converters.IStringConverter
-	if lob.variableWidthChar() {
-		if conn.dBVersion.Number < 10200 && lob.littleEndianClob() {
-			strConv, _ = conn.getStrConv(2002)
-		} else {
-			strConv, _ = conn.getStrConv(2000)
-		}
-	} else {
-		var err error
-		strConv, err = conn.getStrConv(lob.charsetID)
-		if err != nil {
-			return err
-		}
+	strConv, err := conn.getStrConv(lob.charsetID)
+	if err != nil {
+		return err
 	}
 	lobData := strConv.Encode(data)
 	// lob.size = int64(len([]rune(data)))
@@ -168,7 +156,7 @@ func (lob *Lob) putString(data string) error {
 	lob.writeOp(0x40)
 	lob.connection.session.PutBytes(0xE)
 	lob.connection.session.PutClr(lobData)
-	err := lob.connection.session.Write()
+	err = lob.connection.session.Write()
 	if err != nil {
 		return err
 	}

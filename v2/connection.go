@@ -675,10 +675,6 @@ func (conn *Connection) Close() (err error) {
 		if err != nil {
 			tracer.Print("Logoff with error: ", err)
 		}
-		err = conn.session.WriteFinalPacket()
-		if err != nil {
-			tracer.Print("Write Final Packet With Error: ", err)
-		}
 		conn.session.Disconnect()
 		conn.session = nil
 	}

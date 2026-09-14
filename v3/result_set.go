@@ -167,10 +167,14 @@ func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 	case types.CHAR, types.NCHAR:
 		fallthrough
 	case types.OCIClobLocator:
+		fallthrough
+	case types.LongVarChar:
 		return types.TyString
 	case types.RAW:
 		fallthrough
 	case types.OCIBlobLocator, types.OCIFileLocator:
+		fallthrough
+	case types.LongRaw, types.LongVarRaw:
 		return types.TyBytes
 	case types.DATE, types.TIMESTAMP:
 		fallthrough

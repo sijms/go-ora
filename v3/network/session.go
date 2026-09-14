@@ -317,7 +317,10 @@ func (session *Session) negotiate() {
 
 	if tlsConfig := connOption.TLSConfig; tlsConfig != nil {
 		tlsConfig.ServerName = host.Addr
-		session.sslConn = tls.Client(session.conn, tlsConfig)
+		sslConn := tls.Client(session.conn, tlsConfig)
+		session.mu.Lock()
+		session.sslConn = sslConn
+		session.mu.Unlock()
 		return
 	}
 
@@ -339,7 +342,10 @@ func (session *Session) negotiate() {
 	if !connOption.SSLVerify {
 		config.InsecureSkipVerify = true
 	}
-	session.sslConn = tls.Client(session.conn, config)
+	sslConn := tls.Client(session.conn, config)
+	session.mu.Lock()
+	session.sslConn = sslConn
+	session.mu.Unlock()
 }
 
 func (session *Session) ResetBreak() {
@@ -512,11 +518,19 @@ func (session *Session) Connect(ctx context.Context) error {
 			return errors.New("no available servers to connect to")
 		}
 		addr := host.NetworkAddr()
+		var conn net.Conn
 		if len(session.Context.connConfig.UnixAddress) > 0 {
-			session.conn, err = dialer.DialContext(ctx, "unix", session.Context.connConfig.UnixAddress)
+			conn, err = dialer.DialContext(ctx, "unix", session.Context.connConfig.UnixAddress)
 		} else {
-			session.conn, err = dialer.DialContext(ctx, "tcp", addr)
+			conn, err = dialer.DialContext(ctx, "tcp", addr)
 		}
+		// publish conn under the mutex to avoid a data race with
+		// Disconnect() which may be called concurrently by the
+		// StartContext watchdog when the context is canceled during
+		// connection establishment (#736)
+		session.mu.Lock()
+		session.conn = conn
+		session.mu.Unlock()
 
 		if err != nil {
 			session.tracer.Printf("using: %s ..... [FAILED]", addr)
@@ -693,14 +707,8 @@ func (session *Session) processMarker() error {
 	if err != nil {
 		return err
 	}
-	if session.Context.AdvancedService.HashAlgo != nil {
-		err = session.Context.AdvancedService.HashAlgo.Init()
-		if err != nil {
-			return err
-		}
-	}
-	if session.Context.AdvancedService.CryptAlgo != nil {
-		err = session.Context.AdvancedService.CryptAlgo.Reset()
+	if session.Context.nego != nil {
+		err = session.Context.nego.Reset()
 		if err != nil {
 			return err
 		}
@@ -984,11 +992,25 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return session.readPacket()
 	case ACCEPT:
-		return newAcceptPacketFromData(packetData, session.Context.connConfig), nil
+		// packet constructors return nil on malformed input; without this
+		// check the typed-nil interface passes the caller's type assertion
+		// and panics on first field access
+		acceptPck := newAcceptPacketFromData(packetData, session.Context.connConfig)
+		if acceptPck == nil {
+			return nil, fmt.Errorf("invalid accept packet received from server")
+		}
+		return acceptPck, nil
 	case REFUSE:
-		return newRefusePacketFromData(packetData), nil
+		refusePck := newRefusePacketFromData(packetData)
+		if refusePck == nil {
+			return nil, fmt.Errorf("invalid refuse packet received from server")
+		}
+		return refusePck, nil
 	case REDIRECT:
 		pck := newRedirectPacketFromData(packetData)
+		if pck == nil {
+			return nil, fmt.Errorf("invalid redirect packet received from server")
+		}
 		dataLen := binary.BigEndian.Uint16(packetData[8:])
 		var data string
 		if uint16(pck.length) <= pck.dataOffset {
@@ -1027,7 +1049,11 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		}
 		return nil, err
 	case MARKER:
-		return newMarkerPacketFromData(packetData, session.Context), nil
+		markerPck := newMarkerPacketFromData(packetData, session.Context)
+		if markerPck == nil {
+			return nil, fmt.Errorf("invalid marker packet received from server")
+		}
+		return markerPck, nil
 	default:
 		// fmt.Printf("Packet Data: %#v\n", packetData)
 		return nil, fmt.Errorf("unsupported packet type: %d", pckType)

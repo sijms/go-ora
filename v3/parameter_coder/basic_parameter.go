@@ -81,8 +81,7 @@ func (basic *BasicParameter) Bytes() []byte {
 func (basic *BasicParameter) GetParameterInfo() BasicParameter {
 	return *basic
 }
-
-func (basic *BasicParameter) SetParameterInfo(data BasicParameter) {
+func (basic *BasicParameter) UpdateParameterInfo(data BasicParameter) {
 	if len(basic.TypeName) == 0 {
 		basic.TypeName = data.TypeName
 	}
@@ -115,7 +114,9 @@ func (basic *BasicParameter) SetParameterInfo(data BasicParameter) {
 	basic.VectorFormat = data.VectorFormat
 	basic.VectorFlag = data.VectorFlag
 	basic.VectorType = data.VectorType
-	//*basic = data
+}
+func (basic *BasicParameter) SetParameterInfo(data BasicParameter) {
+	*basic = data
 }
 
 // func (basic *BasicParameter) UpdateParameterInfo() {}

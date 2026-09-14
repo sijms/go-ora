@@ -8,10 +8,11 @@ import (
 
 	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/network"
+	"github.com/sijms/go-ora/v3/network/security"
 	"github.com/sijms/go-ora/v3/trace"
 )
 
-var version = 0x17000000
+const version = uint32(0x17000000)
 
 // KerberosAuthInterface is an alias for configurations.KerberosAuthInterface, maintained for backwards compatibility.
 type KerberosAuthInterface = configurations.KerberosAuthInterface
@@ -24,15 +25,25 @@ func SetKerberosAuth(input KerberosAuthInterface) {
 }
 
 type AdvNego struct {
-	comm        *AdvancedNegoComm
-	clientInfo  *configurations.ClientInfo
-	negoInfo    *configurations.AdvNegoServiceInfo
-	tracer      trace.Tracer
-	serviceList []AdvNegoService
+	version      uint32
+	authKerberos bool
+	authNTS      bool
+	comm         *AdvancedNegoComm
+	clientInfo   *configurations.ClientInfo
+	negoInfo     *configurations.AdvNegoServiceInfo
+	tracer       trace.Tracer
+	serviceList  []AdvNegoService
+	sessionKey   []byte
+	iv           []byte
+	oldIV        []byte
+	cryptAlgo    security.OracleNetworkEncryption
+	hashAlgo     security.OracleNetworkDataIntegrity
+	keyFolding   bool
 }
 
 func NewAdvNego(session *network.Session, tracer trace.Tracer, config *configurations.ConnectionConfig) (*AdvNego, error) {
 	output := &AdvNego{
+		version:     version,
 		comm:        &AdvancedNegoComm{session: session},
 		clientInfo:  &config.ClientInfo,
 		negoInfo:    &config.AdvNegoServiceInfo,
@@ -40,104 +51,125 @@ func NewAdvNego(session *network.Session, tracer trace.Tracer, config *configura
 		serviceList: make([]AdvNegoService, 5),
 	}
 	var err error
-	output.serviceList[1], err = newAuthService(output.comm, output.negoInfo)
+	output.serviceList[1], err = newAuthService(output, output.negoInfo)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[2], err = newEncryptService(output.comm, output.negoInfo)
+	output.serviceList[2], err = newEncryptService(output, output.negoInfo)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[3], err = newDataIntegrityService(output.comm, output.negoInfo, output.tracer)
+	output.serviceList[3], err = newDataIntegrityService(output, output.negoInfo, output.tracer)
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[4], err = newSupervisorService(output.comm)
+	output.serviceList[4], err = newSupervisorService(output)
 	if err != nil {
 		return nil, err
 	}
 	return output, nil
 }
 
-func (nego *AdvNego) readHeader() ([]int, error) {
-	num, err := nego.comm.session.GetInt64(4, false, true)
+func (nego *AdvNego) readHeader() (length, version, servCount int, err error) {
+	var num int64
+	num, err = nego.comm.session.GetInt64(4, false, true)
 	if err != nil {
-		return nil, err
+		return
 	}
 	if num != 0xDEADBEEF {
-		return nil, errors.New("advanced negotiation error: during receive header")
+		err = errors.New("advanced negotiation error: during receive header")
+		return
 	}
-	output := make([]int, 4)
-	output[0], err = nego.comm.session.GetInt(2, false, true)
+	length, err = nego.comm.session.GetInt(2, false, true)
 	if err != nil {
-		return nil, err
+		return
 	}
-	output[1], err = nego.comm.session.GetInt(4, false, true)
+	version, err = nego.comm.session.GetInt(4, false, true)
 	if err != nil {
-		return nil, err
+		return
 	}
-	output[2], err = nego.comm.session.GetInt(2, false, true)
+	servCount, err = nego.comm.session.GetInt(2, false, true)
 	if err != nil {
-		return nil, err
+		return
 	}
-	output[3], err = nego.comm.session.GetInt(1, false, true)
-	return output, err
+	var errFlags int
+	errFlags, err = nego.comm.session.GetInt(1, false, true)
+	if err != nil {
+		return
+	}
+	if errFlags != 0 {
+		err = network.NewOracleError(errFlags)
+		//err = fmt.Errorf("advanced negotiation error: during receive ano header: network exception: ora-%d", errFlags)
+	}
+	return
 }
 
-func (nego *AdvNego) writeHeader(length, servCount int, errFlags uint8) {
+func (nego *AdvNego) writeHeader(length, servCount int) {
 	nego.comm.session.PutInt(uint64(0xDEADBEEF), 4, true, false)
 	nego.comm.session.PutInt(length, 2, true, false)
-	nego.comm.session.PutInt(version, 4, true, false)
+	nego.comm.session.PutInt(nego.version, 4, true, false)
 	nego.comm.session.PutInt(servCount, 2, true, false)
+	var errFlags = uint8(0)
 	nego.comm.session.PutBytes(errFlags)
 }
 
-func (nego *AdvNego) readServiceHeader() ([]int, error) {
-	output := make([]int, 3)
-	var err error
-	output[0], err = nego.comm.session.GetInt(2, false, true)
+func (nego *AdvNego) readServiceHeader() (serviceType, serviceSubPacket int, err error) {
+	serviceType, err = nego.comm.session.GetInt(2, false, true)
 	if err != nil {
-		return nil, err
+		return
 	}
-	output[1], err = nego.comm.session.GetInt(2, false, true)
+	serviceSubPacket, err = nego.comm.session.GetInt(2, false, true)
 	if err != nil {
-		return nil, err
+		return
 	}
-	output[2], err = nego.comm.session.GetInt(4, false, true)
-	return output, err
+	var errFlags int
+	errFlags, err = nego.comm.session.GetInt(4, false, true)
+	if err != nil {
+		return
+	}
+	if errFlags != 0 {
+		err = network.NewOracleError(errFlags)
+	}
+	return
+}
+
+func (nego *AdvNego) IsNTSAuth() bool {
+	return nego.authNTS
+}
+
+func (nego *AdvNego) IsKerberosAuth() bool {
+	return nego.authKerberos
 }
 
 func (nego *AdvNego) Read() error {
-	header, err := nego.readHeader()
+	_, version, count, err := nego.readHeader()
 	if err != nil {
 		return err
 	}
-	for i := 0; i < header[2]; i++ {
-		serviceHeader, err := nego.readServiceHeader()
+	nego.version = uint32(version)
+	for i := 0; i < count; i++ {
+		serviceType, subPacket, err := nego.readServiceHeader()
 		if err != nil {
 			return err
 		}
-		if serviceHeader[2] != 0 {
-			return fmt.Errorf("advanced negotiation error: during receive service header: network excpetion: ora-%d", serviceHeader[2])
-		}
-		err = nego.serviceList[serviceHeader[0]].readServiceData(serviceHeader[1])
+		err = nego.serviceList[serviceType].readServiceData(subPacket)
 		if err != nil {
 			return err
 		}
-		err = nego.serviceList[serviceHeader[0]].validateResponse()
+		err = nego.serviceList[serviceType].validateResponse()
 		if err != nil {
 			return err
 		}
 	}
-	authKerberos := false
-	authNTS := false
+	nego.authKerberos = false
+	nego.authNTS = false
 	if authServ, ok := nego.serviceList[1].(*authService); ok {
 		if authServ.active {
 			if authServ.serviceName == "KERBEROS5" {
 				// return errors.New("advanced negotiation: KERBEROS5 authentication still not supported")
-				authKerberos = true
+				nego.authKerberos = true
 			} else if authServ.serviceName == "NTS" {
-				authNTS = true
+				nego.authNTS = true
 			}
 		}
 	}
@@ -149,11 +181,11 @@ func (nego *AdvNego) Read() error {
 			numService++
 		}
 	}
-	if authKerberos {
+	if nego.authKerberos {
 		size += 37
 		numService++
 	}
-	if authNTS {
+	if nego.authNTS {
 		size += 130
 		numService++
 	}
@@ -161,7 +193,7 @@ func (nego *AdvNego) Read() error {
 		return nil
 	}
 	nego.comm.session.ResetBuffer()
-	nego.writeHeader(size+13, numService, 0)
+	nego.writeHeader(size+13, numService)
 	if dataServ, ok := nego.serviceList[3].(*dataIntegrityService); ok {
 		if len(dataServ.publicKey) > 0 {
 			nego.tracer.Print("Send Client Public Key:")
@@ -169,7 +201,7 @@ func (nego *AdvNego) Read() error {
 			nego.comm.writeBytes(dataServ.publicKey)
 		}
 	}
-	if authKerberos {
+	if nego.authKerberos {
 		// Validate configuration
 		if kerberosAuth == nil && nego.negoInfo.Kerberos == nil {
 			return fmt.Errorf("advanced negotiation error: Kerberos authenticator not set; call SetKerberosAuth to set it globally or WithKerberosAuth to set it per session")
@@ -194,7 +226,7 @@ func (nego *AdvNego) Read() error {
 			return nego.kerberosHandshake(auth, authServ)
 		}
 	}
-	if authNTS {
+	if nego.authNTS {
 		ntsPacket, err := createNTSNegoPacket(nego.clientInfo.DomainName, nego.clientInfo.HostName)
 		if err != nil {
 			return err
@@ -240,7 +272,7 @@ func (nego *AdvNego) Write() error {
 		size = size + 8 + nego.serviceList[i].getServiceDataLength()
 	}
 	// size += 13
-	nego.writeHeader(13+size, 4, 0)
+	nego.writeHeader(13+size, 4)
 	err := nego.serviceList[4].writeServiceData()
 	if err != nil {
 		return err
@@ -280,18 +312,23 @@ func (nego *AdvNego) StartServices() error {
 	return nil
 }
 
+func (nego *AdvNego) IsNewVersion(serviceType int) bool {
+	if serviceType < len(nego.serviceList) {
+		return nego.serviceList[serviceType].isNewVersion()
+	}
+
+	return isNew(nego.version)
+}
+
 func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ *authService) error {
-	header, err := nego.readHeader()
+	_, _, count, err := nego.readHeader()
 	if err != nil {
 		return err
 	}
-	for i := 0; i < header[2]; i++ {
-		serviceHeader, err := nego.readServiceHeader()
+	for i := 0; i < count; i++ {
+		_, _, err = nego.readServiceHeader()
 		if err != nil {
 			return err
-		}
-		if serviceHeader[2] != 0 {
-			return fmt.Errorf("advanced negotiation error: during receive service header: network excpetion: ora-%d", serviceHeader[2])
 		}
 	}
 	serviceName, err := nego.comm.readString()
@@ -325,7 +362,7 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 	}
 	nego.comm.session.ResetBuffer()
 	// send ano header(length of ticket + 43 + length of address, 1 , 0)
-	nego.writeHeader(len(ticketData)+43+len(localAddress), 1, 0)
+	nego.writeHeader(len(ticketData)+43+len(localAddress), 1)
 	// send header(4)
 	authServ.writeHeader(4)
 	// send ub2 = num1
@@ -342,17 +379,14 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 		return err
 	}
 	// read ano header
-	header, err = nego.readHeader()
+	_, _, count, err = nego.readHeader()
 	if err != nil {
 		return err
 	}
-	for index := 0; index < header[2]; index++ {
-		serviceHeader, err := nego.readServiceHeader()
+	for index := 0; index < count; index++ {
+		_, _, err := nego.readServiceHeader()
 		if err != nil {
 			return err
-		}
-		if serviceHeader[2] != 0 {
-			return network.NewOracleError(serviceHeader[2])
 		}
 	}
 	// get packet header (2)
@@ -372,7 +406,7 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 	}
 	// send ano header (25,1, 0)
 	nego.comm.session.ResetBuffer()
-	nego.writeHeader(25, 1, 0)
+	nego.writeHeader(25, 1)
 	// as.send header(1)
 	authServ.writeHeader(1)
 	// send packet header(0, 1)
@@ -397,4 +431,109 @@ func getHostIPAddress() (net.IP, error) {
 		}
 	}
 	return nil, errors.New("advanced negotiation error: during get local ip address")
+}
+
+func (nego *AdvNego) WriteDataBuffer(data []byte) ([]byte, error) {
+	if nego.hashAlgo != nil {
+		hashData := nego.hashAlgo.Compute(data)
+		data = append(data, hashData...)
+	}
+	var err error
+	tracer := nego.tracer
+	if nego.cryptAlgo != nil {
+		// outputData = make([]byte, len(outputData))
+		// copy(outputData, outputData)
+		tracer.LogPacket("Write packet (Decrypted): ", data)
+		data, err = nego.cryptAlgo.Encrypt(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if nego.hashAlgo != nil || nego.cryptAlgo != nil {
+		foldingKey := uint8(0)
+		if nego.keyFolding {
+			foldingKey = uint8(1)
+		}
+		data = append(data, foldingKey)
+	}
+	return data, nil
+}
+
+func (nego *AdvNego) ReadDataBuffer(data []byte) ([]byte, error) {
+	var err error
+	if nego.cryptAlgo != nil || nego.hashAlgo != nil {
+		data = data[:len(data)-1]
+	}
+	tracer := nego.tracer
+	if nego.cryptAlgo != nil {
+		data, err = nego.cryptAlgo.Decrypt(data)
+		if err != nil {
+			return nil, err
+		}
+		tracer.LogPacket("Read packet (Decrypted): ", data)
+	}
+	if nego.hashAlgo != nil {
+		data, err = nego.hashAlgo.Validate(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return data, nil
+}
+
+func (nego *AdvNego) SetKeyFolding(key []byte, isExternalAuth, isSys bool) error {
+	nego.keyFolding = false
+	if isExternalAuth {
+		if nego.IsNTSAuth() && (!isSys) {
+			return nil
+		}
+		//if ano.IsKerberosAuth() && ano.IsNewVersion(1) && ano.kkey != null {
+		//	Key = ano.kkey
+		//}
+	}
+	if len(key) == 0 || len(nego.sessionKey) == 0 || len(nego.iv) == 0 {
+		return nil
+	}
+
+	length := len(key)
+	if length > len(nego.sessionKey) {
+		length = len(nego.sessionKey)
+	}
+	for i := 0; i < length; i++ {
+		nego.sessionKey[i] ^= key[i]
+	}
+	if nego.IsNewVersion(ENCRYPTION_SERVICE_ID) || nego.IsNewVersion(DATA_INTEGRITY_SERVICE_ID) {
+		length = len(key)
+		if length > len(nego.iv) {
+			length = len(nego.iv)
+		}
+		for i := 0; i < length; i++ {
+			nego.iv[i] ^= key[i]
+		}
+	}
+	if nego.cryptAlgo != nil || nego.hashAlgo != nil {
+		err := nego.StartServices()
+		if err != nil {
+			return err
+		}
+		nego.keyFolding = true
+	}
+	return nil
+}
+
+func (nego *AdvNego) Reset() error {
+	var err error
+	if nego.hashAlgo != nil {
+		err = nego.hashAlgo.Init()
+		if err != nil {
+			return err
+		}
+	}
+	if nego.cryptAlgo != nil {
+		err = nego.cryptAlgo.Reset()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

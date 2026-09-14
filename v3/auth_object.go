@@ -212,7 +212,7 @@ func (obj *AuthObject) read() error {
 	}
 
 	// get the hash key form server and client session key
-	newKey, err := obj.generatePasswordEncKey()
+	obj.conn.newKey, err = obj.generatePasswordEncKey()
 	if err != nil {
 		return err
 	}
@@ -222,12 +222,12 @@ func (obj *AuthObject) read() error {
 		padding = true
 	}
 	// encrypt the password
-	obj.EPassword, err = encryptPassword([]byte(obj.conn.connOption.Password), newKey, true)
+	obj.EPassword, err = encryptPassword([]byte(obj.conn.connOption.Password), obj.conn.newKey, true)
 	if err != nil {
 		return err
 	}
 	if obj.VerifierType == 18453 {
-		obj.ESpeedyKey, err = encryptPassword(speedyKey, newKey, padding)
+		obj.ESpeedyKey, err = encryptPassword(speedyKey, obj.conn.newKey, padding)
 		if err != nil {
 			return err
 		}

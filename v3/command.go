@@ -368,7 +368,7 @@ func (stmt *Stmt) writePars() error {
 		if !par.isLongType() {
 			if par.encoder != nil {
 				//par.encoder.SetTypeInfo(par.TypeInfo)
-				par.encoder.SetParameterInfo(par.GetParameterInfo())
+				par.encoder.UpdateParameterInfo(par.GetParameterInfo())
 				err := par.encoder.Write(ms)
 				if err != nil {
 					return err

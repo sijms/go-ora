@@ -13,13 +13,13 @@ type encryptService struct {
 	algoID int
 }
 
-func newEncryptService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoServiceInfo) (*encryptService, error) {
+func newEncryptService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo) (*encryptService, error) {
 	output := &encryptService{
 		defaultService: defaultService{
-			comm:        comm,
+			ano:         ano,
 			level:       negoInfo.EncServiceLevel,
 			serviceType: 2,
-			version:     0x17000000,
+			version:     version,
 			availableServiceNames: []string{
 				"", "RC4_40", "RC4_56", "RC4_128", "RC4_256",
 				"DES40C", "DES56C", "3DES112", "3DES168", "AES128", "AES192", "AES256",
@@ -34,10 +34,17 @@ func newEncryptService(comm *AdvancedNegoComm, negoInfo *configurations.AdvNegoS
 	}
 	return output, nil
 }
-
-func (serv *encryptService) readServiceData(subPacketnum int) error {
+func (serv *encryptService) isNewVersion() bool {
+	switch serv.algoID {
+	case 1, 2, 3, 6, 8, 10:
+		return false
+	default:
+		return serv.defaultService.isNewVersion()
+	}
+}
+func (serv *encryptService) readServiceData(_ int) error {
 	var err error
-	comm := serv.comm
+	comm := serv.ano.comm
 	serv.version, err = comm.readVersion()
 	if err != nil {
 		return err
@@ -53,7 +60,7 @@ func (serv *encryptService) readServiceData(subPacketnum int) error {
 
 func (serv *encryptService) writeServiceData() error {
 	serv.writeHeader(3)
-	comm := serv.comm
+	comm := serv.ano.comm
 	comm.writeVersion(serv.getVersion())
 	selectedIndices := make([]byte, len(serv.selectedIndices))
 	for i := 0; i < len(serv.selectedIndices); i++ {
@@ -71,8 +78,12 @@ func (serv *encryptService) getServiceDataLength() int {
 }
 
 func (serv *encryptService) activateAlgorithm() error {
-	key := serv.comm.session.Context.AdvancedService.SessionKey
-	iv := serv.comm.session.Context.AdvancedService.IV
+	key := serv.ano.sessionKey
+	var iv []byte = serv.ano.oldIV
+	if serv.isNewVersion() && len(serv.ano.iv) >= 16 {
+		iv = serv.ano.iv[:16]
+	}
+
 	// iv := make([]byte, 16)
 	var algo security.OracleNetworkEncryption = nil
 	var err error
@@ -82,7 +93,7 @@ func (serv *encryptService) activateAlgorithm() error {
 	case 1:
 		algo, err = security.NewOracleNetworkRC4Cryptor(key, iv, 40)
 	case 2:
-		algo, err = security.NewOracleNetworkDESCryptor(key[:8], nil)
+		algo, err = security.NewOracleNetworkDESCryptor(key[:8], iv)
 	case 6:
 		algo, err = security.NewOracleNetworkRC4Cryptor(key, iv, 256)
 	case 8:
@@ -90,17 +101,17 @@ func (serv *encryptService) activateAlgorithm() error {
 	case 10:
 		algo, err = security.NewOracleNetworkRC4Cryptor(key, iv, 128)
 	case 15:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], nil)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], iv)
 	case 16:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:24], nil)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:24], iv)
 	case 17:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:32], nil)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:32], iv)
 	default:
 		err = errors.New(fmt.Sprintf("advanced negotiation error: encryption service algorithm: %d still not supported", serv.algoID))
 	}
 	if err != nil {
 		return err
 	}
-	serv.comm.session.Context.AdvancedService.CryptAlgo = algo
+	serv.ano.cryptAlgo = algo
 	return nil
 }

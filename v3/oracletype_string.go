@@ -106,6 +106,7 @@ var _OracleType_map = map[uint16]string{
 	231: _OracleType_name[336:352],
 	232: _OracleType_name[352:365],
 }
+
 //
 //func (i uint16) String() string {
 //	if str, ok := _OracleType_map[i]; ok {

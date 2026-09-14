@@ -133,6 +133,7 @@ type Connection struct {
 	token                    []byte
 	tokenPrivateKey          []byte
 	connectionCookie         *ConnectionCookie
+	newKey                   []byte
 }
 
 type ConnectionProperties struct {
@@ -597,9 +598,10 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		return err
 	}
 	// advanced negotiation
+	var ano *advanced_nego.AdvNego = nil
 	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
 		tracer.Print("Advance Negotiation")
-		ano, err := advanced_nego.NewAdvNego(session, conn.tracer, conn.connOption)
+		ano, err = advanced_nego.NewAdvNego(session, conn.tracer, conn.connOption)
 		if err != nil {
 			return err
 		}
@@ -616,6 +618,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			return err
 		}
 	}
+	conn.session.Context.SetAdvancedNegotiator(ano)
 	// if fast login enabled this means new features are available
 	if conn.session.Context.FastAuthEnabled {
 		session.UseBigClrChunks = true
@@ -692,18 +695,29 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		}
 		err = conn.read()
 	}
-	if errors.Is(err, driver.ErrBadConn) && conn.connectionCookie != nil {
+	if conn.connectionCookie != nil && (errors.Is(err, driver.ErrBadConn) || errors.Is(err, io.EOF)) {
 		// if cookie based remove cookie and reconnect
 		tracer.Print("Bad connection")
 		tracer.Print("Remove cookie with key: ", conn.connectionCookie.cookieKey)
 		deleteCookie(conn)
 		conn.connectionCookie = nil
+		if conn.session != nil {
+			conn.session.Disconnect()
+		}
 		tracer.Print("Reconnect")
 		return conn.OpenWithContext(ctx)
 	}
 	if err != nil {
 		return err
 	}
+	if ano != nil {
+		externalAuth := len(conn.connOption.UserID) == 0 || len(conn.connOption.Password) == 0
+		err = ano.SetKeyFolding(conn.newKey, externalAuth, conn.LogonMode&0x20 > 0 || conn.LogonMode&0x40 > 0)
+		if err != nil {
+			return err
+		}
+	}
+
 	conn.State = Opened
 	conn.session.ServerFlags = conn.tcpNego.ServerFlags
 	if conn.connectionCookie == nil && conn.isFastLoginEnabled() && conn.tcpNego != nil {
@@ -912,10 +926,6 @@ func (conn *Connection) Close() (err error) {
 		if err != nil {
 			tracer.Print("Logoff with error: ", err)
 		}
-		err = conn.session.WriteFinalPacket()
-		if err != nil {
-			tracer.Print("Write Final Packet With Error: ", err)
-		}
 		conn.session.Disconnect()
 		conn.session = nil
 	}
@@ -1020,9 +1030,6 @@ func (conn *Connection) doAuth() error {
 				}
 				conn.SessionProperties[string(key)] = string(val)
 			}
-		// case 27:
-		//	this.ProcessImplicitResultSet(ref implicitRSList);
-		//	continue;
 		default:
 			err = conn.ProcessTCCResponse(msg)
 			if err != nil {

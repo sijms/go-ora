@@ -60,7 +60,7 @@ func (param *ArrayParameter) Encode(input interface{}, conn IConnection) (err er
 		}
 		coder = param.attrib.Copy()
 		coder.Init()
-		param.SetParameterInfo(coder.GetParameterInfo())
+		param.UpdateParameterInfo(coder.GetParameterInfo())
 		rValue := reflect.ValueOf(input)
 		length := rValue.Len()
 		if length > param.ArraySize {
@@ -97,7 +97,7 @@ func (param *ArrayParameter) Encode(input interface{}, conn IConnection) (err er
 					return err
 				}
 			}
-			param.SetParameterInfo(coder.GetParameterInfo())
+			param.UpdateParameterInfo(coder.GetParameterInfo())
 			if param.DataType == types.NCHAR {
 				param.MaxLen = conn.GetMaxStringLength()
 				param.MaxCharLen = param.MaxLen // / converters.MaxBytePerChar(par.CharsetID)
@@ -130,7 +130,7 @@ func (param *ArrayParameter) Decode(conn IConnection) (value interface{}, err er
 		items := make([]interface{}, param.ArraySize)
 		for i := 0; i < param.ArraySize; i++ {
 			decoder := param.attrib.Copy()
-			decoder.SetParameterInfo(param.GetParameterInfo())
+			decoder.UpdateParameterInfo(param.GetParameterInfo())
 			err = decoder.Read(session)
 			if err != nil {
 				return nil, err

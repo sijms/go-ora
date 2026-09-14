@@ -195,14 +195,13 @@ func CreateClob(db *sql.DB, uploadCtx context.Context, input interface{}, useNCl
 	return ret, ret.SetValue(input)
 }
 
-func NewClob(stream LobStreamer, uploadCtx context.Context, input interface{}, useNClob bool) (*Clob, error) {
-	ret := &Clob{}
-	ret.UseNCharset = useNClob
-	ret.UploadCtx = uploadCtx
-	ret.stream = stream
-	return ret, ret.SetValue(input)
-}
-
+//func NewClob(stream LobStreamer, uploadCtx context.Context, input interface{}, useNClob bool) (*Clob, error) {
+//	ret := &Clob{}
+//	ret.UseNCharset = useNClob
+//	ret.UploadCtx = uploadCtx
+//	ret.stream = stream
+//	return ret, ret.SetValue(input)
+//}
 //	func NewClob(streamer LobStreamer) *Clob {
 //		ret := &Clob{}
 //		ret.stream = streamer
@@ -237,6 +236,7 @@ func NewClob(stream LobStreamer, uploadCtx context.Context, input interface{}, u
 //	func (l *clob) Charset() (charsetID int, charsetForm int) {
 //		return l.charsetID, l.charsetForm
 //	}
+
 func (clob *Clob) CopyTo(dest driver.Value) error {
 	temp, err := clob.Value()
 	if err != nil {

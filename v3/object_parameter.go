@@ -126,7 +126,7 @@ func (param *ObjectParameter) Encode(input interface{}, conn parameter_coder.ICo
 	if param.isArray {
 		coder := param.attribs[""].Copy()
 		coder.Init()
-		param.SetParameterInfo(coder.GetParameterInfo())
+		param.UpdateParameterInfo(coder.GetParameterInfo())
 		size := rValue.Len()
 		if size > 0 {
 			session.PutBytes(1, 3)
@@ -160,7 +160,7 @@ func (param *ObjectParameter) Encode(input interface{}, conn parameter_coder.ICo
 				//} else {
 				//	session.PutClr(coder.Bytes())
 				//}
-				param.SetParameterInfo(coderPI)
+				param.UpdateParameterInfo(coderPI)
 			}
 		}
 	} else {
@@ -318,7 +318,7 @@ func (param *ObjectParameter) Decode(conn parameter_coder.IConnection) (interfac
 		items := make([]interface{}, itemsLen)
 		for i := 0; i < itemsLen; i++ {
 			decoder := param.attribs[""].Copy()
-			decoder.SetParameterInfo(param.GetParameterInfo())
+			decoder.UpdateParameterInfo(param.GetParameterInfo())
 			decoder.SetLobStreamer(conn.NewLobStreamer())
 			err = decoder.Read(param.PSession)
 			if err != nil {

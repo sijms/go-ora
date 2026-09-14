@@ -247,7 +247,7 @@ func (w *Wallet) readCredentials(input []byte) error {
 			}
 
 			var walletCredentialsRegexp *regexp.Regexp
-			walletCredentialsRegexp, err = regexp.Compile("(^.+)([0-9]+)")
+			walletCredentialsRegexp, err = regexp.Compile("(^.+?)([0-9]+)")
 			if err != nil {
 				return err
 			}

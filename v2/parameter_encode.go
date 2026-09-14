@@ -547,7 +547,7 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 				arrayBuffer := bytes.Buffer{}
 				if par.DataType == XMLType {
 					arrayBuffer.Write([]byte{1, 3})
-					if par.MaxNoOfArrayElements > 0xFC {
+					if par.MaxNoOfArrayElements > 0xF5 {
 						session.WriteUint(&arrayBuffer, 0xFE, 2, true, false)
 						session.WriteUint(&arrayBuffer, par.MaxNoOfArrayElements, 4, true, false)
 					} else {

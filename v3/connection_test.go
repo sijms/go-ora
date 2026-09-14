@@ -15,7 +15,7 @@ func TestValidatorInterface(t *testing.T) {
 }
 
 func TestSessionResetterInterface(t *testing.T) {
-	// Test that Connection implements driver.SessionResetter interface  
+	// Test that Connection implements driver.SessionResetter interface
 	var conn interface{} = &Connection{}
 	if _, ok := conn.(driver.SessionResetter); !ok {
 		t.Error("Connection does not implement driver.SessionResetter interface")

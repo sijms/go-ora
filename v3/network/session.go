@@ -316,7 +316,7 @@ func (session *Session) negotiate() {
 	host := connOption.GetActiveServer(false)
 
 	if tlsConfig := connOption.TLSConfig; tlsConfig != nil {
-		tlsConfig.ServerName = host.Addr
+		tlsConfig.ServerName = host.TLSHostName()
 		sslConn := tls.Client(session.conn, tlsConfig)
 		session.mu.Lock()
 		session.sslConn = sslConn
@@ -331,7 +331,7 @@ func (session *Session) negotiate() {
 		}
 	}
 	config := &tls.Config{
-		ServerName: host.Addr,
+		ServerName: host.TLSHostName(),
 	}
 	if len(session.SSL.tlsCertificates) > 0 {
 		config.Certificates = session.SSL.tlsCertificates

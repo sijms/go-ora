@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -145,5 +146,41 @@ func TestNegotiateStillVerifiesHostName(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "scan.example.com") {
 		t.Errorf("error = %v, want a host name mismatch for scan.example.com", err)
+	}
+}
+
+func TestNegotiateDoesNotModifyCallerTLSConfig(t *testing.T) {
+	shared := &tls.Config{}
+	var wg sync.WaitGroup
+	for _, addr := range []string{"a.example.com", "b.example.com", "c.example.com", "d.example.com"} {
+		wg.Add(1)
+		go func(addr string) {
+			defer wg.Done()
+			connOption := &configurations.ConnectionConfig{
+				DatabaseInfo: configurations.DatabaseInfo{
+					Servers: []configurations.ServerAddr{
+						{Protocol: "TCPS", Addr: addr, Port: 2484},
+					},
+					ServiceName: "svc",
+				},
+				SessionInfo: configurations.SessionInfo{
+					SessionDataUnitSize:   0xFFFF,
+					TransportDataUnitSize: 0xFFFF,
+					SSLVerify:             true,
+				},
+			}
+			connOption.TLSConfig = shared
+			connOption.ResetServerIndex()
+			clientConn, serverConn := net.Pipe()
+			defer clientConn.Close()
+			defer serverConn.Close()
+			session := NewSession(connOption, trace.NilTracer())
+			session.conn = clientConn
+			session.negotiate()
+		}(addr)
+	}
+	wg.Wait()
+	if shared.ServerName != "" {
+		t.Errorf("caller tls.Config ServerName = %q, want it left empty", shared.ServerName)
 	}
 }

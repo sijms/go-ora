@@ -316,6 +316,8 @@ func (session *Session) negotiate() {
 	host := connOption.GetActiveServer(false)
 
 	if tlsConfig := connOption.TLSConfig; tlsConfig != nil {
+		// clone: TLSConfig is shared by all connections of the connector
+		tlsConfig = tlsConfig.Clone()
 		tlsConfig.ServerName = host.TLSHostName()
 		sslConn := tls.Client(session.conn, tlsConfig)
 		session.mu.Lock()

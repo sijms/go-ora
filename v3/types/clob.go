@@ -29,18 +29,32 @@ func (clob *Clob) Upload() error {
 		}
 		done := clob.stream.StartContext(clob.UploadCtx)
 		defer clob.stream.EndContext(done)
-		_, err = clob.stream.CreateTemporaryLocator(clob.Conv.GetLangID(), charsetForm)
+		createCharset := clob.Conv.GetLangID()
+		_, err = clob.stream.CreateTemporaryLocator(createCharset, charsetForm)
 		if err != nil {
 			return err
 		}
 		if clob.Conv != nil {
 			locator := clob.GetLocator()
 			if locator.IsVarWidthChar() {
-				tempValue := clob.Conv.Decode(clob.bValue)
+				desiredCharset := 2000
 				if clob.stream.DatabaseVersionNumber() < 10200 && locator.IsLittleEndian() {
-					clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(2002, 0)
-				} else {
-					clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(2000, 0)
+					desiredCharset = 2002
+				}
+				if createCharset != desiredCharset {
+					err = clob.stream.FreeTemporaryLocator()
+					if err != nil {
+						return err
+					}
+					_, err = clob.stream.CreateTemporaryLocator(desiredCharset, charsetForm)
+					if err != nil {
+						return err
+					}
+				}
+				tempValue := clob.Conv.Decode(clob.bValue)
+				clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(desiredCharset, 0)
+				if err != nil {
+					return err
 				}
 				clob.bValue = clob.Conv.Encode(tempValue)
 			}

@@ -37,7 +37,7 @@ func main() {
 	err = db.Ping()
 	dieOnError("Can't ping connection:", err)
 
-	fmt.Println("\nSuccessfully connected.\n")
+	fmt.Println("\nSuccessfully connected.")
 	rows, err := db.Query("SELECT * FROM v$version")
 	dieOnError("Can't create query:", err)
 	defer func() {

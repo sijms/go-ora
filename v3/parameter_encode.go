@@ -782,7 +782,6 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	//		par.MaxCharLen = int64(size)
 	//	}
 	//}
-	return nil
 
 	//if par.MaxNoOfArrayElements > 0 && par.MaxNoOfArrayElements < int(size) {
 	//	par.MaxNoOfArrayElements = int(size)

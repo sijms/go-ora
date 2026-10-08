@@ -1,8 +1,11 @@
+//go:build integration
+
 package TestIssues
 
 import (
-	go_ora "github.com/sijms/go-ora/v3"
 	"testing"
+
+	go_ora "github.com/sijms/go-ora/v3"
 	"xorm.io/xorm"
 )
 

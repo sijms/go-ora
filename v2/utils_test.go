@@ -110,22 +110,22 @@ func TestGetInt(t *testing.T) {
 		t.Error(err)
 	}
 	// passing NullFlat
-	err = checkGetInt(sql.NullFloat64{5.78, true}, 5)
+	err = checkGetInt(sql.NullFloat64{Float64: 5.78, Valid: true}, 5)
 	if err != nil {
 		t.Error(err)
 	}
 	// passing NullInt
-	err = checkGetInt(sql.NullInt64{2, true}, 2)
+	err = checkGetInt(sql.NullInt64{Int64: 2, Valid: true}, 2)
 	if err != nil {
 		t.Error(err)
 	}
 	// passing *NullFloat
-	err = checkGetInt(&sql.NullFloat64{8.44, true}, 8)
+	err = checkGetInt(&sql.NullFloat64{Float64: 8.44, Valid: true}, 8)
 	if err != nil {
 		t.Error(err)
 	}
 	// passing *NullInt
-	err = checkGetInt(&sql.NullInt64{10, true}, 10)
+	err = checkGetInt(&sql.NullInt64{Int64: 10, Valid: true}, 10)
 	if err != nil {
 		t.Error(err)
 	}
@@ -142,12 +142,12 @@ func TestGetInt(t *testing.T) {
 	}
 
 	// passing NullString
-	err = checkGetInt(sql.NullString{"12", true}, 12)
+	err = checkGetInt(sql.NullString{String: "12", Valid: true}, 12)
 	if err != nil {
 		t.Error(err)
 	}
 	// passing *NullString
-	err = checkGetInt(&sql.NullString{"13", true}, 13)
+	err = checkGetInt(&sql.NullString{String: "13", Valid: true}, 13)
 	if err != nil {
 		t.Error(err)
 	}

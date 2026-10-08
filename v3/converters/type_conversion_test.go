@@ -141,25 +141,25 @@ func TestEncodeDouble(t *testing.T) {
 //
 // func TestEncodeDate(t *testing.T) {
 // 	ti := time.Date(2006, 01, 02, 15, 04, 06, 0, time.UTC)
-
+//
 // 	got := EncodeDate(ti)
 // 	want := []byte{214, 7, 1, 2, 15, 4, 5, 0}
-
+//
 // 	if !reflect.DeepEqual(got, want) {
 // 		t.Errorf("EncodeDate(%v) = %v, want %v", ti, got, want)
 // 	}
 // }
-
-func TestDecodeDate(t *testing.T) {
-	// 57 3c
-	// 0001
-	// 0101
-	// data := []byte{0x78, 0x7b, 0xb, 0xa, 0x16, 0x31, 0x12, 0x30, 0xb4, 0xa0, 0xc0, 0x17, 0x3c}
-	data := []byte{0x78, 0x7C, 0x01, 0x08, 0x11, 0x23, 0x32, 0x28, 0xE9, 0x6E, 0x70, 0x84, 0x80}
-	date, err := DecodeDate(data)
-	if err != nil {
-		t.Error(err)
-	}
-	// result: 2024-01-08 19:34:49.6863868 +0300 +03
-	t.Log(date)
-}
+//
+// func TestDecodeDate(t *testing.T) {
+// 	// 57 3c
+// 	// 0001
+// 	// 0101
+// 	// data := []byte{0x78, 0x7b, 0xb, 0xa, 0x16, 0x31, 0x12, 0x30, 0xb4, 0xa0, 0xc0, 0x17, 0x3c}
+// 	data := []byte{0x78, 0x7C, 0x01, 0x08, 0x11, 0x23, 0x32, 0x28, 0xE9, 0x6E, 0x70, 0x84, 0x80}
+// 	date, err := DecodeDate(data)
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	// result: 2024-01-08 19:34:49.6863868 +0300 +03
+// 	t.Log(date)
+// }

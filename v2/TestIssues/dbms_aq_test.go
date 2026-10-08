@@ -1,8 +1,11 @@
+//go:build integration
+
 package TestIssues
 
 import (
-	"github.com/sijms/go-ora/dbms"
 	"testing"
+
+	"github.com/sijms/go-ora/dbms"
 )
 
 func TestDBMSAQ(t *testing.T) {

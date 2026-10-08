@@ -90,11 +90,11 @@ END;`, go_ora.Object{Name: "Customer", Value: customer},
 func inputPar(db *sql.DB) error {
 	input := []int{1, 2, 3, 4, 5}
 	input2 := []sql.NullString{
-		{"test", true},
-		{"test", true},
-		{"", false},
-		{"", false},
-		{"test", true},
+		{String: "test", Valid: true},
+		{String: "test", Valid: true},
+		{String: "", Valid: false},
+		{String: "", Valid: false},
+		{String: "test", Valid: true},
 	}
 
 	var output []int
@@ -194,9 +194,9 @@ func basicPars(db *sql.DB) error {
 	input9 = make([]go_ora.NClob, length)
 	for x := 0; x < length; x++ {
 		if x%5 == 0 {
-			input1[x] = sql.NullString{"", false}
-			input2[x] = sql.NullString{"", false}
-			input3[x] = sql.NullInt64{0, false}
+			input1[x] = sql.NullString{String: "", Valid: false}
+			input2[x] = sql.NullString{String: "", Valid: false}
+			input3[x] = sql.NullInt64{Int64: 0, Valid: false}
 			input4[x] = sql.NullTime{Valid: false}
 			input5[x] = sql.NullTime{Valid: false}
 			input6[x] = nil
@@ -204,10 +204,10 @@ func basicPars(db *sql.DB) error {
 			input8[x] = go_ora.Clob{Valid: false}
 			input9[x] = go_ora.NClob{Valid: false}
 		} else {
-			input1[x] = sql.NullString{"varchar_", true}
-			input2[x] = sql.NullString{"안녕하세요AAA_", true}
-			input3[x] = sql.NullInt64{int64(x), true}
-			input4[x] = sql.NullTime{time.Now(), true}
+			input1[x] = sql.NullString{String: "varchar_", Valid: true}
+			input2[x] = sql.NullString{String: "안녕하세요AAA_", Valid: true}
+			input3[x] = sql.NullInt64{Int64: int64(x), Valid: true}
+			input4[x] = sql.NullTime{Time: time.Now(), Valid: true}
 			input5[x] = sql.NullTime{Time: time.Now(), Valid: true}
 			input6[x] = []byte("test_")
 			input7[x] = go_ora.Blob{Data: []byte("BLOB"), Valid: true}

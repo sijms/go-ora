@@ -67,45 +67,45 @@ func setNumber(value reflect.Value, input *Number) error {
 		if err != nil {
 			return err
 		}
-		value.Set(reflect.ValueOf(sql.NullString{temp, true}))
+		value.Set(reflect.ValueOf(sql.NullString{String: temp, Valid: true}))
 	case tyNullByte:
 		temp, err := input.Int64()
 		if err != nil {
 			return err
 		}
-		value.Set(reflect.ValueOf(sql.NullByte{uint8(temp), true}))
+		value.Set(reflect.ValueOf(sql.NullByte{Byte: uint8(temp), Valid: true}))
 	case tyNullInt16:
 		temp, err := input.Int64()
 		if err != nil {
 			return err
 		}
-		value.Set(reflect.ValueOf(sql.NullInt16{int16(temp), true}))
+		value.Set(reflect.ValueOf(sql.NullInt16{Int16: int16(temp), Valid: true}))
 	case tyNullInt32:
 		temp, err := input.Int64()
 		if err != nil {
 			return err
 		}
-		value.Set(reflect.ValueOf(sql.NullInt32{int32(temp), true}))
+		value.Set(reflect.ValueOf(sql.NullInt32{Int32: int32(temp), Valid: true}))
 	case tyNullInt64:
 		temp, err := input.Int64()
 		if err != nil {
 			return err
 		}
-		value.Set(reflect.ValueOf(sql.NullInt64{temp, true}))
+		value.Set(reflect.ValueOf(sql.NullInt64{Int64: temp, Valid: true}))
 	case tyNullFloat64:
 		temp, err := input.Float64()
 		if err != nil {
 			return err
 		}
-		value.Set(reflect.ValueOf(sql.NullFloat64{temp, true}))
+		value.Set(reflect.ValueOf(sql.NullFloat64{Float64: temp, Valid: true}))
 	case tyNullBool:
-		value.Set(reflect.ValueOf(sql.NullBool{!input.isZero(), true}))
+		value.Set(reflect.ValueOf(sql.NullBool{Bool: !input.isZero(), Valid: true}))
 	case tyNullNVarChar:
 		temp, err := input.String()
 		if err != nil {
 			return err
 		}
-		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(temp), true}))
+		value.Set(reflect.ValueOf(NullNVarChar{NVarChar: NVarChar(temp), Valid: true}))
 	default:
 		if temp, ok := value.Interface().(sql.Scanner); ok {
 			if temp != nil && !reflect.ValueOf(temp).IsNil() {
@@ -284,9 +284,9 @@ func setBytes(value reflect.Value, input []byte) error {
 	case tyNClob:
 		value.Set(reflect.ValueOf(NClob{String: string(input), Valid: true}))
 	case tyNullString:
-		value.Set(reflect.ValueOf(sql.NullString{string(input), true}))
+		value.Set(reflect.ValueOf(sql.NullString{String: string(input), Valid: true}))
 	case tyNullNVarChar:
-		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(input), true}))
+		value.Set(reflect.ValueOf(NullNVarChar{NVarChar: NVarChar(input), Valid: true}))
 	default:
 		if temp, ok := value.Interface().(sql.Scanner); ok {
 			if temp != nil && !reflect.ValueOf(temp).IsNil() {
@@ -322,13 +322,13 @@ func setTime(value reflect.Value, input time.Time) error {
 	case tyTimeStampTZ:
 		value.Set(reflect.ValueOf(TimeStampTZ(input)))
 	case tyNullString:
-		value.Set(reflect.ValueOf(sql.NullString{input.Format(time.RFC3339), true}))
+		value.Set(reflect.ValueOf(sql.NullString{String: input.Format(time.RFC3339), Valid: true}))
 	case tyNullTime:
-		value.Set(reflect.ValueOf(sql.NullTime{input, true}))
+		value.Set(reflect.ValueOf(sql.NullTime{Time: input, Valid: true}))
 	case tyNullTimeStamp:
-		value.Set(reflect.ValueOf(NullTimeStamp{TimeStamp(input), true}))
+		value.Set(reflect.ValueOf(NullTimeStamp{TimeStamp: TimeStamp(input), Valid: true}))
 	case tyNullTimeStampTZ:
-		value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ(input), true}))
+		value.Set(reflect.ValueOf(NullTimeStampTZ{TimeStampTZ: TimeStampTZ(input), Valid: true}))
 	default:
 		if temp, ok := value.Interface().(sql.Scanner); ok {
 			if temp != nil && !reflect.ValueOf(temp).IsNil() {
@@ -451,7 +451,7 @@ func setLob(value reflect.Value, input Lob) error {
 		if err != nil {
 			return err
 		}
-		value.Set(reflect.ValueOf(sql.NullString{strConv.Decode(lobData), true}))
+		value.Set(reflect.ValueOf(sql.NullString{String: strConv.Decode(lobData), Valid: true}))
 	case tyNVarChar:
 		strConv, err = getStrConv()
 		if err != nil {
@@ -463,7 +463,7 @@ func setLob(value reflect.Value, input Lob) error {
 		if err != nil {
 			return err
 		}
-		value.Set(reflect.ValueOf(NullNVarChar{NVarChar(strConv.Decode(lobData)), true}))
+		value.Set(reflect.ValueOf(NullNVarChar{NVarChar: NVarChar(strConv.Decode(lobData)), Valid: true}))
 	case tyClob:
 		strConv, err = getStrConv()
 		if err != nil {

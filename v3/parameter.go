@@ -456,101 +456,100 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	}
 	par.oPrimValue, err = decoder.Decode(conn)
 	return err
-
-	//switch par.DataType {
-
-	//case OCIClobLocator, OCIBlobLocator:
-	//	var locator []byte
-	//	if !udt {
-	//		locator, err = session.GetClr()
-	//	} else {
-	//		locator = par.BValue
-	//	}
-	//	if err != nil {
-	//		return err
-	//	}
-	//	lob := Lob{
-	//		sourceLocator: locator,
-	//		sourceLen:     len(locator),
-	//		connection:    conn,
-	//		charsetID:     par.CharsetID,
-	//	}
-	//	if lob.isTemporary() {
-	//		*temporaryLobs = append(*temporaryLobs, locator)
-	//	}
-	//	par.oPrimValue = lob
-	//case VECTOR:
-	//	var locator []byte
-	//	if !udt {
-	//		locator, err = session.GetClr()
-	//	} else {
-	//		locator = par.BValue
-	//	}
-	//	if err != nil {
-	//		return err
-	//	}
-	//	lob := Lob{
-	//		sourceLocator: locator,
-	//		sourceLen:     len(locator),
-	//		connection:    conn,
-	//		charsetID:     par.CharsetID,
-	//	}
-	//	v := oraTypes.Vector{}
-	//	if lob.isTemporary() {
-	//		*temporaryLobs = append(*temporaryLobs, locator)
-	//	}
-	//	par.oPrimValue = v
-	//case OCIFileLocator:
-	//	var locator []byte
-	//	if !udt {
-	//		locator, err = session.GetClr()
-	//	} else {
-	//		locator = par.BValue
-	//	}
-	//	if err != nil {
-	//		return err
-	//	}
-	//	var dirName, fileName string
-	//	if len(locator) > 16 {
-	//		index := 16
-	//		length := int(binary.BigEndian.Uint16(locator[index : index+2]))
-	//		index += 2
-	//		dirName = conn.sStrConv.Decode(locator[index : index+length])
-	//		index += length
-	//		length = int(binary.BigEndian.Uint16(locator[index : index+2]))
-	//		index += 2
-	//		fileName = conn.sStrConv.Decode(locator[index : index+length])
-	//		index += length
-	//	}
-	//	lob := &Lob{
-	//		sourceLocator: locator,
-	//		sourceLen:     len(locator),
-	//		connection:    conn,
-	//		charsetID:     par.CharsetID,
-	//	}
-	//	f := oraTypes.CreateBFileFromStream(lob, dirName, fileName)
-	//	//f := oraTypes.BFile{
-	//	//	dirName:  dirName,
-	//	//	fileName: fileName,
-	//	//	Valid:    len(locator) > 0,
-	//	//	isOpened: false,
-	//	//	,
-	//	//}
-	//	if lob.isTemporary() {
-	//		*temporaryLobs = append(*temporaryLobs, locator)
-	//	}
-	//	par.oPrimValue = f
-
-	//case XMLType:
-	//	err = decodeObject(conn, par, temporaryLobs)
-	//	if err != nil {
-	//		return err
-	//	}
-	//default:
-	//	return fmt.Errorf("unable to decode oracle type %v to its primitive value", par.DataType)
-	//}
-	return nil
 }
+
+//switch par.DataType {
+
+//case OCIClobLocator, OCIBlobLocator:
+//	var locator []byte
+//	if !udt {
+//		locator, err = session.GetClr()
+//	} else {
+//		locator = par.BValue
+//	}
+//	if err != nil {
+//		return err
+//	}
+//	lob := Lob{
+//		sourceLocator: locator,
+//		sourceLen:     len(locator),
+//		connection:    conn,
+//		charsetID:     par.CharsetID,
+//	}
+//	if lob.isTemporary() {
+//		*temporaryLobs = append(*temporaryLobs, locator)
+//	}
+//	par.oPrimValue = lob
+//case VECTOR:
+//	var locator []byte
+//	if !udt {
+//		locator, err = session.GetClr()
+//	} else {
+//		locator = par.BValue
+//	}
+//	if err != nil {
+//		return err
+//	}
+//	lob := Lob{
+//		sourceLocator: locator,
+//		sourceLen:     len(locator),
+//		connection:    conn,
+//		charsetID:     par.CharsetID,
+//	}
+//	v := oraTypes.Vector{}
+//	if lob.isTemporary() {
+//		*temporaryLobs = append(*temporaryLobs, locator)
+//	}
+//	par.oPrimValue = v
+//case OCIFileLocator:
+//	var locator []byte
+//	if !udt {
+//		locator, err = session.GetClr()
+//	} else {
+//		locator = par.BValue
+//	}
+//	if err != nil {
+//		return err
+//	}
+//	var dirName, fileName string
+//	if len(locator) > 16 {
+//		index := 16
+//		length := int(binary.BigEndian.Uint16(locator[index : index+2]))
+//		index += 2
+//		dirName = conn.sStrConv.Decode(locator[index : index+length])
+//		index += length
+//		length = int(binary.BigEndian.Uint16(locator[index : index+2]))
+//		index += 2
+//		fileName = conn.sStrConv.Decode(locator[index : index+length])
+//		index += length
+//	}
+//	lob := &Lob{
+//		sourceLocator: locator,
+//		sourceLen:     len(locator),
+//		connection:    conn,
+//		charsetID:     par.CharsetID,
+//	}
+//	f := oraTypes.CreateBFileFromStream(lob, dirName, fileName)
+//	//f := oraTypes.BFile{
+//	//	dirName:  dirName,
+//	//	fileName: fileName,
+//	//	Valid:    len(locator) > 0,
+//	//	isOpened: false,
+//	//	,
+//	//}
+//	if lob.isTemporary() {
+//		*temporaryLobs = append(*temporaryLobs, locator)
+//	}
+//	par.oPrimValue = f
+
+//case XMLType:
+//	err = decodeObject(conn, par, temporaryLobs)
+//	if err != nil {
+//		return err
+//	}
+//default:
+//	return fmt.Errorf("unable to decode oracle type %v to its primitive value", par.DataType)
+//}
 
 func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
 	currentLobFetch := connection.connOption.Lob

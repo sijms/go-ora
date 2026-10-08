@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"strings"
 	"testing"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func TestRegularTypeArray(t *testing.T) {
@@ -172,9 +173,9 @@ end;`, go_ora.NVarChar("안녕하세요AAA_"),
 		input9 = make([]go_ora.NClob, length)
 		for x := 0; x < length; x++ {
 			if x%5 == 0 {
-				input1[x] = sql.NullString{"", false}
-				input2[x] = sql.NullString{"", false}
-				input3[x] = sql.NullInt64{0, false}
+				input1[x] = sql.NullString{String: "", Valid: false}
+				input2[x] = sql.NullString{String: "", Valid: false}
+				input3[x] = sql.NullInt64{Int64: 0, Valid: false}
 				input4[x] = sql.NullTime{Valid: false}
 				//input5[x] = sql.NullTime{Valid: false}
 				input6[x] = nil
@@ -182,10 +183,10 @@ end;`, go_ora.NVarChar("안녕하세요AAA_"),
 				input8[x] = go_ora.Clob{Valid: false}
 				input9[x] = go_ora.NClob{Valid: false}
 			} else {
-				input1[x] = sql.NullString{"varchar_", true}
-				input2[x] = sql.NullString{"안녕하세요AAA_", true}
-				input3[x] = sql.NullInt64{int64(x), true}
-				input4[x] = sql.NullTime{time.Date(2024, 11, 11, 11, 11, 11, 11, time.UTC), true}
+				input1[x] = sql.NullString{String: "varchar_", Valid: true}
+				input2[x] = sql.NullString{String: "안녕하세요AAA_", Valid: true}
+				input3[x] = sql.NullInt64{Int64: int64(x), Valid: true}
+				input4[x] = sql.NullTime{Time: time.Date(2024, 11, 11, 11, 11, 11, 11, time.UTC), Valid: true}
 				//input5[x] = sql.NullTime{Time: time.Now(), Valid: true}
 				input6[x] = []byte("test_")
 				input7[x] = go_ora.Blob{Data: []byte("BLOB")}

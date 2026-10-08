@@ -5,9 +5,10 @@ import (
 	"database/sql/driver"
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -103,12 +104,12 @@ func bulkInsert3(db *sql.DB, rowNum int) error {
 		data[x] = nil
 		initalVal += 0.1
 		if x == 0 {
-			major[x] = sql.NullString{"M-13", true}
+			major[x] = sql.NullString{String: "M-13", Valid: true}
 		} else {
 			if x%2 == 0 {
-				major[x] = sql.NullString{"", false}
+				major[x] = sql.NullString{String: "", Valid: false}
 			} else {
-				major[x] = sql.NullString{"SP-17", true}
+				major[x] = sql.NullString{String: "SP-17", Valid: true}
 			}
 
 		}
@@ -152,12 +153,12 @@ func bulkInsert2(db *sql.DB, rowNum int) error {
 		}
 		initalVal += 0.1
 		if x == 0 {
-			major[x] = sql.NullString{"M-13", true}
+			major[x] = sql.NullString{String: "M-13", Valid: true}
 		} else {
 			if x%2 == 0 {
-				major[x] = sql.NullString{"", false}
+				major[x] = sql.NullString{String: "", Valid: false}
 			} else {
-				major[x] = sql.NullString{"SP-17", true}
+				major[x] = sql.NullString{String: "SP-17", Valid: true}
 			}
 
 		}

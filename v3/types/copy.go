@@ -216,15 +216,15 @@ func Copy(dest, src any) error {
 func createNewType(dstValue reflect.Value, dstType reflect.Type) error {
 	// special types
 	if dstType == reflect.TypeOf((*Blob)(nil)).Elem() {
-		dstValue.Set(reflect.ValueOf(&Blob{}))
+		dstValue.Set(reflect.ValueOf(Blob{}))
 		return nil
 	}
 	if dstType == reflect.TypeOf((*Clob)(nil)).Elem() {
-		dstValue.Set(reflect.ValueOf(&Clob{}))
+		dstValue.Set(reflect.ValueOf(Clob{}))
 		return nil
 	}
 	if dstType == reflect.TypeOf((*Vector)(nil)).Elem() {
-		dstValue.Set(reflect.ValueOf(&Vector{}))
+		dstValue.Set(reflect.ValueOf(Vector{}))
 		return nil
 	}
 	if dstType.Kind() != reflect.Ptr {

@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(db *sql.DB) error {
@@ -54,9 +55,9 @@ func insert(db *sql.DB) error {
 	for x := 0; x < length; x++ {
 		args[x] = TempStruct{
 			Id:   x + 1,
-			Name: sql.NullString{strings.Repeat("*", 20), true},
-			Val:  sql.NullFloat64{float64(length) / float64(x+1), true},
-			Date: sql.NullTime{time.Now(), true},
+			Name: sql.NullString{String: strings.Repeat("*", 20), Valid: true},
+			Val:  sql.NullFloat64{Float64: float64(length) / float64(x+1), Valid: true},
+			Date: sql.NullTime{Time: time.Now(), Valid: true},
 			Data: bytes.Repeat([]byte{55}, 20),
 		}
 		if x == 2 {

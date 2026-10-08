@@ -5,9 +5,10 @@ import (
 	"database/sql/driver"
 	"flag"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"time"
+
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 type test2 struct {
@@ -239,7 +240,15 @@ func main() {
 			fmt.Println("Can't drop table: ", err)
 		}
 	}()
-	err = conn.RegisterType("UDTPAR_TYPE", "", test2{})
+	// RegisterType requires *sql.DB; the rest of this example uses the low-level
+	// *go_ora.Connection API directly.
+	db, err := sql.Open("oracle", connStr)
+	if err != nil {
+		fmt.Println("Can't open sql.DB for RegisterType: ", err)
+		return
+	}
+	err = go_ora.RegisterType(db, "UDTPAR_TYPE", "", test2{})
+	db.Close()
 	if err != nil {
 		fmt.Println("Can't register UDT: ", err)
 		return

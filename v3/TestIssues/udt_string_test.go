@@ -1,3 +1,5 @@
+//go:build integration
+
 // issue 578
 // can't read or write UDT when contain string > 251
 package TestIssues

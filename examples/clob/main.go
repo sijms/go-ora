@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 var (
@@ -230,7 +231,7 @@ func insertData(db *sql.DB) error {
 			temp.Data3 = nil
 			temp.Data4.Data = nil
 		} else {
-			temp.Data1 = sql.NullString{"this is a test", true}
+			temp.Data1 = sql.NullString{String: "this is a test", Valid: true}
 			temp.Data2.String, temp.Data2.Valid = clob, true
 
 			temp.Data3 = []byte("this is a test")

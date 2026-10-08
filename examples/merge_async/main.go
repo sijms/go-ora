@@ -112,7 +112,6 @@ func merge(db *sql.DB) error {
 	}
 	fmt.Println("finish merge: ", time.Now().Sub(t))
 	return tx.Commit()
-	return nil
 }
 
 func main() {

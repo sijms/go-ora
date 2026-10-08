@@ -4,11 +4,12 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/sijms/go-ora/v2"
-	go_ora "github.com/sijms/go-ora/v2"
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/sijms/go-ora/v2"
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 func createTable(conn *sql.DB) error {
@@ -62,7 +63,7 @@ VALUES(:1, :2, :3, :4)`)
 	val := 1.1
 	for index = 1; index <= 100; index++ {
 		if index%5 == 0 {
-			tempTime := &sql.NullTime{time.Now(), false}
+			tempTime := &sql.NullTime{Time: time.Now(), Valid: false}
 			_, err = stmt.Exec(index, nameText, val, tempTime)
 		} else {
 			_, err = stmt.Exec(index, nameText, val, time.Now())

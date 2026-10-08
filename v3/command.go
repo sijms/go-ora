@@ -240,6 +240,7 @@ func (stmt *defaultStmt) writeDefine() error {
 	session := stmt.connection.session
 	num := 0x7FFFFFFF
 	for index, col := range stmt.columns {
+		stmt.columns[index].captureColumnMetadata(stmt.connection)
 		// temp := new(ParameterInfo)
 		// *temp = col
 		col.oaccollid = 0
@@ -1047,11 +1048,27 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 	// 		return err
 	// 	}
 	// }
+	resultSet.buildColumnDescriptors()
 	if stmt.connection.tracer.IsOn() {
 		resultSet.Trace(stmt.connection.tracer)
 	}
 	// return stmt.readLobs(dataSet)
 	return nil
+}
+
+// buildColumnDescriptors constructs the result column descriptors exactly
+// once for a non-empty result set. Subsequent read()/fetch() cycles and
+// writeDefine()/connection option mutations must not change them.
+func (resultSet *ResultSet) buildColumnDescriptors() {
+	if resultSet == nil || resultSet.descriptors != nil ||
+		resultSet.cols == nil || len(*resultSet.cols) == 0 {
+		return
+	}
+	descriptors := make([]columnDescriptor, len(*resultSet.cols))
+	for i := range *resultSet.cols {
+		descriptors[i] = newColumnDescriptor(&(*resultSet.cols)[i])
+	}
+	resultSet.descriptors = descriptors
 }
 
 // requestCustomTypeInfo an experimental function to ask for UDT information

@@ -3,6 +3,7 @@ package go_ora
 import (
 	"database/sql/driver"
 	"math"
+	"reflect"
 	"strings"
 
 	"github.com/sijms/go-ora/v3/configurations"
@@ -74,12 +75,57 @@ type ParameterInfo struct {
 	parent            *ParameterInfo
 	Annotations       map[string]string
 	parameter_coder.BasicParameter
+
+	originalDataType      uint16
+	originalDataTypeKnown bool
+	rawPrecision          int64
+	rawScale              int64
+	precisionScaleKnown   bool
+	unconstrainedNumber   bool
+	nullabilityKnown      bool
+	lobFetch              configurations.LobFetch
+	lobFetchKnown         bool
+	lobReadMode           configurations.LobReadMode
+	lobReadModeKnown      bool
+	udtScanType           reflect.Type
+}
+
+// captureColumnMetadata preserves descriptor state needed by ColumnType methods
+// before writeDefine may replace LOB-like wire types with LONG define types.
+func (par *ParameterInfo) captureColumnMetadata(conn *Connection) {
+	if conn != nil && conn.connOption != nil {
+		par.lobFetch = conn.connOption.Lob
+		par.lobFetchKnown = true
+		par.lobReadMode = conn.connOption.LobReadMode
+		par.lobReadModeKnown = true
+	}
+	if !par.originalDataTypeKnown {
+		par.originalDataType = par.DataType
+		par.originalDataTypeKnown = true
+	}
+	if conn != nil && len(par.TypeName) > 0 {
+		if coder, ok := conn.nameTypeCoder[strings.ToUpper(par.TypeName)]; ok {
+			if objectCoder, ok := coder.(*ObjectParameter); ok {
+				if objectCoder.isArray {
+					par.udtScanType = reflect.TypeOf([]interface{}{})
+				} else {
+					par.udtScanType = objectCoder.typ
+				}
+			}
+		}
+	}
 }
 
 // load get parameter information form network session
 func (par *ParameterInfo) load(conn *Connection) error {
 	session := conn.session
 	par.getDataFromServer = true
+	if conn != nil && conn.connOption != nil {
+		par.lobFetch = conn.connOption.Lob
+		par.lobFetchKnown = true
+		par.lobReadMode = conn.connOption.LobReadMode
+		par.lobReadModeKnown = true
+	}
 	dataType, err := session.GetByte()
 	if err != nil {
 		return err
@@ -90,6 +136,10 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.Precision, err = session.GetByte()
+	if err != nil {
+		return err
+	}
+	par.rawPrecision = int64(par.Precision)
 	// precision, err := session.GetInt(1, false, false)
 	// var scale int
 	switch par.DataType {
@@ -114,6 +164,9 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		if err != nil {
 			return err
 		}
+		par.rawScale = int64(scale)
+		par.precisionScaleKnown = true
+		par.unconstrainedNumber = par.DataType == oraTypes.NUMBER && par.rawPrecision == 0 && scale == -127
 
 		if scale == -127 {
 			par.Precision = uint8(math.Ceil(float64(par.Precision) * 0.30103))
@@ -123,6 +176,11 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		}
 	default:
 		par.Scale, err = session.GetByte()
+		if err != nil {
+			return err
+		}
+		par.rawScale = int64(par.Scale)
+		par.precisionScaleKnown = true
 		// scale, err = session.GetInt(1, false, false)
 	}
 	// if par.Scale == uint8(-127) {
@@ -172,6 +230,9 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.ToID, err = session.GetDlc()
+	if err != nil {
+		return err
+	}
 	par.Version, err = session.GetInt(2, true, true)
 	if err != nil {
 		return err
@@ -190,12 +251,16 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	}
 	if session.TTCVersion >= 8 {
 		par.oaccollid, err = session.GetInt(4, true, true)
+		if err != nil {
+			return err
+		}
 	}
 	num1, err := session.GetInt(1, false, false)
 	if err != nil {
 		return err
 	}
 	par.AllowNull = num1 > 0
+	par.nullabilityKnown = true
 	_, err = session.GetByte() //  v7 length of name
 	if err != nil {
 		return err
@@ -227,15 +292,22 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		par.DataType = oraTypes.XMLType
 		par.IsXmlType = true
 	}
+	par.captureColumnMetadata(conn)
 	if session.TTCVersion < 3 {
 		return nil
 	}
 	_, err = session.GetInt(2, true, true)
+	if err != nil {
+		return err
+	}
 	if session.TTCVersion < 6 {
 		return nil
 	}
 	var uds_flags int
 	uds_flags, err = session.GetInt(4, true, true)
+	if err != nil {
+		return err
+	}
 	par.IsJson = (uds_flags & 0x500) > 0
 	if session.TTCVersion < 17 {
 		return nil
@@ -298,6 +370,9 @@ func (par *ParameterInfo) load(conn *Connection) error {
 			return err
 		}
 		par.VectorFlag, err = session.GetByte()
+		if err != nil {
+			return err
+		}
 
 		par.VectorType = oraTypes.VECTOR_DENSE
 		if par.VectorFlag&2 == 2 {
@@ -365,6 +440,18 @@ func (par *ParameterInfo) clone() ParameterInfo {
 	tempPar.CharsetForm = par.CharsetForm
 	tempPar.Scale = par.Scale
 	tempPar.Precision = par.Precision
+	tempPar.originalDataType = par.originalDataType
+	tempPar.originalDataTypeKnown = par.originalDataTypeKnown
+	tempPar.rawPrecision = par.rawPrecision
+	tempPar.rawScale = par.rawScale
+	tempPar.precisionScaleKnown = par.precisionScaleKnown
+	tempPar.unconstrainedNumber = par.unconstrainedNumber
+	tempPar.nullabilityKnown = par.nullabilityKnown
+	tempPar.lobFetch = par.lobFetch
+	tempPar.lobFetchKnown = par.lobFetchKnown
+	tempPar.lobReadMode = par.lobReadMode
+	tempPar.lobReadModeKnown = par.lobReadModeKnown
+	tempPar.udtScanType = par.udtScanType
 	return tempPar
 }
 

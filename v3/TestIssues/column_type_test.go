@@ -60,6 +60,7 @@ func TestColumnType(t *testing.T) {
 			t.Error(err)
 		}
 	}()
+	wantNames := []string{"CHAR", "NCHAR", "VARCHAR2", "NVARCHAR2"}
 	for rows.Next() {
 		columns, err := rows.ColumnTypes()
 		if err != nil {
@@ -67,11 +68,8 @@ func TestColumnType(t *testing.T) {
 			return
 		}
 		for key, val := range columns {
-			if (key == 0 || key == 1) && val.DatabaseTypeName() != "CHAR" {
-				t.Errorf("expected: %s and got: %s", "CHAR", val.DatabaseTypeName())
-			}
-			if (key == 2 || key == 3) && val.DatabaseTypeName() != "NCHAR" {
-				t.Errorf("expected: %s and got: %s", "NCHAR", val.DatabaseTypeName())
+			if val.DatabaseTypeName() != wantNames[key] {
+				t.Errorf("column %d expected: %s and got: %s", key, wantNames[key], val.DatabaseTypeName())
 			}
 		}
 	}

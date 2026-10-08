@@ -1,3 +1,8 @@
+//go:build ignore
+
+// Disabled: written against the pre-coder encoding API — it references
+// commented-out types (Number, NewNumberFromInt64) and unprefixed oracle type
+// constants, so it no longer compiles. Needs a rewrite against parameter_coder.
 package go_ora
 
 import (

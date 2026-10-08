@@ -22,6 +22,7 @@ type ResultSet struct {
 	uACBufferLength int
 	maxRowSize      int
 	cols            *[]ParameterInfo
+	descriptors     []columnDescriptor
 	rows            []Row
 	currentRow      Row
 	index           int
@@ -76,7 +77,7 @@ func (resultSet *ResultSet) setBitVector(bitVector []byte) {
 	if resultSet.columnCount%8 > 0 {
 		index++
 	}
-	if len(bitVector) > 0 {
+	if len(bitVector) > 0 && resultSet.cols != nil {
 		for x := 0; x < len(bitVector); x++ {
 			for i := 0; i < 8; i++ {
 				if (x*8)+i < resultSet.columnCount {
@@ -84,16 +85,17 @@ func (resultSet *ResultSet) setBitVector(bitVector []byte) {
 				}
 			}
 		}
-	} else {
-		if resultSet.cols != nil {
-			for x := 0; x < len(*resultSet.cols); x++ {
-				(*resultSet.cols)[x].getDataFromServer = true
-			}
+	} else if resultSet.cols != nil {
+		for x := 0; x < len(*resultSet.cols); x++ {
+			(*resultSet.cols)[x].getDataFromServer = true
 		}
 	}
 }
 
 func (resultSet *ResultSet) Close() error {
+	if resultSet == nil || resultSet.parent == nil {
+		return nil
+	}
 	if resultSet.parent.CanAutoClose() {
 		return resultSet.parent.Close()
 	}
@@ -101,7 +103,7 @@ func (resultSet *ResultSet) Close() error {
 }
 
 func (resultSet *ResultSet) Columns() []string {
-	if resultSet.cols == nil || len(*resultSet.cols) == 0 {
+	if resultSet == nil || resultSet.cols == nil || len(*resultSet.cols) == 0 {
 		return nil
 	}
 	ret := make([]string, len(*resultSet.cols))
@@ -123,76 +125,41 @@ func (resultSet *ResultSet) Trace(t trace.Tracer) {
 	}
 }
 
+// columnMetadata returns the descriptor snapshot for a result column, or a
+// zero-value descriptor for nil/empty result sets and out-of-range indexes.
+func (resultSet *ResultSet) columnMetadata(index int) columnDescriptor {
+	if resultSet == nil || len(resultSet.descriptors) == 0 ||
+		index < 0 || index >= len(resultSet.descriptors) {
+		return columnDescriptor{}
+	}
+	return resultSet.descriptors[index]
+}
+
 // ColumnTypeDatabaseTypeName return Col DataType name
 func (resultSet *ResultSet) ColumnTypeDatabaseTypeName(index int) string {
-	return ""
-	//return (*resultSet.cols)[index].DataType.String()
+	return resultSet.columnMetadata(index).databaseTypeName
 }
 
 // ColumnTypeLength return length of column type
 func (resultSet *ResultSet) ColumnTypeLength(index int) (int64, bool) {
-	switch (*resultSet.cols)[index].DataType {
-	case types.NCHAR, types.CHAR:
-		return int64((*resultSet.cols)[index].MaxCharLen), true
-	}
-	return int64(0), false
+	metadata := resultSet.columnMetadata(index)
+	return metadata.length, metadata.lengthKnown
 }
 
 // ColumnTypeNullable return if column allow null or not
 func (resultSet *ResultSet) ColumnTypeNullable(index int) (nullable, ok bool) {
-	return (*resultSet.cols)[index].AllowNull, true
+	metadata := resultSet.columnMetadata(index)
+	return metadata.nullable, metadata.nullabilityKnown
 }
 
 // ColumnTypePrecisionScale return the precision and scale for numeric types
 func (resultSet *ResultSet) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
-	col := (*resultSet.cols)[index]
-	switch col.DataType {
-	case types.NUMBER:
-		return int64(col.Precision), int64(col.Scale), true
-	}
-	return int64(0), int64(0), false
+	metadata := resultSet.columnMetadata(index)
+	return metadata.precision, metadata.scale, metadata.precisionScaleOK
 }
 
 func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
-	col := (*resultSet.cols)[index]
-	switch col.DataType {
-	case types.NUMBER:
-		if col.Precision > 0 {
-			return types.TyFloat64
-		} else {
-			return types.TyInt64
-		}
-	case types.ROWID, types.UROWID:
-		fallthrough
-	case types.CHAR, types.NCHAR:
-		fallthrough
-	case types.OCIClobLocator:
-		fallthrough
-	case types.LongVarChar:
-		return types.TyString
-	case types.RAW:
-		fallthrough
-	case types.OCIBlobLocator, types.OCIFileLocator:
-		fallthrough
-	case types.LongRaw, types.LongVarRaw:
-		return types.TyBytes
-	case types.DATE, types.TIMESTAMP:
-		fallthrough
-	case types.TimeStampDTY:
-		fallthrough
-	case types.TimeStampLTZ, types.TimeStampLTZ_DTY:
-		fallthrough
-	case types.TIMESTAMPTZ, types.TimeStampTZ_DTY:
-		return types.TyTime
-	case types.IBFLOAT:
-		return types.TyFloat32
-	case types.IBDOUBLE:
-		return types.TyFloat64
-	case types.INTERVALDS_DTY, types.INTERVALYM_DTY:
-		return types.TyString
-	default:
-		return nil
-	}
+	return resultSet.columnMetadata(index).scanType
 }
 
 func (resultSet *ResultSet) Err() error {

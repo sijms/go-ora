@@ -1,3 +1,7 @@
+//go:build ignore
+
+// Disabled: exercises the BulkCopy implementation, which is commented out in
+// bulk_copy.go. Enable once the feature is restored.
 package go_ora
 
 import (

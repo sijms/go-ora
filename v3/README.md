@@ -72,9 +72,61 @@ oracle://USER:PASSWORD@HOST:PORT/SERVICE_NAME?PARAM1=value&PARAM2=value
 | `FAST LOGIN` | Enable fast login optimization | `false` |
 | `TOKEN FILE` | Path to authentication token file | -- |
 | `TOKEN PRIVATE KEY FILE` | Path to token private key | -- |
+| `LOB FETCH` | `INLINE`/`PRE` (default) or `STREAM`/`POST` | `INLINE` |
 | `LOB READ` | `AUTO`/`IMPLICIT` (default) or `NO`/`EXPLICIT` | `AUTO` |
 | `TRACE DIR` | Directory for trace files | -- |
 | `CONNECT TIMEOUT` | Connection timeout | -- |
+
+## Column Metadata
+
+`Rows.ColumnTypes()` exposes the five optional `RowsColumnType*` interfaces defined by `database/sql/driver`:
+
+```go
+rows, err := db.Query("SELECT id, name, amount FROM orders")
+if err != nil {
+    log.Fatal(err)
+}
+defer rows.Close()
+
+columnTypes, err := rows.ColumnTypes()
+if err != nil {
+    log.Fatal(err)
+}
+for _, col := range columnTypes {
+    length, lengthOK := col.Length()
+    nullable, nullableOK := col.Nullable()
+    precision, scale, decimalOK := col.DecimalSize()
+    fmt.Println(
+        col.Name(),
+        col.DatabaseTypeName(),
+        length, lengthOK,
+        nullable, nullableOK,
+        precision, scale, decimalOK,
+        col.ScanType(),
+    )
+}
+```
+
+Metadata behavior:
+
+- `DatabaseTypeName()` returns canonical Oracle names where the wire descriptor provides enough information, including `CHAR`/`NCHAR`, `VARCHAR2`/`NVARCHAR2`, `CLOB`/`NCLOB`, `LONG`, `LONG RAW`, timestamps, intervals, `JSON`, `VECTOR`, `BOOLEAN`, `ROWID`, and `UROWID`. Registered or unregistered UDT columns use the TTC type name when available.
+- `Length()` is reported only for variable-length columns. Character columns prefer the character limit (`MaxCharLen`) and binary columns use byte length. LOB-like, XML, JSON, and VECTOR columns report `math.MaxInt64`; fixed-length types report `ok == false`.
+- `DecimalSize()` preserves signed Oracle scale. For example, `NUMBER(10,-2)` reports `(10, -2, true)`. An unconstrained `NUMBER` descriptor reports `(math.MaxInt64, math.MaxInt64, true)`.
+- `Nullable()` returns the TTC nullability flag and `ok == true` when that field was loaded successfully.
+- `ScanType()` predicts the final Go type produced by the driver's result decoding. It is based on the descriptor and the LOB fetch/read settings captured when the descriptor is built; it does not reread mutable connection options later. The snapshot makes metadata stable, but the existing LOB runtime still observes the effective read mode at decode time.
+
+LOB modes affect both metadata and runtime values:
+
+- Inline CLOB/NCLOB values produce `string`; inline BLOB and VECTOR values produce `[]byte`.
+- A JSON wire descriptor without Oracle's native JSON semantic flag may also be defined as `LONG RAW` and produce `[]byte`; native JSON marked by the descriptor remains `*types.Json`.
+- Streamed LOBs with automatic read produce `string` for CLOB/NCLOB and `[]byte` for BLOB.
+- Streamed LOBs with explicit/no read produce `*types.Clob`, `*types.Blob`, or `*types.BFile`.
+- Streamed VECTOR with automatic read produces `[]float32`, `[]float64`, or `[]byte` according to the descriptor's vector format; explicit read produces `*types.Vector`.
+- Native JSON normally produces `*types.Json`.
+
+Some Oracle-specific values (`*types.Clob`, `*types.Blob`, `*types.Vector`, `*types.Json`, registered UDT values, `float32`, and typed VECTOR slices) describe the driver's actual runtime behavior but are not standard `database/sql/driver.Value` scalar types. Inline CLOB/BLOB/VECTOR fetching or automatic LOB reading can reduce wrapper values, but JSON, typed VECTOR slices, BFILE, and UDT values may still remain outside the standard `driver.Value` set.
+
+`ScanType()` is a descriptor-level prediction. NULL LOB locators and quasi/value-based locators can remain wrapper values even when automatic reading is configured. Registered UDTs report their registered Go type; unknown UDTs, unsupported wire IDs, and currently unsupported cursor values report a nil scan type.
 
 ## New Types
 

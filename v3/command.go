@@ -240,6 +240,7 @@ func (stmt *defaultStmt) writeDefine() error {
 	session := stmt.connection.session
 	num := 0x7FFFFFFF
 	for index, col := range stmt.columns {
+		stmt.columns[index].captureColumnMetadata(stmt.connection)
 		// temp := new(ParameterInfo)
 		// *temp = col
 		col.oaccollid = 0

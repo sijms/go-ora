@@ -2,10 +2,11 @@ package go_ora
 
 import (
 	"database/sql/driver"
-	"github.com/sijms/go-ora/v3/network"
-	"github.com/sijms/go-ora/v3/trace"
 	"io"
 	"reflect"
+
+	"github.com/sijms/go-ora/v3/network"
+	"github.com/sijms/go-ora/v3/trace"
 )
 
 // Compile time Sentinels for implemented Interfaces.
@@ -15,10 +16,9 @@ var (
 	_ = driver.RowsColumnTypeLength((*DataSet)(nil))
 	_ = driver.RowsColumnTypeNullable((*DataSet)(nil))
 	_ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
+	_ = driver.RowsColumnTypeScanType((*DataSet)(nil))
+	_ = driver.RowsNextResultSet((*DataSet)(nil))
 )
-
-// var _ = driver.RowsColumnTypeScanType((*DataSet)(nil))
-// var _ = driver.RowsNextResultSet((*DataSet)(nil))
 
 type DataSet struct {
 	resultSets []ResultSet
@@ -36,9 +36,14 @@ type DataSet struct {
 }
 
 func (dataSet *DataSet) currentResultSet() *ResultSet {
-	if dataSet.resultSets == nil {
-		dataSet.resultSets = make([]ResultSet, 0)
-		dataSet.resultSets = append(dataSet.resultSets, ResultSet{})
+	if dataSet == nil {
+		return &ResultSet{}
+	}
+	if len(dataSet.resultSets) == 0 {
+		dataSet.resultSets = []ResultSet{{}}
+		dataSet.index = 0
+	}
+	if dataSet.index < 0 || dataSet.index >= len(dataSet.resultSets) {
 		dataSet.index = 0
 	}
 	return &dataSet.resultSets[dataSet.index]

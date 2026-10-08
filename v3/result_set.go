@@ -4,7 +4,9 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"math"
 
+	"github.com/sijms/go-ora/v3/configurations"
 	"github.com/sijms/go-ora/v3/network"
 	"github.com/sijms/go-ora/v3/trace"
 	types "github.com/sijms/go-ora/v3/types"
@@ -76,7 +78,7 @@ func (resultSet *ResultSet) setBitVector(bitVector []byte) {
 	if resultSet.columnCount%8 > 0 {
 		index++
 	}
-	if len(bitVector) > 0 {
+	if len(bitVector) > 0 && resultSet.cols != nil {
 		for x := 0; x < len(bitVector); x++ {
 			for i := 0; i < 8; i++ {
 				if (x*8)+i < resultSet.columnCount {
@@ -84,16 +86,17 @@ func (resultSet *ResultSet) setBitVector(bitVector []byte) {
 				}
 			}
 		}
-	} else {
-		if resultSet.cols != nil {
-			for x := 0; x < len(*resultSet.cols); x++ {
-				(*resultSet.cols)[x].getDataFromServer = true
-			}
+	} else if resultSet.cols != nil {
+		for x := 0; x < len(*resultSet.cols); x++ {
+			(*resultSet.cols)[x].getDataFromServer = true
 		}
 	}
 }
 
 func (resultSet *ResultSet) Close() error {
+	if resultSet == nil || resultSet.parent == nil {
+		return nil
+	}
 	if resultSet.parent.CanAutoClose() {
 		return resultSet.parent.Close()
 	}
@@ -101,7 +104,7 @@ func (resultSet *ResultSet) Close() error {
 }
 
 func (resultSet *ResultSet) Columns() []string {
-	if resultSet.cols == nil || len(*resultSet.cols) == 0 {
+	if resultSet == nil || resultSet.cols == nil || len(*resultSet.cols) == 0 {
 		return nil
 	}
 	ret := make([]string, len(*resultSet.cols))
@@ -123,76 +126,256 @@ func (resultSet *ResultSet) Trace(t trace.Tracer) {
 	}
 }
 
+type columnLengthKind uint8
+
+const (
+	columnLengthNone columnLengthKind = iota
+	columnLengthChars
+	columnLengthBytes
+	columnLengthUnbounded
+)
+
+type columnTypeMetadata struct {
+	databaseTypeName string
+	length           int64
+	lengthKnown      bool
+	precision        int64
+	scale            int64
+	precisionScaleOK bool
+	nullable         bool
+	nullabilityKnown bool
+	scanType         reflect.Type
+}
+
+type columnTypeBase struct {
+	databaseTypeName string
+	lengthKind       columnLengthKind
+	scanType         reflect.Type
+}
+
+var columnTypeMetadataByType = map[uint16]columnTypeBase{
+	types.NCHAR:            {databaseTypeName: "VARCHAR2", lengthKind: columnLengthChars, scanType: types.TyString},
+	types.NUMBER:           {databaseTypeName: "NUMBER", scanType: types.TyString},
+	types.FLOAT:            {databaseTypeName: "FLOAT"},
+	types.LONG:             {databaseTypeName: "LONG", lengthKind: columnLengthUnbounded, scanType: types.TyString},
+	types.VARCHAR:          {databaseTypeName: "VARCHAR2", lengthKind: columnLengthChars},
+	types.ROWID:            {databaseTypeName: "ROWID", scanType: types.TyString},
+	types.DATE:             {databaseTypeName: "DATE", scanType: types.TyTime},
+	types.VarRaw:           {databaseTypeName: "RAW", lengthKind: columnLengthBytes},
+	types.BFLOAT:           {databaseTypeName: "BINARY_FLOAT"},
+	types.BDOUBLE:          {databaseTypeName: "BINARY_DOUBLE"},
+	types.RAW:              {databaseTypeName: "RAW", lengthKind: columnLengthBytes, scanType: types.TyBytes},
+	types.LongRaw:          {databaseTypeName: "LONG RAW", lengthKind: columnLengthUnbounded, scanType: types.TyBytes},
+	types.LongVarChar:      {databaseTypeName: "LONG", lengthKind: columnLengthUnbounded, scanType: types.TyString},
+	types.LongVarRaw:       {databaseTypeName: "LONG RAW", lengthKind: columnLengthUnbounded},
+	types.CHAR:             {databaseTypeName: "CHAR", scanType: types.TyString},
+	types.CHARZ:            {databaseTypeName: "CHAR"},
+	types.IBFLOAT:          {databaseTypeName: "BINARY_FLOAT", scanType: types.TyFloat32},
+	types.IBDOUBLE:         {databaseTypeName: "BINARY_DOUBLE", scanType: types.TyFloat64},
+	types.REFCURSOR:        {databaseTypeName: "REF CURSOR"},
+	types.OCIXMLType:       {databaseTypeName: "XMLTYPE", lengthKind: columnLengthUnbounded},
+	types.XMLType:          {databaseTypeName: "XMLTYPE", lengthKind: columnLengthUnbounded},
+	types.OCIClobLocator:   {databaseTypeName: "CLOB", lengthKind: columnLengthUnbounded},
+	types.OCIBlobLocator:   {databaseTypeName: "BLOB", lengthKind: columnLengthUnbounded},
+	types.OCIFileLocator:   {databaseTypeName: "BFILE", lengthKind: columnLengthUnbounded},
+	types.RESULTSET:        {databaseTypeName: "RESULT SET"},
+	types.JSON:             {databaseTypeName: "JSON", lengthKind: columnLengthUnbounded, scanType: reflect.TypeOf((*types.Json)(nil))},
+	types.VECTOR:           {databaseTypeName: "VECTOR", lengthKind: columnLengthUnbounded},
+	types.TimeStampDTY:     {databaseTypeName: "TIMESTAMP", scanType: types.TyTime},
+	types.TimeStampTZ_DTY:  {databaseTypeName: "TIMESTAMP WITH TIME ZONE", scanType: types.TyTime},
+	types.INTERVALYM_DTY:   {databaseTypeName: "INTERVAL YEAR TO MONTH", scanType: types.TyTime},
+	types.INTERVALDS_DTY:   {databaseTypeName: "INTERVAL DAY TO SECOND", scanType: types.TyTime},
+	types.TimeTZ:           {databaseTypeName: "TIME WITH TIME ZONE"},
+	types.TIMESTAMP:        {databaseTypeName: "TIMESTAMP", scanType: types.TyTime},
+	types.TIMESTAMPTZ:      {databaseTypeName: "TIMESTAMP WITH TIME ZONE", scanType: types.TyTime},
+	types.IntervalYM:       {databaseTypeName: "INTERVAL YEAR TO MONTH"},
+	types.IntervalDS:       {databaseTypeName: "INTERVAL DAY TO SECOND"},
+	types.UROWID:           {databaseTypeName: "UROWID", lengthKind: columnLengthBytes, scanType: types.TyString},
+	types.TimeStampLTZ_DTY: {databaseTypeName: "TIMESTAMP WITH LOCAL TIME ZONE", scanType: types.TyTime},
+	types.TimeStampLTZ:     {databaseTypeName: "TIMESTAMP WITH LOCAL TIME ZONE", scanType: types.TyTime},
+	types.BOOLEAN:          {databaseTypeName: "BOOLEAN", scanType: types.TyBool},
+}
+
+func (resultSet *ResultSet) columnMetadata(index int) columnTypeMetadata {
+	if resultSet == nil || resultSet.cols == nil || index < 0 || index >= len(*resultSet.cols) {
+		return columnTypeMetadata{}
+	}
+	return metadataForColumn(&(*resultSet.cols)[index])
+}
+
+func metadataForColumn(col *ParameterInfo) columnTypeMetadata {
+	if col == nil {
+		return columnTypeMetadata{}
+	}
+	dataType := col.DataType
+	if col.originalDataTypeKnown {
+		dataType = col.originalDataType
+	}
+	base := columnTypeMetadataByType[dataType]
+	metadata := columnTypeMetadata{
+		databaseTypeName: base.databaseTypeName,
+		nullable:         col.AllowNull,
+		nullabilityKnown: col.nullabilityKnown,
+		scanType:         base.scanType,
+	}
+
+	switch dataType {
+	case types.CHAR, types.CHARZ:
+		if col.CharsetForm == 2 {
+			metadata.databaseTypeName = "NCHAR"
+		}
+	case types.NCHAR, types.VARCHAR:
+		if col.CharsetForm == 2 {
+			metadata.databaseTypeName = "NVARCHAR2"
+		}
+	case types.OCIClobLocator:
+		if col.CharsetForm == 2 {
+			metadata.databaseTypeName = "NCLOB"
+		}
+	}
+	if isUDTColumn(col, dataType) {
+		metadata.databaseTypeName = strings.ToUpper(col.TypeName)
+		metadata.scanType = col.udtScanType
+	} else if col.IsXmlType || strings.EqualFold(col.TypeName, "XMLTYPE") {
+		metadata.databaseTypeName = "XMLTYPE"
+	}
+	if col.IsJson {
+		metadata.databaseTypeName = "JSON"
+	}
+
+	switch base.lengthKind {
+	case columnLengthChars:
+		if col.MaxCharLen > 0 {
+			metadata.length = col.MaxCharLen
+			metadata.lengthKnown = true
+		} else if col.MaxLen > 0 {
+			metadata.length = col.MaxLen
+			metadata.lengthKnown = true
+		}
+	case columnLengthBytes:
+		if col.MaxLen > 0 {
+			metadata.length = col.MaxLen
+			metadata.lengthKnown = true
+		}
+	case columnLengthUnbounded:
+		metadata.length = math.MaxInt64
+		metadata.lengthKnown = true
+	}
+	if col.IsJson {
+		metadata.length = math.MaxInt64
+		metadata.lengthKnown = true
+	}
+	if isUDTColumn(col, dataType) {
+		metadata.length = 0
+		metadata.lengthKnown = false
+	}
+
+	if dataType == types.NUMBER && col.precisionScaleKnown {
+		if col.unconstrainedNumber {
+			metadata.precision = math.MaxInt64
+			metadata.scale = math.MaxInt64
+		} else {
+			metadata.precision = col.rawPrecision
+			metadata.scale = col.rawScale
+		}
+		metadata.precisionScaleOK = true
+	}
+
+	metadata.scanType = metadataScanType(col, dataType, metadata.scanType)
+	return metadata
+}
+
+func isUDTColumn(col *ParameterInfo, dataType uint16) bool {
+	return len(col.TypeName) > 0 && !strings.EqualFold(col.TypeName, "XMLTYPE") &&
+		(dataType == types.XMLType || dataType == types.OCIXMLType)
+}
+
+func metadataScanType(col *ParameterInfo, dataType uint16, scanType reflect.Type) reflect.Type {
+	switch dataType {
+	case types.OCIClobLocator:
+		if inlineLobColumn(col, dataType) || automaticLobColumn(col) {
+			return types.TyString
+		}
+		return reflect.TypeOf((*types.Clob)(nil))
+	case types.OCIBlobLocator:
+		if inlineLobColumn(col, dataType) || automaticLobColumn(col) {
+			return types.TyBytes
+		}
+		return reflect.TypeOf((*types.Blob)(nil))
+	case types.JSON:
+		if inlineLobColumn(col, dataType) {
+			return types.TyBytes
+		}
+		return reflect.TypeOf((*types.Json)(nil))
+	case types.VECTOR:
+		if inlineLobColumn(col, dataType) {
+			return types.TyBytes
+		}
+		if automaticLobColumn(col) {
+			switch col.VectorFormat {
+			case 2:
+				return reflect.TypeOf((*[]float32)(nil)).Elem()
+			case 3:
+				return reflect.TypeOf((*[]float64)(nil)).Elem()
+			case 4:
+				return types.TyBytes
+			default:
+				return nil
+			}
+		}
+		return reflect.TypeOf((*types.Vector)(nil))
+	case types.OCIFileLocator:
+		return reflect.TypeOf((*types.BFile)(nil))
+	default:
+		return scanType
+	}
+}
+
+func inlineLobColumn(col *ParameterInfo, dataType uint16) bool {
+	if dataType == types.OCIFileLocator || col.IsJson {
+		return false
+	}
+	if col.lobFetchKnown {
+		return col.lobFetch == configurations.INLINE
+	}
+	switch col.DataType {
+	case types.LongVarChar:
+		return dataType == types.OCIClobLocator
+	case types.LongRaw:
+		return dataType == types.OCIBlobLocator || dataType == types.VECTOR || dataType == types.JSON
+	}
+	return false
+}
+
+func automaticLobColumn(col *ParameterInfo) bool {
+	return !col.lobReadModeKnown || col.lobReadMode == configurations.LobReadMode_AUTO
+}
+
 // ColumnTypeDatabaseTypeName return Col DataType name
 func (resultSet *ResultSet) ColumnTypeDatabaseTypeName(index int) string {
-	return ""
-	//return (*resultSet.cols)[index].DataType.String()
+	return resultSet.columnMetadata(index).databaseTypeName
 }
 
 // ColumnTypeLength return length of column type
 func (resultSet *ResultSet) ColumnTypeLength(index int) (int64, bool) {
-	switch (*resultSet.cols)[index].DataType {
-	case types.NCHAR, types.CHAR:
-		return int64((*resultSet.cols)[index].MaxCharLen), true
-	}
-	return int64(0), false
+	metadata := resultSet.columnMetadata(index)
+	return metadata.length, metadata.lengthKnown
 }
 
 // ColumnTypeNullable return if column allow null or not
 func (resultSet *ResultSet) ColumnTypeNullable(index int) (nullable, ok bool) {
-	return (*resultSet.cols)[index].AllowNull, true
+	metadata := resultSet.columnMetadata(index)
+	return metadata.nullable, metadata.nullabilityKnown
 }
 
 // ColumnTypePrecisionScale return the precision and scale for numeric types
 func (resultSet *ResultSet) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
-	col := (*resultSet.cols)[index]
-	switch col.DataType {
-	case types.NUMBER:
-		return int64(col.Precision), int64(col.Scale), true
-	}
-	return int64(0), int64(0), false
+	metadata := resultSet.columnMetadata(index)
+	return metadata.precision, metadata.scale, metadata.precisionScaleOK
 }
 
 func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
-	col := (*resultSet.cols)[index]
-	switch col.DataType {
-	case types.NUMBER:
-		if col.Precision > 0 {
-			return types.TyFloat64
-		} else {
-			return types.TyInt64
-		}
-	case types.ROWID, types.UROWID:
-		fallthrough
-	case types.CHAR, types.NCHAR:
-		fallthrough
-	case types.OCIClobLocator:
-		fallthrough
-	case types.LongVarChar:
-		return types.TyString
-	case types.RAW:
-		fallthrough
-	case types.OCIBlobLocator, types.OCIFileLocator:
-		fallthrough
-	case types.LongRaw, types.LongVarRaw:
-		return types.TyBytes
-	case types.DATE, types.TIMESTAMP:
-		fallthrough
-	case types.TimeStampDTY:
-		fallthrough
-	case types.TimeStampLTZ, types.TimeStampLTZ_DTY:
-		fallthrough
-	case types.TIMESTAMPTZ, types.TimeStampTZ_DTY:
-		return types.TyTime
-	case types.IBFLOAT:
-		return types.TyFloat32
-	case types.IBDOUBLE:
-		return types.TyFloat64
-	case types.INTERVALDS_DTY, types.INTERVALYM_DTY:
-		return types.TyString
-	default:
-		return nil
-	}
+	return resultSet.columnMetadata(index).scanType
 }
 
 func (resultSet *ResultSet) Err() error {

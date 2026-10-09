@@ -38,6 +38,9 @@ type ServerAddr struct {
 	Protocol string
 	Addr     string
 	Port     int
+	// TLSServerName, if set, is used instead of Addr to verify the server
+	// certificate. It keeps the original host across a listener redirect.
+	TLSServerName string
 }
 
 type DatabaseInfo struct {
@@ -154,6 +157,11 @@ func (info *DatabaseInfo) UpdateDatabaseInfoForRedirect(redirectAddr string, rec
 	redirectAddr = strings.ReplaceAll(redirectAddr, "\n", "")
 	reconnectData = strings.ReplaceAll(reconnectData, "\r", "")
 	reconnectData = strings.ReplaceAll(reconnectData, "\n", "")
+	// Verify the certificate against the original host, not the redirect address.
+	var tlsServerName string
+	if current := info.GetActiveServer(false); current != nil {
+		tlsServerName = current.TLSHostName()
+	}
 	var err error
 	info.Servers, err = ExtractServers(redirectAddr)
 	if err != nil {
@@ -161,6 +169,9 @@ func (info *DatabaseInfo) UpdateDatabaseInfoForRedirect(redirectAddr string, rec
 	}
 	if len(info.Servers) == 0 {
 		return errors.New("no address passed in connection string")
+	}
+	for i := range info.Servers {
+		info.Servers[i].TLSServerName = tlsServerName
 	}
 	r, err := regexp.Compile(`(?i)\(\s*SERVICE_NAME\s*=\s*([\w.-]+)\s*\)`)
 	if err != nil {
@@ -206,6 +217,14 @@ func (serv *ServerAddr) IsEqual(input *ServerAddr) bool {
 
 func (serv *ServerAddr) NetworkAddr() string {
 	return net.JoinHostPort(serv.Addr, strconv.Itoa(serv.Port))
+}
+
+// TLSHostName returns TLSServerName if set, otherwise Addr.
+func (serv *ServerAddr) TLSHostName() string {
+	if len(serv.TLSServerName) > 0 {
+		return serv.TLSServerName
+	}
+	return serv.Addr
 }
 
 func (info *DatabaseInfo) ResetServerIndex() {

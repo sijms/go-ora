@@ -260,6 +260,18 @@ func (stmt *defaultStmt) writeDefine() error {
 					col.DataType = oraTypes.LongVarChar
 					// change data type in the original array
 					stmt.columns[index].DataType = oraTypes.LongVarChar
+					// Fetch CLOB text in the national character set when it is
+					// AL16UTF16: the server then sends the LOB's UTF-16 content
+					// as stored. Converting it to a variable-width client
+					// character set happens piece by piece on some servers
+					// (observed on 19.3), and a surrogate pair split across two
+					// pieces comes back as two U+FFFD.
+					if col.CharsetForm == 1 && stmt.connection.tcpNego.ServerNCharset == 2000 {
+						col.CharsetForm = 2
+						col.CharsetID = 2000
+						stmt.columns[index].CharsetForm = 2
+						stmt.columns[index].CharsetID = 2000
+					}
 				}
 			} else {
 				col.ContFlag |= 0x2000000

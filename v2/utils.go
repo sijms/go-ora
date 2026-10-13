@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -382,6 +383,86 @@ func isArrayValue(val interface{}) bool {
 	return false
 }
 
+// xmltype image flags (xml flag word is a bit mask)
+const (
+	objectImageNoPrefixSeg   = 0x04
+	objectImageIsDegenerate  = 0x10
+	objectImageLongLength    = 0xFE
+	xmlTypeLOB               = 0x0001
+	xmlTypeString            = 0x0004
+	xmlTypeFlagSkipNext4     = 0x100000
+	xmlTypeImageVersionBytes = 1
+)
+
+// parseXMLTypeImage return xml flag word and payload (xml text or clob locator)
+func parseXMLTypeImage(image []byte) (xmlFlag uint32, payload []byte, err error) {
+	errTruncated := fmt.Errorf("truncated XMLType image (%d bytes)", len(image))
+	index := 0
+	readByte := func() (byte, error) {
+		if index >= len(image) {
+			return 0, errTruncated
+		}
+		b := image[index]
+		index++
+		return b, nil
+	}
+	readUint32 := func() (uint32, error) {
+		if index+4 > len(image) {
+			return 0, errTruncated
+		}
+		v := binary.BigEndian.Uint32(image[index : index+4])
+		index += 4
+		return v, nil
+	}
+	readLength := func() (uint32, error) {
+		b, err := readByte()
+		if err != nil {
+			return 0, err
+		}
+		if b == objectImageLongLength {
+			return readUint32()
+		}
+		return uint32(b), nil
+	}
+	flags, err := readByte()
+	if err != nil {
+		return 0, nil, err
+	}
+	if _, err = readByte(); err != nil { // image version
+		return 0, nil, err
+	}
+	if _, err = readLength(); err != nil { // total image length
+		return 0, nil, err
+	}
+	if flags&objectImageIsDegenerate != 0 {
+		return 0, nil, errors.New("XMLType stored in a LOB image is not supported")
+	}
+	if flags&objectImageNoPrefixSeg == 0 {
+		prefixLength, err := readLength()
+		if err != nil {
+			return 0, nil, err
+		}
+		if uint64(index)+uint64(prefixLength) > uint64(len(image)) {
+			return 0, nil, errTruncated
+		}
+		index += int(prefixLength)
+	}
+	if index+xmlTypeImageVersionBytes > len(image) {
+		return 0, nil, errTruncated
+	}
+	index += xmlTypeImageVersionBytes
+	if xmlFlag, err = readUint32(); err != nil {
+		return 0, nil, err
+	}
+	if xmlFlag&xmlTypeFlagSkipNext4 != 0 {
+		if index+4 > len(image) {
+			return 0, nil, errTruncated
+		}
+		index += 4
+	}
+	return xmlFlag, image[index:], nil
+}
+
 func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]byte) error {
 	session := conn.session
 	if parent.parent == nil {
@@ -464,26 +545,18 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 			}
 			parent.oPrimValue = pars
 		case 0x85: // xmltype
-			_, err = session.GetByte() // represent 1
+			xmlFlag, value, err := parseXMLTypeImage(parent.BValue)
 			if err != nil {
 				return err
 			}
-			dataType, err := session.GetInt(4, false, true) // represent 0x14
-			if err != nil {
-				return err
-			}
-			value, err := session.GetBytes(len(parent.BValue) - 8)
-			if err != nil {
-				return err
-			}
-			switch dataType {
-			case 0x14:
+			switch {
+			case xmlFlag&xmlTypeString != 0:
 				conv, err := conn.getDefaultStrConv()
 				if err != nil {
 					return err
 				}
 				parent.oPrimValue = conv.Decode(value)
-			case 0x11:
+			case xmlFlag&xmlTypeLOB != 0:
 				lob := Lob{
 					sourceLocator: value,
 					sourceLen:     len(value),
@@ -496,6 +569,8 @@ func decodeObject(conn *Connection, parent *ParameterInfo, temporaryLobs *[][]by
 					return err
 				}
 				parent.oPrimValue = strValue
+			default:
+				return fmt.Errorf("unsupported XMLType image flags: 0x%X", xmlFlag)
 			}
 		case 0x84:
 			// pars := make([]ParameterInfo, 0, len(parent.cusType.attribs))

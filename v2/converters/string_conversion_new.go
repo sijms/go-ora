@@ -10484,7 +10484,7 @@ func NewStringConverter(langID int) IStringConverter {
 		return &StringConverter{
 			LangID:    830,
 			CharWidth: 3,
-			eReplace:  65533,
+			eReplace:  0x3F, // Oracle-side replacement: ASCII question mark.
 			dReplace:  41385,
 			dBuffer: []int{
 				256, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,
@@ -13300,7 +13300,7 @@ func NewStringConverter(langID int) IStringConverter {
 		return &StringConverter{
 			LangID:    831,
 			CharWidth: 3,
-			eReplace:  65533,
+			eReplace:  0x3F, // Oracle-side replacement: ASCII question mark.
 			dReplace:  41385,
 			dBuffer: []int{
 				256, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,
@@ -23948,7 +23948,7 @@ func NewStringConverter(langID int) IStringConverter {
 		return &StringConverter{
 			LangID:    837,
 			CharWidth: 2,
-			eReplace:  65533,
+			eReplace:  0x3F, // Oracle-side replacement: ASCII question mark.
 			dReplace:  63,
 			dBuffer: []int{
 				256, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,

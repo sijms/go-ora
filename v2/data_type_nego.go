@@ -82,7 +82,9 @@ func buildTypeNego(nego *TCPNego, session *network.Session) *DataTypeNego {
 		Server:      nego,
 		TypeAndRep:  make([]int16, bufferGrow),
 		CompileTimeCaps: []byte{
-			6, 1, 0, 0, 106, 1, 1, 11,
+			// index 4 (logon types): O5LOGON_NP | O5LOGON | O7LOGON | O8LOGON_LONG_IDENTIFIER |
+			// O9LOGON_LONG_PASSWORD (0x80); without 0x80 the server rejects passwords longer than 30 bytes
+			6, 1, 0, 0, 234, 1, 1, 11,
 			1, 1, 1, 1, 1, 1, 0, 41,
 			144, 3, 7, 3, 0, 1, 0, 235,
 			1, 0, 5, 1, 0, 0, 0, 24,

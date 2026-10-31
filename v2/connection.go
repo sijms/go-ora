@@ -91,6 +91,7 @@ type Connection struct {
 	State             ConnectionState
 	LogonMode         LogonMode
 	autoCommit        bool
+	inTransaction     bool
 	tracer            trace.Tracer
 	connOption        *configurations.ConnectionConfig
 	session           *network.Session
@@ -616,7 +617,8 @@ func (conn *Connection) getDBTimeZone() error {
 func (conn *Connection) Begin() (driver.Tx, error) {
 	conn.tracer.Print("Begin transaction")
 	conn.autoCommit = false
-	return &Transaction{conn: conn, ctx: context.Background()}, nil
+	conn.inTransaction = true
+	return &Transaction{conn: conn}, nil
 }
 
 func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
@@ -628,7 +630,8 @@ func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 	}
 	conn.tracer.Print("Begin transaction with context")
 	conn.autoCommit = false
-	return &Transaction{conn: conn, ctx: ctx}, nil
+	conn.inTransaction = true
+	return &Transaction{conn: conn}, nil
 }
 
 // NewConnection create a new connection from databaseURL string or configuration
@@ -671,9 +674,16 @@ func (conn *Connection) Close() (err error) {
 	tracer.Print("Close")
 	// var err error = nil
 	if conn.session != nil {
-		err = conn.Logoff()
-		if err != nil {
-			tracer.Print("Logoff with error: ", err)
+		if conn.inTransaction && !conn.rollbackOnClose() {
+			// Oracle commits the open transaction of a session that logs off and rolls back the transaction of a
+			// session whose connection ends without a logoff, so a transaction not rolled back here is left to the
+			// server by closing the connection without a logoff.
+			tracer.Print("Close without logoff: the open transaction was not rolled back")
+		} else {
+			err = conn.Logoff()
+			if err != nil {
+				tracer.Print("Logoff with error: ", err)
+			}
 		}
 		conn.session.Disconnect()
 		conn.session = nil
@@ -1331,6 +1341,34 @@ func (conn *Connection) processTCCResponse(msgCode uint8) error {
 
 func (conn *Connection) setBad() {
 	conn.bad = true
+}
+
+// endTransaction commits (0xE) or rolls back (0xF) the transaction open on the connection. When the call fails,
+// the transaction's state on the server is unknown: the connection is marked bad, so database/sql does not reuse
+// it and Close does not log off with the transaction open.
+func (conn *Connection) endTransaction(operationID uint8) error {
+	conn.autoCommit = true
+	conn.session.ResetBuffer()
+	err := (&simpleObject{connection: conn, operationID: operationID}).exec()
+	if err != nil {
+		conn.setBad()
+		return err
+	}
+	conn.inTransaction = false
+	return nil
+}
+
+// rollbackOnClose rolls back the transaction open on a connection being closed and reports whether it did. A
+// connection marked bad is not used: a reply read for the rollback could belong to an earlier call.
+func (conn *Connection) rollbackOnClose() bool {
+	if conn.bad || conn.State != Opened {
+		return false
+	}
+	if err := conn.endTransaction(0xF); err != nil {
+		conn.tracer.Print("Rollback on close with error: ", err)
+		return false
+	}
+	return true
 }
 
 // ResetSession decides responsible for resetting a connection. Part of a keepConnOnRollback condition to decide if to keep a transaction after rollback.

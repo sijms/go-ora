@@ -382,6 +382,8 @@ func (session *Session) ResetBreak() {
 
 // IsBreak tell if the connection break elicit
 func (session *Session) IsBreak() bool {
+	session.mu.Lock()
+	defer session.mu.Unlock()
 	return session.breakConn
 }
 

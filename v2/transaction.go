@@ -1,33 +1,26 @@
 package go_ora
 
 import (
-	"context"
 	"database/sql/driver"
 )
 
 type Transaction struct {
 	conn *Connection
-	ctx  context.Context
 }
 
+// Commit and Rollback run without a context watcher. database/sql rolls a transaction back from Tx.awaitDone
+// because the transaction's context is done, so a watcher on that context breaks the rollback it is running, or,
+// when the break arrives after the rollback has finished, the next call on the connection (ORA-01013).
 func (tx *Transaction) Commit() error {
 	if tx.conn.State != Opened {
 		return driver.ErrBadConn
 	}
-	tx.conn.autoCommit = true
-	tx.conn.session.ResetBuffer()
-	done := tx.conn.session.StartContext(tx.ctx)
-	defer tx.conn.session.EndContext(done)
-	return (&simpleObject{connection: tx.conn, operationID: 0xE}).exec()
+	return tx.conn.endTransaction(0xE)
 }
 
 func (tx *Transaction) Rollback() error {
 	if tx.conn.State != Opened {
 		return driver.ErrBadConn
 	}
-	tx.conn.autoCommit = true
-	tx.conn.session.ResetBuffer()
-	done := tx.conn.session.StartContext(tx.ctx)
-	defer tx.conn.session.EndContext(done)
-	return (&simpleObject{connection: tx.conn, operationID: 0xF}).exec()
+	return tx.conn.endTransaction(0xF)
 }

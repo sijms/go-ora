@@ -138,6 +138,7 @@ type ConnectionProperties struct {
 type OracleConnector struct {
 	drv           *OracleDriver
 	connectString string
+	config        *configurations.ConnectionConfig
 	dialer        configurations.DialerContext
 	tlsConfig     *tls.Config
 	kerberos      configurations.KerberosAuthInterface
@@ -148,13 +149,34 @@ func NewConnector(connString string) driver.Connector {
 	return &OracleConnector{connectString: connString, drv: NewDriver()}
 }
 
+// NewConnectorWithConfig creates a connector from a ConnectionConfig rather
+// than from a connection string, so settings that would otherwise have to be
+// spliced into a URL can be set as fields. The common case is credentials: a
+// password set on the config never needs to exist inside a connection string,
+// which is useful where that string may be logged or formatted into an error.
+//
+// RegisterConnConfig also takes a ConnectionConfig, but assigns it to the
+// package level driver, so every pool in the process shares it and the last
+// caller wins. This keeps the config on the connector, which lets one process
+// open several databases with different configurations.
+func NewConnectorWithConfig(config *configurations.ConnectionConfig) driver.Connector {
+	return &OracleConnector{config: config, drv: NewDriver()}
+}
+
 func (driver *OracleDriver) OpenConnector(connString string) (driver.Connector, error) {
 	// create hash from connection string
 	return &OracleConnector{drv: driver, connectString: connString}, nil
 }
 
 func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	conn, err := NewConnection(connector.connectString, connector.drv.connOption)
+	// A config supplied to this connector takes precedence over the driver
+	// wide one from RegisterConnConfig. NewConnection ignores the config when
+	// connectString is set, which is what NewConnector produces.
+	config := connector.drv.connOption
+	if connector.config != nil {
+		config = connector.config
+	}
+	conn, err := NewConnection(connector.connectString, config)
 	if err != nil {
 		return nil, err
 	}

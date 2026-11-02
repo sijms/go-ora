@@ -3,6 +3,11 @@ name: PR check
 on:
   pull_request:
 
+permissions:
+  contents: read
+  # golangci-lint's only-new-issues reads the pull request diff
+  pull-requests: read
+
 jobs:
   test:
     name: basic check

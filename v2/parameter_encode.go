@@ -31,20 +31,11 @@ func (par *ParameterInfo) setDataType(conn *Connection, goType reflect.Type, dat
 		return nil
 	}
 	switch goType {
-	case tyString, tyNullString:
-		par.DataType = NCHAR
-		par.CharsetForm = 1
-		par.ContFlag = 16
-		par.CharsetID = conn.getDefaultCharsetID()
+	case tyString, tyNullString, tyNVarChar, tyNullNVarChar:
+		par.setStringType(conn, goType)
 		return nil
-	case tyTime, tyNullTime:
-		if par.Flag&0x40 > 0 {
-			par.DataType = DATE
-			par.MaxLen = converters.MAX_LEN_DATE
-		} else {
-			par.DataType = TimeStampTZ_DTY
-			par.MaxLen = converters.MAX_LEN_TIMESTAMP
-		}
+	case tyTime, tyNullTime, tyTimeStamp, tyNullTimeStamp, tyTimeStampTZ, tyNullTimeStampTZ:
+		par.setTimeType(goType)
 		return nil
 	case tyBytes:
 		par.DataType = RAW
@@ -709,4 +700,32 @@ func (par *ParameterInfo) encodeValue(size int, connection *Connection) error {
 		}
 	}
 	return nil
+}
+
+// setStringType sends NVarChar in the national charset so text outside the database charset survives.
+func (par *ParameterInfo) setStringType(conn *Connection, goType reflect.Type) {
+	par.DataType = NCHAR
+	par.ContFlag = 16
+	if goType == tyNVarChar || goType == tyNullNVarChar {
+		par.CharsetForm = 2
+		par.CharsetID = conn.tcpNego.ServernCharset
+		return
+	}
+	par.CharsetForm = 1
+	par.CharsetID = conn.getDefaultCharsetID()
+}
+
+// setTimeType keeps TimeStamp as TIMESTAMP; a plain time.Time goes as TIMESTAMP WITH TIME ZONE unless bound as DATE.
+func (par *ParameterInfo) setTimeType(goType reflect.Type) {
+	switch {
+	case goType == tyTimeStamp || goType == tyNullTimeStamp:
+		par.DataType = TIMESTAMP
+		par.MaxLen = converters.MAX_LEN_DATE
+	case par.Flag&0x40 > 0:
+		par.DataType = DATE
+		par.MaxLen = converters.MAX_LEN_DATE
+	default:
+		par.DataType = TimeStampTZ_DTY
+		par.MaxLen = converters.MAX_LEN_TIMESTAMP
+	}
 }

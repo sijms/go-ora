@@ -12,6 +12,7 @@ import (
 
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -125,8 +126,16 @@ func (resultSet *ResultSet) Trace(t trace.Tracer) {
 
 // ColumnTypeDatabaseTypeName return Col DataType name
 func (resultSet *ResultSet) ColumnTypeDatabaseTypeName(index int) string {
-	return ""
-	//return (*resultSet.cols)[index].DataType.String()
+	return oracleTypeName((*resultSet.cols)[index].DataType)
+}
+
+// oracleTypeName gives the same names as v2's TNSType.String(), which v3 cannot
+// attach as a method because its data type codes are plain uint16.
+func oracleTypeName(code uint16) string {
+	if name, ok := _OracleType_map[code]; ok {
+		return name
+	}
+	return "TNSType(" + strconv.Itoa(int(code)) + ")"
 }
 
 // ColumnTypeLength return length of column type

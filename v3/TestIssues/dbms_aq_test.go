@@ -1,8 +1,10 @@
 package TestIssues
 
 import (
-	"github.com/sijms/go-ora/dbms"
+	"bytes"
 	"testing"
+
+	"github.com/sijms/go-ora/v3/aq"
 )
 
 func TestDBMSAQ(t *testing.T) {
@@ -17,41 +19,49 @@ func TestDBMSAQ(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	aq := dbms.NewAQ(db, "GO_ORA_QU", "RAW")
-	err = aq.Create()
+	err = execCmd(db, `BEGIN
+	DBMS_AQADM.CREATE_QUEUE_TABLE(queue_table => 'GO_ORA_QT', queue_payload_type => 'RAW');
+	DBMS_AQADM.CREATE_QUEUE(queue_name => 'GO_ORA_QU', queue_table => 'GO_ORA_QT');
+	DBMS_AQADM.START_QUEUE(queue_name => 'GO_ORA_QU');
+END;`)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	defer func() {
-		err = aq.Drop()
+		err = execCmd(db, `BEGIN
+	DBMS_AQADM.STOP_QUEUE(queue_name => 'GO_ORA_QU');
+	DBMS_AQADM.DROP_QUEUE(queue_name => 'GO_ORA_QU');
+	DBMS_AQADM.DROP_QUEUE_TABLE(queue_table => 'GO_ORA_QT');
+END;`)
 		if err != nil {
 			t.Error(err)
 		}
 	}()
-	err = aq.Start(true, true)
+	queue, err := aq.CreateQueue(db, "GO_ORA_QU", aq.RAW, "")
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer func() {
-		err = aq.Stop(true, true)
-		if err != nil {
-			t.Error(err)
-		}
-	}()
-	messageID, err := aq.Enqueue([]byte("this is a test"))
+	queue.SetAutoCommit(true)
+	expected := []byte("this is a test")
+	message, err := queue.NewMessage(expected)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	t.Log("Enqueue message ID: ", messageID)
-	var output []byte
-	messageID, err = aq.Dequeue(&output, 100)
+	err = queue.Enqueue(message)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	t.Log("Dequeue message ID: ", messageID)
-	t.Log("message: ", string(output))
+	output, err := queue.Dequeue(aq.DefaultDequeueOptions())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	got, ok := output.Payload.([]byte)
+	if !ok || !bytes.Equal(got, expected) {
+		t.Errorf("expected payload %q and got %#v", expected, output.Payload)
+	}
 }

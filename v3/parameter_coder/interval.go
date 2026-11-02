@@ -7,6 +7,8 @@ import (
 
 type IntervalParameter struct {
 	BasicParameter
+	// column precision and scale, set for result columns so Decode prints the column's width
+	Precision, Scale uint8
 }
 
 func (param *IntervalParameter) Copy() OracleParameterCoder {
@@ -40,6 +42,7 @@ func (param *IntervalParameter) Encode(input interface{}, _ IConnection) error {
 func (param *IntervalParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder := &types.Interval{}
 	decoder.SetBytes(param.BValue)
+	decoder.SetPrecisionScale(param.Precision, param.Scale)
 	return decoder.Value()
 }
 

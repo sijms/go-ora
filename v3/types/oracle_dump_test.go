@@ -1,8 +1,9 @@
-package converters
+package types
 
 import (
 	"math/big"
 	"testing"
+	"time"
 )
 
 /*
@@ -33,7 +34,7 @@ func TestBinaryFloat(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		v := ConvertBinaryFloat(c.raw)
+		v := decodeTestValue(t, &Number{}, IBFLOAT, c.raw).(float32)
 		if v != c.expected {
 			t.Errorf("expected %v, got %v", c.expected, v)
 		}
@@ -72,7 +73,7 @@ func TestBinaryDouble(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		v := ConvertBinaryDouble(c.raw)
+		v := decodeTestValue(t, &Number{}, IBDOUBLE, c.raw).(float64)
 		if v != c.expected {
 			t.Errorf("expected %v, got %v", c.expected, v)
 		}
@@ -147,7 +148,7 @@ func TestIntervalYM(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		v := ConvertIntervalYM_DTY(c.raw)
+		v := decodeTestValue(t, &Interval{}, INTERVALYM_DTY, c.raw)
 		if v != c.expected {
 			t.Errorf("expected %v, got %v", c.expected, v)
 		}
@@ -207,9 +208,35 @@ func TestIntervalDS(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		v := ConvertIntervalDS_DTY(c.raw)
+		v := decodeTestValue(t, &Interval{}, INTERVALDS_DTY, c.raw)
 		if v != c.expected {
 			t.Errorf("expected %v, got %v", c.expected, v)
 		}
+	}
+}
+
+// decodeTestValue decodes raw wire bytes the way a fetched column is decoded.
+func decodeTestValue(t *testing.T, value interface {
+	SetDataType(uint16)
+	SetBytes([]byte)
+	Value() (interface{}, error)
+}, dataType uint16, raw []byte) interface{} {
+	t.Helper()
+	value.SetDataType(dataType)
+	value.SetBytes(raw)
+	ret, err := value.Value()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ret
+}
+
+func TestDecodeDate(t *testing.T) {
+	// TIMESTAMP WITH TIME ZONE bytes sent by the server for 2024-01-08 19:34:49.6863868 +03:00
+	data := []byte{0x78, 0x7C, 0x01, 0x08, 0x11, 0x23, 0x32, 0x28, 0xE9, 0x6E, 0x70, 0x84, 0x80}
+	date := decodeTestValue(t, &Date{}, TimeStampTZ_DTY, data).(time.Time)
+	want := time.Date(2024, 1, 8, 16, 34, 49, 686386800, time.UTC)
+	if !date.Equal(want) {
+		t.Errorf("expected %v and got %v", want, date)
 	}
 }

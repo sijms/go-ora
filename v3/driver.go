@@ -130,12 +130,16 @@ func (driver *OracleDriver) init() {
 	driver.goTypeCoder[types.TyNullInt64] = &parameter_coder.NumberParameter{}
 	driver.goTypeCoder[types.TyNullFloat64] = &parameter_coder.NumberParameter{}
 	driver.goTypeCoder[types.TyNumber] = &parameter_coder.NumberParameter{}
+	driver.goTypeCoder[types.TyBool] = &parameter_coder.NumberParameter{}
+	driver.goTypeCoder[types.TyNullBool] = &parameter_coder.NumberParameter{}
 
 	driver.goTypeCoder[types.TyBoolean] = &parameter_coder.BoolParameter{}
 
 	driver.goTypeCoder[types.TyTime] = &parameter_coder.DateParameter{}
 	driver.goTypeCoder[types.TyNullTime] = &parameter_coder.DateParameter{}
 	driver.goTypeCoder[types.TyDate] = &parameter_coder.DateParameter{}
+	driver.goTypeCoder[reflect.TypeOf(TimeStampTZ{})] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
+	driver.goTypeCoder[reflect.TypeOf(NullTimeStampTZ{})] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
 
 	driver.goTypeCoder[types.TyInterval] = &parameter_coder.IntervalParameter{}
 

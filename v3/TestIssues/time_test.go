@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/sijms/go-ora/v3/types"
 )
 
 func TestTime(t *testing.T) {
@@ -23,8 +25,10 @@ CREATE TABLE TTB_TIME(
 	var date = time.Now()
 	loc, _ := time.LoadLocation("Asia/Shanghai")
 	var insert = func(db *sql.DB) error {
+		// v3 binds a plain time.Time as DATE so that indexes on DATE columns stay usable;
+		// the timestamp columns need an explicit type to keep fractional seconds and zone.
 		_, err := db.Exec("INSERT INTO TTB_TIME(ID, DATE1, DATE2, DATE3, DATE4) VALUES(:1, :2, :3, :4, :5)",
-			1, date, date, date.In(loc), date)
+			1, date, types.NewTimeStamp(date), types.NewTimeStampTZ(date.In(loc)), types.NewTimeStampTZ(date))
 		return err
 	}
 	var query = func(db *sql.DB) error {

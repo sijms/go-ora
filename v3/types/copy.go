@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 )
@@ -66,9 +67,14 @@ func defaultCopy(dest reflect.Value, src any) error {
 		dest.Set(reflect.ValueOf(src))
 		return nil
 	}
-	if dest.CanConvert(reflect.TypeOf(src)) {
-		dest.Set(reflect.ValueOf(src))
+	srcValue := reflect.ValueOf(src)
+	if dest.Kind() == reflect.String && srcValue.IsValid() && tNumber(srcValue.Type()) {
+		dest.SetString(numberToString(srcValue))
 		return nil
+	}
+	// requiring both directions keeps lossy conversions like int64 -> string out
+	if srcValue.IsValid() && dest.CanConvert(srcValue.Type()) && srcValue.CanConvert(dest.Type()) {
+		return setConverted(dest, srcValue)
 	}
 
 	return fmt.Errorf("can't copy value of type %T into type %v", src, dest.Type().String())
@@ -242,3 +248,58 @@ func createNewType(dstValue reflect.Value, dstType reflect.Type) error {
 //		temp.data = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}
 //	}
 //}
+
+func setConverted(dest, src reflect.Value) error {
+	if numericOverflows(dest, src) {
+		return fmt.Errorf("value %v overflows type %v", src.Interface(), dest.Type())
+	}
+	dest.Set(src.Convert(dest.Type()))
+	return nil
+}
+
+// numericOverflows reports whether converting src into dest would wrap around
+// or overflow. Dropping a fraction is allowed, as v2's getInt does.
+func numericOverflows(dest, src reflect.Value) bool {
+	switch {
+	case dest.CanInt():
+		return intOverflows(dest, src)
+	case dest.CanUint():
+		return uintOverflows(dest, src)
+	case dest.CanFloat() && src.CanFloat():
+		return dest.OverflowFloat(src.Float())
+	}
+	return false
+}
+
+func intOverflows(dest, src reflect.Value) bool {
+	switch {
+	case src.CanInt():
+		return dest.OverflowInt(src.Int())
+	case src.CanUint():
+		return src.Uint() > math.MaxInt64 || dest.OverflowInt(int64(src.Uint()))
+	case src.CanFloat():
+		f := math.Trunc(src.Float())
+		return !(f >= math.MinInt64 && f < math.MaxInt64) || dest.OverflowInt(int64(f))
+	}
+	return false
+}
+
+func uintOverflows(dest, src reflect.Value) bool {
+	switch {
+	case src.CanInt():
+		return src.Int() < 0 || dest.OverflowUint(uint64(src.Int()))
+	case src.CanUint():
+		return dest.OverflowUint(src.Uint())
+	case src.CanFloat():
+		f := math.Trunc(src.Float())
+		return !(f >= 0 && f < math.MaxUint64) || dest.OverflowUint(uint64(f))
+	}
+	return false
+}
+
+func numberToString(value reflect.Value) string {
+	if tFloat(value.Type()) {
+		return fmt.Sprintf("%f", value.Float())
+	}
+	return fmt.Sprint(value.Interface())
+}

@@ -1804,35 +1804,11 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			if fieldValue.Kind() != reflect.Ptr {
 				return nil, errors.New("output parameter should be pointer type")
 			}
-			fieldValue = fieldValue.Elem()
-			if par.ArraySize > 0 {
-				//if pars, ok := par.oPrimValue.([]ParameterInfo); ok {
-				//	err = setArray(fieldValue, pars)
-				//	if err != nil {
-				//		return nil, err
-				//	}
-				//}
-			} else {
-				// check if LobReadMode is auto so auto read all lobs
-				if stmt.connection.connOption.LobReadMode == configurations.LobReadMode_AUTO {
-					if lob, ok := par.oPrimValue.(oraTypes.Lob); ok {
-						err = lob.Read(context.Background())
-						if err != nil {
-							return nil, err
-						}
-					}
+			if stmt.connection.connOption.LobReadMode == configurations.LobReadMode_AUTO {
+				err = readOutputLobs(par.oPrimValue)
+				if err != nil {
+					return nil, err
 				}
-				// reading of blob
-				//err = copy_(par.Value, par.oPrimValue)
-				//if err != nil {
-				//	return nil, err
-				//}
-				//continue
-				//err = setFieldValue(fieldValue, par.cusType, par.oPrimValue)
-				//if err != nil {
-				//	return nil, err
-				//}
-
 			}
 			err = oraTypes.Copy(par.Value, par.oPrimValue)
 			if err != nil {
@@ -2179,107 +2155,80 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 }
 
 func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
-	var err error
 	// convert from go-ora primitives to sql primitives
 	for rowIndex, row := range resultSet.rows {
 		for colIndex, _ := range stmt.columns {
 			if row == nil {
 				continue
 			}
-			switch val := row[colIndex].(type) {
-			case *RefCursor:
-				resultSet.rows[rowIndex][colIndex], err = val.Query()
-				if err != nil {
-					return err
-				}
-			//case sql.NullTime:
-			//	if val.Valid {
-			//		resultSet.rows[rowIndex][colIndex] = val.Time
-			//	} else {
-			//		resultSet.rows[rowIndex][colIndex] = nil
-			//	}
-			case *oraTypes.Vector:
-				if stmt.connection.connOption.Lob == configurations.INLINE {
-					resultSet.rows[rowIndex][colIndex], err = val.Value()
-					if err != nil {
-						return err
-					}
-				} else {
-					if val.GetReadMode() == configurations.LobReadMode_AUTO {
-						err = val.Read(context.Background())
-						if err != nil {
-							return err
-						}
-						resultSet.rows[rowIndex][colIndex], err = val.Value()
-						if err != nil {
-							return err
-						}
-					}
-				}
-			case *oraTypes.Clob:
-				if val.GetReadMode() == configurations.LobReadMode_AUTO {
-					err = val.Read(context.Background())
-					if err != nil {
-						return err
-					}
-					resultSet.rows[rowIndex][colIndex], err = val.Value()
-					if err != nil {
-						return err
-					}
-					//data := val.Data()
-					//if data.Valid {
-					//	resultSet.rows[rowIndex][colIndex] = data.String
-					//} else {
-					//	resultSet.rows[rowIndex][colIndex] = nil
-					//}
-					//if err != nil {
-					//	return err
-					//}
-				}
-			case *oraTypes.Blob:
-				if val.GetReadMode() == configurations.LobReadMode_AUTO {
-					err = val.Read(context.Background())
-					if err != nil {
-						return err
-					}
-					resultSet.rows[rowIndex][colIndex], err = val.Value()
-					if err != nil {
-						return err
-					}
-				}
-				//case LobStream:
-				//	if col.DataType == oraTypes.OCIClobLocator {
-				//		tempString := sql.NullString{String: "", Valid: false}
-				//		err = setLob(reflect.ValueOf(&tempString).Elem(), val)
-				//		if err != nil {
-				//			return err
-				//		}
-				//		if tempString.Valid {
-				//			resultSet.rows[rowIndex][colIndex] = tempString.String
-				//		} else {
-				//			resultSet.rows[rowIndex][colIndex] = nil
-				//		}
-				//	} else {
-				//		var tempByte []byte
-				//		err = setLob(reflect.ValueOf(&tempByte).Elem(), val)
-				//		if err != nil {
-				//			return err
-				//		}
-				//		resultSet.rows[rowIndex][colIndex] = tempByte
-				//	}
-				//case []ParameterInfo:
-				//	if col.cusType != nil {
-				//		tempObject := reflect.New(col.cusType.typ)
-				//		err = setUDTObject(tempObject.Elem(), col.cusType, val)
-				//		if err != nil {
-				//			return err
-				//		}
-				//		resultSet.rows[rowIndex][colIndex] = tempObject.Elem().Interface()
-				//	}
+			value, replace, err := stmt.primToSQL(row[colIndex])
+			if err != nil {
+				return err
+			}
+			if replace {
+				resultSet.rows[rowIndex][colIndex] = value
 			}
 		}
 	}
 	return nil
+}
+
+type rowLob interface {
+	IsNil() bool
+	GetReadMode() configurations.LobReadMode
+	Read(ctx context.Context) error
+	Value() (interface{}, error)
+}
+
+// primToSQL converts one go-ora primitive into the value database/sql receives;
+// replace is false when the primitive is passed through unchanged.
+func (stmt *defaultStmt) primToSQL(prim interface{}) (value interface{}, replace bool, err error) {
+	switch val := prim.(type) {
+	case *RefCursor:
+		value, err = val.Query()
+		return value, true, err
+	case *oraTypes.Vector:
+		if stmt.connection.connOption.Lob == configurations.INLINE && !val.IsNil() {
+			value, err = val.Value()
+			return value, true, err
+		}
+		return readLobValue(val)
+	case rowLob:
+		return readLobValue(val)
+	}
+	return nil, false, nil
+}
+
+// readOutputLobs reads every LOB in an output parameter value, including the elements
+// of arrays and collections, which the server returns as locators only.
+func readOutputLobs(value interface{}) error {
+	switch val := value.(type) {
+	case oraTypes.Lob:
+		return val.Read(context.Background())
+	case []interface{}:
+		for _, item := range val {
+			if err := readOutputLobs(item); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// readLobValue reads a fetched LOB when LOB READ is AUTO. A NULL LOB has no locator
+// and is reported as nil whatever the read mode, so database/sql can scan it into NullString etc.
+func readLobValue(lob rowLob) (interface{}, bool, error) {
+	if lob.IsNil() {
+		return nil, true, nil
+	}
+	if lob.GetReadMode() != configurations.LobReadMode_AUTO {
+		return nil, false, nil
+	}
+	if err := lob.Read(context.Background()); err != nil {
+		return nil, false, err
+	}
+	value, err := lob.Value()
+	return value, true, err
 }
 
 // Query execute a query command and return dataset object in form of driver.Rows interface

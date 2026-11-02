@@ -108,3 +108,12 @@ func (val *NullTimeStamp) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+// isDriverEncodedValuer reports values whose Value() returns themselves; database/sql would reject them, so the driver encodes them as TIMESTAMP.
+func isDriverEncodedValuer(value driver.Value) bool {
+	switch value.(type) {
+	case TimeStamp, NullTimeStamp, *TimeStamp, *NullTimeStamp:
+		return true
+	}
+	return false
+}

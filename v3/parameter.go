@@ -446,6 +446,9 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 		return err
 	}
 	decoder.SetParameterInfo(par.GetParameterInfo())
+	if interval, ok := decoder.(*parameter_coder.IntervalParameter); ok {
+		interval.Precision, interval.Scale = par.Precision, par.Scale
+	}
 	if par.isLobType() {
 		streamer := &LobStream{conn: conn}
 		decoder.SetLobStreamer(streamer)

@@ -1114,7 +1114,7 @@ func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driv
 }
 
 func (conn *Connection) CheckNamedValue(nv *driver.NamedValue) error {
-	if _, ok := nv.Value.(driver.Valuer); ok {
+	if _, ok := nv.Value.(driver.Valuer); ok && !isDriverEncodedValuer(nv.Value) {
 		return driver.ErrSkip
 	}
 

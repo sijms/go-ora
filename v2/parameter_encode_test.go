@@ -7,10 +7,16 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/sijms/go-ora/v2/converters"
 )
 
 var (
-	conn      = &Connection{tcpNego: &TCPNego{ServernCharset: 870, ServerCharset: 0x230}}
+	conn = &Connection{
+		tcpNego:  &TCPNego{ServernCharset: 870, ServerCharset: 0x230},
+		sStrConv: converters.NewStringConverter(0x230),
+		nStrConv: converters.NewStringConverter(870),
+	}
 	expNilPar = ParameterInfo{
 		DataType: NCHAR,
 		Flag:     3,
@@ -352,7 +358,7 @@ func TestEncodeValue(t *testing.T) {
 		return
 	}
 
-	timeVal := time.Date(2023, 5, 28, 23, 38, 11, 500, time.Local)
+	timeVal := time.Date(2023, 5, 28, 23, 38, 11, 500, time.FixedZone("", 0))
 	par.Value = timeVal
 	conn.dataNego = &DataTypeNego{
 		clientTZVersion: 1,

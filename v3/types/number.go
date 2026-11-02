@@ -579,6 +579,24 @@ func (number *Number) encodeString(input string) error {
 	number.bValue, err = number.encode(mantissa, exp, negative)
 	return err
 }
+
+// boolAsNumberInput maps bool and sql.NullBool to 1, 0 or nil, the NUMBER values v2 sent for a Go bool.
+func boolAsNumberInput(input interface{}) interface{} {
+	switch value := input.(type) {
+	case bool:
+		if value {
+			return int64(1)
+		}
+		return int64(0)
+	case sql.NullBool:
+		if !value.Valid {
+			return nil
+		}
+		return boolAsNumberInput(value.Bool)
+	}
+	return input
+}
+
 func (number *Number) SetValue(input interface{}) error {
 	var err error
 	defer func(input *Number) {
@@ -586,6 +604,7 @@ func (number *Number) SetValue(input interface{}) error {
 			input.dataType = NUMBER
 		}
 	}(number)
+	input = boolAsNumberInput(input)
 	if input == nil {
 		number.bValue = nil
 		return nil

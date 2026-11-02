@@ -2,7 +2,6 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/sijms/go-ora/v3"
 	"testing"
 )
 
@@ -43,7 +42,7 @@ func TestEmoji(t *testing.T) {
 	expectedValue := "😁🍎$➔®≧①◎◉§❤️🇨🇳"
 	var got string
 	var id int
-	_, err = db.Exec("INSERT INTO TEST_EMOJI(ID, CONTENT) VALUES(1, :1)", go_ora.NClob{String: expectedValue, Valid: true})
+	_, err = db.Exec("INSERT INTO TEST_EMOJI(ID, CONTENT) VALUES(1, :1)", clobOf(expectedValue, true))
 	if err != nil {
 		t.Error(err)
 		return

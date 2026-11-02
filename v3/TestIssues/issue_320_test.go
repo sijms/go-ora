@@ -4,13 +4,14 @@ import (
 	"context"
 	"database/sql"
 	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"testing"
 )
 
 func TestIssue320(t *testing.T) {
 	type Mat struct {
 		Id       sql.NullString
-		Response go_ora.Clob
+		Response types.Clob
 	}
 	var MatCol = func(colname string, mat *Mat) interface{} {
 		switch colname {

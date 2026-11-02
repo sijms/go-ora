@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"strings"
 	"testing"
 	"time"
@@ -86,12 +87,12 @@ BEGIN
 	:output3 := p_int_array;
 	:output4 := p_date_array;
 	:output6 := p_raw_array;
-end;`, go_ora.NVarChar("안녕하세요AAA_"),
-			go_ora.Out{Dest: go_ora.Object{Name: "SLICE", Value: &output}},
-			go_ora.Out{Dest: go_ora.Object{Name: "SLICE2", Value: &output2}},
-			go_ora.Out{Dest: go_ora.Object{Name: "IntArray", Value: &output3}},
-			go_ora.Out{Dest: go_ora.Object{Name: "DateArray", Value: &output4}},
-			go_ora.Out{Dest: go_ora.Object{Name: "ByteArray", Value: &output6}},
+end;`, nvarcharOf("안녕하세요AAA_"),
+			go_ora.Out{Dest: types.Object{Name: "SLICE", Value: &output}},
+			go_ora.Out{Dest: types.Object{Name: "SLICE2", Value: &output2}},
+			go_ora.Out{Dest: types.Object{Name: "IntArray", Value: &output3}},
+			go_ora.Out{Dest: types.Object{Name: "DateArray", Value: &output4}},
+			go_ora.Out{Dest: types.Object{Name: "ByteArray", Value: &output6}},
 		)
 		if err != nil {
 			return err
@@ -156,9 +157,9 @@ end;`, go_ora.NVarChar("안녕하세요AAA_"),
 			input4, output4 []sql.NullTime
 			//input5, output5 []sql.NullTime
 			input6, output6 [][]byte
-			input7, output7 []go_ora.Blob
-			input8, output8 []go_ora.Clob
-			input9, output9 []go_ora.NClob
+			input7, output7 []types.Blob
+			input8, output8 []types.Clob
+			input9, output9 []types.Clob
 		)
 		// fill input arrays
 		input1 = make([]sql.NullString, length)
@@ -167,9 +168,9 @@ end;`, go_ora.NVarChar("안녕하세요AAA_"),
 		input4 = make([]sql.NullTime, length)
 		//input5 = make([]sql.NullTime, length)
 		input6 = make([][]byte, length)
-		input7 = make([]go_ora.Blob, length)
-		input8 = make([]go_ora.Clob, length)
-		input9 = make([]go_ora.NClob, length)
+		input7 = make([]types.Blob, length)
+		input8 = make([]types.Clob, length)
+		input9 = make([]types.Clob, length)
 		for x := 0; x < length; x++ {
 			if x%5 == 0 {
 				input1[x] = sql.NullString{"", false}
@@ -178,9 +179,9 @@ end;`, go_ora.NVarChar("안녕하세요AAA_"),
 				input4[x] = sql.NullTime{Valid: false}
 				//input5[x] = sql.NullTime{Valid: false}
 				input6[x] = nil
-				input7[x] = go_ora.Blob{Data: nil}
-				input8[x] = go_ora.Clob{Valid: false}
-				input9[x] = go_ora.NClob{Valid: false}
+				input7[x] = types.Blob{}
+				input8[x] = types.Clob{}
+				input9[x] = types.Clob{String: types.String{UseNCharset: true}}
 			} else {
 				input1[x] = sql.NullString{"varchar_", true}
 				input2[x] = sql.NullString{"안녕하세요AAA_", true}
@@ -188,9 +189,9 @@ end;`, go_ora.NVarChar("안녕하세요AAA_"),
 				input4[x] = sql.NullTime{time.Date(2024, 11, 11, 11, 11, 11, 11, time.UTC), true}
 				//input5[x] = sql.NullTime{Time: time.Now(), Valid: true}
 				input6[x] = []byte("test_")
-				input7[x] = go_ora.Blob{Data: []byte("BLOB")}
-				input8[x] = go_ora.Clob{String: "CLOB_", Valid: true}
-				input9[x] = go_ora.NClob{String: "NCLOB_안녕하세요AAA", Valid: true}
+				input7[x] = blobOf([]byte("BLOB"))
+				input8[x] = clobOf("CLOB_", false)
+				input9[x] = clobOf("NCLOB_안녕하세요AAA", true)
 			}
 		}
 		_, err := db.Exec(`
@@ -244,25 +245,25 @@ BEGIN
 	:output8 := p8;
 	:output9 := p9;
 END;`, length,
-			go_ora.Object{Name: "SLICE", Value: input1},
-			go_ora.Object{Name: "SLICE2", Value: input2},
-			go_ora.Object{Name: "IntArray", Value: input3},
-			go_ora.Object{Name: "DateArray", Value: input4},
-			//go_ora.Object{Name: "ZoneArray", Value: input5},
-			go_ora.Object{Name: "ByteArray", Value: input6},
-			go_ora.Object{Name: "BlobArray", Value: input7},
-			go_ora.Object{Name: "ClobArray", Value: input8},
-			go_ora.Object{Name: "NClobArray", Value: input9},
+			types.Object{Name: "SLICE", Value: input1},
+			types.Object{Name: "SLICE2", Value: input2},
+			types.Object{Name: "IntArray", Value: input3},
+			types.Object{Name: "DateArray", Value: input4},
+			//types.Object{Name: "ZoneArray", Value: input5},
+			types.Object{Name: "ByteArray", Value: input6},
+			types.Object{Name: "BlobArray", Value: input7},
+			types.Object{Name: "ClobArray", Value: input8},
+			types.Object{Name: "NClobArray", Value: input9},
 
-			go_ora.Object{Name: "SLICE", Value: &output1},
-			go_ora.Object{Name: "SLICE2", Value: &output2},
-			go_ora.Object{Name: "IntArray", Value: &output3},
-			go_ora.Object{Name: "DateArray", Value: &output4},
-			//go_ora.Object{Name: "ZoneArray", Value: &output5},
-			go_ora.Object{Name: "ByteArray", Value: &output6},
-			go_ora.Object{Name: "BlobArray", Value: &output7},
-			go_ora.Object{Name: "ClobArray", Value: &output8},
-			go_ora.Object{Name: "NClobArray", Value: &output9},
+			types.Object{Name: "SLICE", Value: &output1},
+			types.Object{Name: "SLICE2", Value: &output2},
+			types.Object{Name: "IntArray", Value: &output3},
+			types.Object{Name: "DateArray", Value: &output4},
+			//types.Object{Name: "ZoneArray", Value: &output5},
+			types.Object{Name: "ByteArray", Value: &output6},
+			types.Object{Name: "BlobArray", Value: &output7},
+			types.Object{Name: "ClobArray", Value: &output8},
+			types.Object{Name: "NClobArray", Value: &output9},
 		)
 		if err != nil {
 			return err
@@ -286,14 +287,14 @@ END;`, length,
 				if output6[x] != nil {
 					return fmt.Errorf(nullErrorFormat, "DateArray", output6)
 				}
-				if output7[x].Data != nil {
-					return fmt.Errorf(nullErrorFormat, "BlobArray", output7[x].Data)
+				if output7[x].Bytes() != nil {
+					return fmt.Errorf(nullErrorFormat, "BlobArray", output7[x].Bytes())
 				}
-				if output8[x].Valid {
-					return fmt.Errorf(nullErrorFormat, "ClobArray", output8[x].String)
+				if output8[x].Bytes() != nil {
+					return fmt.Errorf(nullErrorFormat, "ClobArray", clobText(&output8[x]))
 				}
-				if output9[x].Valid {
-					return fmt.Errorf(nullErrorFormat, "NClobArray", output9[x].String)
+				if output9[x].Bytes() != nil {
+					return fmt.Errorf(nullErrorFormat, "NClobArray", clobText(&output9[x]))
 				}
 			} else {
 				if !strings.EqualFold(output1[x].String, fmt.Sprintf("varchar_%d", x+1)) {
@@ -311,14 +312,14 @@ END;`, length,
 				if !bytes.Equal(input6[x], output6[x]) {
 					return fmt.Errorf(errorFormat, "ByteArray", input6[x], output6[x])
 				}
-				if !bytes.Equal(input7[x].Data, output7[x].Data) {
-					return fmt.Errorf(errorFormat, "BlobArray", input7[x].Data, output7[x].Data)
+				if !bytes.Equal(input7[x].Bytes(), output7[x].Bytes()) {
+					return fmt.Errorf(errorFormat, "BlobArray", input7[x].Bytes(), output7[x].Bytes())
 				}
-				if !strings.EqualFold(fmt.Sprintf("%s%d", input8[x].String, x+1), output8[x].String) {
-					return fmt.Errorf(errorFormat, "ClobArray", fmt.Sprintf("%s%d", input8[x].String, x+1), output8[x].String)
+				if !strings.EqualFold(fmt.Sprintf("%s%d", clobText(&input8[x]), x+1), clobText(&output8[x])) {
+					return fmt.Errorf(errorFormat, "ClobArray", fmt.Sprintf("%s%d", clobText(&input8[x]), x+1), clobText(&output8[x]))
 				}
-				if !strings.EqualFold(input9[x].String, output9[x].String) {
-					return fmt.Errorf(errorFormat, "NClobArray", input9[x].String, output9[x].String)
+				if !strings.EqualFold(clobText(&input9[x]), clobText(&output9[x])) {
+					return fmt.Errorf(errorFormat, "NClobArray", clobText(&input9[x]), clobText(&output9[x]))
 				}
 			}
 		}
@@ -351,8 +352,8 @@ BEGIN
 		t_customer.PRICES(x) := x + 1.25;
 	end loop;
 	:3 := t_customer;
-END;`, go_ora.Object{Name: "Customer", Value: customer}, refDate,
-			go_ora.Object{Name: "Customer", Value: &output})
+END;`, types.Object{Name: "Customer", Value: customer}, refDate,
+			types.Object{Name: "Customer", Value: &output})
 		if err != nil {
 			return err
 		}

@@ -2,7 +2,6 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/sijms/go-ora/v3"
 	"testing"
 )
 
@@ -24,7 +23,7 @@ func TestIssue264(t *testing.T) {
 		return nil
 	}
 	var update = func(db *sql.DB) error {
-		blob := go_ora.Blob{Data: []byte("123456789012345678901234567890 123456789012345678901234567890")}
+		blob := blobOf([]byte("123456789012345678901234567890 123456789012345678901234567890"))
 		stmt, err := db.Prepare("UPDATE TTB_264 SET SVGTEMPLATE=:1 WHERE ID=1")
 		if err != nil {
 			return err

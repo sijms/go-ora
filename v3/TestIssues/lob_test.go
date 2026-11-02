@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"os"
 	"strings"
 	"testing"
@@ -38,9 +38,9 @@ func TestLob(t *testing.T) {
 		type TempStruct struct {
 			ID    int            `db:"ID"`
 			Data1 sql.NullString `db:"DATA1"`
-			Data2 go_ora.Clob    `db:"DATA2"`
+			Data2 types.Clob     `db:"DATA2"`
 			Data3 []byte         `db:"DATA3"`
-			Data4 go_ora.Blob    `db:"DATA4"`
+			Data4 types.Blob     `db:"DATA4"`
 		}
 		input := make([]TempStruct, 10)
 		for x := 1; x <= len(input); x++ {
@@ -48,15 +48,15 @@ func TestLob(t *testing.T) {
 			temp.ID = x
 			if x%2 == 0 {
 				temp.Data1.Valid = false
-				temp.Data2.Valid = false
+				temp.Data2 = types.Clob{}
 				temp.Data3 = nil
-				temp.Data4.Data = nil
+				temp.Data4 = types.Blob{}
 			} else {
 				temp.Data1 = sql.NullString{"this is a test", true}
-				temp.Data2.String, temp.Data2.Valid = clob, true
+				temp.Data2 = clobOf(clob, false)
 
 				temp.Data3 = []byte("this is a test")
-				temp.Data4.Data = blob
+				temp.Data4 = blobOf(blob)
 
 			}
 			input[x-1] = temp
@@ -117,16 +117,16 @@ END;`
 		var temp = struct {
 			ID    int            `db:"ID,,,output"`
 			Data1 sql.NullString `db:"DATA1,,500,output"`
-			Data2 go_ora.Clob    `db:"DATA2,clob,100000000,output"`
+			Data2 types.Clob     `db:"DATA2,clob,100000000,output"`
 			Data3 []byte         `db:"DATA3,,500,output"`
-			Data4 go_ora.Blob    `db:"DATA4,blob,100000000,output"`
+			Data4 types.Blob     `db:"DATA4,blob,100000000,output"`
 		}{}
 		_, err := db.Exec(sqlText, &temp, sql.Named("iid", id))
 		if err != nil {
 			return err
 		}
 		if id%2 == 0 {
-			if temp.Data1.Valid == true || temp.Data2.Valid == true || temp.Data3 != nil || temp.Data4.Data != nil {
+			if temp.Data1.Valid == true || temp.Data2.Bytes() != nil || temp.Data3 != nil || temp.Data4.Bytes() != nil {
 				return errors.New("expected null and got a value")
 			}
 		} else {
@@ -136,10 +136,10 @@ END;`
 			if !bytes.Equal(temp.Data3, []byte("this is a test")) {
 				return fmt.Errorf("expected: %v and got: %v", []byte("this is a test"), temp.Data3)
 			}
-			if temp.Data2.String != clob {
+			if clobText(&temp.Data2) != clob {
 				return errors.New("un-equal large clob data")
 			}
-			if !bytes.Equal(temp.Data4.Data, blob) {
+			if !bytes.Equal(temp.Data4.Bytes(), blob) {
 				return errors.New("un-equal large blob data")
 			}
 		}

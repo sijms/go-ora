@@ -3,6 +3,11 @@ name: PR check
 on:
   pull_request:
 
+permissions:
+  contents: read
+  # golangci-lint's only-new-issues reads the pull request diff
+  pull-requests: read
+
 jobs:
   test:
     name: basic check
@@ -27,6 +32,37 @@ jobs:
 
       - name: test
         run: go test
+
+  # v2 and v3 are separate modules, so the root "go test" above never builds
+  # their tests. TestIssues has its own go.mod and needs a live database, so
+  # "./..." here leaves it out.
+  module-tests:
+    name: ${{ matrix.module }} unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - module: v2
+            go-version: '1.20.x'
+          - module: v3
+            go-version: '1.24.x'
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: build
+        run: go build ./...
+
+      - name: test
+        run: go test ./...
 
   # https://github.com/golangci/golangci-lint-action
   golangci:

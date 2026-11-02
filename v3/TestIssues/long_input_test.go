@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	go_ora "github.com/sijms/go-ora/v3"
 	"strings"
 	"testing"
 	"time"
@@ -113,15 +112,15 @@ func TestLongInput(t *testing.T) {
 	}
 
 	var nvarchar = func(db *sql.DB, data string) error {
-		_, err := db.Exec(`INSERT INTO TTB_557(DATA_NCLOB, ID, LDATE) VALUES(:1, :2, :3)`, go_ora.NVarChar(data), 1, time.Now())
+		_, err := db.Exec(`INSERT INTO TTB_557(DATA_NCLOB, ID, LDATE) VALUES(:1, :2, :3)`, nvarcharOf(data), 1, time.Now())
 		if err != nil {
 			return err
 		}
-		_, err = db.Exec(`INSERT INTO TTB_557(ID, DATA_NCLOB, LDATE) VALUES(:1, :2, :3)`, 2, go_ora.NVarChar(data), time.Now())
+		_, err = db.Exec(`INSERT INTO TTB_557(ID, DATA_NCLOB, LDATE) VALUES(:1, :2, :3)`, 2, nvarcharOf(data), time.Now())
 		if err != nil {
 			return err
 		}
-		_, err = db.Exec(`INSERT INTO TTB_557(ID, LDATE, DATA_NCLOB) VALUES(:1, :2, :3)`, 3, time.Now(), go_ora.NVarChar(data))
+		_, err = db.Exec(`INSERT INTO TTB_557(ID, LDATE, DATA_NCLOB) VALUES(:1, :2, :3)`, 3, time.Now(), nvarcharOf(data))
 		if err != nil {
 			return err
 		}

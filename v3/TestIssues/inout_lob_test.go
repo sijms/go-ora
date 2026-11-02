@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"strings"
 	"testing"
 )
@@ -30,15 +31,12 @@ END;`)
 
 	var call = func(db *sql.DB) error {
 		var (
-			par_01 go_ora.Clob
+			par_01 types.Clob
 			par_02 int
 			par_03 string
 			par_04 string
 		)
-		par_01 = go_ora.Clob{
-			String: strings.Repeat("a", 0x8010),
-			Valid:  true,
-		}
+		par_01 = clobOf(strings.Repeat("a", 0x8010), false)
 		_, err := db.Exec("BEGIN proc_626(:par_01, :par_02, :par_03, :par_04); END;",
 			sql.Named("par_01", go_ora.Out{Dest: &par_01, Size: 50000, In: true}),
 			sql.Named("par_02", go_ora.Out{Dest: &par_02}),
@@ -47,7 +45,7 @@ END;`)
 		if err != nil {
 			return err
 		}
-		if par_01.String != strings.Repeat("a", 0x8010)+" output string" {
+		if clobText(&par_01) != strings.Repeat("a", 0x8010)+" output string" {
 			return errors.New("parameter par_01 return unexpected value")
 		}
 		if par_02 != 15 {

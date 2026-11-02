@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"strings"
 	"testing"
 	"time"
@@ -78,7 +79,7 @@ func TestUDTString(t *testing.T) {
 	}
 	var callLoad = func(db *sql.DB, qty int) error {
 		var obj Data
-		_, err := db.Exec(`BEGIN USP_LOAD_TEST(:1, :2); END;`, go_ora.Object{
+		_, err := db.Exec(`BEGIN USP_LOAD_TEST(:1, :2); END;`, types.Object{
 			Owner: "LAB",
 			Name:  "OBJ_TYPE_DATA",
 			Value: &obj,

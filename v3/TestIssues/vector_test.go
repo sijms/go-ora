@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"reflect"
 	"testing"
 )
@@ -26,15 +27,15 @@ func TestVector(t *testing.T) {
 	}
 
 	var insert = func(db *sql.DB) error {
-		v1, err := go_ora.NewVector([]uint8{10, 20, 30})
+		v1, err := types.CreateVector([]uint8{10, 20, 30})
 		if err != nil {
 			return err
 		}
-		v2, err := go_ora.NewVector([]float32{-10.1, -20.2, -30.3})
+		v2, err := types.CreateVector([]float32{-10.1, -20.2, -30.3})
 		if err != nil {
 			return err
 		}
-		v3, err := go_ora.NewVector([]float64{10.1, 20.2, 30.3})
+		v3, err := types.CreateVector([]float64{10.1, 20.2, 30.3})
 		if err != nil {
 			return err
 		}
@@ -63,7 +64,7 @@ func TestVector(t *testing.T) {
 	}
 
 	var queryAsVector = func(db *sql.DB) error {
-		var data1, data2, data3 go_ora.Vector
+		var data1, data2, data3 types.Vector
 		err := db.QueryRow(fmt.Sprintf("SELECT V01, V02, V03 FROM %s", tableName)).Scan(&data1, &data2, &data3)
 		if err != nil {
 			return err
@@ -73,9 +74,15 @@ func TestVector(t *testing.T) {
 			v2 []float32
 			v3 []float64
 		)
-		v1, _ = data1.Data.([]uint8)
-		v2, _ = data2.Data.([]float32)
-		v3, _ = data3.Data.([]float64)
+		if err := data1.CopyTo(&v1); err != nil {
+			return err
+		}
+		if err := data2.CopyTo(&v2); err != nil {
+			return err
+		}
+		if err := data3.CopyTo(&v3); err != nil {
+			return err
+		}
 		return do_check(v1, v2, v3)
 	}
 
@@ -93,7 +100,7 @@ func TestVector(t *testing.T) {
 	}
 
 	var outputAsVector = func(db *sql.DB) error {
-		var data1, data2, data3 go_ora.Vector
+		var data1, data2, data3 types.Vector
 		_, err := db.Exec(fmt.Sprintf("BEGIN SELECT V01, V02, V03 INTO :1, :2, :3 FROM %s; END;", tableName),
 			go_ora.Out{Dest: &data1},
 			go_ora.Out{Dest: &data2},
@@ -107,9 +114,15 @@ func TestVector(t *testing.T) {
 			v2 []float32
 			v3 []float64
 		)
-		v1, _ = data1.Data.([]uint8)
-		v2, _ = data2.Data.([]float32)
-		v3, _ = data3.Data.([]float64)
+		if err := data1.CopyTo(&v1); err != nil {
+			return err
+		}
+		if err := data2.CopyTo(&v2); err != nil {
+			return err
+		}
+		if err := data3.CopyTo(&v3); err != nil {
+			return err
+		}
 		return do_check(v1, v2, v3)
 	}
 

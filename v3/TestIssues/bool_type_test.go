@@ -3,6 +3,7 @@ package TestIssues
 import (
 	"database/sql"
 	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"testing"
 )
 
@@ -46,7 +47,12 @@ END GO_ORA_TEMP_PROC;`)
 		}
 	}()
 	var message string
-	_, err = db.Exec("BEGIN GO_ORA_TEMP_PROC(:1, :2); END;", go_ora.PLBool(false), go_ora.Out{Dest: &message, Size: 100})
+	input := types.Bool{}
+	if err = input.SetValue(false); err != nil {
+		t.Error(err)
+		return
+	}
+	_, err = db.Exec("BEGIN GO_ORA_TEMP_PROC(:1, :2); END;", input, go_ora.Out{Dest: &message, Size: 100})
 	if err != nil {
 		t.Error(err)
 		return

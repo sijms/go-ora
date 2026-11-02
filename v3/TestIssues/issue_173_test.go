@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"strings"
 	"testing"
 )
@@ -22,13 +23,13 @@ func TestIssue173(t *testing.T) {
 	}
 	var dropFunction = func(db *sql.DB) error { return execCmd(db, "DROP FUNCTION go_ora$text") }
 	var run = func(db *sql.DB) error {
-		var str go_ora.Clob
+		var str types.Clob
 		_, err := db.Exec("BEGIN :1 := go_ora$text(:2);end;", go_ora.Out{Dest: &str, Size: 100000}, "ss")
 		if err != nil {
 			return err
 		}
 		expected := strings.Repeat("tttttttttttttttttttttttt", 4000) + "\\n" + "ss"
-		if str.String != expected {
+		if clobText(&str) != expected {
 			return errors.New("return value is different from input value")
 		}
 		return nil

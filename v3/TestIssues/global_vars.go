@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"os"
 	"reflect"
 	"strconv"
@@ -112,4 +113,37 @@ func queryStruct(row *sql.Row, s any) error {
 		scanValue[x] = fieldValue.Addr().Interface()
 	}
 	return row.Scan(scanValue...)
+}
+
+// v3 sets LOB and NCHAR values through SetValue; these helpers keep the test call sites short.
+func nvarcharOf(s string) types.String {
+	v := types.String{UseNCharset: true}
+	if err := v.SetValue(s); err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func clobOf(s string, nchar bool) types.Clob {
+	v := types.Clob{String: types.String{UseNCharset: nchar}}
+	if err := v.SetValue(s); err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func blobOf(b []byte) types.Blob {
+	v := types.Blob{}
+	if err := v.SetValue(b); err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func clobText(c *types.Clob) string {
+	var s string
+	if err := c.CopyTo(&s); err != nil {
+		panic(err)
+	}
+	return s
 }

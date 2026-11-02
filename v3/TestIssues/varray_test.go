@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"strings"
 	"testing"
 )
@@ -52,7 +53,7 @@ BEGIN
 		l_array(x) := 'string_' || x;
 	end loop;
 	:1 := l_array;
-END;`, go_ora.Object{Name: "StringArray", Value: &output})
+END;`, types.Object{Name: "StringArray", Value: &output})
 	if err != nil {
 		t.Error(err)
 		return

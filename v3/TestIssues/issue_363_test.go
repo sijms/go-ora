@@ -43,11 +43,14 @@ func TestIssue363(t *testing.T) {
 		return
 	}
 	var result []myStruct2
-	query := engine.NoAutoCondition().Table(myStruct2{}).Where(`"string"='str2' AND "id"<>0`).ForUpdate()
-	err = query.Find(&result)
+	// xorm's Oracle dialect cannot build ForUpdate(), so the SELECT ... FOR UPDATE of the
+	// original report is passed as raw SQL; rows still go through xorm's scanning path.
+	err = engine.SQL(`SELECT "id", "string" FROM ISSUE_363 WHERE "string"='str2' AND "id"<>0 FOR UPDATE`).Find(&result)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	t.Log(result)
+	if len(result) != 2 {
+		t.Errorf("expected 2 rows and got %d: %v", len(result), result)
+	}
 }

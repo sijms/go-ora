@@ -2,7 +2,7 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"testing"
 )
 
@@ -19,8 +19,8 @@ func TestBulkinsertBFile(t *testing.T) {
 
 	var insertEmpty = func(db *sql.DB) error {
 		var files []interface{} = make([]interface{}, 2)
-		files[0] = go_ora.CreateNullBFile()
-		files[1] = go_ora.CreateNullBFile()
+		files[0] = &types.BFile{}
+		files[1] = &types.BFile{}
 		ids := []int{1, 2}
 		_, err := db.Exec("INSERT INTO GOORA_TEST_BFILE(FILE_ID, FILE_DATA) VALUES(:1, :2)", ids, files)
 		return err
@@ -28,12 +28,12 @@ func TestBulkinsertBFile(t *testing.T) {
 	var insert = func(db *sql.DB, dirName, fileName string) error {
 		var files = make([]interface{}, 3)
 		var err error
-		files[0], err = go_ora.CreateBFile(db, dirName, fileName)
+		files[0], err = types.CreateBFile(db, dirName, fileName)
 		if err != nil {
 			return err
 		}
-		files[1] = go_ora.CreateNullBFile()
-		files[2], err = go_ora.CreateBFile(db, dirName, fileName)
+		files[1] = &types.BFile{}
+		files[2], err = types.CreateBFile(db, dirName, fileName)
 		if err != nil {
 			return err
 		}

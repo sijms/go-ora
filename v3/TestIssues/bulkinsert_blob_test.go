@@ -2,7 +2,7 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/sijms/go-ora/v3"
+	"github.com/sijms/go-ora/v3/types"
 	"testing"
 )
 
@@ -12,10 +12,7 @@ func TestBulkinsertBlob(t *testing.T) {
 	}
 	var dropTable = func(db *sql.DB) error { return execCmd(db, `DROP TABLE TTB_465 PURGE`) }
 	var insert = func(db *sql.DB, data []byte) error {
-		datas := make([]go_ora.Blob, 3)
-		datas[0].Data = nil
-		datas[1].Data = data
-		datas[2].Data = data
+		datas := []types.Blob{{}, blobOf(data), blobOf(data)}
 		_, err := db.Exec("INSERT INTO TTB_465 VALUES(:1)", datas)
 		return err
 	}

@@ -84,7 +84,8 @@ func TestIntervalDecode(t *testing.T) {
 		b[4] = 60 + 2
 		b[5] = 60 + 30
 		b[6] = 60 + 15
-		binary.BigEndian.PutUint32(b[7:], uint32(0x80000000+0))
+		// The wire carries nanoseconds; INTERVAL DAY TO SECOND(9) must keep all nine digits.
+		binary.BigEndian.PutUint32(b[7:], uint32(0x80000000+123456789))
 		interval := &Interval{}
 		interval.SetDataType(INTERVALDS_DTY)
 		interval.SetBytes(b)
@@ -92,10 +93,64 @@ func TestIntervalDecode(t *testing.T) {
 		if err != nil {
 			t.Fatalf("decode failed: %v", err)
 		}
-		if val != "+04 02:30:15.000000" {
-			t.Errorf("expected +04 02:30:15.000000, got %v", val)
+		if val != "+04 02:30:15.123456789" {
+			t.Errorf("expected +04 02:30:15.123456789, got %v", val)
 		}
 	})
+}
+
+// TestIntervalColumnPrecision checks that the leading and fractional precision of the
+// column decide the width, matching TO_CHAR on Oracle 23:
+//
+//	CAST(INTERVAL '2 12:23:34.123456789' DAY TO SECOND(9) AS INTERVAL DAY(2) TO SECOND(0)) -> +02 12:23:34
+//	... AS INTERVAL DAY(3) TO SECOND(3)  -> +002 12:23:34.123
+//	... AS INTERVAL DAY(2) TO SECOND(9)  -> +02 12:23:34.123456789
+//	CAST(INTERVAL '-2 12:23:34.5' DAY TO SECOND(9) AS INTERVAL DAY(9) TO SECOND(9)) -> -000000002 12:23:34.500000000
+//	CAST(INTERVAL '21-10' YEAR TO MONTH AS INTERVAL YEAR(4) TO MONTH) -> +0021-10
+func TestIntervalColumnPrecision(t *testing.T) {
+	ds := func(days int32, hour, minute, second byte, ns int32) []byte {
+		b := make([]byte, 11)
+		binary.BigEndian.PutUint32(b, uint32(int64(days)+0x80000000))
+		b[4], b[5], b[6] = hour, minute, second
+		binary.BigEndian.PutUint32(b[7:], uint32(int64(ns)+0x80000000))
+		return b
+	}
+	ym := make([]byte, 5)
+	binary.BigEndian.PutUint32(ym, uint32(0x80000000+21))
+	ym[4] = 60 + 10
+	cases := []struct {
+		name             string
+		dataType         uint16
+		precision, scale uint8
+		raw              []byte
+		want             string
+	}{
+		{"DAY(2) TO SECOND(0)", INTERVALDS_DTY, 2, 0, ds(2, 72, 83, 94, 0), "+02 12:23:34"},
+		{"DAY(3) TO SECOND(3)", INTERVALDS_DTY, 3, 3, ds(2, 72, 83, 94, 123000000), "+002 12:23:34.123"},
+		{"DAY(2) TO SECOND(9)", INTERVALDS_DTY, 2, 9, ds(2, 72, 83, 94, 123456789), "+02 12:23:34.123456789"},
+		{"DAY(9) TO SECOND(9) negative", INTERVALDS_DTY, 9, 9, ds(-2, 48, 37, 26, -500000000), "-000000002 12:23:34.500000000"},
+		{"YEAR(4) TO MONTH", INTERVALYM_DTY, 4, 0, ym, "+0021-10"},
+		// An expression such as CAST(... AS INTERVAL DAY TO SECOND(6)) still carries nine digits; Oracle rounds them.
+		{"rounds half up", INTERVALDS_DTY, 2, 6, ds(2, 72, 83, 94, 123456789), "+02 12:23:34.123457"},
+		{"rounds negative into the second", INTERVALDS_DTY, 2, 0, ds(-2, 48, 37, 26, -500000000), "-02 12:23:35"},
+		{"carries into the next day", INTERVALDS_DTY, 2, 0, ds(1, 83, 119, 119, 600000000), "+02 00:00:00"},
+		// Without column metadata (output parameters, UDT attributes) nothing below a microsecond is dropped.
+		{"unknown, nanoseconds", INTERVALDS_DTY, 0, 0, ds(2, 72, 83, 94, 123456789), "+02 12:23:34.123456789"},
+		{"unknown, microseconds", INTERVALDS_DTY, 0, 0, ds(2, 72, 83, 94, 456000000), "+02 12:23:34.456000"},
+		// parameter.go sets Scale to 0xFF when the describe reports -127; Oracle allows 0-9 fraction digits.
+		{"scale 0xFF is unknown", INTERVALDS_DTY, 2, 0xFF, ds(2, 72, 83, 94, 123456789), "+02 12:23:34.123456789"},
+		{"scale 12 is unknown", INTERVALDS_DTY, 2, 12, ds(2, 72, 83, 94, 456000000), "+02 12:23:34.456000"},
+	}
+	for _, c := range cases {
+		interval := &Interval{}
+		interval.SetDataType(c.dataType)
+		interval.SetPrecisionScale(c.precision, c.scale)
+		interval.SetBytes(c.raw)
+		got, err := interval.Value()
+		if err != nil || got != c.want {
+			t.Errorf("%s: expected %q and got %v (%v)", c.name, c.want, got, err)
+		}
+	}
 }
 
 func TestIntervalCopyTo(t *testing.T) {

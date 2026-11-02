@@ -11,6 +11,14 @@ import (
 
 type Interval struct {
 	Basic
+	// leading (day or year) and fractional-second precision of the column; precision 0 means
+	// unknown, as for output parameters and UDT attributes, which carry no column metadata.
+	precision, scale uint8
+}
+
+// SetPrecisionScale passes the column's leading and fractional precision so Value prints the same width as Oracle.
+func (interval *Interval) SetPrecisionScale(precision, scale uint8) {
+	interval.precision, interval.scale = precision, scale
 }
 
 func NewYearMonthInterval(year, month int) (*Interval, error) {
@@ -54,34 +62,73 @@ func (interval *Interval) Value() (interface{}, error) {
 		if len(interval.bValue) < int(MaxLenIntervalYM) {
 			return nil, fmt.Errorf("interval data length is too short")
 		}
-		return formatIntervalYM(interval.bValue), nil
+		return interval.formatYM(), nil
 	case INTERVALDS_DTY:
 		if len(interval.bValue) < int(MaxLenIntervalDS) {
 			return nil, fmt.Errorf("interval data length is too short")
 		}
-		return formatIntervalDS(interval.bValue), nil
+		return interval.formatDS(), nil
 	default:
 		return nil, fmt.Errorf("unsupported type id: %d used for decoding interval", typeId)
 	}
 }
 
-// formatIntervalYM renders INTERVAL YEAR TO MONTH as Oracle prints it ("+2021-10"); a time.Time cannot hold a signed duration.
-func formatIntervalYM(val []byte) string {
-	years := int64(binary.BigEndian.Uint32(val)) - 0x80000000
-	if years >= 0 && val[4] >= 60 {
-		return fmt.Sprintf("+%02d-%02d", years, val[4]-60)
+// leadWidth is the column's day or year precision; Oracle's default of 2 when it is unknown.
+func (interval *Interval) leadWidth() int {
+	if interval.precision == 0 {
+		return 2
 	}
-	return fmt.Sprintf("-%02d-%02d", -years, 60-val[4])
+	return int(interval.precision)
 }
 
-// formatIntervalDS renders INTERVAL DAY TO SECOND as Oracle prints it ("+02 12:23:34.456000").
-func formatIntervalDS(val []byte) string {
-	days := int64(binary.BigEndian.Uint32(val)) - 0x80000000
-	ns := (int64(binary.BigEndian.Uint32(val[7:])) - 0x80000000) / 1000
-	if days >= 0 && ns >= 0 && val[4] >= 60 && val[5] >= 60 && val[6] >= 60 {
-		return fmt.Sprintf("+%02d %02d:%02d:%02d.%06d", days, val[4]-60, val[5]-60, val[6]-60, ns)
+// formatYM renders INTERVAL YEAR TO MONTH as Oracle prints it ("+21-10"); a time.Time cannot hold a signed duration.
+func (interval *Interval) formatYM() string {
+	val := interval.bValue
+	years := int64(binary.BigEndian.Uint32(val)) - 0x80000000
+	if years >= 0 && val[4] >= 60 {
+		return fmt.Sprintf("+%0*d-%02d", interval.leadWidth(), years, val[4]-60)
 	}
-	return fmt.Sprintf("-%02d %02d:%02d:%02d.%06d", -days, 60-val[4], 60-val[5], 60-val[6], -ns)
+	return fmt.Sprintf("-%0*d-%02d", interval.leadWidth(), -years, 60-val[4])
+}
+
+// formatDS renders INTERVAL DAY TO SECOND as Oracle prints it ("+02 12:23:34.456000").
+func (interval *Interval) formatDS() string {
+	val := interval.bValue
+	days := int64(binary.BigEndian.Uint32(val)) - 0x80000000
+	ns := int64(binary.BigEndian.Uint32(val[7:])) - 0x80000000
+	sign, clock := "+", int64(val[4]-60)*3600+int64(val[5]-60)*60+int64(val[6]-60)
+	if days < 0 || ns < 0 || val[4] < 60 || val[5] < 60 || val[6] < 60 {
+		sign, days, ns, clock = "-", -days, -ns, int64(60-val[4])*3600+int64(60-val[5])*60+int64(60-val[6])
+	}
+	digits := interval.fractionDigits(ns)
+	unit := int64(1)
+	for i := digits; i < 9; i++ {
+		unit *= 10
+	}
+	// Expressions such as CAST(... AS INTERVAL DAY TO SECOND(6)) still carry nine digits; Oracle rounds them.
+	const nsPerDay = int64(86400) * 1e9
+	subDay := (clock*1e9 + ns + unit/2) / unit * unit
+	days += subDay / nsPerDay
+	subDay %= nsPerDay
+	clock, ns = subDay/1e9, subDay%1e9
+	text := fmt.Sprintf("%s%0*d %02d:%02d:%02d", sign, interval.leadWidth(), days, clock/3600, clock/60%60, clock%60)
+	if digits > 0 {
+		text += fmt.Sprintf(".%0*d", digits, ns/unit)
+	}
+	return text
+}
+
+// fractionDigits is the column's fractional precision. Without column metadata it keeps
+// Oracle's default of six digits unless that would drop nanoseconds.
+func (interval *Interval) fractionDigits(ns int64) int {
+	// Oracle allows 0-9 fraction digits; anything else (0xFF from a -127 describe) is unknown.
+	if interval.precision != 0 && interval.scale <= 9 {
+		return int(interval.scale)
+	}
+	if ns%1000 != 0 {
+		return 9
+	}
+	return 6
 }
 
 func (interval *Interval) encode(input time.Time) error {

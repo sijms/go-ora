@@ -9,8 +9,8 @@ import (
 
 type TimeStampTZ time.Time
 
-func (val *TimeStampTZ) Value() (driver.Value, error) {
-	return val, nil
+func (val TimeStampTZ) Value() (driver.Value, error) {
+	return time.Time(val), nil
 }
 
 func (val *TimeStampTZ) Scan(value interface{}) error {

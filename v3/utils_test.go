@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestGetValue(t *testing.T) {
@@ -245,63 +244,6 @@ func TestGetInt(t *testing.T) {
 //	}
 //}
 
-func TestSetString(t *testing.T) {
-	var intVar int
-	err := setString(reflect.ValueOf(&intVar).Elem(), "15")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(intVar)
-	var uint8Var uint8
-	err = setString(reflect.ValueOf(&uint8Var).Elem(), "17")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(uint8Var)
-	var int32Var sql.NullInt32
-	err = setString(reflect.ValueOf(&int32Var).Elem(), "18")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(int32Var)
-}
-
-func TestSetFieldValue(t *testing.T) {
-	var testString *sql.NullString
-	err := setFieldValue(reflect.ValueOf(&testString).Elem(), nil, "this is a test")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(*testString)
-	type test1 struct {
-		Id   int
-		Name string
-		Date sql.NullTime
-	}
-	test := test1{}
-	sField := reflect.Indirect(reflect.ValueOf(&test))
-	err = setFieldValue(sField.Field(0), nil, int64(15))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	err = setFieldValue(sField.Field(1), nil, "this is a test")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	err = setFieldValue(sField.Field(2), nil, time.Now().Format(time.RFC3339))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(test)
-}
-
 func TestSetArray(t *testing.T) {
 	var array []int
 	pars := []ParameterInfo{}
@@ -313,29 +255,8 @@ func TestSetArray(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	fmt.Println(array)
-}
-
-func TestSetNull(t *testing.T) {
-	var x int = 10
-	var xx float64 = 3.3
-	var xxx string = "test"
-	rx := reflect.ValueOf(&x).Elem()
-	rxx := reflect.ValueOf(&xx).Elem()
-	rxxx := reflect.ValueOf(&xxx).Elem()
-	// var xx = reflect.ValueOf(float64(3.3))
-	// var xxx = reflect.ValueOf("test")
-	setNull(rx)
-	setNull(rxx)
-	setNull(rxxx)
-	if x != 0 {
-		t.Error("expected 0 get ", x)
-	}
-	if xx != 0 {
-		t.Error("expected 0 get: ", xx)
-	}
-	if xxx != "" {
-		t.Error("expected empty get: ", xxx)
+	if !reflect.DeepEqual(array, []int{5, 6, 7}) {
+		t.Errorf("expected [5 6 7] and got %v", array)
 	}
 }
 

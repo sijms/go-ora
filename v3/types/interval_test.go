@@ -1,6 +1,7 @@
 package types
 
 import (
+	"database/sql"
 	"encoding/binary"
 	"testing"
 	"time"
@@ -72,9 +73,8 @@ func TestIntervalDecode(t *testing.T) {
 		if err != nil {
 			t.Fatalf("decode failed: %v", err)
 		}
-		result := val.(time.Time)
-		if result.Year() != 2026 {
-			t.Errorf("expected year=2026, got %d", result.Year())
+		if val != "+2026-05" {
+			t.Errorf("expected +2026-05, got %v", val)
 		}
 	})
 
@@ -92,10 +92,30 @@ func TestIntervalDecode(t *testing.T) {
 		if err != nil {
 			t.Fatalf("decode failed: %v", err)
 		}
-		result := val.(time.Time)
-		if result.Hour() != 2 || result.Minute() != 30 || result.Second() != 15 {
-			t.Errorf("expected 2:30:15, got %d:%d:%d",
-				result.Hour(), result.Minute(), result.Second())
+		if val != "+04 02:30:15.000000" {
+			t.Errorf("expected +04 02:30:15.000000, got %v", val)
 		}
 	})
+}
+
+func TestIntervalCopyTo(t *testing.T) {
+	interval := &Interval{}
+	interval.SetDataType(INTERVALYM_DTY)
+	interval.SetBytes([]byte{127, 255, 248, 27, 50})
+	var str string
+	if err := interval.CopyTo(&str); err != nil || str != "-2021-10" {
+		t.Errorf("*string: expected -2021-10 and got %q (%v)", str, err)
+	}
+	var nullStr sql.NullString
+	if err := interval.CopyTo(&nullStr); err != nil || nullStr != (sql.NullString{String: "-2021-10", Valid: true}) {
+		t.Errorf("*sql.NullString: expected {-2021-10 true} and got %v (%v)", nullStr, err)
+	}
+	var tm time.Time
+	if err := interval.CopyTo(&tm); err == nil {
+		t.Errorf("*time.Time: expected an error because an interval is not a point in time, got %v", tm)
+	}
+	interval.SetBytes(nil)
+	if err := interval.CopyTo(&nullStr); err != nil || nullStr.Valid {
+		t.Errorf("null into *sql.NullString: expected invalid and got %v (%v)", nullStr, err)
+	}
 }

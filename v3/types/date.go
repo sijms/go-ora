@@ -125,7 +125,7 @@ func (date *Date) SetValue(input interface{}) (err error) {
 		if date.AsUTC == data.AsUTC {
 			*date = data
 		} else {
-			temp, err := data.decode()
+			temp, err := data.Value()
 			if err != nil {
 				return err
 			}
@@ -136,7 +136,7 @@ func (date *Date) SetValue(input interface{}) (err error) {
 		if date.AsUTC == data.AsUTC {
 			*date = *data
 		} else {
-			temp, err := data.decode()
+			temp, err := data.Value()
 			if err != nil {
 				return err
 			}

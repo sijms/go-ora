@@ -66,8 +66,14 @@ func defaultCopy(dest reflect.Value, src any) error {
 		dest.Set(reflect.ValueOf(src))
 		return nil
 	}
-	if dest.CanConvert(reflect.TypeOf(src)) {
-		dest.Set(reflect.ValueOf(src))
+	srcValue := reflect.ValueOf(src)
+	if dest.Kind() == reflect.String && srcValue.IsValid() && tNumber(srcValue.Type()) {
+		dest.SetString(numberToString(srcValue))
+		return nil
+	}
+	// requiring both directions keeps lossy conversions like int64 -> string out
+	if srcValue.IsValid() && dest.CanConvert(srcValue.Type()) && srcValue.CanConvert(dest.Type()) {
+		dest.Set(srcValue.Convert(dest.Type()))
 		return nil
 	}
 
@@ -242,3 +248,10 @@ func createNewType(dstValue reflect.Value, dstType reflect.Type) error {
 //		temp.data = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}
 //	}
 //}
+
+func numberToString(value reflect.Value) string {
+	if tFloat(value.Type()) {
+		return fmt.Sprintf("%f", value.Float())
+	}
+	return fmt.Sprint(value.Interface())
+}

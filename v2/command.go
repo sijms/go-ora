@@ -1844,7 +1844,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 
 func (stmt *Stmt) CheckNamedValue(nv *driver.NamedValue) error {
-	if _, ok := nv.Value.(driver.Valuer); ok {
+	if _, ok := nv.Value.(driver.Valuer); ok && !isDriverEncodedValuer(nv.Value) {
 		return driver.ErrSkip
 	}
 	return nil

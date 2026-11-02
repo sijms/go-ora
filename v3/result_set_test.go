@@ -20,7 +20,8 @@ func TestResultSetColumnsNilSafe(t *testing.T) {
 	rs := ResultSet{}
 	if got := rs.Columns(); got != nil {
 		t.Errorf("expected nil columns for uninitialized ResultSet, got %v", got)
-
+	}
+}
 
 // TestColumnTypeScanTypeInlineLOB verifies that ColumnTypeScanType returns
 // the correct Go type for columns whose DataType was mutated to LongVarChar

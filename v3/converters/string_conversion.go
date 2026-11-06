@@ -107,18 +107,32 @@ func (conv *StringConverter) Encode(input string) []byte {
 			return []byte(input)
 		}
 		output := make([]byte, 0, len(temp))
-		for x := 0; x < len(temp); x++ {
-			if ch, ok := conv.eBuffer[int(temp[x])]; ok {
-				if ch < 0x100 {
-					output = append(output, uint8(ch))
-				} else if ch < 0x10000 {
-					output = append(output, uint8(ch>>8), uint8(ch))
-				} else {
-					output = append(output, uint8(ch>>24), uint8(ch>>16), uint8(ch>>8), uint8(ch))
+		for _, char := range input {
+			ch, ok := conv.eBuffer[int(char)]
+			if !ok {
+				// The tables store the encoded replacement in dReplace.
+				ch = conv.dReplace
+				switch conv.LangID {
+				case 832, 834, 838:
+					ch = 0x8148
+				case 833, 835, 842, 853, 864:
+					ch = 0x0E426F0F
+				case 837, 860:
+					ch = 0xA1A9
+				case 840, 846, 850, 851, 852:
+					ch = 0xA3BF
+				case 845:
+					ch = 0xD939
+				case 865, 867, 868, 992:
+					ch = 0xA148
 				}
+			}
+			if ch < 0x100 {
+				output = append(output, uint8(ch))
+			} else if ch < 0x10000 {
+				output = append(output, uint8(ch>>8), uint8(ch))
 			} else {
-				output = append(output, uint8(conv.eReplace))
-				// output[x] = uint8(conv.eReplace)
+				output = append(output, uint8(ch>>24), uint8(ch>>16), uint8(ch>>8), uint8(ch))
 			}
 		}
 		return output

@@ -435,10 +435,15 @@ func (stmt *Stmt) write() error {
 			execFlag = 1
 		}
 
-		session.PutUint(stmt.cursorID, 2, true, true)
-		session.PutUint(count, 2, true, true)
-		session.PutUint(exeOf, 2, true, true)
-		session.PutUint(execFlag, 2, true, true)
+		// cursor, iteration count, execute options and flags are UB4 on the
+		// wire: a 2-byte cap writes a length byte of 2 followed by three
+		// bytes for any value over 0xFFFF (an array bind of 65,536 rows, or
+		// exeOf with 0x40000 set), and the server reads every later field
+		// one byte off (ORA-03106 on 23ai/26ai).
+		session.PutUint(stmt.cursorID, 4, true, true)
+		session.PutUint(count, 4, true, true)
+		session.PutUint(exeOf, 4, true, true)
+		session.PutUint(execFlag, 4, true, true)
 		// err := stmt.writePars()
 		// if err != nil {
 		// 	return err

@@ -26,8 +26,11 @@ func (number *Number) GetMaxLen() int64 {
 		return MaxLenNumber
 	}
 }
+
+// isZero reports whether the value is zero. Zero is stored as the single byte 0x80;
+// longer values can also start with 0x80 (1E-130 is 80 02), so the length is checked too.
 func (number *Number) isZero() bool {
-	return len(number.bValue) > 0 && number.bValue[0] == 0x80
+	return len(number.bValue) == 1 && number.bValue[0] == 0x80
 }
 
 func (number *Number) isPositive() bool {

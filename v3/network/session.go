@@ -698,12 +698,13 @@ func (session *Session) Write() error {
 	return session.WriteRPC(false, false)
 }
 
-func (session *Session) processMarker() error {
-	var err error
-	// send reset connection
+// maxBreakResets bounds the reset markers answered while recovering from a break.
+const maxBreakResets = 8
+
+// sendReset sends a reset marker and resets the negotiated data integrity and encryption state.
+func (session *Session) sendReset() error {
 	session.resetWrite()
-	marker := newMarkerPacket(marker_type_reset, session.Context)
-	err = session.writePacket(marker)
+	err := session.writePacket(newMarkerPacket(marker_type_reset, session.Context))
 	if err != nil {
 		return err
 	}
@@ -713,9 +714,34 @@ func (session *Session) processMarker() error {
 			return err
 		}
 	}
-	_, err = session.readPacket()
+	return nil
+}
+
+func (session *Session) processMarker() error {
+	err := session.sendReset()
 	if err != nil {
 		return err
+	}
+	// After a break sent by the client, the server can answer the client's reset
+	// with another reset marker (array DML interrupted on 19c and later) and
+	// sends the call's response only after that reset is answered too.
+	for answered := 0; ; answered++ {
+		var pck PacketInterface
+		pck, err = session.readPacket()
+		if err != nil {
+			return err
+		}
+		marker, ok := pck.(*MarkerPacket)
+		if !ok || !session.IsBreak() {
+			break
+		}
+		if marker.markerType != marker_type_reset || answered == maxBreakResets {
+			return fmt.Errorf("break recovery: received marker type %d after sending %d resets", marker.markerType, answered+1)
+		}
+		err = session.sendReset()
+		if err != nil {
+			return err
+		}
 	}
 	// receive all packet until you get marker
 	// var pck PacketInterface = nil

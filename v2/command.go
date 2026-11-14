@@ -347,7 +347,9 @@ func NewStmt(text string, conn *Connection) *Stmt {
 			stmt._hasReturnClause = false
 			return stmt
 		}
-		stmt._hasReturnClause = sqlQueryReturnStatementRegexpAny.(*regexp.Regexp).MatchString(uCmdText)
+		// the regex can only match text holding both words; skip its backtracking for the common case
+		stmt._hasReturnClause = strings.Contains(uCmdText, "INTO") && strings.Contains(uCmdText, "RETURN") &&
+			sqlQueryReturnStatementRegexpAny.(*regexp.Regexp).MatchString(uCmdText)
 	}
 	return stmt
 }

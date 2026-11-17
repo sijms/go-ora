@@ -630,6 +630,8 @@ func (par *ParameterInfo) encodePrimValue(conn *Connection) error {
 
 func (par *ParameterInfo) init() {
 	par.DataType = 0
+	par.describeDataType = 0
+	par.udsFlags = 0
 	par.Flag = 3
 	par.ContFlag = 0
 	par.CharsetID = 0

@@ -122,7 +122,87 @@ func (resultSet *ResultSet) Trace(t trace.Tracer) {
 
 // ColumnTypeDatabaseTypeName return Col DataType name
 func (resultSet *ResultSet) ColumnTypeDatabaseTypeName(index int) string {
-	return (*resultSet.cols)[index].DataType.String()
+	col := (*resultSet.cols)[index]
+	dataType := col.describeDataType
+	if dataType == 0 {
+		dataType = col.DataType
+	}
+	switch dataType {
+	case 0:
+		return ""
+	case NCHAR, VARCHAR, NullStr, OCIString:
+		if col.CharsetForm == 2 {
+			return "NVARCHAR2"
+		}
+		return "VARCHAR2"
+	case CHAR, CHARZ:
+		if col.CharsetForm == 2 {
+			return "NCHAR"
+		}
+		return "CHAR"
+	case NUMBER, VarNum, BInteger, UINT, PDN:
+		return "NUMBER"
+	case FLOAT:
+		return "FLOAT"
+	case BFloat, IBFloat:
+		return "BINARY_FLOAT"
+	case BDouble, IBDouble:
+		return "BINARY_DOUBLE"
+	case DATE, OCIDate:
+		return "DATE"
+	case TimeStampDTY, TIMESTAMP:
+		return "TIMESTAMP"
+	case TimeStampTZ_DTY, TIMESTAMPTZ:
+		return "TIMESTAMP WITH TIME ZONE"
+	case TimeStampLTZ_DTY, TimeStampeLTZ:
+		return "TIMESTAMP WITH LOCAL TIME ZONE"
+	case IntervalYM_DTY, IntervalYM:
+		return "INTERVAL YEAR TO MONTH"
+	case IntervalDS_DTY, IntervalDS:
+		return "INTERVAL DAY TO SECOND"
+	case RAW, VarRaw:
+		return "RAW"
+	case LONG, LongVarChar:
+		return "LONG"
+	case LongRaw, LongVarRaw:
+		return "LONG RAW"
+	case ROWID:
+		return "ROWID"
+	case UROWID:
+		return "UROWID"
+	case OCIClobLocator:
+		if col.CharsetForm == 2 {
+			return "NCLOB"
+		}
+		return "CLOB"
+	case OCIBlobLocator:
+		if col.udsFlags&0x400 != 0 {
+			return "JSON"
+		}
+		return "BLOB"
+	case OCIFileLocator:
+		return "BFILE"
+	case JSON:
+		return "JSON"
+	case VECTOR:
+		return "VECTOR"
+	case Boolean:
+		return "BOOLEAN"
+	case REFCURSOR, RESULTSET:
+		return "REFCURSOR"
+	case OCIRef, TNSType(TNS_DATA_TYPE_INT_REF):
+		return "REF"
+	case OCIXMLType, XMLType:
+		if col.IsXmlType || col.TypeName == "" || col.TypeName == "XMLTYPE" {
+			return "XMLTYPE"
+		}
+		if col.SchemaName != "" {
+			return col.SchemaName + "." + col.TypeName
+		}
+		return col.TypeName
+	default:
+		return dataType.String()
+	}
 }
 
 // ColumnTypeLength return length of column type

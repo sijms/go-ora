@@ -50,18 +50,20 @@ type Out struct {
 //)
 
 type ParameterInfo struct {
-	Name         string
-	SchemaName   string
-	DomainSchema string
-	DomainName   string
-	Direction    ParameterDirection
-	IsNull       bool
-	AllowNull    bool
-	IsJson       bool
-	ColAlias     string
-	IsXmlType    bool
-	Precision    uint8
-	Scale        uint8
+	Name             string
+	SchemaName       string
+	DomainSchema     string
+	DomainName       string
+	Direction        ParameterDirection
+	IsNull           bool
+	AllowNull        bool
+	IsJson           bool
+	ColAlias         string
+	describeDataType uint16
+	udsFlags         int
+	IsXmlType        bool
+	Precision        uint8
+	Scale            uint8
 	//MaxNoOfArrayElements int
 
 	Value             driver.Value
@@ -85,6 +87,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.DataType = uint16(dataType)
+	par.describeDataType = par.DataType
 	par.Flag, err = session.GetByte()
 	if err != nil {
 		return err
@@ -116,6 +119,11 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		}
 
 		if scale == -127 {
+			if par.DataType == oraTypes.NUMBER && par.Precision > 0 {
+				// FLOAT(p), REAL, and DOUBLE PRECISION columns are described as
+				// NUMBER with a nonzero binary precision and scale -127.
+				par.describeDataType = oraTypes.FLOAT
+			}
 			par.Precision = uint8(math.Ceil(float64(par.Precision) * 0.30103))
 			par.Scale = 0xFF
 		} else {
@@ -225,6 +233,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	}
 	if par.TypeName == "XMLTYPE" {
 		par.DataType = oraTypes.XMLType
+		par.describeDataType = oraTypes.XMLType
 		par.IsXmlType = true
 	}
 	if session.TTCVersion < 3 {
@@ -236,6 +245,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	}
 	var uds_flags int
 	uds_flags, err = session.GetInt(4, true, true)
+	par.udsFlags = uds_flags
 	par.IsJson = (uds_flags & 0x500) > 0
 	if session.TTCVersion < 17 {
 		return nil
@@ -357,7 +367,12 @@ func (par *ParameterInfo) write(session *network.Session) error {
 func (par *ParameterInfo) clone() ParameterInfo {
 	tempPar := ParameterInfo{}
 	tempPar.DataType = par.DataType
+	tempPar.describeDataType = par.describeDataType
+	tempPar.udsFlags = par.udsFlags
+	tempPar.IsJson = par.IsJson
+	tempPar.IsXmlType = par.IsXmlType
 	tempPar.cusType = par.cusType
+	tempPar.SchemaName = par.SchemaName
 	tempPar.TypeName = par.TypeName
 	tempPar.MaxLen = par.MaxLen
 	tempPar.MaxCharLen = par.MaxCharLen

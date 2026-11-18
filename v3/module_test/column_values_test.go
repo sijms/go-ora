@@ -1,4 +1,4 @@
-package TestIssues
+package v2_test
 
 import (
 	"database/sql"
@@ -15,14 +15,26 @@ import (
 // NULL, a declared VECTOR column of each format, and NUMBER's smallest value.
 // VECTOR needs Oracle 23ai.
 func TestColumnValues(t *testing.T) {
-	db, err := getDB()
+	db, err := newDbConnection()
 	if err != nil {
 		t.Fatal(err)
+	}
+	if db == nil {
+		t.Skip("ORACLE_DSN is not set")
 	}
 	defer func() {
 		_ = db.Close()
 	}()
-	err = execCmd(db, `CREATE TABLE GOORA_T_VALUES (
+	exec := func(statements ...string) error {
+		for _, statement := range statements {
+			if _, err := db.Exec(statement); err != nil {
+				return fmt.Errorf("%s: %w", statement, err)
+			}
+		}
+		return nil
+	}
+	_ = exec("DROP TABLE GOORA_T_VALUES PURGE")
+	err = exec(`CREATE TABLE GOORA_T_VALUES (
 		id NUMBER, ym INTERVAL YEAR TO MONTH, ds INTERVAL DAY(2) TO SECOND(9), x XMLTYPE, j JSON,
 		f32 VECTOR(3, FLOAT32), f64 VECTOR(2, FLOAT64), i8 VECTOR(3, INT8), bin VECTOR(16, BINARY),
 		sp VECTOR(5, FLOAT32, SPARSE), tiny NUMBER)`)
@@ -30,9 +42,9 @@ func TestColumnValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = execCmd(db, "DROP TABLE GOORA_T_VALUES PURGE")
+		_ = exec("DROP TABLE GOORA_T_VALUES PURGE")
 	}()
-	err = execCmd(db, `INSERT INTO GOORA_T_VALUES VALUES (1, INTERVAL '-2-3' YEAR TO MONTH,
+	err = exec(`INSERT INTO GOORA_T_VALUES VALUES (1, INTERVAL '-2-3' YEAR TO MONTH,
 		INTERVAL '4 05:06:07.123456789' DAY(2) TO SECOND(9), XMLTYPE('<a>ü</a>'), JSON('{"b":[1,2.5,null],"a":"x"}'),
 		'[1,2.5,3]', '[0.1,-1e300]', '[1,-2,127]', '[255,0]', '[5,[1,3],[1.5,2.5]]', 1e-130)`,
 		"INSERT INTO GOORA_T_VALUES (id) VALUES (2)")

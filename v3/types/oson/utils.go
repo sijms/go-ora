@@ -3,6 +3,7 @@ package oson
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -538,6 +539,54 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 		}
 		field.value.SetBytes(temp)
 		return field, nil
+	case opDate, opTimeStamp7, opTimeStamp, opTimeStampTZ:
+		data, err := readFixed(buffer, dateLengths[opCode])
+		if err != nil {
+			return nil, err
+		}
+		field := &dateField{basicField: basicField{opCode: opCode}}
+		field.value.SetBytes(data)
+		return field, nil
+	case opIntervalYM, opIntervalDS:
+		length := types.MaxLenIntervalYM
+		dataType := types.INTERVALYM_DTY
+		if opCode == opIntervalDS {
+			length, dataType = types.MaxLenIntervalDS, types.INTERVALDS_DTY
+		}
+		data, err := readFixed(buffer, int(length))
+		if err != nil {
+			return nil, err
+		}
+		field := &intervalField{basicField: basicField{opCode: opCode}}
+		field.value.SetDataType(dataType)
+		field.value.SetBytes(data)
+		return field, nil
+	case opBinary16, opBinary32, opID:
+		var length int
+		switch opCode {
+		case opBinary16:
+			var temp uint16
+			err = binary.Read(buffer, binary.BigEndian, &temp)
+			length = int(temp)
+		case opBinary32:
+			var temp uint32
+			err = binary.Read(buffer, binary.BigEndian, &temp)
+			length = int(temp)
+		default:
+			var temp uint8
+			temp, err = buffer.ReadByte()
+			length = int(temp)
+		}
+		if err != nil {
+			return nil, err
+		}
+		data, err := readFixed(buffer, length)
+		if err != nil {
+			return nil, err
+		}
+		return &rawField{value: data, basicField: basicField{opCode: opCode}}, nil
+	case opExtended:
+		return nil, errors.New("unsupported extended type in json")
 	}
 	// Decimal
 	if opCode&0x60 == 0x60 {

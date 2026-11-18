@@ -113,6 +113,9 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	case oraTypes.TimeStampLTZ_DTY:
 		fallthrough
 	case oraTypes.TimeStampLTZ:
+		fallthrough
+	case oraTypes.VECTOR:
+		// a vector column's scale is its element's size, sent as a number
 		scale, err := session.GetInt(2, true, true)
 		if err != nil {
 			return err

@@ -163,6 +163,7 @@ func (driver *OracleDriver) init() {
 	tempClob := &parameter_coder.ClobParameter{}
 	tempClob.CharsetForm = 2
 	driver.nameTypeCoder["NCLOB"] = tempClob
+	driver.nameTypeCoder["XMLTYPE"] = &parameter_coder.XmlParameter{}
 
 	// initialize all
 	for _, coder := range driver.goTypeCoder {

@@ -63,10 +63,14 @@ func (param *JsonParameter) Encode(input interface{}, _ IConnection) (err error)
 }
 
 func (param *JsonParameter) Decode(_ IConnection) (interface{}, error) {
+	if len(param.BValue) == 0 && (param.streamer == nil || param.streamer.GetLocator() == nil) {
+		return nil, nil
+	}
 	decoder := &types.Json{}
 	decoder.Coder = &oson.Oson{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)
+	decoder.SetLength(param.length)
 	return decoder, nil
 }
 

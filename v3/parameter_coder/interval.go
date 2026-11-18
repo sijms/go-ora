@@ -37,10 +37,14 @@ func (param *IntervalParameter) Encode(input interface{}, _ IConnection) error {
 	return nil
 }
 
+// Decode returns the interval as Oracle's text, which is what ColumnTypeScanType
+// reports and what v2 returned: a time.Time cannot hold a negative interval, and
+// a year to month interval is not a date.
 func (param *IntervalParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder := &types.Interval{}
+	decoder.SetDataType(param.DataType)
 	decoder.SetBytes(param.BValue)
-	return decoder.Value()
+	return decoder.Text()
 }
 
 func (param *IntervalParameter) Read(session network.SessionReader) error {

@@ -45,6 +45,7 @@ func (param *VectorParameter) Decode(_ IConnection) (interface{}, error) {
 	decoder := &types.Vector{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)
+	decoder.SetLength(param.length)
 	return decoder, nil
 }
 

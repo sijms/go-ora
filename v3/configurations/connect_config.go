@@ -32,6 +32,14 @@ type KerberosAuthInterface interface {
 	Authenticate(server, service string) ([]byte, error)
 }
 
+// KerberosMutualAuthInterface is a KerberosAuthInterface that checks the server's reply to its ticket: AuthenticateMutual
+// returns the ticket, an AP-REQ asking for mutual authentication, and a check of the server's AP-REP, which fails
+// the connection when it returns an error. It is used in place of Authenticate where present.
+type KerberosMutualAuthInterface interface {
+	KerberosAuthInterface
+	AuthenticateMutual(server, service string) (ticket []byte, accept func(reply []byte) error, err error)
+}
+
 type AdvNegoServiceInfo struct {
 	AuthService     []string
 	EncServiceLevel int

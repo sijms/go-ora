@@ -630,6 +630,9 @@ import (
 
 func (par *ParameterInfo) init() {
 	par.SetDefault()
+	par.DataType = 0
+	par.describeDataType = 0
+	par.udsFlags = 0
 	par.Flag = 0
 	par.iPrimValue = nil
 	par.oPrimValue = nil

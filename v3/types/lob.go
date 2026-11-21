@@ -23,6 +23,14 @@ var errNilStreamer = errors.New("calling Lob function: nil streamer")
 type lobBase struct {
 	stream    LobStreamer
 	UploadCtx context.Context
+	// length is the LOB's length in the database, which the bytes sent with the
+	// row may fall short of
+	length int64
+}
+
+// SetLength records the LOB's length in the database.
+func (l *lobBase) SetLength(length int64) {
+	l.length = length
 }
 
 func (l *lobBase) createStreamer(db *sql.DB) error {

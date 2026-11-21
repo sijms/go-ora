@@ -125,8 +125,90 @@ func (resultSet *ResultSet) Trace(t trace.Tracer) {
 
 // ColumnTypeDatabaseTypeName return Col DataType name
 func (resultSet *ResultSet) ColumnTypeDatabaseTypeName(index int) string {
-	return ""
-	//return (*resultSet.cols)[index].DataType.String()
+	col := (*resultSet.cols)[index]
+	dataType := col.describeDataType
+	if dataType == 0 {
+		dataType = col.DataType
+	}
+	switch dataType {
+	case 0:
+		return ""
+	case types.NCHAR, types.VARCHAR, types.NullStr, types.OCIString:
+		if col.CharsetForm == 2 {
+			return "NVARCHAR2"
+		}
+		return "VARCHAR2"
+	case types.CHAR, types.CHARZ:
+		if col.CharsetForm == 2 {
+			return "NCHAR"
+		}
+		return "CHAR"
+	case types.NUMBER, types.VarNum, types.BInteger, types.UINT, types.PDN:
+		return "NUMBER"
+	case types.FLOAT:
+		return "FLOAT"
+	case types.BFLOAT, types.IBFLOAT:
+		return "BINARY_FLOAT"
+	case types.BDOUBLE, types.IBDOUBLE:
+		return "BINARY_DOUBLE"
+	case types.DATE, types.OCIDate:
+		return "DATE"
+	case types.TimeStampDTY, types.TIMESTAMP:
+		return "TIMESTAMP"
+	case types.TimeStampTZ_DTY, types.TIMESTAMPTZ:
+		return "TIMESTAMP WITH TIME ZONE"
+	case types.TimeStampLTZ_DTY, types.TimeStampLTZ:
+		return "TIMESTAMP WITH LOCAL TIME ZONE"
+	case types.INTERVALYM_DTY, types.IntervalYM:
+		return "INTERVAL YEAR TO MONTH"
+	case types.INTERVALDS_DTY, types.IntervalDS:
+		return "INTERVAL DAY TO SECOND"
+	case types.RAW, types.VarRaw:
+		return "RAW"
+	case types.LONG, types.LongVarChar:
+		return "LONG"
+	case types.LongRaw, types.LongVarRaw:
+		return "LONG RAW"
+	case types.ROWID:
+		return "ROWID"
+	case types.UROWID:
+		return "UROWID"
+	case types.OCIClobLocator:
+		if col.CharsetForm == 2 {
+			return "NCLOB"
+		}
+		return "CLOB"
+	case types.OCIBlobLocator:
+		if col.udsFlags&0x400 != 0 {
+			return "JSON"
+		}
+		return "BLOB"
+	case types.OCIFileLocator:
+		return "BFILE"
+	case types.JSON:
+		return "JSON"
+	case types.VECTOR:
+		return "VECTOR"
+	case types.BOOLEAN:
+		return "BOOLEAN"
+	case types.REFCURSOR, types.RESULTSET:
+		return "REFCURSOR"
+	case types.OCIRef, TNS_DATA_TYPE_INT_REF:
+		return "REF"
+	case types.OCIXMLType, types.XMLType:
+		if col.IsXmlType || col.TypeName == "" || col.TypeName == "XMLTYPE" {
+			return "XMLTYPE"
+		}
+		if col.SchemaName != "" {
+			return col.SchemaName + "." + col.TypeName
+		}
+		return col.TypeName
+	default:
+		if str, ok := _OracleType_map[dataType]; ok {
+			return str
+		}
+		return ""
+	}
 }
 
 // ColumnTypeLength return length of column type

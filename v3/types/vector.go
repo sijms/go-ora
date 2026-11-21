@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 )
 
 type VectorDataType int
@@ -84,6 +85,15 @@ func (vector *Vector) SetValue(input interface{}) error {
 		data = temp
 		//v.Type = VECTOR_UINT8
 		//v.data = temp
+	case []int8:
+		// an INT8 vector, as Value returns it
+		temp := make([]byte, len(value))
+		for i, val := range value {
+			temp[i] = byte(val)
+		}
+		format = vectorFormatInt8
+		length = uint32(len(value))
+		data = temp
 	case []float32:
 		format = 2
 		length = uint32(len(value))
@@ -198,130 +208,126 @@ func (vector *Vector) SetValue(input interface{}) error {
 	return nil
 }
 
+// The vector image: a magic byte and a version, flags, the element format, the
+// number of dimensions, 8 bytes of a norm where a flag says so, and the elements;
+// a sparse vector's elements are its count of values that are not zero, their
+// indexes, then the values.
+const (
+	vectorMagic         = 0xDB
+	vectorVersionSparse = 2
+	vectorFlagNorm      = 0x02
+	vectorFlagNormSpace = 0x10
+	vectorFlagSparse    = 0x20
+	vectorFormatFloat32 = 2
+	vectorFormatFloat64 = 3
+	vectorFormatInt8    = 4
+	vectorFormatBinary  = 5
+)
+
+// SparseVector is a sparse VECTOR: its number of dimensions, and the indexes,
+// from 0, and values of the dimensions that are not zero. Values is a []float32,
+// a []float64, or a []int8.
+type SparseVector struct {
+	Dimensions int
+	Indices    []uint32
+	Values     interface{}
+}
+
+// Value returns a dense vector's elements as a []float32, a []float64, a []int8,
+// or, for a BINARY vector, its bits packed in a []uint8; and a sparse vector as a
+// SparseVector.
 func (vector *Vector) Value() (interface{}, error) {
 	if len(vector.bValue) == 0 {
 		return nil, nil
 	}
-	read := func(tempBuffer *bytes.Buffer, size int) (int, error) {
-		var err error
-		switch size {
-		case 1:
-			var temp uint8
-			temp, err = tempBuffer.ReadByte()
-			if err != nil {
-				return 0, vectorTypeError
-			}
-			return int(temp), nil
-		case 2:
-			var temp uint16
-			err = binary.Read(tempBuffer, binary.BigEndian, &temp)
-			if err != nil {
-				return 0, vectorTypeError
-			}
-			return int(temp), nil
-		case 4:
-			var temp uint32
-			err = binary.Read(tempBuffer, binary.BigEndian, &temp)
-			if err != nil {
-				return 0, vectorTypeError
-			}
-			return int(temp), nil
-		default:
-			return 0, vectorTypeError
-		}
+	buffer := bytes.NewReader(vector.bValue)
+	var header struct {
+		Magic   uint8
+		Version uint8
+		Flags   uint16
+		Format  uint8
+		Count   uint32
 	}
-	buffer := bytes.NewBuffer(vector.bValue)
-	magicNumber, err := read(buffer, 1)
-	if err != nil {
-		return nil, err
-	}
-	if magicNumber != 219 {
+	if err := binary.Read(buffer, binary.BigEndian, &header); err != nil {
 		return nil, vectorTypeError
 	}
-	var version, flag, format, count int
-	version, err = read(buffer, 1)
-	if err != nil {
-		return nil, err
+	if header.Magic != vectorMagic {
+		return nil, vectorTypeError
 	}
-	if version != 0 {
-		return nil, fmt.Errorf("vector version (%d) not supported", version)
+	if header.Version > vectorVersionSparse {
+		return nil, fmt.Errorf("vector version (%d) not supported", header.Version)
 	}
-	flag, err = read(buffer, 2)
-	if err != nil {
-		return nil, err
+	if header.Flags&(vectorFlagNorm|vectorFlagNormSpace) != 0 {
+		if _, err := buffer.Seek(8, io.SeekCurrent); err != nil {
+			return nil, vectorTypeError
+		}
 	}
-	format, err = read(buffer, 1)
-	if err != nil {
-		return nil, err
+	if header.Flags&vectorFlagSparse != 0 {
+		var count uint16
+		if err := binary.Read(buffer, binary.BigEndian, &count); err != nil {
+			return nil, vectorTypeError
+		}
+		indices := make([]uint32, count)
+		if err := binary.Read(buffer, binary.BigEndian, indices); err != nil {
+			return nil, vectorTypeError
+		}
+		values, err := vectorElements(buffer, header.Format, int(count))
+		if err != nil {
+			return nil, err
+		}
+		return SparseVector{Dimensions: int(header.Count), Indices: indices, Values: values}, nil
 	}
-	if flag&1 > 0 {
-		count, err = read(buffer, 1)
-	} else if flag&2 > 0 {
-		count, err = read(buffer, 4)
-	} else {
-		count, err = read(buffer, 2)
+	count := int(header.Count)
+	if header.Format == vectorFormatBinary {
+		count /= 8
 	}
-	if err != nil {
-		return nil, err
+	return vectorElements(buffer, header.Format, count)
+}
+
+func vectorElements(buffer *bytes.Reader, format uint8, count int) (interface{}, error) {
+	size := map[uint8]int{vectorFormatFloat32: 4, vectorFormatFloat64: 8, vectorFormatInt8: 1, vectorFormatBinary: 1}[format]
+	if size == 0 {
+		return nil, fmt.Errorf("unsupported format (%d) for vector type", format)
 	}
-	if flag&0x10 > 0 {
-		_ = buffer.Next(8)
+	data := make([]byte, count*size)
+	if _, err := io.ReadFull(buffer, data); err != nil {
+		return nil, vectorTypeError
 	}
 	switch format {
-	case 2:
-		// float32 array
-		vecData := make([]float32, count)
-		for i := 0; i < count; i++ {
+	case vectorFormatFloat32:
+		values := make([]float32, count)
+		for i := range values {
 			n := Number{}
-			n.SetBytes(buffer.Next(4))
+			n.SetBytes(data[i*4 : i*4+4])
 			n.SetDataType(IBFLOAT)
-			output, err := n.Value()
+			value, err := n.Value()
 			if err != nil {
 				return nil, err
 			}
-			if temp, ok := output.(float32); ok {
-				vecData[i] = temp
-			}
-			//temp := &DoubleCoder{}
-			//vecData[i], err = temp.DecodeFloat(buffer.Next(4))
-			//if err != nil {
-			//	return nil, err
-			//}
+			values[i] = value.(float32)
 		}
-		return vecData, nil
-		//return types.NewVector(vecData, coder.streamer, coder.copy())
-	case 3:
-		// float64 array
-		vecData := make([]float64, count)
-		for i := 0; i < count; i++ {
+		return values, nil
+	case vectorFormatFloat64:
+		values := make([]float64, count)
+		for i := range values {
 			n := Number{}
-			n.SetBytes(buffer.Next(8))
+			n.SetBytes(data[i*8 : i*8+8])
 			n.SetDataType(IBDOUBLE)
-			output, err := n.Value()
+			value, err := n.Value()
 			if err != nil {
 				return nil, err
 			}
-			if temp, ok := output.(float64); ok {
-				vecData[i] = temp
-			}
-			//temp := &DoubleCoder{}
-			//vecData[i], err = temp.DecodeDouble(buffer.Next(8))
-			//if err != nil {
-			//	return nil, err
-			//}
+			values[i] = value.(float64)
 		}
-		return vecData, nil
-		//return types.NewVector(vecData, coder.streamer, coder.copy())
-	case 4:
-		// int8 array
-		vecData := make([]uint8, count)
-		for i := 0; i < count; i++ {
-			vecData[i], err = buffer.ReadByte()
+		return values, nil
+	case vectorFormatInt8:
+		values := make([]int8, count)
+		for i, b := range data {
+			values[i] = int8(b)
 		}
-		return vecData, nil
-		//return types.NewVector(vecData, coder.streamer, coder.copy())
+		return values, nil
 	default:
-		return nil, fmt.Errorf("unsupported format (%d) for vector type", format)
+		return data, nil
 	}
 }
 
@@ -465,6 +471,12 @@ func CreateVector(array interface{}) (*Vector, error) {
 //	return v.data
 //}
 
+// Truncated reports whether the vector holds less than the database's, which
+// Read fetches.
+func (vector *Vector) Truncated() bool {
+	return vector.length > int64(len(vector.bValue))
+}
+
 func (vector *Vector) Read(ctx context.Context) error {
 	var err error
 	vector.bValue, err = vector.ReadFromPos(ctx, 0)
@@ -590,6 +602,24 @@ func (vector *Vector) CopyTo(dest driver.Value) error {
 			return nil
 		}
 		if v, ok := val.([]float64); ok {
+			*dst = v
+			return nil
+		}
+	case *[]int8:
+		if val == nil {
+			*dst = nil
+			return nil
+		}
+		if v, ok := val.([]int8); ok {
+			*dst = v
+			return nil
+		}
+	case *SparseVector:
+		if val == nil {
+			*dst = SparseVector{}
+			return nil
+		}
+		if v, ok := val.(SparseVector); ok {
 			*dst = v
 			return nil
 		}

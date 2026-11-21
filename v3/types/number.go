@@ -27,7 +27,7 @@ func (number *Number) GetMaxLen() int64 {
 	}
 }
 func (number *Number) isZero() bool {
-	return len(number.bValue) > 0 && number.bValue[0] == 0x80
+	return len(number.bValue) == 1 && number.bValue[0] == 0x80
 }
 
 func (number *Number) isPositive() bool {
@@ -439,24 +439,29 @@ func (number *Number) decodeDouble() (float64, error) {
 	if len(number.bValue) < int(MaxLenBDouble) {
 		return 0, fmt.Errorf("error decoding binary double, supplied buffer length: %d and required length: %d", len(number.bValue), 8)
 	}
-	if number.bValue[0]&128 != 0 {
-		number.bValue[0] = number.bValue[0] & 127
+	// decode a copy, so the value reads the same each time
+	data := make([]byte, MaxLenBDouble)
+	copy(data, number.bValue)
+	if data[0]&128 != 0 {
+		data[0] = data[0] & 127
 	} else {
-		xorBuffer(number.bValue, int(MaxLenBDouble))
+		xorBuffer(data, int(MaxLenBDouble))
 	}
-	return math.Float64frombits(binary.BigEndian.Uint64(number.bValue)), nil
+	return math.Float64frombits(binary.BigEndian.Uint64(data)), nil
 }
 
 func (number *Number) decodeFloat() (float32, error) {
 	if len(number.bValue) < int(MaxLenBFloat) {
 		return 0, fmt.Errorf("error decoding binary float, supplied buffer length: %d and required length: %d", len(number.bValue), 4)
 	}
-	if number.bValue[0]&128 != 0 {
-		number.bValue[0] = number.bValue[0] & 127
+	data := make([]byte, MaxLenBFloat)
+	copy(data, number.bValue)
+	if data[0]&128 != 0 {
+		data[0] = data[0] & 127
 	} else {
-		xorBuffer(number.bValue, int(MaxLenBFloat))
+		xorBuffer(data, int(MaxLenBFloat))
 	}
-	return math.Float32frombits(binary.BigEndian.Uint32(number.bValue)), nil
+	return math.Float32frombits(binary.BigEndian.Uint32(data)), nil
 }
 
 func (number *Number) Value() (interface{}, error) {

@@ -88,6 +88,23 @@ func (h *header) read(buffer *bytes.Reader) error {
 	if h.flags&2 == 0 || h.flags&4 == 0 {
 		return errors.New("corrupted json data")
 	}
+	if h.flags&0x10 != 0 {
+		// a scalar has no keys: its tree segment's size, then the node
+		if h.flags&0x1000 != 0 {
+			var temp uint32
+			err = binary.Read(buffer, binary.BigEndian, &temp)
+			h.nodeDataLen = int(temp)
+		} else {
+			var temp uint16
+			err = binary.Read(buffer, binary.BigEndian, &temp)
+			h.nodeDataLen = int(temp)
+		}
+		if err != nil {
+			return err
+		}
+		h.nodeOffset, err = buffer.Seek(0, io.SeekCurrent)
+		return err
+	}
 	keyCount, err := h.readKeyCount(buffer)
 	if err != nil {
 		return err
@@ -190,10 +207,20 @@ func (h *header) readKeys(buffer *bytes.Reader, keysCount int) error {
 			return err
 		}
 	}
-	var offset uint16
+	// a key's offset is 4 bytes where the key segment is longer than 64K
 	for index = 0; index < keysCount; index++ {
-		err = binary.Read(buffer, binary.BigEndian, &offset)
-		h.keys[index].offset = int(offset)
+		if h.flags&0x800 != 0 {
+			var offset uint32
+			err = binary.Read(buffer, binary.BigEndian, &offset)
+			h.keys[index].offset = int(offset)
+		} else {
+			var offset uint16
+			err = binary.Read(buffer, binary.BigEndian, &offset)
+			h.keys[index].offset = int(offset)
+		}
+		if err != nil {
+			return err
+		}
 	}
 	var baseOffset int64
 	baseOffset, err = buffer.Seek(0, io.SeekCurrent)

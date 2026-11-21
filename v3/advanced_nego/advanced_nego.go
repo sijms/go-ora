@@ -17,6 +17,9 @@ const version = uint32(0x17000000)
 // KerberosAuthInterface is an alias for configurations.KerberosAuthInterface, maintained for backwards compatibility.
 type KerberosAuthInterface = configurations.KerberosAuthInterface
 
+// KerberosMutualAuthInterface is an alias for configurations.KerberosMutualAuthInterface.
+type KerberosMutualAuthInterface = configurations.KerberosMutualAuthInterface
+
 var kerberosAuth KerberosAuthInterface = nil
 
 // SetKerberosAuth Set Kerberos5 Authentication interface used for kerberos authentication
@@ -345,7 +348,7 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 	if len(serverHostName) == 0 {
 		return errors.New("kerberos negotiation error: Server hostname not received")
 	}
-	ticketData, err := kerberos.Authenticate(serverHostName, serviceName)
+	ticketData, accept, err := kerberosTicket(kerberos, serverHostName, serviceName)
 	if err != nil {
 		return err
 	}
@@ -399,10 +402,15 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 	if err != nil {
 		return err
 	}
-	// receive byte array
-	_, err = nego.comm.readBytes()
+	// receive byte array: the server's AP-REP where the ticket asked for mutual authentication
+	reply, err := nego.comm.readBytes()
 	if err != nil {
 		return err
+	}
+	if accept != nil {
+		if err = accept(reply); err != nil {
+			return err
+		}
 	}
 	// send ano header (25,1, 0)
 	nego.comm.session.ResetBuffer()
@@ -413,6 +421,15 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 	nego.comm.writePacketHeader(0, 1)
 	// write
 	return nego.comm.session.Write()
+}
+
+// kerberosTicket is the ticket to send and, for a KerberosMutualAuthInterface, the check of the server's reply.
+func kerberosTicket(kerberos KerberosAuthInterface, server, service string) ([]byte, func([]byte) error, error) {
+	if mutual, ok := kerberos.(KerberosMutualAuthInterface); ok {
+		return mutual.AuthenticateMutual(server, service)
+	}
+	ticket, err := kerberos.Authenticate(server, service)
+	return ticket, nil, err
 }
 
 func getHostIPAddress() (net.IP, error) {

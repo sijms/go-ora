@@ -1395,6 +1395,44 @@ func (session *Session) GetNullTermString(maxSize int) (result string, err error
 }
 
 // GetClr reed variable length bytearray from input buffer
+// AppendClr reads a value as GetClr does and appends it to dst, returning the extended slice. It returns dst unchanged
+// for a NULL. A caller reading many values into one buffer, such as a LOB's data, can reuse its memory.
+func (session *Session) AppendClr(dst []byte) ([]byte, error) {
+	nb, err := session.GetByte()
+	if err != nil {
+		return dst, err
+	}
+	if nb == 0 || nb == 0xFF || nb == 0xFD {
+		return dst, nil
+	}
+	chunkSize := int(nb)
+	if chunkSize != 0xFE {
+		chunk, err := session.GetBytes(chunkSize)
+		if err != nil {
+			return dst, err
+		}
+		return append(dst, chunk...), nil
+	}
+	for chunkSize > 0 {
+		if session.UseBigClrChunks {
+			chunkSize, err = session.GetInt(4, true, true)
+		} else {
+			nb, err = session.GetByte()
+			chunkSize = int(nb)
+		}
+		if err != nil {
+			return dst, err
+		}
+		chunk, err := session.GetBytes(chunkSize)
+		if err != nil {
+			return dst, err
+		}
+		// Each chunk is copied before the next read, which may reuse its memory.
+		dst = append(dst, chunk...)
+	}
+	return dst, nil
+}
+
 func (session *Session) GetClr() (output []byte, err error) {
 	var nb byte
 	nb, err = session.GetByte()

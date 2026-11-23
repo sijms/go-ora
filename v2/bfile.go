@@ -188,6 +188,13 @@ func (file *BFile) ReadBytesFromPosContext(ctx context.Context, pos, count int64
 	return file.lob.getDataWithOffsetSize(ctx, pos, count)
 }
 
+// ReadBytesFromPosIntoContext reads what ReadBytesFromPosContext reads, and appends it to dst, returning the extended
+// slice. ReadBytesFromPosContext returns a slice of the file's own buffer, which the next read reuses, so callers copy
+// it. Reading into a buffer the caller keeps, such as dst[:0], skips that copy and the file's buffer.
+func (file *BFile) ReadBytesFromPosIntoContext(ctx context.Context, pos, count int64, dst []byte) ([]byte, error) {
+	return file.lob.appendDataWithOffsetSize(ctx, pos, count, dst)
+}
+
 func (file *BFile) Scan(value interface{}) error {
 	if value == nil {
 		file.Valid = false

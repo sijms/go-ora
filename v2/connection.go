@@ -119,6 +119,8 @@ type Connection struct {
 	dbTimeZone               *time.Location // equivalent to database timezone used for timestamp with local timezone
 	dbServerTimeZone         *time.Location // equivalent to timezone of the server carry the database
 	dbServerTimeZoneExplicit *time.Location
+	dbTimeZoneUTC            utcCheck // isEqualLoc(dbTimeZone, time.UTC), see utcCheck
+	dbServerTimeZoneUTC      utcCheck // isEqualLoc(dbServerTimeZone, time.UTC), see utcCheck
 }
 
 type ConnectionProperties struct {

@@ -705,6 +705,9 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 	return
 }
 
+// isEqualLoc reports whether zone1 and zone2 have the same name and offset now.
+// utcCheck remembers its answer for a connection's zones: it must give the same answer
+// at any time for the same zones, or utcCheck would keep a stale one.
 func isEqualLoc(zone1, zone2 *time.Location) bool {
 	t := time.Now()
 	t1 := t.In(zone1)
@@ -712,4 +715,22 @@ func isEqualLoc(zone1, zone2 *time.Location) bool {
 	name1, offset1 := t1.Zone()
 	name2, offset2 := t2.Zone()
 	return name1 == name2 && offset1 == offset2
+}
+
+// utcCheck is isEqualLoc(loc, time.UTC) for the last location it was given: it asks
+// isEqualLoc again only when the location changes. For the zones of the tz database,
+// whose name never switches between "UTC" and another while keeping offset 0, the
+// answer is the one isEqualLoc would give at the moment of each call. A utcCheck
+// belongs to one connection and is not safe for concurrent use, like decoding.
+type utcCheck struct {
+	loc *time.Location
+	set bool
+	utc bool
+}
+
+func (c *utcCheck) isUTC(loc *time.Location) bool {
+	if !c.set || c.loc != loc {
+		c.loc, c.utc, c.set = loc, isEqualLoc(loc, time.UTC), true
+	}
+	return c.utc
 }

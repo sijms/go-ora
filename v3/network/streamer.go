@@ -1,6 +1,8 @@
 package network
 
 type TerminalReader interface {
+	// read returns the next num bytes in a new slice the caller owns: it never
+	// shares memory with the input buffer (GetBytes and GetClr rely on this).
 	read(num int) ([]byte, error)
 }
 type SessionReader interface {

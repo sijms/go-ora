@@ -101,29 +101,25 @@ func (session *basicSession) GetClr() (output []byte, err error) {
 		return
 	}
 	chunkSize := int(nb)
+	if chunkSize != 0xFE {
+		// One chunk: GetBytes returns a slice the caller owns, so it is the value.
+		return session.GetBytes(chunkSize)
+	}
 	var chunk []byte
 	var tempBuffer bytes.Buffer
-	if chunkSize == 0xFE {
-		for chunkSize > 0 {
-			//if session.IsBreak() {
-			//	break
-			//}
-			if session.UseBigClrChunks {
-				chunkSize, err = session.GetInt(4, true, true)
-			} else {
-				nb, err = session.GetByte()
-				chunkSize = int(nb)
-			}
-			if err != nil {
-				return
-			}
-			chunk, err = session.GetBytes(chunkSize)
-			if err != nil {
-				return
-			}
-			tempBuffer.Write(chunk)
+	for chunkSize > 0 {
+		//if session.IsBreak() {
+		//	break
+		//}
+		if session.UseBigClrChunks {
+			chunkSize, err = session.GetInt(4, true, true)
+		} else {
+			nb, err = session.GetByte()
+			chunkSize = int(nb)
 		}
-	} else {
+		if err != nil {
+			return
+		}
 		chunk, err = session.GetBytes(chunkSize)
 		if err != nil {
 			return

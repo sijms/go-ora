@@ -20,8 +20,11 @@ func (num Number) SetDataType(conn *Connection, par *ParameterInfo) error {
 	par.MaxLen = converters.MAX_LEN_NUMBER
 	return nil
 }
+
+// isZero reports whether num is zero, which Oracle stores as the single byte 0x80. Positive numbers from 1E-130 up to
+// 1E-128 also start with 0x80, followed by their mantissa.
 func (num *Number) isZero() bool {
-	return len(num.data) > 0 && num.data[0] == 0x80
+	return len(num.data) == 1 && num.data[0] == 0x80
 }
 
 func (num *Number) isPositive() bool {

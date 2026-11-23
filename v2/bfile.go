@@ -9,6 +9,21 @@ import (
 	"errors"
 )
 
+// bfileName reads a name of a BFILE locator at index: a 2-byte length, then its bytes.
+// It returns the name and the index after it; ok is false when the name would end past
+// the locator, whose lengths come from the server.
+func bfileName(locator []byte, index int) (name []byte, next int, ok bool) {
+	if index+2 > len(locator) {
+		return nil, index, false
+	}
+	length := int(binary.BigEndian.Uint16(locator[index : index+2]))
+	index += 2
+	if index+length > len(locator) {
+		return nil, index, false
+	}
+	return locator[index : index+length], index + length, true
+}
+
 type BFile struct {
 	dirName  string
 	fileName string

@@ -572,6 +572,9 @@ func (lob *Lob) readData() error {
 
 func (lob *Lob) GetLobId(locator []byte) []byte {
 	// BitConverter.ToString(lobLocator, 10, 10);
+	if len(locator) < 10+10 {
+		return nil
+	}
 	return locator[10 : 10+10]
 }
 

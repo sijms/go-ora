@@ -1105,7 +1105,17 @@ func (session *Session) PutString(data string) {
 // GetString read a string data from input buffer
 func (session *Session) GetString(length int) (string, error) {
 	ret, err := session.GetClr()
-	return string(ret[:length]), err
+	if err != nil {
+		return "", err
+	}
+	// The length comes from another field: the string stays within its value.
+	if length > len(ret) {
+		length = len(ret)
+	}
+	if length < 0 {
+		length = 0
+	}
+	return string(ret[:length]), nil
 }
 
 // PutBytes write bytes of data to output buffer

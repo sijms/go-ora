@@ -522,7 +522,7 @@ func (lob *LobStream) readData() error {
 
 func (lob *LobStream) GetLobId() []byte {
 	// BitConverter.ToString(lobLocator, 10, 10);
-	if lob.sourceLocator == nil {
+	if len(lob.sourceLocator) < 10+10 {
 		return nil
 	}
 	return lob.sourceLocator[10 : 10+10]

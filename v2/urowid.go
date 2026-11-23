@@ -23,6 +23,9 @@ func newURowID(session *network.Session) (*urowid, error) {
 		if err != nil {
 			return nil, err
 		}
+		if len(ret.data) > 0 && ret.data[0] == 1 && len(ret.data) < 13 {
+			return nil, fmt.Errorf("a physical UROWID of %d bytes, want 13", len(ret.data))
+		}
 		return ret, nil
 	}
 	return nil, nil

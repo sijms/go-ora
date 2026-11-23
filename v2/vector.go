@@ -124,10 +124,22 @@ func (v *Vector) decode(value []byte) error {
 		}
 		index = index + cnt
 	}
+	// The count comes from the header: it must fit the bytes the value holds.
+	elementSize := 0
+	switch v.format {
+	case 2:
+		elementSize = 4
+	case 3:
+		elementSize = 8
+	case 4:
+		elementSize = 1
+	}
+	if elementSize > 0 && (v.Count < 0 || v.Count > (len(value)-index)/elementSize) {
+		return vectorTypeError
+	}
 	switch v.format {
 	case 2:
 		// float32 array
-		elementSize := 4
 		data := make([]float32, 0)
 		for i := 0; i < v.Count; i++ {
 			number := converters.ConvertBinaryFloat(value[index : index+elementSize])
@@ -137,7 +149,6 @@ func (v *Vector) decode(value []byte) error {
 		v.Data = data
 	case 3:
 		// float64 array
-		elementSize := 8
 		data := make([]float64, 0)
 		for i := 0; i < v.Count; i++ {
 			number := converters.ConvertBinaryDouble(value[index : index+elementSize])
@@ -147,7 +158,6 @@ func (v *Vector) decode(value []byte) error {
 		v.Data = data
 	case 4:
 		// int8 array
-		elementSize := 1
 		data := make([]uint8, 0)
 		for i := 0; i < v.Count; i++ {
 			data = append(data, value[index])

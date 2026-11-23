@@ -24,6 +24,9 @@ func (rowid RowID) Value() (interface{}, error) {
 		return string(rowid.decode()), nil
 	case UROWID:
 		if len(rowid.bValue) > 0 && rowid.bValue[0] == 1 {
+			if len(rowid.bValue) < 13 {
+				return nil, fmt.Errorf("a physical UROWID of %d bytes, want 13", len(rowid.bValue))
+			}
 			return string(rowid.physicalRawIDToByteArray(rowid.bValue)), nil
 		}
 		return string(rowid.logicalRawIDToByteArray(rowid.bValue)), nil

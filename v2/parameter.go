@@ -2,7 +2,6 @@ package go_ora
 
 import (
 	"database/sql/driver"
-	"encoding/binary"
 	"fmt"
 	"math"
 	"strings"
@@ -657,16 +656,11 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, temporaryLobs *[][]b
 			return err
 		}
 		var dirName, fileName string
-		if len(locator) > 16 {
-			index := 16
-			length := int(binary.BigEndian.Uint16(locator[index : index+2]))
-			index += 2
-			dirName = conn.sStrConv.Decode(locator[index : index+length])
-			index += length
-			length = int(binary.BigEndian.Uint16(locator[index : index+2]))
-			index += 2
-			fileName = conn.sStrConv.Decode(locator[index : index+length])
-			index += length
+		if dir, next, ok := bfileName(locator, 16); ok {
+			dirName = conn.sStrConv.Decode(dir)
+			if file, _, ok := bfileName(locator, next); ok {
+				fileName = conn.sStrConv.Decode(file)
+			}
 		}
 		f := BFile{
 			dirName:  dirName,

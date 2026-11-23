@@ -192,14 +192,25 @@ func (file *BFile) Close() error {
 	return nil
 }
 
+// bfileName reads a name of a BFILE locator at index: a 2-byte length, then its bytes.
+// It returns the name and the index after it; ok is false when the name would end past
+// the locator, whose lengths come from the server.
+func bfileName(locator []byte, index int) (name []byte, next int, ok bool) {
+	if index+2 > len(locator) {
+		return nil, index, false
+	}
+	length := int(binary.BigEndian.Uint16(locator[index : index+2]))
+	index += 2
+	if index+length > len(locator) {
+		return nil, index, false
+	}
+	return locator[index : index+length], index + length, true
+}
+
 func (file *BFile) GetDirName() string {
 	dirName := ""
-	locator := file.GetLocator()
-	if len(locator) > 16 && file.Conv != nil {
-		index := 16
-		length := int(binary.BigEndian.Uint16(locator[index : index+2]))
-		index += 2
-		dirName = file.Conv.Decode(locator[index : index+length])
+	if dir, _, ok := bfileName(file.GetLocator(), 16); ok && file.Conv != nil {
+		dirName = file.Conv.Decode(dir)
 	}
 	return dirName
 }
@@ -207,15 +218,10 @@ func (file *BFile) GetDirName() string {
 func (file *BFile) GetFileName() string {
 	fileName := ""
 	locator := file.GetLocator()
-	if len(locator) > 16 && file.Conv != nil {
-		index := 16
-		length := int(binary.BigEndian.Uint16(locator[index : index+2]))
-		index += 2
-		_ = file.Conv.Decode(locator[index : index+length])
-		index += length
-		length = int(binary.BigEndian.Uint16(locator[index : index+2]))
-		index += 2
-		fileName = file.Conv.Decode(locator[index : index+length])
+	if _, next, ok := bfileName(locator, 16); ok && file.Conv != nil {
+		if name, _, ok := bfileName(locator, next); ok {
+			fileName = file.Conv.Decode(name)
+		}
 	}
 	return fileName
 }

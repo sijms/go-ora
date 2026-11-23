@@ -427,3 +427,28 @@ func TestIsEqualLoc(t *testing.T) {
 		})
 	}
 }
+
+// utcCheck answers as isEqualLoc does, asked once or twice in a row, and remembers the
+// last location it was given.
+func TestUTCCheckAnswersAsIsEqualLoc(t *testing.T) {
+	zones := []*time.Location{time.UTC, time.FixedZone("UTC", 0), time.FixedZone("", 0), time.FixedZone("", 4*60*60), time.Local}
+	for _, name := range []string{"Etc/UTC", "America/New_York", "Europe/London"} {
+		loc, err := time.LoadLocation(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		zones = append(zones, loc)
+	}
+	var c utcCheck
+	for _, loc := range zones {
+		want := isEqualLoc(loc, time.UTC)
+		for call := 1; call <= 2; call++ {
+			if got := c.isUTC(loc); got != want {
+				t.Errorf("call %d: isUTC(%q) = %v, isEqualLoc says %v", call, loc, got, want)
+			}
+			if !c.set || c.loc != loc {
+				t.Errorf("call %d: isUTC(%q) does not remember the location", call, loc)
+			}
+		}
+	}
+}

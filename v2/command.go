@@ -714,6 +714,16 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, resultSet *ResultSet) error
 	return stmt.read(resultSet)
 }
 
+// Return an ORA-1403 error for anything else than SELECT, for which it is an end-of-fetch
+// marker
+func (stmt *defaultStmt) noDataFoundError() error {
+	session := stmt.connection.session
+	if stmt.stmtType != SELECT && session.Summary != nil && session.Summary.RetCode == 1403 {
+		return session.GetError()
+	}
+	return nil
+}
+
 // read this is common read for stmt it read much information related to
 // columns, dataset information, output parameter information, rows values
 // and at the end summary object about this operation
@@ -1015,6 +1025,11 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			if err != nil {
 				return err
 			}
+			if msg == 4 {
+				if err = stmt.noDataFoundError(); err != nil {
+					return err
+				}
+			}
 			if msg == 4 || msg == 9 {
 				loop = false
 			}
@@ -1242,6 +1257,9 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 		session := stmt.connection.session
 		if session.Summary != nil {
 			stmt.cursorID = session.Summary.CursorID
+		}
+		if err == nil {
+			err = stmt.noDataFoundError()
 		}
 	}
 	if err != nil {
@@ -1831,6 +1849,9 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		if session.Summary != nil {
 			stmt.cursorID = session.Summary.CursorID
 		}
+		if err == nil {
+			err = stmt.noDataFoundError()
+		}
 	}
 	if err != nil {
 		if isBadConn(err) {
@@ -1946,6 +1967,9 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 		session := stmt.connection.session
 		if session.Summary != nil {
 			stmt.cursorID = session.Summary.CursorID
+		}
+		if err == nil {
+			err = stmt.noDataFoundError()
 		}
 	}
 	if err != nil {

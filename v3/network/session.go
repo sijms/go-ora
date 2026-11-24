@@ -860,9 +860,11 @@ func (session *Session) HasError() bool {
 }
 
 // GetError Return the error in form or OracleError
+// Also passes an ORA-1403, which can be an end-of-fetch marker for a SELECT
+// but also a real error indication when raised from a trigger PLSQL block.
 func (session *Session) GetError() *OracleError {
 	err := &OracleError{}
-	if session.HasError() {
+	if session.Summary != nil && session.Summary.RetCode != 0 {
 		err.ErrCode = session.Summary.RetCode
 		if session.StrConv != nil {
 			err.ErrMsg = session.StrConv.Decode(session.Summary.ErrorMessage)

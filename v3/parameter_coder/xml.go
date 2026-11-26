@@ -17,10 +17,14 @@ type XmlParameter struct {
 	streamer types.LobStreamer
 }
 
+// The image's flags: its document inline as text, or a CLOB's locator to it,
+// with four bytes before either where xmlSkipNext4 is set. Other bits vary by
+// release (18c sets 0x20000 where 21c does not), so each is tested alone.
 const (
-	xmlImage      = 0x85
-	xmlInlineText = 0x14
-	xmlClob       = 0x11
+	xmlImage     = 0x85
+	xmlString    = 0x04
+	xmlLob       = 0x01
+	xmlSkipNext4 = 0x100000
 )
 
 func (param *XmlParameter) Copy() OracleParameterCoder {
@@ -75,7 +79,7 @@ func (param *XmlParameter) Read(session network.SessionReader) error {
 	return err
 }
 
-// Decode reads the image: 0x85, its length, a flag byte, a 4-byte kind, then
+// Decode reads the image: 0x85, its length, a flag byte, 4 bytes of flags, then
 // the document's text in the database character set or a CLOB's locator.
 func (param *XmlParameter) Decode(conn IConnection) (interface{}, error) {
 	image := param.BValue
@@ -106,17 +110,23 @@ func (param *XmlParameter) Decode(conn IConnection) (interface{}, error) {
 	if pos+4 > len(image) {
 		return nil, errors.New("XMLTYPE image is too short")
 	}
-	kind := binary.BigEndian.Uint32(image[pos:])
+	flags := binary.BigEndian.Uint32(image[pos:])
 	pos += 4
+	if flags&xmlSkipNext4 != 0 {
+		pos += 4
+		if pos > len(image) {
+			return nil, errors.New("XMLTYPE image is too short")
+		}
+	}
 	value := image[pos:]
-	switch kind {
-	case xmlInlineText:
+	switch {
+	case flags&xmlString != 0:
 		conv, err := conn.GetDefaultStringCoder()
 		if err != nil {
 			return nil, err
 		}
 		return conv.Decode(value), nil
-	case xmlClob:
+	case flags&xmlLob != 0:
 		if param.streamer == nil {
 			param.streamer = conn.NewLobStreamer()
 		}
@@ -136,6 +146,6 @@ func (param *XmlParameter) Decode(conn IConnection) (interface{}, error) {
 		}
 		return clob, err
 	default:
-		return nil, fmt.Errorf("unsupported XMLTYPE storage: %#x", kind)
+		return nil, fmt.Errorf("unsupported XMLTYPE storage: %#x", flags)
 	}
 }

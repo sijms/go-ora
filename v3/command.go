@@ -249,10 +249,12 @@ func (stmt *defaultStmt) writeDefine() error {
 		if col.isLobType() {
 			num = 0
 			// temp.ContFlag |= 0x2000000
-			if stmt.connection.connOption.Lob == configurations.INLINE && !col.IsJson && col.DataType != oraTypes.OCIFileLocator {
+			// JSON and VECTOR are prefetched as LOBs: a VECTOR redefined as a LONG RAW is not read
+			if stmt.connection.connOption.Lob == configurations.INLINE && !col.IsJson && col.DataType != oraTypes.OCIFileLocator &&
+				col.DataType != oraTypes.VECTOR {
 				num = 0x3FFFFFFF
 				// col.MaxCharLen = 0
-				if col.DataType == oraTypes.OCIBlobLocator || col.DataType == oraTypes.VECTOR || col.DataType == oraTypes.JSON {
+				if col.DataType == oraTypes.OCIBlobLocator || col.DataType == oraTypes.JSON {
 					col.DataType = oraTypes.LongRaw
 					// change data type in the original array
 					stmt.columns[index].DataType = oraTypes.LongRaw
@@ -2200,6 +2202,13 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 			//	}
 			case *oraTypes.Vector:
 				if stmt.connection.connOption.Lob == configurations.INLINE {
+					// a vector longer than the prefetch is read in full
+					if val.Truncated() && val.GetReadMode() == configurations.LobReadMode_AUTO {
+						err = val.Read(context.Background())
+						if err != nil {
+							return err
+						}
+					}
 					resultSet.rows[rowIndex][colIndex], err = val.Value()
 					if err != nil {
 						return err
@@ -2214,6 +2223,14 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 						if err != nil {
 							return err
 						}
+					}
+				}
+			case *oraTypes.Json:
+				// a value longer than the prefetch is read in full
+				if val.Truncated() && val.GetReadMode() == configurations.LobReadMode_AUTO {
+					err = val.Read(context.Background())
+					if err != nil {
+						return err
 					}
 				}
 			case *oraTypes.Clob:

@@ -11,6 +11,10 @@ func (oson *Oson) DecodeJson(data []byte) (interface{}, error) {
 	return Decode(data)
 }
 
+func (oson *Oson) JsonText(data []byte) ([]byte, error) {
+	return Text(data)
+}
+
 //type Json struct {
 //	Value  interface{}
 //	bValue []byte

@@ -699,7 +699,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		// if cookie based remove cookie and reconnect
 		tracer.Print("Bad connection")
 		tracer.Print("Remove cookie with key: ", conn.connectionCookie.cookieKey)
-		deleteCookie(conn)
+		refuseCookie(conn)
 		conn.connectionCookie = nil
 		if conn.session != nil {
 			conn.session.Disconnect()

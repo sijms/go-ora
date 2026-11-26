@@ -20,8 +20,9 @@ type ConnectionCookie struct {
 }
 
 var (
-	cookieStore = make(map[string]*ConnectionCookie)
-	cookieMu    sync.Mutex
+	cookieStore   = make(map[string]*ConnectionCookie)
+	cookieRefused = make(map[string]bool)
+	cookieMu      sync.Mutex
 )
 
 func getCookieKey(conn *Connection) string {
@@ -50,12 +51,17 @@ func lookupCookie(conn *Connection) *ConnectionCookie {
 	defer cookieMu.Unlock()
 	return cookieStore[key]
 }
-func deleteCookie(conn *Connection) {
+
+// refuseCookie drops the server's cookie and sends it no other: a server that
+// closed the connection on one (Oracle 23ai and 26ai, #732) closes it on every
+// later one too, and each refusal costs a second connection.
+func refuseCookie(conn *Connection) {
 	key := getCookieKey(conn)
 	if len(key) > 0 {
 		cookieMu.Lock()
 		defer cookieMu.Unlock()
 		delete(cookieStore, key)
+		cookieRefused[key] = true
 	}
 }
 func saveCookie(conn *Connection) {
@@ -75,7 +81,9 @@ func saveCookie(conn *Connection) {
 		cookieKey:             key,
 	}
 	cookieMu.Lock()
-	cookieStore[key] = cookie
+	if !cookieRefused[key] {
+		cookieStore[key] = cookie
+	}
 	cookieMu.Unlock()
 }
 

@@ -23,6 +23,11 @@ type JsonDecoder interface {
 type JsonEncoder interface {
 	EncodeJson(input interface{}) ([]byte, error)
 }
+
+// JsonTexter is a JsonCoder that writes its encoding as JSON text.
+type JsonTexter interface {
+	JsonText(data []byte) ([]byte, error)
+}
 type Json struct {
 	Basic
 	Coder JsonCoder
@@ -104,6 +109,32 @@ func (js *Json) Value() (interface{}, error) {
 	return js.Coder.DecodeJson(js.bValue)
 }
 
+// MarshalJSON returns the value's JSON text as Oracle writes it, members in
+// their stored order and numbers with all their digits; NULL is null.
+func (js *Json) MarshalJSON() ([]byte, error) {
+	if len(js.bValue) == 0 {
+		return []byte("null"), nil
+	}
+	if texter, ok := js.Coder.(JsonTexter); ok {
+		return texter.JsonText(js.bValue)
+	}
+	value, err := js.Value()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(value)
+}
+
+// String returns the value's JSON text, or the error that kept it from being
+// read.
+func (js *Json) String() string {
+	text, err := js.MarshalJSON()
+	if err != nil {
+		return fmt.Sprintf("%%!(json error: %v)", err)
+	}
+	return string(text)
+}
+
 func (js *Json) Scan(input interface{}) error {
 	return js.SetValue(input)
 }
@@ -120,7 +151,7 @@ func (js *Json) CopyTo(dest driver.Value) error {
 		if value == nil {
 			*dst = ""
 		} else {
-			temp, err := json.Marshal(value)
+			temp, err := js.MarshalJSON()
 			if err != nil {
 				return err
 			}
@@ -143,6 +174,12 @@ func (js *Json) CopyTo(dest driver.Value) error {
 		return fmt.Errorf("cannot copy Json to variable of type %T", dest)
 	}
 	return nil
+}
+
+// Truncated reports whether the value holds less than the database's, which
+// Read fetches.
+func (js *Json) Truncated() bool {
+	return js.length > int64(len(js.bValue))
 }
 
 func (js *Json) Read(ctx context.Context) error {

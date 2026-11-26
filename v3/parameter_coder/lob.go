@@ -9,6 +9,8 @@ import (
 type lobParameter struct {
 	BasicParameter
 	streamer types.LobStreamer
+	// length is the LOB's length, which the data sent inline may fall short of
+	length int64
 }
 
 func (param *lobParameter) SetLobStreamer(streamer types.LobStreamer) {
@@ -36,6 +38,7 @@ func (param *lobParameter) Write(session network.SessionWriter) error {
 func (param *lobParameter) Read(session network.SessionReader) error {
 	var locator types.Locator
 	var err error
+	param.length = 0
 	if !(param.IsUDTPar || param.IsArrayPar) && param.streamer.GetLobStreamMode() == configurations.INLINE {
 		// the following code is working when the lob is inline (default)
 		var maxSize int64
@@ -44,7 +47,7 @@ func (param *lobParameter) Read(session network.SessionReader) error {
 			return err
 		}
 		if maxSize > 0 {
-			/*size*/ _, err = session.GetInt64(8, true, true)
+			param.length, err = session.GetInt64(8, true, true)
 			if err != nil {
 				return err
 			}

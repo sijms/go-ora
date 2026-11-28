@@ -663,8 +663,11 @@ func (stmt *defaultStmt) _fetch(resultSet *ResultSet) error {
 	// }()
 	session.ResetBuffer()
 	session.PutBytes(3, 5, 0)
-	session.PutInt(stmt.cursorID, 2, true, true)
-	session.PutInt(stmt._noOfRowsToFetch, 2, true, true)
+	// Both fields are UB4: with a cap of 2 a row count over 0xFFFF is sent as a
+	// length byte of 2 plus three bytes (ORA-03146). A cap of 4 sends the same
+	// bytes as before for values up to 0xFFFF.
+	session.PutInt(stmt.cursorID, 4, true, true)
+	session.PutInt(stmt._noOfRowsToFetch, 4, true, true)
 	err := session.Write()
 	if err != nil {
 		return err
